@@ -1,0 +1,252 @@
+You are taking over an existing Call Centre web application originally developed in Lovable.
+
+This repository is the approved application baseline.
+
+IMPORTANT:
+Do not redesign, restyle, simplify, modernise, refactor or otherwise change the existing user interface.
+
+The existing application screens, layout, colours, typography, spacing, responsive behaviour, navigation and interactions are approved and must remain visually unchanged unless I explicitly request a UI change later.
+
+## Current state
+
+The application contains 19 screens/routes and currently uses mostly sample/self-populated data.
+
+This repository is the current working Lovable version of the Call Centre application. No handover refactor or data-source abstraction has been performed. The application currently uses self-populated/mock data in its existing structure. Your first task is to inspect and document where that data comes from before making any integration changes.
+Do not assume any service abstraction already exists. Identify the current data flow exactly as implemented
+
+Existing integrations that must remain operational:
+
+* Supabase is currently used for WhatsApp authentication/OTP, WhatsApp chat and Formatting Hub.
+* Existing Supabase edge functions under `supabase/functions/` must remain untouched unless specifically required later.
+* Initiate Call currently connects to an external voice service.
+* Its API key is currently exposed in application code. Do not change this yet, but identify and document it because it must eventually move server-side.
+
+Environment variables currently include:
+
+* `VITE_SUPABASE_URL`
+* `VITE_SUPABASE_PUBLISHABLE_KEY`
+* `VITE_SUPABASE_PROJECT_ID`
+
+## Target architecture
+
+The next phase is to integrate this frontend with real Call Centre APIs.
+
+The Call Centre APIs already exist and are hosted independently on a server with a static public IP.
+
+Initially:
+
+Existing Call Centre API Server
+↓
+API integration / backend gateway
+↓
+This existing web application
+↓
+Development hosting
+
+Eventually the application will be hosted on Vercel and/or a custom domain.
+
+Do NOT directly begin integrating APIs.
+
+First understand and document the application.
+
+## Phase 1 — Baseline audit only
+
+Perform a complete repository audit.
+
+Do not modify application behaviour during this phase.
+
+### 1. Application structure
+
+Identify:
+
+* framework and versions
+* build system
+* routing architecture
+* state-management approach
+* data-fetching approach
+* authentication architecture
+* Supabase integration
+* edge functions
+* service/data-source layer
+* environment configuration
+* TypeScript types
+* reusable component architecture
+* styling system
+* external libraries
+* existing external API calls
+
+### 2. Screen inventory
+
+Verify every route in the application and identify the component responsible for it.
+
+Expected areas include:
+
+* Login / landing
+* WhatsApp Authenticate
+* Dashboard
+* Initiate Call
+* Call Logs
+* Outbound Campaigns
+* Create New Outbound Calling Campaign
+* NPS Campaigns
+* Live View
+* QA Review
+* WhatsApp Hub
+* Formatting Hub
+* AI Agents
+* Orchestrator
+
+  * list
+  * new
+  * flow editor
+  * integrations
+* Analytics
+* Reports
+* User Management
+* Settings
+* Not Found
+
+AI Agents is deliberately hidden from the left navigation while remaining directly reachable by URL. Do not change this.
+
+### 3. Data-flow audit
+
+For every screen identify:
+
+SCREEN
+→ data-source/service function
+→ mock file/generator/current service
+→ returned TypeScript type
+→ consuming component
+
+Pay particular attention to:
+
+* calls
+* campaigns
+* NPS
+* QA
+* reports
+* analytics
+* users
+* orchestrator flows
+* Live View
+* industry-dependent data
+
+Identify any remaining screen that directly imports mock data rather than using the abstraction layer.
+
+Do not change it yet. Report it.
+
+### 4. Real API replacement map
+
+Create an integration matrix showing which existing data-source functions will eventually need a real backend API.
+
+For each function document:
+
+* function name
+* current source
+* expected request
+* expected response type
+* consuming screen(s)
+* whether polling may be required
+* whether real-time/WebSocket behaviour may eventually be appropriate
+* authentication requirement if evident
+* whether it should execute browser-side or server-side
+
+Do NOT invent API endpoints.
+
+If the actual backend API is not yet available in this repository, mark the endpoint as TBD.
+
+### 5. Security audit
+
+Without changing anything, identify:
+
+* API keys exposed to the browser
+* secrets accidentally committed
+* Supabase keys and their purpose
+* direct third-party API calls
+* CORS implications
+* authentication assumptions
+* service credentials
+* browser-to-static-IP API calls
+* anything that should ultimately run through a server-side gateway
+
+Distinguish normal public browser configuration from actual secrets.
+
+### 6. Hosting assessment
+
+Assess the existing project for:
+
+* local development
+* Vercel deployment
+* custom-domain deployment
+* environment-variable handling
+* SPA routing requirements
+* API proxy/gateway requirements
+* CORS
+* HTTPS
+* WebSocket/SSE compatibility if relevant
+
+Do not deploy anything yet.
+
+### 7. Baseline verification
+
+Run, where available:
+
+* dependency installation
+* TypeScript check
+* lint
+* tests
+* production build
+
+Do not silently repair failures.
+
+If something fails, explain the cause before changing code.
+
+## Deliverable
+
+Create:
+
+`docs/CALL_CENTRE_BASELINE_AUDIT.md`
+
+The document should contain:
+
+1. Executive Summary
+2. Current Architecture
+3. Technology Stack
+4. Route & Screen Inventory
+5. Component Architecture
+6. Data Source Architecture
+7. Screen-to-Data Mapping
+8. Current External Integrations
+9. Supabase Usage
+10. Voice Service Integration
+11. Security Observations
+12. Hosting Architecture
+13. Real API Integration Matrix
+14. Recommended Integration Architecture
+15. Issues / Risks / Unknowns
+16. Proposed Implementation Sequence
+
+Also include a simple architecture diagram using Mermaid.
+
+## Critical rule
+
+For this first phase:
+
+DO NOT MODIFY THE UI.
+DO NOT REFACTOR SCREEN COMPONENTS.
+DO NOT REPLACE MOCK DATA.
+DO NOT ADD API ENDPOINTS.
+DO NOT CHANGE SUPABASE.
+DO NOT CHANGE ROUTING.
+DO NOT CHANGE AUTHENTICATION.
+
+Inspect, test and document first.
+
+At the end, give me:
+
+* a concise summary of what you found
+* any discrepancies between the README and actual source code
+* build/type/lint status
+* the proposed real-API integration sequence
+
+Then stop and wait for the next implementation instruction.

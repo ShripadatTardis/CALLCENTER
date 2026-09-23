@@ -1,0 +1,271 @@
+Continue from the baseline audit you already completed.
+
+Do not repeat the audit unless needed to support the new planning work.
+
+## Updated project direction
+
+The objective is now:
+
+**Make all existing Call Centre screens integrate with the live system, remove all mock/simulated/demo data, and evolve the architecture so that future modules and enhancements can be added cleanly.**
+
+The existing Lovable UI is still the baseline, but individual fields, metrics, columns, cards, charts or controls are not automatically sacred if they do not map meaningfully to the live system.
+
+## Important clarifications
+
+1. Ignore `voiceforce-backend-v01-main.zip` and the empty backend/extraction folder. They are only artifacts from downloading/exporting the project and will be deleted.
+
+2. Do not address the existing Supabase RLS issues in this phase. They are known and will be handled later.
+
+3. Existing WhatsApp integration through Supabase + Twilio is already working and should remain unchanged unless a compatibility issue is discovered.
+
+4. Vapi is legacy and will no longer be used.
+
+   The current frontend may still contain Vapi-related code and assumptions. Our own Voice Agent / Call Centre backend now replaces Vapi completely.
+
+   Do not improve or preserve Vapi as a target architecture.
+
+   Identify Vapi-related dependencies only so they can later be replaced or removed safely.
+
+5. User authentication is a last-priority task.
+
+   Keep the current development login mechanism for now. We will build our own proper authentication after the live functional integration is complete.
+
+## Reference documents
+
+Six reference documents have been added to the project. Treat them as the authoritative source for the current backend APIs and live system capabilities.
+
+Review all six before producing the plan.
+
+Do not invent endpoints, fields, metrics or capabilities that are not supported by those documents.
+
+If the documents do not expose an API needed by a screen, mark it as a backend gap / decision point.
+
+## Architecture objective
+
+Introduce a clean integration architecture between the screens and the live backend.
+
+The intended direction is approximately:
+
+Existing React screens
+↓
+UI hooks / view-model layer where useful
+↓
+typed API/service layer
+↓
+backend adapters / transport
+↓
+our Voice Agent / Call Centre APIs
+
+The screen components should not directly depend on backend transport details.
+
+Future modules should be able to use the same architecture without creating ad-hoc API calls inside pages.
+
+Do not over-engineer this. Use the existing React/Vite/TypeScript application and its installed libraries where practical.
+
+## Key planning principle
+
+For every existing screen element that currently uses mock/simulated data:
+
+* Try to map it to a real field or capability in the live system.
+* If there is no clear live mapping, do not automatically remove it and do not invent a mapping.
+* Treat it as a decision point and recommend one of:
+
+  * extend/add a backend API field or endpoint,
+  * derive it from existing live data,
+  * change the UI representation,
+  * remove the field/control/metric because it no longer has a meaningful live equivalent.
+
+These decisions must be made case by case.
+
+The required end-state is **no mock/simulated/demo data**, but both frontend details and backend API contracts may evolve where justified.
+
+## Scope for this phase
+
+This is a PLANNING AND ARCHITECTURE phase only.
+
+Do not start broad integration work yet.
+
+You may inspect all project source and all six reference documents.
+
+Do not redesign the UI.
+
+Do not remove Vapi code yet.
+
+Do not delete mock data yet.
+
+Do not modify Supabase/Twilio WhatsApp behavior.
+
+Do not change authentication.
+
+Do not install or upgrade dependencies without approval.
+
+## Tasks
+
+### 1. Review the six backend reference documents
+
+Extract the actual live backend capabilities, endpoints, authentication requirements, request/response schemas and known limitations relevant to this frontend.
+
+Create a concise API capability inventory.
+
+### 2. Map every existing screen to the live system
+
+For every existing screen, identify:
+
+* current mock/static/simulated source,
+* live endpoint/capability that can replace it,
+* fields that map directly,
+* fields that can reasonably be derived,
+* fields that have no current mapping,
+* user actions that need a live write/action API,
+* real-time/polling requirements if applicable.
+
+Do this at screen-field/action level where practical, not merely screen level.
+
+### 3. Classify each item
+
+Use these categories:
+
+* `DIRECT` — clean mapping to an existing live API field/capability
+* `DERIVED` — can be calculated safely from existing live data
+* `BACKEND_GAP` — backend/API must be extended
+* `UI_DECISION` — current UI element may need to change/remove
+* `LEGACY_VAPI` — current behavior depends on Vapi and must be replaced
+* `EXISTING_LIVE` — already genuinely live and should remain unchanged
+
+### 4. Identify backend gaps
+
+Produce a list of required backend additions or clarifications.
+
+Do not invent the implementation.
+
+For each gap state:
+
+* screen/component needing it,
+* existing UI expectation,
+* closest currently available backend data,
+* recommended resolution:
+
+  * new field,
+  * new endpoint,
+  * existing endpoint enhancement,
+  * derive in frontend/service layer,
+  * UI change/removal,
+* priority.
+
+### 5. Design the frontend integration architecture
+
+Recommend the folder/module structure for the new live integration layer.
+
+For example, evaluate whether we should introduce something like:
+
+`src/services/`
+or
+`src/api/`
+
+with domain modules such as:
+
+* calls
+* sessions/transcripts
+* agents
+* campaigns
+* live-view
+* analytics
+* reports
+* NPS
+* QA
+* orchestrator
+* users/settings where relevant later
+
+Define:
+
+* transport/client layer,
+* typed API DTOs,
+* adapters/mappers from API DTOs to UI models,
+* hooks/query layer,
+* error handling,
+* loading states,
+* polling strategy,
+* configuration/environment handling,
+* where server-side proxying is required.
+
+Do not implement all of this yet.
+
+### 6. Determine server-side proxy requirement
+
+The live backend uses API authentication.
+
+Assess how the frontend should connect during:
+
+* local development,
+* Vercel deployment,
+* custom-domain deployment.
+
+Do not expose backend secrets in browser code.
+
+Recommend the thinnest sensible server-side proxy/BFF architecture.
+
+### 7. Vapi replacement map
+
+Identify every remaining Vapi dependency in the repository.
+
+For each one state:
+
+* current purpose,
+* screen/function affected,
+* equivalent live backend capability if available,
+* whether it can be deleted once replacement is complete,
+* whether any useful data model/behavior should be retained.
+
+Do not remove the code yet.
+
+### 8. Recommend implementation sequence
+
+The first implementation goal should be an end-to-end live vertical slice, likely around:
+
+Initiate Call
+→ live call state
+→ Call Logs
+→ call detail/transcript
+
+But verify this against the actual APIs and existing code.
+
+Then propose the sequence for the remaining screens.
+
+Authentication must remain last priority.
+
+WhatsApp should remain untouched unless required.
+
+## Deliverable
+
+Create:
+
+`docs/CALL_CENTRE_LIVE_INTEGRATION_PLAN.md`
+
+It should contain:
+
+1. Objective and scope
+2. Assumptions and explicit exclusions
+3. Live backend/API capability inventory
+4. Target frontend integration architecture
+5. Screen-by-screen live integration matrix
+6. Field/action mapping and classifications
+7. Backend gaps and decision points
+8. Vapi replacement map
+9. Existing-live components to preserve
+10. Server-side proxy/BFF recommendation
+11. Polling/realtime strategy
+12. Proposed module/service structure
+13. Implementation sequence
+14. Risks/unknowns requiring clarification
+15. Recommended first implementation slice
+
+At the end, give me a concise summary containing only:
+
+* architecture recommendation,
+* first implementation slice,
+* major backend gaps,
+* decisions you need from me before coding.
+
+Then stop and wait for approval.
+
+Do not begin implementation until I approve the plan.

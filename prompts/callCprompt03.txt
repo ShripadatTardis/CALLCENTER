@@ -1,0 +1,217 @@
+Continue from the baseline audit and the live-integration plan.
+
+Do not write integration code yet.
+
+We are changing the next phase from implementation to a complete functional and technical scope analysis of the entire Call Centre application.
+
+Core objective
+
+Produce a complete blueprint for converting the existing application from its current mock/simulated state into a fully live, extensible Call Centre product.
+
+Every existing screen must be understood not only in terms of data it displays, but also in terms of:
+
+business purpose
+data displayed
+user inputs
+create/edit/delete actions
+workflow/state transitions
+validation
+persistence
+backend/API requirements
+realtime/polling requirements
+permissions
+dependencies on other modules
+current mock/simulated behavior
+live replacement approach
+missing backend capabilities
+
+Do not reduce the exercise to “screen → GET API mapping.”
+
+Important corrections
+The Voice Agent / Call Centre backend is multi-domain, not banking-only.
+
+Banking names and examples in the API documents are examples from the current deployment and must not be treated as an architectural limitation.
+
+The frontend architecture and service layer must remain domain-neutral.
+
+Do not fabricate data for unsupported domains.
+
+The existing APIs are a starting point, not an immutable contract.
+
+Where the UI requires real functionality not currently exposed by the backend, classify the requirement and recommend whether to:
+
+extend an existing API,
+add a new API,
+derive the value from existing data,
+add backend persistence/workflow logic,
+modify the UI,
+or remove the UI element if it has no meaningful product purpose.
+
+Decisions must be case by case.
+
+The final system must contain no mock, random, simulated or demo data.
+
+However, do not delete mock data yet. Use it as a source for understanding intended functionality until the live replacement design is approved.
+
+Existing WhatsApp/Supabase/Twilio functionality remains in scope as an existing live module. Do not redesign it yet.
+Vapi is legacy and will eventually be removed completely.
+Authentication and User Management backend implementation remain last priority, but their functional requirements should still be analysed now.
+Application inventory
+
+Use the actual routed pages/components found in the baseline audit. Group related pages into functional modules where appropriate.
+
+For example:
+
+Authentication
+Dashboard
+Initiate Call
+Call Logs / Call Detail / Transcript
+Live View
+Outbound Campaigns / Create Campaign
+NPS
+QA Review
+WhatsApp
+Formatting Hub
+AI Agents
+Orchestrator
+Analytics
+Reports
+User Management
+Settings
+
+Do not assume every module is read-only.
+
+For every module produce
+
+A. Functional purpose
+
+What business problem the screen/module solves.
+
+B. Current behavior
+
+What the Lovable implementation currently does, including mock data, simulated behavior, localStorage, hardcoded actions, disabled controls, and existing live integrations.
+
+C. Read requirements
+
+Data required to render the screen.
+
+D. Write/action requirements
+
+All user actions requiring backend behavior:
+
+create
+edit
+delete
+activate/deactivate
+start/stop
+upload
+schedule
+approve/reject
+score/review
+publish/version
+configure
+export/download
+etc.
+
+E. State model
+
+Identify meaningful business states and transitions where applicable.
+
+Examples:
+
+Campaign: Draft → Scheduled → Running → Paused → Completed/Cancelled
+
+Call: Initiated → Connecting → Active → Completed/Failed/Escalated
+
+QA Review: Pending → In Review → Completed
+
+Do not invent states unsupported by either the existing UI or reference system; flag uncertain ones.
+
+F. Existing backend/API coverage
+
+Which documented APIs already support the requirement.
+
+G. Missing backend functionality
+
+Identify exactly what needs to be added or clarified.
+
+H. Recommended UI disposition
+
+Keep as-is, modify, add field/control, remove, or defer.
+
+Do not change UI code yet.
+
+Cross-cutting architecture
+
+Design the target application architecture covering:
+
+typed API/service layer
+DTOs vs UI models
+adapters/mappers
+TanStack Query/hooks
+server-side proxy/BFF
+domain modules
+persistence
+realtime/polling
+error handling
+validation
+configuration
+permissions/auth boundary
+extensibility for future modules
+
+The architecture must remain multi-domain.
+
+Backend requirements catalogue
+
+Produce a consolidated backend requirements catalogue after analysing all screens.
+
+For each requirement classify:
+
+existing API sufficient
+existing API needs extension
+new API required
+new persistence/data model required
+frontend-derived
+UI decision required
+product decision required
+
+This catalogue will become the development contract for the frontend and backend work.
+
+Deliverable
+
+Create:
+
+docs/CALL_CENTRE_FULL_FUNCTIONAL_SCOPE.md
+
+Include:
+
+Product objective
+Functional module inventory
+Target architecture
+Module-by-module functional analysis
+Read/write/action matrix
+State/workflow models
+Live API coverage
+Backend gaps
+Required API enhancements/new APIs
+Data model/persistence requirements
+UI decisions requiring review
+Existing live functionality to preserve
+Vapi replacement scope
+Mock-data retirement plan
+Cross-module dependencies
+Proposed development phases
+Open product decisions
+
+At the end, provide a concise executive summary containing:
+
+number of functional modules analysed
+which modules are already close to live-ready
+which require significant backend development
+major architectural decisions
+major product decisions needed from me
+recommended implementation phases
+
+Do not implement anything yet.
+
+Stop after producing the scope and wait for approval.

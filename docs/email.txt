@@ -1,0 +1,57 @@
+Sharing the API and Web UI documentation to help with the integration and testing of the Banking Voice Agent.
+
+1. API Documentation
+
+Attached are three API documents covering the endpoints required for integration:
+
+• Trigger Call API – Initiate a call, with request/response fields, query parameters, sample cURL command, and error codes.
+
+• Get Session Transcript API – Retrieve the session transcript, with request/response details, query parameters, sample cURL command, and error codes.
+
+• Get Call Data API – Retrieve call details and data, with request/response fields, query parameters, sample cURL command, and error codes.
+
+Common API Details:
+
+• Base URL: https://bankingvoicebot.nl-demo.com
+
+• Authentication: Every request requires the X-API-Key header that has been issued to you.
+
+2. Swagger – Interactive API Reference
+
+The same APIs are available through Swagger for interactive testing:
+
+https://bankingvoicebot.nl-demo.com/api/v1/docs
+
+You can click Authorize, enter the API key, and use Try it out to test the endpoints and view the responses.
+
+The raw OpenAPI specification is available at /api/v1/openapi.yaml and can be used to import the APIs into Postman or generate a client.
+
+3. Web UI Guide
+
+Attached is the walkthrough for using the application itself, covering:
+
+• Placing and monitoring calls in Voice Mode and Chat Mode
+
+• Viewing live transcripts
+
+• Reviewing call history, analytics, and call metrics on the dashboard
+
+The application is currently available for testing. Please feel free to reach out if you face any issues during the API or application testing, and we will be happy to assist.
+
+Thanks & Regards,
+
+Web UI Credentials:
+Username: admin
+Password: xxx
+
+API Key:
+vb_xxx
+
+Swagger Documentation:
+https://bankingvoicebot.nl-demo.com/api/v1/docs
+
+Langfuse Credentials:
+Email: kalyani.nakat@nineleaps.com
+Password:xxx
+
+Please let us know if you face any issues while accessing the application or APIs.

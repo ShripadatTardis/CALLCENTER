@@ -1,20 +1,35 @@
-import type { AgentSummaryDto } from '@/types/api/agents';
+import type { AgentsResponseDto, AgentSummaryDto } from '@/types/api/agents';
 
 /**
- * Minimal UI-facing agent summary. Kept intentionally small — mirrors
- * only the 3 fields confirmed in AgentSummaryDto (see
- * src/types/api/agents.ts for why this is provisional).
+ * UI-facing agent summary, mapped from the confirmed live /agents
+ * response (see src/types/api/agents.ts).
  */
 export interface AgentSummary {
   agentId: string;
   displayName: string;
+  personaName: string;
   direction: string;
+  language: string;
+  isDefault: boolean;
 }
 
 export function mapAgentSummary(dto: AgentSummaryDto): AgentSummary {
   return {
     agentId: dto.agent_id,
-    displayName: dto.name,
+    displayName: dto.display_name,
+    personaName: dto.persona_name,
     direction: dto.direction,
+    language: dto.language,
+    isDefault: dto.is_default,
+  };
+}
+
+export function mapAgentsResponse(dto: AgentsResponseDto): {
+  defaultAgentId: string;
+  agents: AgentSummary[];
+} {
+  return {
+    defaultAgentId: dto.default_agent_id,
+    agents: dto.agents.map(mapAgentSummary),
   };
 }

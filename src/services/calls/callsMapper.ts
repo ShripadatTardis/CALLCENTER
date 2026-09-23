@@ -94,9 +94,10 @@ export function mapCallDataEntryToInteraction(dto: CallDataEntryDto): Interactio
 
     escalation: dto.escalation_trigger ? { trigger: dto.escalation_trigger } : undefined,
 
-    // Not reliably provided by the current API — see interaction.ts header.
+    // customerId: not reliably provided by the current API — see interaction.ts header.
     customerId: undefined,
-    direction: undefined,
+    // direction: confirmed present on every call-data row (2026-09-23 live verification).
+    direction: dto.direction,
 
     quality: undefined,
   };

@@ -6,18 +6,20 @@
  *
  * Field confidence — read before assuming a value should be present:
  *
- * CONFIRMED-SAFE (backed by a documented API field on at least one of
- * Trigger Call / Session Transcript / Call Data):
+ * CONFIRMED-SAFE (backed by a documented/live-verified API field on at
+ * least one of Trigger Call / Session Transcript / Call Data):
  *   interactionId, channel, phoneNumber, callerName, fromPhoneNumber,
  *   agentId, agentDisplayName, startTime, status, outcome, fcr, intent,
  *   intentAccuracy, sentiment, sentimentScore, durationSeconds,
- *   transcript, summary, recording, tags, campaignName, escalation.
+ *   transcript, summary, recording, tags, campaignName, escalation,
+ *   direction (confirmed present on every call-data row via live
+ *   verification on 2026-09-23 — previously listed as unconfirmed).
  *
  * STRUCTURALLY PRESENT BUT EXPECT `undefined` UNTIL A BACKEND
  * ENHANCEMENT LANDS (per docs/GLT_CALL_CENTRE_PHASE1_AI_NATIVE_SCOPE.md
  * §4.1's list of fields to request/confirm — an `undefined` value here
  * is a known upstream gap, not a mapper bug):
- *   customerId, direction, endTime, campaignId.
+ *   customerId, endTime, campaignId.
  */
 export interface TranscriptEntry {
   timestamp: string;

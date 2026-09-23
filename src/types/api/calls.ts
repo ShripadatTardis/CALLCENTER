@@ -107,6 +107,8 @@ export interface CallDataEntryDto {
   caller_number: string;
   from_phone_number: string;
   agent_id: string | null;
+  /** Confirmed present on every call-data row via live verification (2026-09-23). */
+  direction: 'inbound' | 'outbound';
   outcome: string;
   fcr: boolean;
   aht_seconds: number;

@@ -1,5 +1,4 @@
 import { Industry, INDUSTRY_CONFIGS } from '@/types/industry';
-import { initiateCallAgents } from '@/data/initiateCallAgents';
 
 // Campaign type mappings for each industry
 export const getIndustryCampaignTypes = (industry: Industry) => {

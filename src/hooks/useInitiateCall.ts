@@ -1,59 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { CallConfiguration, InitiatedCall } from '@/types/initiateCall';
+import { CallConfiguration } from '@/types/initiateCall';
 import { validatePhoneNumber } from '@/utils/initiateCallValidation';
-import { generateCallPayload, makeApiCall } from '@/utils/initiateCallApi';
-import { initiateCallAgents } from '@/data/initiateCallAgents';
-import { useAuth } from '@/contexts/AuthContext';
+import { useTriggerCall } from '@/hooks/calls/useTriggerCall';
+import { useCallData } from '@/hooks/calls/useCallData';
 
-const CALL_HISTORY_KEY = 'tardis_call_history';
-
+/**
+ * Session 2: replaces the Vapi fetch (src/utils/initiateCallApi.ts,
+ * removed) with the live POST /api/calls/trigger mutation, and replaces
+ * localStorage call history with the same live call-data query Call
+ * Logs uses (small page size, no filters) — see the Session 2 plan §3
+ * for why: history was never a real system of record, and a
+ * just-triggered call now surfaces here naturally once the mutation
+ * invalidates the calls list.
+ */
 export const useInitiateCall = () => {
-  const { user } = useAuth();
   const [config, setConfig] = useState<CallConfiguration>({
     phoneNumber: '',
-    selectedAgent: ''
+    selectedAgent: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [callHistory, setCallHistory] = useState<InitiatedCall[]>([]);
 
-  // Load call history on mount
-  useEffect(() => {
-    if (user) {
-      const savedHistory = localStorage.getItem(`${CALL_HISTORY_KEY}_${user.id}`);
-      if (savedHistory) {
-        setCallHistory(JSON.parse(savedHistory));
-      }
-    }
-  }, [user]);
-
-  // Clear call history on user change (logout)
-  useEffect(() => {
-    if (!user) {
-      setCallHistory([]);
-      // Clean up all call history from localStorage
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(CALL_HISTORY_KEY)) {
-          localStorage.removeItem(key);
-        }
-      });
-    }
-  }, [user]);
+  const triggerCallMutation = useTriggerCall();
+  const recentCalls = useCallData({ page_size: 5 });
 
   const updatePhoneNumber = (phoneNumber: string) => {
-    setConfig(prev => ({ ...prev, phoneNumber }));
+    setConfig((prev) => ({ ...prev, phoneNumber }));
   };
 
   const updateSelectedAgent = (selectedAgent: string) => {
-    setConfig(prev => ({ ...prev, selectedAgent }));
-  };
-
-  const addToCallHistory = (call: InitiatedCall) => {
-    const newHistory = [call, ...callHistory];
-    setCallHistory(newHistory);
-    if (user) {
-      localStorage.setItem(`${CALL_HISTORY_KEY}_${user.id}`, JSON.stringify(newHistory));
-    }
+    setConfig((prev) => ({ ...prev, selectedAgent }));
   };
 
   const initiateCall = async () => {
@@ -72,54 +47,41 @@ export const useInitiateCall = () => {
       return;
     }
 
-    setIsLoading(true);
-
     try {
-      // Generate JSON payload
-      const payload = generateCallPayload(config.phoneNumber, config.selectedAgent);
-      const jsonPayload = JSON.stringify(payload);
+      const result = await triggerCallMutation.mutateAsync({
+        to_phone_number: config.phoneNumber,
+        agent_id: config.selectedAgent,
+      });
 
-      // Make the API call
-      const response = await makeApiCall(jsonPayload);
-
-      if (response.ok) {
-        const selectedAgentName = initiateCallAgents.find(agent => agent.id === config.selectedAgent)?.name || 'Unknown Agent';
-        
-        // Add to call history
-        const newCall: InitiatedCall = {
-          id: Date.now().toString(),
-          phoneNumber: config.phoneNumber,
-          agentName: selectedAgentName,
-          agentId: config.selectedAgent,
-          timestamp: new Date(),
-          status: 'initiated'
-        };
-        
-        addToCallHistory(newCall);
-        
-        toast.success('Call initiated successfully!');
-        // Reset phone number but keep agent selection
-        setConfig(prev => ({ ...prev, phoneNumber: '' }));
+      if (result.success) {
+        toast.success(`Call initiated — status: ${result.status}`);
+        setConfig((prev) => ({ ...prev, phoneNumber: '' }));
       } else {
-        toast.error(`Call failed: ${response.status} ${response.statusText}`);
+        toast.error('Call was not accepted by the backend');
       }
     } catch (error) {
-      console.error('API call error:', error);
-      toast.error('Failed to initiate call. Please check your network connection.');
-    } finally {
-      setIsLoading(false);
+      console.error('Trigger call error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to initiate call';
+      toast.error(message);
     }
   };
 
-  const isInitiateCallDisabled = isLoading || !config.phoneNumber || !validatePhoneNumber(config.phoneNumber) || !config.selectedAgent;
+  const isInitiateCallDisabled =
+    triggerCallMutation.isPending ||
+    !config.phoneNumber ||
+    !validatePhoneNumber(config.phoneNumber) ||
+    !config.selectedAgent;
 
   return {
     config,
-    isLoading,
-    callHistory,
+    isLoading: triggerCallMutation.isPending,
+    callHistory: recentCalls.data?.interactions ?? [],
+    isCallHistoryLoading: recentCalls.isLoading,
     updatePhoneNumber,
     updateSelectedAgent,
     initiateCall,
-    isInitiateCallDisabled
+    isInitiateCallDisabled,
+    /** Result of the most recent trigger, for the short-lived post-trigger poll (see InitiateCall.tsx). */
+    lastTriggeredInteractionId: triggerCallMutation.data?.interactionId,
   };
 };

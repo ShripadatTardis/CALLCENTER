@@ -12,8 +12,8 @@
  *   agentId, agentDisplayName, startTime, status, outcome, fcr, intent,
  *   intentAccuracy, sentiment, sentimentScore, durationSeconds,
  *   transcript, summary, recording, tags, campaignName, escalation,
- *   direction (confirmed present on every call-data row via live
- *   verification on 2026-09-23 — previously listed as unconfirmed).
+ *   wasAuthenticated, direction (confirmed present on every call-data
+ *   row via live verification on 2026-09-23 — previously unconfirmed).
  *
  * STRUCTURALLY PRESENT BUT EXPECT `undefined` UNTIL A BACKEND
  * ENHANCEMENT LANDS (per docs/GLT_CALL_CENTRE_PHASE1_AI_NATIVE_SCOPE.md
@@ -86,6 +86,7 @@ export interface Interaction {
   campaignName?: string;
 
   escalation?: InteractionEscalation;
+  wasAuthenticated?: boolean | null;
 
   // Not reliably provided by the current API — see file header.
   customerId?: string;

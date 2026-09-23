@@ -93,6 +93,7 @@ export function mapCallDataEntryToInteraction(dto: CallDataEntryDto): Interactio
     campaignName: dto.campaign_name || undefined,
 
     escalation: dto.escalation_trigger ? { trigger: dto.escalation_trigger } : undefined,
+    wasAuthenticated: dto.was_authenticated,
 
     // customerId: not reliably provided by the current API — see interaction.ts header.
     customerId: undefined,

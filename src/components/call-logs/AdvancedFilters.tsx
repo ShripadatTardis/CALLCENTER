@@ -3,86 +3,61 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, X, Calendar as CalendarIcon, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import type { CallDataQueryDto } from '@/types/api/calls';
 
-interface FilterState {
-  dateRange: { start?: Date; end?: Date };
-  outcomes: string[];
-  sentimentRange: [number, number];
-  durationRange: [number, number];
-  intents: string[];
-  tags: string[];
-  agents: string[];
-}
+export type CallLogFilters = Pick<
+  CallDataQueryDto,
+  'date_from' | 'date_to' | 'outcome' | 'direction' | 'search' | 'min_duration' | 'max_duration'
+>;
 
 interface AdvancedFiltersProps {
-  onFiltersChange: (filters: FilterState) => void;
+  filters: CallLogFilters;
+  onFiltersChange: (filters: CallLogFilters) => void;
   onExport: () => void;
 }
 
+const MAX_DURATION_SECONDS = 1800;
+
+/**
+ * Session 2: reworked to match the live GET /api/calls/data query
+ * params exactly (see the Session 2 plan §7). Sentiment range, intent,
+ * tag, and agent filters from the previous mock version had no live
+ * server-side equivalent and were removed rather than faked as
+ * client-side-only filters (which would have silently only applied to
+ * whatever page happened to be loaded).
+ */
 export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
+  filters,
   onFiltersChange,
-  onExport
+  onExport,
 }) => {
-  const [filters, setFilters] = useState<FilterState>({
-    dateRange: {},
-    outcomes: [],
-    sentimentRange: [0, 100],
-    durationRange: [0, 1800],
-    intents: [],
-    tags: [],
-    agents: []
-  });
-
   const [isExpanded, setIsExpanded] = useState(false);
+  const [durationRange, setDurationRange] = useState<[number, number]>([
+    filters.min_duration ?? 0,
+    filters.max_duration ?? MAX_DURATION_SECONDS,
+  ]);
 
-  const outcomeOptions = ['resolved', 'escalated', 'dropped', 'callback_scheduled'];
-  const intentOptions = ['billing', 'loan_status', 'technical', 'general', 'complaint'];
-  const tagOptions = ['urgent', 'vip', 'follow_up', 'training', 'escalation'];
-  const agentOptions = ['AI-Agent-01', 'AI-Agent-02', 'AI-Agent-03', 'AI-Agent-04'];
-
-  const updateFilters = (key: keyof FilterState, value: any) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    onFiltersChange(newFilters);
-  };
-
-  const toggleArrayFilter = (key: keyof FilterState, value: string) => {
-    const currentArray = filters[key] as string[];
-    const newArray = currentArray.includes(value)
-      ? currentArray.filter(item => item !== value)
-      : [...currentArray, value];
-    updateFilters(key, newArray);
+  const update = (patch: Partial<CallLogFilters>) => {
+    onFiltersChange({ ...filters, ...patch });
   };
 
   const clearFilters = () => {
-    const clearedFilters: FilterState = {
-      dateRange: {},
-      outcomes: [],
-      sentimentRange: [0, 100],
-      durationRange: [0, 1800],
-      intents: [],
-      tags: [],
-      agents: []
-    };
-    setFilters(clearedFilters);
-    onFiltersChange(clearedFilters);
+    setDurationRange([0, MAX_DURATION_SECONDS]);
+    onFiltersChange({});
   };
 
-  const activeFilterCount = 
-    (filters.outcomes.length > 0 ? 1 : 0) +
-    (filters.intents.length > 0 ? 1 : 0) +
-    (filters.tags.length > 0 ? 1 : 0) +
-    (filters.agents.length > 0 ? 1 : 0) +
-    (filters.dateRange.start ? 1 : 0) +
-    (filters.sentimentRange[0] > 0 || filters.sentimentRange[1] < 100 ? 1 : 0) +
-    (filters.durationRange[0] > 0 || filters.durationRange[1] < 1800 ? 1 : 0);
+  const activeFilterCount =
+    (filters.date_from ? 1 : 0) +
+    (filters.outcome ? 1 : 0) +
+    (filters.direction ? 1 : 0) +
+    (filters.search ? 1 : 0) +
+    (filters.min_duration !== undefined || filters.max_duration !== undefined ? 1 : 0);
 
   return (
     <Card>
@@ -90,17 +65,15 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <Filter className="h-5 w-5" />
-            <span>Advanced Filters</span>
+            <span>Filters</span>
             {activeFilterCount > 0 && (
-              <Badge variant="secondary">{activeFilterCount} active</Badge>
+              <span className="text-xs bg-secondary text-secondary-foreground rounded px-2 py-0.5">
+                {activeFilterCount} active
+              </span>
             )}
           </CardTitle>
           <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
+            <Button variant="outline" size="sm" onClick={() => setIsExpanded(!isExpanded)}>
               {isExpanded ? 'Collapse' : 'Expand'}
             </Button>
             <Button variant="outline" size="sm" onClick={clearFilters}>
@@ -113,11 +86,23 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
             </Button>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground pt-1">
+          Export downloads the currently loaded/filtered page only, not the complete call
+          history — narrow the filters if you need a specific set.
+        </p>
       </CardHeader>
 
       {isExpanded && (
         <CardContent className="space-y-6">
-          {/* Date Range */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Search</label>
+            <Input
+              placeholder="Search caller name, phone, intent, summary…"
+              value={filters.search ?? ''}
+              onChange={(e) => update({ search: e.target.value || undefined })}
+            />
+          </div>
+
           <div>
             <label className="text-sm font-medium mb-2 block">Date Range</label>
             <div className="flex space-x-2">
@@ -125,14 +110,14 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="justify-start text-left">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.dateRange.start ? format(filters.dateRange.start, 'MMM dd, yyyy') : 'Start date'}
+                    {filters.date_from ? filters.date_from : 'Start date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={filters.dateRange.start}
-                    onSelect={(date) => updateFilters('dateRange', { ...filters.dateRange, start: date })}
+                    selected={filters.date_from ? new Date(filters.date_from) : undefined}
+                    onSelect={(date) => update({ date_from: date ? format(date, 'yyyy-MM-dd') : undefined })}
                   />
                 </PopoverContent>
               </Popover>
@@ -140,111 +125,74 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="justify-start text-left">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.dateRange.end ? format(filters.dateRange.end, 'MMM dd, yyyy') : 'End date'}
+                    {filters.date_to ? filters.date_to : 'End date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={filters.dateRange.end}
-                    onSelect={(date) => updateFilters('dateRange', { ...filters.dateRange, end: date })}
+                    selected={filters.date_to ? new Date(filters.date_to) : undefined}
+                    onSelect={(date) => update({ date_to: date ? format(date, 'yyyy-MM-dd') : undefined })}
                   />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
 
-          {/* Outcomes */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">Outcomes</label>
-            <div className="flex flex-wrap gap-2">
-              {outcomeOptions.map(outcome => (
-                <label key={outcome} className="flex items-center space-x-2 cursor-pointer">
-                  <Checkbox
-                    checked={filters.outcomes.includes(outcome)}
-                    onCheckedChange={() => toggleArrayFilter('outcomes', outcome)}
-                  />
-                  <span className="text-sm capitalize">{outcome.replace('_', ' ')}</span>
-                </label>
-              ))}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Outcome</label>
+              <Select
+                value={filters.outcome ?? 'any'}
+                onValueChange={(value) => update({ outcome: value === 'any' ? undefined : (value as 'resolved' | 'escalated') })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
+                  <SelectItem value="escalated">Escalated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Direction</label>
+              <Select
+                value={filters.direction ?? 'any'}
+                onValueChange={(value) => update({ direction: value === 'any' ? undefined : (value as 'inbound' | 'outbound') })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="inbound">Inbound</SelectItem>
+                  <SelectItem value="outbound">Outbound</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Sentiment Range */}
           <div>
             <label className="text-sm font-medium mb-2 block">
-              Sentiment Score ({filters.sentimentRange[0]}% - {filters.sentimentRange[1]}%)
+              Call Duration ({Math.floor(durationRange[0] / 60)}m - {Math.floor(durationRange[1] / 60)}m)
             </label>
             <Slider
-              value={filters.sentimentRange}
-              onValueChange={(value) => updateFilters('sentimentRange', value)}
-              max={100}
-              step={5}
-              className="w-full"
-            />
-          </div>
-
-          {/* Duration Range */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">
-              Call Duration ({Math.floor(filters.durationRange[0] / 60)}m - {Math.floor(filters.durationRange[1] / 60)}m)
-            </label>
-            <Slider
-              value={filters.durationRange}
-              onValueChange={(value) => updateFilters('durationRange', value)}
-              max={1800}
+              value={durationRange}
+              onValueChange={(value) => {
+                const [min, max] = value as [number, number];
+                setDurationRange([min, max]);
+                update({
+                  min_duration: min > 0 ? min : undefined,
+                  max_duration: max < MAX_DURATION_SECONDS ? max : undefined,
+                });
+              }}
+              max={MAX_DURATION_SECONDS}
               step={30}
               className="w-full"
             />
-          </div>
-
-          {/* Intents */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">Intents</label>
-            <div className="flex flex-wrap gap-2">
-              {intentOptions.map(intent => (
-                <label key={intent} className="flex items-center space-x-2 cursor-pointer">
-                  <Checkbox
-                    checked={filters.intents.includes(intent)}
-                    onCheckedChange={() => toggleArrayFilter('intents', intent)}
-                  />
-                  <span className="text-sm capitalize">{intent.replace('_', ' ')}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">Tags</label>
-            <div className="flex flex-wrap gap-2">
-              {tagOptions.map(tag => (
-                <Badge
-                  key={tag}
-                  variant={filters.tags.includes(tag) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleArrayFilter('tags', tag)}
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* AI Agents */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">AI Agents</label>
-            <div className="flex flex-wrap gap-2">
-              {agentOptions.map(agent => (
-                <label key={agent} className="flex items-center space-x-2 cursor-pointer">
-                  <Checkbox
-                    checked={filters.agents.includes(agent)}
-                    onCheckedChange={() => toggleArrayFilter('agents', agent)}
-                  />
-                  <span className="text-sm">{agent}</span>
-                </label>
-              ))}
-            </div>
           </div>
         </CardContent>
       )}

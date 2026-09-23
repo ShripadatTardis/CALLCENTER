@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Phone, Bot } from 'lucide-react';
 import { CallConfiguration } from '@/types/initiateCall';
-import { useIndustryData } from '@/hooks/useIndustryData';
+import { useAgents } from '@/hooks/agents/useAgents';
 import { validatePhoneNumber } from '@/utils/initiateCallValidation';
 import { InitiateCallButton } from './InitiateCallButton';
 
@@ -27,7 +27,8 @@ export const CallConfigurationForm: React.FC<CallConfigurationFormProps> = ({
   isLoading,
   isDisabled
 }) => {
-  const { agents } = useIndustryData();
+  const { data: agentsData, isLoading: isAgentsLoading } = useAgents();
+  const agents = agentsData?.agents ?? [];
   return (
     <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg">
       <CardHeader className="text-center pb-4">
@@ -68,12 +69,12 @@ export const CallConfigurationForm: React.FC<CallConfigurationFormProps> = ({
           </Label>
           <Select value={config.selectedAgent} onValueChange={onAgentChange}>
             <SelectTrigger className="h-10 text-base border-blue-300 focus:border-blue-500">
-              <SelectValue placeholder="Select an AI Agent" />
+              <SelectValue placeholder={isAgentsLoading ? 'Loading agents…' : 'Select an AI Agent'} />
             </SelectTrigger>
             <SelectContent>
               {agents.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id} className="text-base py-2">
-                  {agent.name}
+                <SelectItem key={agent.agentId} value={agent.agentId} className="text-base py-2">
+                  {agent.displayName} ({agent.direction})
                 </SelectItem>
               ))}
             </SelectContent>

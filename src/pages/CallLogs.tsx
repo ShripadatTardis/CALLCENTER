@@ -1,75 +1,57 @@
 
 import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { AdvancedFilters } from '@/components/call-logs/AdvancedFilters';
-import { TranscriptViewer } from '@/components/call-logs/TranscriptViewer';
+import { AdvancedFilters, CallLogFilters } from '@/components/call-logs/AdvancedFilters';
+import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, FileText, TrendingUp, Clock, Target, Users } from 'lucide-react';
-import { useIndustryData, useIndustryTerminology } from '@/hooks/useIndustryData';
-import { useIndustry } from '@/contexts/IndustryContext';
-import { getIndustrySpecificTranscript } from '@/utils/industryTranscriptGenerator';
+import { Play, FileText, TrendingUp, Clock, Target, Users, Loader2 } from 'lucide-react';
+import { useCallData } from '@/hooks/calls/useCallData';
+import { Interaction } from '@/types/interaction';
+
+function toCsv(interactions: Interaction[]): string {
+  const headers = [
+    'interactionId', 'phoneNumber', 'callerName', 'agentDisplayName', 'direction',
+    'status', 'outcome', 'fcr', 'durationSeconds', 'intent', 'intentAccuracy',
+    'sentiment', 'sentimentScore', 'campaignName', 'startTime',
+  ];
+  const rows = interactions.map((i) =>
+    headers.map((h) => JSON.stringify((i as unknown as Record<string, unknown>)[h] ?? '')).join(','),
+  );
+  return [headers.join(','), ...rows].join('\n');
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const CallLogs: React.FC = () => {
-  const { callLogs } = useIndustryData();
-  const { getTerminology } = useIndustryTerminology();
-  const { selectedIndustry } = useIndustry();
-  const [selectedCall, setSelectedCall] = useState(null);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [filters, setFilters] = useState<CallLogFilters>({});
+  const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
 
-  const handleViewTranscript = (call: any) => {
-    setSelectedCall(call);
-    setShowTranscript(true);
-  };
+  const { data, isLoading, isError } = useCallData({ status: 'inactive', page_size: 50, ...filters });
 
-  const handleFiltersChange = (filters: any) => {
-    console.log('Filters changed:', filters);
+  const interactions = data?.interactions ?? [];
+  const summary = data?.summary;
+
+  const handleViewDetail = (interaction: Interaction) => {
+    setSelectedInteraction(interaction);
+    setShowDetail(true);
   };
 
   const handleExport = () => {
-    console.log('Exporting call logs...');
+    // Exports only the currently fetched/filtered result set — see the
+    // limitation note rendered in AdvancedFilters above the controls.
+    downloadCsv(toCsv(interactions), `call-logs-${new Date().toISOString().slice(0, 10)}.csv`);
   };
-
-  // Convert industry call logs to extended format for display
-  const extendedCallLogs = callLogs.map(call => {
-    // Generate industry-specific transcript based on selected industry and customer name
-    const industryTranscript = getIndustrySpecificTranscript(selectedIndustry, call.customerName);
-    
-    // Convert industry transcript format to the format expected by TranscriptViewer
-    const detailedTranscript = industryTranscript.map((entry, index) => ({
-      timestamp: entry.time,
-      speaker: entry.speaker.toLowerCase() === 'ai' ? 'ai' : 'customer',
-      text: entry.message,
-      sentiment: index % 3 === 0 ? 'positive' : index % 3 === 1 ? 'neutral' : 'negative',
-      confidence: Math.random() * 0.3 + 0.7 // Random between 0.7-1.0
-    }));
-
-    return {
-      id: call.id || Math.random().toString(),
-      callId: `call_${Math.random().toString().slice(2, 8)}`,
-      callerName: call.customerName,
-      callerNumber: call.phoneNumber,
-      outcome: call.status === 'completed' ? 'resolved' : call.status === 'escalated' ? 'escalated' : 'in_progress',
-      fcr: call.status === 'completed',
-      aht: call.duration,
-      intentAccuracy: Math.random() * 0.3 + 0.7, // Random between 0.7-1.0
-      transcript: `${getTerminology('customer')}: ${call.intent} inquiry.\nAI Agent: I'll help you with your ${call.intent} request.`,
-      tags: [call.intent, call.campaignName],
-      detailedTranscript
-    };
-  });
-
-  // Calculate statistics from industry call logs
-  const totalCalls = extendedCallLogs.length;
-  const resolvedCalls = extendedCallLogs.filter(call => call.outcome === 'resolved').length;
-  const escalatedCalls = extendedCallLogs.filter(call => call.outcome === 'escalated').length;
-  const fcrCalls = extendedCallLogs.filter(call => call.fcr).length;
-  
-  const fcrRate = ((fcrCalls / totalCalls) * 100).toFixed(1);
-  const escalationRate = ((escalatedCalls / totalCalls) * 100).toFixed(1);
-  const avgAht = Math.round(extendedCallLogs.reduce((sum, call) => sum + call.aht, 0) / totalCalls);
-  const avgIntentAccuracy = (extendedCallLogs.reduce((sum, call) => sum + call.intentAccuracy, 0) / totalCalls * 100).toFixed(1);
 
   return (
     <Layout>
@@ -77,11 +59,11 @@ const CallLogs: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">Call Logs & Recordings</h1>
           <p className="text-muted-foreground">
-            Complete audit trail of all AI {getTerminology('interactions')}
+            Complete audit trail of all AI interactions
           </p>
         </div>
 
-        {/* Summary Statistics */}
+        {/* Summary Statistics — from the live call-data summary, not recomputed client-side */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -89,9 +71,9 @@ const CallLogs: React.FC = () => {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{fcrRate}%</div>
+              <div className="text-2xl font-bold">{summary ? `${summary.fcr_rate.toFixed(1)}%` : '—'}</div>
               <p className="text-xs text-muted-foreground">
-                {fcrCalls} of {totalCalls} calls resolved
+                {summary ? `${summary.resolved_count} of ${summary.total_calls} calls resolved` : ''}
               </p>
             </CardContent>
           </Card>
@@ -102,10 +84,10 @@ const CallLogs: React.FC = () => {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{Math.floor(avgAht / 60)}m {avgAht % 60}s</div>
-              <p className="text-xs text-muted-foreground">
-                Across all calls
-              </p>
+              <div className="text-2xl font-bold">
+                {summary ? `${Math.floor(summary.avg_aht_seconds / 60)}m ${summary.avg_aht_seconds % 60}s` : '—'}
+              </div>
+              <p className="text-xs text-muted-foreground">Across all calls</p>
             </CardContent>
           </Card>
 
@@ -115,10 +97,8 @@ const CallLogs: React.FC = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{avgIntentAccuracy}%</div>
-              <p className="text-xs text-muted-foreground">
-                AI understanding rate
-              </p>
+              <div className="text-2xl font-bold">{summary ? `${summary.avg_intent_accuracy.toFixed(1)}%` : '—'}</div>
+              <p className="text-xs text-muted-foreground">AI understanding rate</p>
             </CardContent>
           </Card>
 
@@ -128,97 +108,128 @@ const CallLogs: React.FC = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{escalationRate}%</div>
+              <div className="text-2xl font-bold">{summary ? `${summary.escalation_rate.toFixed(1)}%` : '—'}</div>
               <p className="text-xs text-muted-foreground">
-                {escalatedCalls} calls escalated
+                {summary ? `${summary.escalated_count} calls escalated` : ''}
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <AdvancedFilters onFiltersChange={handleFiltersChange} onExport={handleExport} />
+        <AdvancedFilters filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
 
         {/* Call Logs Cards */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Call History ({totalCalls} calls)</h2>
+            <h2 className="text-xl font-semibold">Call History ({interactions.length})</h2>
           </div>
-          
-          <div className="space-y-3">
-            {extendedCallLogs.map((call) => (
-              <Card key={call.id} className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="font-semibold text-lg">
-                        {call.callerName} - {call.tags[0] || 'General'}
-                      </h3>
-                      <Badge variant={call.outcome === 'resolved' ? 'default' : 
-                                   call.outcome === 'escalated' ? 'destructive' : 'secondary'}>
-                        {call.outcome.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                    
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {call.callId} • {call.callerNumber} • {Math.floor(call.aht / 60)}m {call.aht % 60}s
-                    </div>
-                    
-                    <p className="text-sm mb-3 text-gray-700">
-                      {call.transcript}
-                    </p>
-                    
-                    <div className="flex flex-wrap gap-1">
-                      {call.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {tag}
+
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isError ? (
+            <p className="text-sm text-destructive">Failed to load call logs.</p>
+          ) : interactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No calls match the current filters.</p>
+          ) : (
+            <div className="space-y-3">
+              {interactions.map((call) => (
+                <Card key={call.interactionId} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="font-semibold text-lg">
+                          {call.callerName || call.phoneNumber} - {call.intent || 'General'}
+                        </h3>
+                        <Badge
+                          variant={
+                            call.outcome === 'resolved'
+                              ? 'default'
+                              : call.outcome === 'escalated'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                        >
+                          {call.outcome ?? call.status}
                         </Badge>
-                      ))}
+                      </div>
+
+                      <div className="text-sm text-muted-foreground mb-2">
+                        {call.interactionId} • {call.phoneNumber} •{' '}
+                        {call.durationSeconds !== undefined
+                          ? `${Math.floor(call.durationSeconds / 60)}m ${call.durationSeconds % 60}s`
+                          : '—'}
+                      </div>
+
+                      <p className="text-sm mb-3 text-gray-700">
+                        {call.summary || 'No summary available'}
+                      </p>
+
+                      {call.tags && call.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {call.tags.map((tag, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-end space-y-2 ml-4">
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!call.recording?.url}
+                          onClick={() => handleViewDetail(call)}
+                          title={call.recording?.url ? 'Play recording' : 'No recording available'}
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleViewDetail(call)}>
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="text-right text-xs text-muted-foreground">
+                        <div className="flex items-center space-x-1 mb-1">
+                          <span>FCR:</span>
+                          <span className={call.fcr ? 'text-green-600' : 'text-red-600'}>
+                            {call.fcr ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <span>Intent:</span>
+                          <span className="font-medium">
+                            {call.intentAccuracy !== undefined ? `${call.intentAccuracy.toFixed(0)}%` : '—'}
+                          </span>
+                          {call.intentAccuracy !== undefined && (
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                call.intentAccuracy >= 90
+                                  ? 'bg-green-500'
+                                  : call.intentAccuracy >= 80
+                                    ? 'bg-yellow-500'
+                                    : 'bg-red-500'
+                              }`}
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-col items-end space-y-2 ml-4">
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Play className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewTranscript(call)}
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="text-right text-xs text-muted-foreground">
-                      <div className="flex items-center space-x-1 mb-1">
-                        <span>FCR:</span>
-                        <span className={call.fcr ? 'text-green-600' : 'text-red-600'}>
-                          {call.fcr ? 'Yes' : 'No'}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <span>Intent:</span>
-                        <span className="font-medium">{(call.intentAccuracy * 100).toFixed(0)}%</span>
-                        <div className={`w-2 h-2 rounded-full ${
-                          call.intentAccuracy >= 0.9 ? 'bg-green-500' :
-                          call.intentAccuracy >= 0.8 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
-        <TranscriptViewer
-          isOpen={showTranscript}
-          onClose={() => setShowTranscript(false)}
-          callId={selectedCall?.callId || ''}
-          transcript={selectedCall?.detailedTranscript || []}
-          duration={selectedCall?.aht || 0}
+        <InteractionDetailDialog
+          isOpen={showDetail}
+          onClose={() => setShowDetail(false)}
+          interaction={selectedInteraction}
         />
       </div>
     </Layout>

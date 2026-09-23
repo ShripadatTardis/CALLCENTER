@@ -11,6 +11,7 @@ const InitiateCall: React.FC = () => {
     config,
     isLoading,
     callHistory,
+    isCallHistoryLoading,
     updatePhoneNumber,
     updateSelectedAgent,
     initiateCall,
@@ -49,7 +50,7 @@ const InitiateCall: React.FC = () => {
               <CardTitle>Recent Calls</CardTitle>
             </CardHeader>
             <CardContent>
-              <CallHistoryList callHistory={callHistory} />
+              <CallHistoryList callHistory={callHistory} isLoading={isCallHistoryLoading} />
             </CardContent>
           </Card>
         </div>

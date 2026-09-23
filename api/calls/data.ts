@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getBackendConfig, methodNotAllowed, proxyRequest, readReqQuery } from '../_voicebot';
+import { getBackendConfig, methodNotAllowed, proxyRequest, readReqQuery, withErrorBoundary } from '../_voicebot.js';
 
 /**
  * GET /api/calls/data -> GET {VOICEBOT_BASE_URL}/api/v1/call-data
@@ -9,7 +9,7 @@ import { getBackendConfig, methodNotAllowed, proxyRequest, readReqQuery } from '
  * max_duration, page, page_size) — no renaming at this layer; renaming
  * happens in the frontend mapper (src/services/calls/callsMapper.ts).
  */
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default withErrorBoundary(async (req, res) => {
   if (req.method !== 'GET') {
     methodNotAllowed(res, ['GET']);
     return;
@@ -21,4 +21,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const url = `${baseUrl}/api/v1/call-data${search ? `?${search}` : ''}`;
 
   await proxyRequest(res, url, { method: 'GET' });
-}
+});

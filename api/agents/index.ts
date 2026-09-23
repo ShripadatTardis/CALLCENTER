@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getBackendConfig, methodNotAllowed, proxyRequest } from '../_voicebot';
+import { getBackendConfig, methodNotAllowed, proxyRequest, withErrorBoundary } from '../_voicebot.js';
 
 /**
  * GET /api/agents -> GET {VOICEBOT_BASE_URL}/api/v1/agents
@@ -11,7 +11,7 @@ import { getBackendConfig, methodNotAllowed, proxyRequest } from '../_voicebot';
  * once the Swagger spec at /api/v1/openapi.yaml is reachable — attempted
  * during Session 1, the whole demo host returned 502 at the time.
  */
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default withErrorBoundary(async (req, res) => {
   if (req.method !== 'GET') {
     methodNotAllowed(res, ['GET']);
     return;
@@ -19,4 +19,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const { baseUrl } = getBackendConfig();
   await proxyRequest(res, `${baseUrl}/api/v1/agents`, { method: 'GET' });
-}
+});

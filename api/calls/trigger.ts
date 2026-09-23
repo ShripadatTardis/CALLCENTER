@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getBackendConfig, methodNotAllowed, proxyRequest } from '../_voicebot';
+import { getBackendConfig, methodNotAllowed, proxyRequest, withErrorBoundary } from '../_voicebot.js';
 
 /**
  * POST /api/calls/trigger -> POST {VOICEBOT_BASE_URL}/api/v1/call
@@ -10,7 +10,7 @@ import { getBackendConfig, methodNotAllowed, proxyRequest } from '../_voicebot';
  * inspects for that and re-emits it as a non-2xx status (502), so the
  * frontend transport layer only ever has to check HTTP status.
  */
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+export default withErrorBoundary(async (req, res) => {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return;
@@ -43,4 +43,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return { status, body };
     },
   );
-}
+});

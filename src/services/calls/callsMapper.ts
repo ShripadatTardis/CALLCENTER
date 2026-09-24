@@ -68,6 +68,7 @@ export function mapCallDataEntryToInteraction(dto: CallDataEntryDto): Interactio
     durationSeconds: dto.duration_seconds ?? dto.aht_seconds,
 
     status: dto.status,
+    stage: dto.stage || undefined,
     outcome: dto.outcome || undefined,
     fcr: dto.fcr,
     intent: dto.intent || undefined,

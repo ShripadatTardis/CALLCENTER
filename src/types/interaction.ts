@@ -9,8 +9,8 @@
  * CONFIRMED-SAFE (backed by a documented/live-verified API field on at
  * least one of Trigger Call / Session Transcript / Call Data):
  *   interactionId, channel, phoneNumber, callerName, fromPhoneNumber,
- *   agentId, agentDisplayName, startTime, status, outcome, fcr, intent,
- *   intentAccuracy, sentiment, sentimentScore, durationSeconds,
+ *   agentId, agentDisplayName, startTime, status, stage, outcome, fcr,
+ *   intent, intentAccuracy, sentiment, sentimentScore, durationSeconds,
  *   transcript, summary, recording, tags, campaignName, escalation,
  *   wasAuthenticated, direction (confirmed present on every call-data
  *   row via live verification on 2026-09-23 — previously unconfirmed).
@@ -66,6 +66,8 @@ export interface Interaction {
 
   // Outcome / quality signals
   status: string;
+  /** "connecting" | "in-progress" for active calls, "completed" for history — distinct from status, per Call Data docs. */
+  stage?: string;
   outcome?: string;
   fcr?: boolean;
   intent?: string;

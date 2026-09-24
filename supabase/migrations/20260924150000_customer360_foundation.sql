@@ -341,12 +341,46 @@ begin
     where (p_all or c.id = any(v_visible))
       and (p_search is null or c.display_name ilike '%' || p_search || '%');
 
-  select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) into v_rows from (
-    select * from call_center.customers c
-      where (p_all or c.id = any(v_visible))
-        and (p_search is null or c.display_name ilike '%' || p_search || '%')
-      order by c.last_seen desc
-      limit p_page_size offset (p_page - 1) * p_page_size
+  -- Aggregate fields are computed here PER ROW from the authorized subset
+  -- of customer_interactions, never selected from customers.* directly —
+  -- the persisted customers.* row is the FULL, unfiltered aggregate and
+  -- must never be serialized into an API response (plan §12). Confirmed
+  -- as a real bug during Session 4 live verification (a category-scoped
+  -- role was seeing the true totalInteractions in the list response even
+  -- though the detail/timeline endpoints correctly filtered it) and
+  -- fixed here.
+  select coalesce(jsonb_agg(t), '[]'::jsonb) into v_rows from (
+    select
+      c.id, c.display_name, c.source_customer_ref,
+      agg.first_seen, agg.last_seen, agg.total_interactions, agg.inbound_count, agg.outbound_count,
+      agg.latest_intent, agg.latest_outcome, null::text as latest_sentiment_label, agg.latest_sentiment_score,
+      agg.escalation_count, agg.channels, agg.latest_agent_id, agg.latest_agent_display_name,
+      jsonb_build_object('everAuthenticated', coalesce(agg.ever_authenticated, false), 'lastAuthenticatedAt', agg.last_authenticated_at) as auth_summary,
+      c.aggregation_version, c.aggregated_at
+    from call_center.customers c
+    cross join lateral (
+      select
+        min(ci.started_at) as first_seen,
+        max(ci.started_at) as last_seen,
+        count(*) as total_interactions,
+        count(*) filter (where ci.direction = 'inbound') as inbound_count,
+        count(*) filter (where ci.direction = 'outbound') as outbound_count,
+        count(*) filter (where ci.escalation_trigger is not null) as escalation_count,
+        coalesce(array_agg(distinct ci.channel), '{}') as channels,
+        (array_agg(ci.intent order by ci.started_at desc))[1] as latest_intent,
+        (array_agg(ci.outcome order by ci.started_at desc))[1] as latest_outcome,
+        (array_agg(ci.sentiment_score order by ci.started_at desc))[1] as latest_sentiment_score,
+        (array_agg(ci.agent_id order by ci.started_at desc))[1] as latest_agent_id,
+        (array_agg(ci.agent_display_name order by ci.started_at desc))[1] as latest_agent_display_name,
+        bool_or(ci.was_authenticated is true) as ever_authenticated,
+        max(ci.started_at) filter (where ci.was_authenticated is true) as last_authenticated_at
+      from call_center.customer_interactions ci
+      where ci.customer_id = c.id and (p_all or ci.agent_id = any(p_agent_ids))
+    ) agg
+    where (p_all or c.id = any(v_visible))
+      and (p_search is null or c.display_name ilike '%' || p_search || '%')
+    order by agg.last_seen desc nulls last
+    limit p_page_size offset (p_page - 1) * p_page_size
   ) t;
 
   return jsonb_build_object('rows', v_rows, 'totalCount', v_total);

@@ -63,11 +63,6 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
 
   noStore(res);
 
-  if (req.query.debug === '1') {
-    res.status(200).json({ url: req.url, query: req.query });
-    return;
-  }
-
   const idRaw = req.query.id;
   const id = Array.isArray(idRaw) ? idRaw[0] : idRaw;
 

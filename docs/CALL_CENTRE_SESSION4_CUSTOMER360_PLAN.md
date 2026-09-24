@@ -526,11 +526,19 @@ explicitly as a deployment choice, not a product requirement. Domain logic — t
 aggregation service, §6, and the authorization service, §11 — depends only on the
 repository interface's operations, never on Postgres/Supabase-specific behavior.)*
 
-**Recommendation: the existing Supabase project remains the persistence layer for this
-deployment**,
-reassessed and still the smallest/cleanest fit — nothing about the category/role model
-changes that conclusion, since it's purely additional tables plus more restrictive
-query logic in the API layer, not a different storage technology.
+**Amended at implementation time, by explicit instruction:** rather than this app's own
+Supabase project (the one behind `VITE_SUPABASE_*`, used for WhatsApp/chat), Customer
+360 persistence lives in a **separate, already-existing Supabase project — "AuditAI"
+(`dtbaczafdzgctkbqviod`)** — isolated inside its own dedicated `call_center` Postgres
+schema. This keeps the smallest-addition reasoning (§14's original argument) while
+guaranteeing zero collision with either Supabase project's own pre-existing objects.
+`call_center` is deliberately **not** added to PostgREST's exposed-schema list — the
+only access path is a set of `public.call_center_*` `SECURITY DEFINER` functions
+(`supabase/migrations/20260924150000_customer360_foundation.sql`), each individually
+granted to `service_role` only (confirmed via `has_function_privilege` — `anon`/
+`authenticated`/`public` all `false`) and revoked from everything else. This is a
+*stricter* form of "configure only the minimum schema grants/exposure needed for
+server-side service-role access" than a directly REST-exposed schema would have been.
 
 **What changes from the previous plan: the access boundary.** The previous plan's
 "direct Supabase client reads with RLS" recommendation for list/detail/timeline is
@@ -539,15 +547,16 @@ server-side, and this app's auth is not Supabase Auth, so Supabase RLS has no re
 signal to filter on anyway. All reads now go through the Vercel API layer:
 
 ```text
-React → Vercel API / server layer → Supabase/Postgres
+React → Vercel API / server layer → call_center_* RPC functions → call_center.* tables
 ```
 
 matching the same shape already used for the Voice Agent backend proxy
-(`api/calls/*.ts` → `VOICEBOT_BASE_URL`). Supabase is accessed **only** with the
-service-role key, **only** from `api/customers/*.ts`, **never** from browser code —
-`SUPABASE_SERVICE_ROLE_KEY` is a server-only env var, added the same way
-`VOICEBOT_API_KEY` already is, and never reaches the client bundle (verified the same
-way, §23.7).
+(`api/calls/*.ts` → `VOICEBOT_BASE_URL`). The database is accessed **only** with the
+service-role key, **only** from `api/customers/*.ts` (via
+`src/server/customer360/supabaseCustomerRepository.ts`), **never** from browser code —
+`CUSTOMER360_SUPABASE_URL` / `CUSTOMER360_SUPABASE_SERVICE_ROLE_KEY` are server-only env
+vars, added the same way `VOICEBOT_API_KEY` already is, and never reach the client
+bundle (verified the same way, §23.9).
 
 ---
 
@@ -920,8 +929,8 @@ No existing screen's deploy behavior changes.
 8. **Customer list visibility**: confirm a customer whose only interactions are in a
    category a given role can't access does not appear in that role's `GET
    /api/customers` at all.
-9. `grep` the production `dist/` bundle for the literal `SUPABASE_SERVICE_ROLE_KEY`
-   value — must never appear client-side.
+9. `grep` the production `dist/` bundle for the literal `CUSTOMER360_SUPABASE_SERVICE_ROLE_KEY`
+   value and for the `supabaseCustomerRepository` filename — must never appear client-side.
 10. Confirm `/customers` and `/customers/:id` render correctly, search works, the
     interaction timeline opens the existing `InteractionDetailDialog` unmodified
     (recording/transcript states behave exactly as already verified in Session 3.5),

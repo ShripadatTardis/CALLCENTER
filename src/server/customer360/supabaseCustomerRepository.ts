@@ -9,35 +9,52 @@ import type {
   NewInteractionInput,
   RoleAccess,
 } from './types.js';
-import { computeAggregate } from './aggregateMath.js';
 
 /**
  * The current deployment's adapter for CustomerRepository, per
- * docs/CALL_CENTRE_SESSION4_CUSTOMER360_PLAN.md §0.3/§14. This is the
- * ONLY file in src/server/customer360 allowed to import
+ * docs/CALL_CENTRE_SESSION4_CUSTOMER360_PLAN.md §0.3/§14 — amended per
+ * explicit instruction to isolate Call Centre persistence in the
+ * existing AuditAI Supabase project (dtbaczafdzgctkbqviod), under a
+ * dedicated `call_center` Postgres schema.
+ *
+ * `call_center` is NOT exposed via PostgREST's schema allow-list, so
+ * this file never calls `.from('call_center....')` directly — every
+ * operation goes through a `public.call_center_*` SECURITY DEFINER
+ * function (see supabase/migrations/20260924150000_customer360_foundation.sql),
+ * each individually granted to `service_role` only. This is the ONLY
+ * file in src/server/customer360 allowed to import
  * `@supabase/supabase-js` — swapping persistence technology later means
  * writing a new file implementing CustomerRepository, with no change to
  * aggregationService.ts or authorizationService.ts.
  *
- * Uses the service-role key — never the anon key, never imported from
- * browser code. SUPABASE_SERVICE_ROLE_KEY is a server-only env var (see
- * .env.example), read here exactly once per process.
+ * Uses the service-role key exclusively — never the anon key, never
+ * imported from browser code. CUSTOMER360_SUPABASE_URL /
+ * CUSTOMER360_SUPABASE_SERVICE_ROLE_KEY are server-only env vars (see
+ * .env.example), deliberately distinct from this app's other
+ * VITE_SUPABASE_* vars, which point at a different Supabase project
+ * used for WhatsApp/chat.
  */
 
 let client: SupabaseClient | null = null;
 
 function getClient(): SupabaseClient {
   if (client) return client;
-  const url = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.CUSTOMER360_SUPABASE_URL;
+  const serviceRoleKey = process.env.CUSTOMER360_SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
-    throw new Error('SUPABASE_URL (or VITE_SUPABASE_URL) / SUPABASE_SERVICE_ROLE_KEY are not configured on the server');
+    throw new Error('CUSTOMER360_SUPABASE_URL / CUSTOMER360_SUPABASE_SERVICE_ROLE_KEY are not configured on the server');
   }
   client = createClient(url, serviceRoleKey, { auth: { persistSession: false } });
   return client;
 }
 
-// --- Row <-> domain mapping -------------------------------------------------
+async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await getClient().rpc(fn, args);
+  if (error) throw new Error(`Supabase RPC ${fn} error: ${error.message}`);
+  return data as T;
+}
+
+// --- Row <-> domain mapping (RPC functions return snake_case jsonb rows) ---
 
 interface CustomerRow {
   id: string;
@@ -155,319 +172,145 @@ function mapInteraction(row: InteractionRow): CustomerInteractionRecord {
   };
 }
 
-function throwIfError<T>(result: { data: T; error: { message: string } | null }): T {
-  if (result.error) throw new Error(`Supabase error: ${result.error.message}`);
-  return result.data;
+function agentIdsArg(authorizedAgentIds: string[] | 'all'): { p_agent_ids: string[] | null; p_all: boolean } {
+  return authorizedAgentIds === 'all'
+    ? { p_agent_ids: null, p_all: true }
+    : { p_agent_ids: authorizedAgentIds, p_all: false };
 }
 
 export const supabaseCustomerRepository: CustomerRepository = {
   async getCustomer(customerId) {
-    const { data, error } = await getClient().from('customers').select('*').eq('id', customerId).maybeSingle();
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return data ? mapCustomer(data as CustomerRow) : null;
+    const row = await rpc<CustomerRow | null>('call_center_get_customer', { p_id: customerId });
+    return row ? mapCustomer(row) : null;
   },
 
   async findContactPoint(type, normalizedValue) {
-    const { data, error } = await getClient()
-      .from('customer_contact_points')
-      .select('*')
-      .eq('type', type)
-      .eq('normalized_value', normalizedValue)
-      .maybeSingle();
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return data ? mapContactPoint(data as ContactPointRow) : null;
+    const row = await rpc<ContactPointRow | null>('call_center_find_contact_point', {
+      p_type: type,
+      p_normalized: normalizedValue,
+    });
+    return row ? mapContactPoint(row) : null;
   },
 
   async listContactPoints(customerId) {
-    const { data, error } = await getClient()
-      .from('customer_contact_points')
-      .select('*')
-      .eq('customer_id', customerId);
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return ((data ?? []) as ContactPointRow[]).map(mapContactPoint);
+    const rows = await rpc<ContactPointRow[]>('call_center_list_contact_points', { p_customer_id: customerId });
+    return (rows ?? []).map(mapContactPoint);
   },
 
   async createCustomerWithContactPoint({ type, rawValue, normalizedValue, displayName, now }) {
-    const customerInsert = throwIfError(
-      await getClient()
-        .from('customers')
-        .insert({
-          display_name: displayName,
-          source_customer_ref: null,
-          first_seen: now,
-          last_seen: now,
-          total_interactions: 0,
-          inbound_count: 0,
-          outbound_count: 0,
-          channels: [],
-          escalation_count: 0,
-          aggregation_version: 1,
-          aggregated_at: now,
-        })
-        .select('*')
-        .single(),
+    const result = await rpc<{ customer: CustomerRow; contactPoint: ContactPointRow }>(
+      'call_center_create_customer_with_contact_point',
+      { p_type: type, p_raw: rawValue, p_normalized: normalizedValue, p_display_name: displayName, p_now: now },
     );
-    const customer = mapCustomer(customerInsert as CustomerRow);
-
-    const contactPointInsert = throwIfError(
-      await getClient()
-        .from('customer_contact_points')
-        .insert({
-          customer_id: customer.id,
-          type,
-          raw_value: rawValue,
-          normalized_value: normalizedValue,
-          is_primary: true,
-          first_seen: now,
-          last_seen: now,
-        })
-        .select('*')
-        .single(),
-    );
-    return { customer, contactPoint: mapContactPoint(contactPointInsert as ContactPointRow) };
+    return { customer: mapCustomer(result.customer), contactPoint: mapContactPoint(result.contactPoint) };
   },
 
   async touchContactPoint(contactPointId, seenAt) {
-    const { error } = await getClient()
-      .from('customer_contact_points')
-      .update({ last_seen: seenAt, updated_at: new Date().toISOString() })
-      .eq('id', contactPointId);
-    if (error) throw new Error(`Supabase error: ${error.message}`);
+    await rpc<null>('call_center_touch_contact_point', { p_id: contactPointId, p_seen_at: seenAt });
   },
 
   async upsertInteraction(input: NewInteractionInput) {
-    // Idempotency key: (source, interaction_id) — plan §6 step 1 / §20.
-    const existing = await getClient()
-      .from('customer_interactions')
-      .select('id')
-      .eq('source', input.source)
-      .eq('interaction_id', input.interactionId)
-      .maybeSingle();
-    if (existing.error) throw new Error(`Supabase error: ${existing.error.message}`);
-    if (existing.data) {
-      return { inserted: false, id: (existing.data as { id: string }).id };
-    }
-
-    const categoryMap = await supabaseCustomerRepository.getCategoryAgentMap();
-    const categoryId = input.agentId ? categoryMap.get(input.agentId) ?? null : null;
-
-    const inserted = throwIfError(
-      await getClient()
-        .from('customer_interactions')
-        .insert({
-          customer_id: input.customerId,
-          contact_point_id: input.contactPointId,
-          interaction_id: input.interactionId,
-          channel: input.channel,
-          direction: input.direction,
-          agent_id: input.agentId,
-          agent_display_name: input.agentDisplayName,
-          category_id: categoryId,
-          started_at: input.startedAt,
-          duration_seconds: input.durationSeconds,
-          intent: input.intent,
-          outcome: input.outcome,
-          sentiment_score: input.sentimentScore,
-          was_authenticated: input.wasAuthenticated,
-          escalation_trigger: input.escalationTrigger,
-          campaign_name: input.campaignName,
-          recording_available: input.recordingAvailable,
-          source: input.source,
-        })
-        .select('id')
-        .single(),
-    );
-    return { inserted: true, id: (inserted as { id: string }).id };
+    const result = await rpc<{ inserted: boolean; id: string }>('call_center_upsert_interaction', {
+      p_payload: {
+        customerId: input.customerId,
+        contactPointId: input.contactPointId,
+        interactionId: input.interactionId,
+        channel: input.channel,
+        direction: input.direction,
+        agentId: input.agentId,
+        agentDisplayName: input.agentDisplayName,
+        startedAt: input.startedAt,
+        durationSeconds: input.durationSeconds,
+        intent: input.intent,
+        outcome: input.outcome,
+        sentimentScore: input.sentimentScore,
+        wasAuthenticated: input.wasAuthenticated,
+        escalationTrigger: input.escalationTrigger,
+        campaignName: input.campaignName,
+        recordingAvailable: input.recordingAvailable,
+        source: input.source,
+      },
+    });
+    return result;
   },
 
   async listInteractions(customerId, { page = 1, pageSize = 25, authorizedAgentIds }) {
-    let query = getClient()
-      .from('customer_interactions')
-      .select('*', { count: 'exact' })
-      .eq('customer_id', customerId)
-      .order('started_at', { ascending: false });
-
-    if (authorizedAgentIds !== 'all') {
-      if (authorizedAgentIds.length === 0) {
-        return { rows: [], totalCount: 0 };
-      }
-      query = query.in('agent_id', authorizedAgentIds);
-    }
-
-    const from = (page - 1) * pageSize;
-    const { data, error, count } = await query.range(from, from + pageSize - 1);
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return { rows: ((data ?? []) as InteractionRow[]).map(mapInteraction), totalCount: count ?? 0 };
+    const { p_agent_ids, p_all } = agentIdsArg(authorizedAgentIds);
+    const result = await rpc<{ rows: InteractionRow[]; totalCount: number }>('call_center_list_interactions', {
+      p_customer_id: customerId,
+      p_page: page,
+      p_page_size: pageSize,
+      p_agent_ids,
+      p_all,
+    });
+    return { rows: (result.rows ?? []).map(mapInteraction), totalCount: result.totalCount ?? 0 };
   },
 
   async listAllInteractions(customerId, authorizedAgentIds) {
-    let query = getClient().from('customer_interactions').select('*').eq('customer_id', customerId);
-    if (authorizedAgentIds !== 'all') {
-      if (authorizedAgentIds.length === 0) return [];
-      query = query.in('agent_id', authorizedAgentIds);
-    }
-    const { data, error } = await query;
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return ((data ?? []) as InteractionRow[]).map(mapInteraction);
+    const { p_agent_ids, p_all } = agentIdsArg(authorizedAgentIds);
+    const rows = await rpc<InteractionRow[]>('call_center_list_all_interactions', {
+      p_customer_id: customerId,
+      p_agent_ids,
+      p_all,
+    });
+    return (rows ?? []).map(mapInteraction);
   },
 
   async recomputeCustomerAggregate(customerId, now) {
-    const allRows = await supabaseCustomerRepository.listAllInteractions(customerId, 'all');
-    const agg = computeAggregate(allRows);
-
-    const current = await supabaseCustomerRepository.getCustomer(customerId);
-    const nextVersion = (current?.aggregationVersion ?? 0) + 1;
-
-    const updated = throwIfError(
-      await getClient()
-        .from('customers')
-        .update({
-          first_seen: agg.firstSeen,
-          last_seen: agg.lastSeen,
-          total_interactions: agg.totalInteractions,
-          inbound_count: agg.inboundCount,
-          outbound_count: agg.outboundCount,
-          latest_intent: agg.latestIntent,
-          latest_outcome: agg.latestOutcome,
-          latest_sentiment_label: agg.latestSentimentLabel,
-          latest_sentiment_score: agg.latestSentimentScore,
-          escalation_count: agg.escalationCount,
-          channels: agg.channels,
-          latest_agent_id: agg.latestAgentId,
-          latest_agent_display_name: agg.latestAgentDisplayName,
-          auth_summary: agg.authSummary,
-          aggregation_version: nextVersion,
-          aggregated_at: now,
-          updated_at: now,
-        })
-        .eq('id', customerId)
-        .select('*')
-        .single(),
-    );
-    return mapCustomer(updated as CustomerRow);
+    const row = await rpc<CustomerRow>('call_center_recompute_customer_aggregate', {
+      p_customer_id: customerId,
+      p_now: now,
+    });
+    return mapCustomer(row);
   },
 
   async listCustomers({ search, authorizedAgentIds, page = 1, pageSize = 25 }) {
-    // §13: a customer appears only if they have >=1 interaction visible
-    // under authorizedAgentIds. Resolve the visible customer_id set
-    // first (from customer_interactions), then page the customers table
-    // restricted to that set — this is the EXISTS-filter, expressed as
-    // two queries since PostgREST has no correlated-subquery builder.
-    let visibleCustomerIds: string[] | null = null;
-    if (authorizedAgentIds !== 'all') {
-      if (authorizedAgentIds.length === 0) return { rows: [], totalCount: 0 };
-      const { data, error } = await getClient()
-        .from('customer_interactions')
-        .select('customer_id')
-        .in('agent_id', authorizedAgentIds);
-      if (error) throw new Error(`Supabase error: ${error.message}`);
-      visibleCustomerIds = Array.from(new Set((data ?? []).map((r: { customer_id: string }) => r.customer_id)));
-      if (visibleCustomerIds.length === 0) return { rows: [], totalCount: 0 };
-    }
-
-    let query = getClient().from('customers').select('*', { count: 'exact' }).order('last_seen', { ascending: false });
-    if (visibleCustomerIds) query = query.in('id', visibleCustomerIds);
-    if (search) {
-      // Name search only here — phone/email search is resolved via
-      // contact points in the transport layer (plan §4's materialization
-      // rule), since a phone search may need to MATERIALIZE a customer,
-      // which this read-only list query must not do.
-      query = query.ilike('display_name', `%${search}%`);
-    }
-
-    const from = (page - 1) * pageSize;
-    const { data, error, count } = await query.range(from, from + pageSize - 1);
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return { rows: ((data ?? []) as CustomerRow[]).map(mapCustomer), totalCount: count ?? 0 };
+    const { p_agent_ids, p_all } = agentIdsArg(authorizedAgentIds);
+    const result = await rpc<{ rows: CustomerRow[]; totalCount: number }>('call_center_list_customers', {
+      p_search: search ?? null,
+      p_agent_ids,
+      p_all,
+      p_page: page,
+      p_page_size: pageSize,
+    });
+    return { rows: (result.rows ?? []).map(mapCustomer), totalCount: result.totalCount ?? 0 };
   },
 
   async listCategories() {
-    const { data, error } = await getClient().from('customer360_categories').select('*').order('name');
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return ((data ?? []) as { id: string; name: string; description: string | null; active: boolean }[]).map((r) => ({
-      id: r.id,
-      name: r.name,
-      description: r.description,
-      active: r.active,
-    }));
+    const rows = await rpc<{ id: string; name: string; description: string | null; active: boolean }[]>(
+      'call_center_list_categories',
+      {},
+    );
+    return (rows ?? []).map((r) => ({ id: r.id, name: r.name, description: r.description, active: r.active }));
   },
 
   async getCategoryAgentMap() {
-    const { data, error } = await getClient().from('customer360_category_agents').select('agent_id, category_id');
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    const map = new Map<string, string>();
-    for (const row of (data ?? []) as { agent_id: string; category_id: string }[]) {
-      map.set(row.agent_id, row.category_id);
-    }
-    return map;
+    const obj = await rpc<Record<string, string>>('call_center_get_category_agent_map', {});
+    return new Map(Object.entries(obj ?? {}));
   },
 
   async upsertCategoryForAgent(agentId, categoryName) {
-    const existingMap = await supabaseCustomerRepository.getCategoryAgentMap();
-    if (existingMap.has(agentId)) return; // already mapped — never overwrite an admin's existing mapping (plan §17)
-
-    const category = throwIfError(
-      await getClient()
-        .from('customer360_categories')
-        .insert({ name: categoryName, description: null, active: true })
-        .select('id')
-        .single(),
-    );
-    const { error } = await getClient()
-      .from('customer360_category_agents')
-      .insert({ category_id: (category as { id: string }).id, agent_id: agentId });
-    if (error) throw new Error(`Supabase error: ${error.message}`);
+    await rpc<null>('call_center_upsert_category_for_agent', { p_agent_id: agentId, p_category_name: categoryName });
   },
 
   async getRoleAccess(role) {
-    const allAccess = await getClient()
-      .from('role_customer360_access')
-      .select('all_categories')
-      .eq('role', role)
-      .maybeSingle();
-    if (allAccess.error) throw new Error(`Supabase error: ${allAccess.error.message}`);
-    const allCategories = Boolean((allAccess.data as { all_categories: boolean } | null)?.all_categories);
-
-    if (allCategories) {
-      return { role, allCategories: true, categoryIds: [] };
-    }
-
-    const { data, error } = await getClient()
-      .from('role_customer360_categories')
-      .select('category_id')
-      .eq('role', role);
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return {
-      role,
-      allCategories: false,
-      categoryIds: ((data ?? []) as { category_id: string }[]).map((r) => r.category_id),
-    };
+    const result = await rpc<RoleAccess & { categoryIds: string[] }>('call_center_get_role_access', { p_role: role });
+    return { role: result.role, allCategories: result.allCategories, categoryIds: result.categoryIds ?? [] };
   },
 
   async getHighWaterMark() {
-    const { data, error } = await getClient()
-      .from('customer_aggregation_state')
-      .select('last_refreshed_through')
-      .eq('id', 1)
-      .maybeSingle();
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return (data as { last_refreshed_through: string } | null)?.last_refreshed_through ?? null;
+    return rpc<string | null>('call_center_get_high_water_mark', {});
   },
 
   async setHighWaterMark(iso) {
-    const { error } = await getClient()
-      .from('customer_aggregation_state')
-      .upsert({ id: 1, last_refreshed_through: iso, updated_at: new Date().toISOString() });
-    if (error) throw new Error(`Supabase error: ${error.message}`);
+    await rpc<null>('call_center_set_high_water_mark', { p_iso: iso });
   },
 
   async refreshInteractionCategoryCache(agentId, categoryId) {
-    const { data, error } = await getClient()
-      .from('customer_interactions')
-      .update({ category_id: categoryId })
-      .eq('agent_id', agentId)
-      .select('id');
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return (data ?? []).length;
+    const count = await rpc<number>('call_center_refresh_interaction_category_cache', {
+      p_agent_id: agentId,
+      p_category_id: categoryId,
+    });
+    return count ?? 0;
   },
 };

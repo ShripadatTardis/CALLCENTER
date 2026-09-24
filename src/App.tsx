@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import InitiateCall from "./pages/InitiateCall";
 import CallLogs from "./pages/CallLogs";
+import Customers from "./pages/Customers";
+import CustomerDetail from "./pages/CustomerDetail";
 import OutboundCampaigns from "./pages/OutboundCampaigns";
 import CreateCampaign from "./pages/CreateCampaign";
 import NPSCampaigns from "./pages/NPSCampaigns";
@@ -41,6 +43,8 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/initiate-call" element={<ProtectedRoute><InitiateCall /></ProtectedRoute>} />
           <Route path="/call-logs" element={<ProtectedRoute><CallLogs /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/customers/:customerId" element={<ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
           <Route path="/outbound-campaigns" element={<ProtectedRoute><OutboundCampaigns /></ProtectedRoute>} />
           <Route path="/outbound-campaigns/create" element={<ProtectedRoute><CreateCampaign /></ProtectedRoute>} />
           <Route path="/nps-campaigns" element={<ProtectedRoute><NPSCampaigns /></ProtectedRoute>} />

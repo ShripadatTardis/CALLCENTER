@@ -12,6 +12,8 @@ export interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
   signal?: AbortSignal;
+  /** Extra headers merged on top of the default Content-Type. Used e.g. by the customers service to attach the client-supplied role signal (see docs/CALL_CENTRE_SESSION4_CUSTOMER360_PLAN.md §0.1 for why this is advisory, not a security boundary). */
+  headers?: Record<string, string>;
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -41,13 +43,16 @@ async function parseBody(res: Response): Promise<unknown> {
  * to the typed success payload, or rejects with a normalized ApiError.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', query, body, signal } = options;
+  const { method = 'GET', query, body, signal, headers } = options;
 
   let res: Response;
   try {
     res = await fetch(buildUrl(path, query), {
       method,
-      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      headers: {
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...headers,
+      },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
     });

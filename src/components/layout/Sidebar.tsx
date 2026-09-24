@@ -25,6 +25,7 @@ import {
 const sidebarItems = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3, permission: 'view_all_dashboards' },
   { name: 'Call Logs', href: '/call-logs', icon: PhoneCall, permission: 'view_call_logs' },
+  { name: 'Customers', href: '/customers', icon: Users, permission: 'view_call_logs' },
   { name: 'Live View', href: '/live-view', icon: Eye, permission: 'monitor_real_time' },
   { name: 'NPS Campaigns', href: '/nps-campaigns', icon: Star, permission: 'manage_nps_campaigns' },
   { name: 'Outbound Campaigns', href: '/outbound-campaigns', icon: MessageSquare, permission: 'manage_outbound_campaigns' },

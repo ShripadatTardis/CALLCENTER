@@ -178,13 +178,17 @@ POST /api/chat                  — send a turn (proxies /api/v1/chat, then pers
                                    the user message and the AI response) → returns the
                                    upstream response fields PLUS this app's internal
                                    chatSessionId
-POST /api/chat/close             — { chatSessionId } → marks call_center.chat_sessions.status
+POST /api/chat?action=close     — { chatSessionId } → marks call_center.chat_sessions.status
                                    = 'closed'; called only by an explicit "New Chat" action
                                    with a currently-open session (§9), never automatically
-GET  /api/chat/logs              — paginated list of chat_sessions (Chat Logs, §11)
-GET  /api/chat/logs/{id}         — one session's row + its ordered messages
+GET  /api/chat/logs             — paginated list of chat_sessions (Chat Logs, §11)
+GET  /api/chat/logs?id={id}     — one session's row + its ordered messages
                                    (Chat Session Detail, §11)
 ```
+
+*(Route shapes shown here are final, per §17's implementation-time findings: Chat uses
+literal paths + query-param dispatch, not `/close` or `/logs/{id}` path segments —
+dynamic path-segment routing proved unreliable in this specific deployment.)*
 
 `api/chat/index.ts` reuses `api/_voicebot.ts`'s `getBackendConfig()` for the outbound
 call (`X-API-Key` server-side, browser never sees the upstream host) exactly like every
@@ -261,7 +265,7 @@ above the repository interface uses the camelCase shapes here.
   clearing. The failed message stays visible with a retry action that resends the same
   text with the same `session_id`. Unchanged from the original plan.
 - **"New Chat"**: an explicit action. Clears the in-hook conversation view AND, if a
-  session is currently open, calls `POST /api/chat/close` with the internal
+  session is currently open, calls `POST /api/chat?action=close` with the internal
   `chatSessionId` — this is the only place `status` ever transitions to `'closed'`.
   Nothing infers session end from a `data_source: 'cancelled'` turn or from inactivity;
   no such rule is documented, so none is invented (§12's same restraint).

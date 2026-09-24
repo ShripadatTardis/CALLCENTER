@@ -101,13 +101,17 @@ async function handleGetLog(id: string, req: VercelRequest, res: VercelResponse)
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
 
+  // This deployment's builder delivers the catch-all segment under the
+  // literal query key "...route" (including the ellipsis), not the
+  // documented "route" — confirmed via a live diagnostic. Reading both
+  // keys defensively in case that ever changes.
+  const raw = req.query['...route'] ?? req.query.route;
+  const route = Array.isArray(raw) ? raw : raw ? [raw] : [];
+
   if (req.query.debug === '1') {
-    res.status(200).json({ url: req.url, query: req.query });
+    res.status(200).json({ url: req.url, query: req.query, parsedRoute: route });
     return;
   }
-
-  const raw = req.query.route;
-  const route = Array.isArray(raw) ? raw : raw ? [raw] : [];
 
   if (route.length === 1 && route[0] === 'close') {
     await handleClose(req, res);

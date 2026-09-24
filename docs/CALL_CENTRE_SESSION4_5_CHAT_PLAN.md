@@ -448,14 +448,21 @@ implementation time):**
 - `src/server/chat/supabaseChatRepository.ts` (adapter — the only new file allowed to
   import `@supabase/supabase-js` for this domain)
 
-**New transport layer — amended twice at implementation time (see notes below):**
-- `api/chat/index.ts` — `POST /api/chat` (send turn) — its own literal file.
-- `api/chat/[...route].ts` — a standard (non-optional) Vercel catch-all covering
-  `POST /api/chat/close`, `GET /api/chat/logs`, `GET /api/chat/logs/{id}`. Public URL
-  paths are exactly as originally planned; only the physical file layout changed.
+**New transport layer — amended three times at implementation time (see notes below),
+final design uses literal paths + query-param dispatch, no dynamic path segments:**
+- `api/chat/index.ts` — `POST /api/chat` (send turn) and
+  `POST /api/chat?action=close` (close a session), one literal file, dispatched by the
+  `action` query param.
+- `api/chat/logs.ts` — `GET /api/chat/logs` (paginated list) and
+  `GET /api/chat/logs?id={id}` (one session + its ordered messages), one literal file,
+  dispatched by the presence of the `id` query param.
+- Public *behavior* is exactly as originally planned (same two logical endpoints, same
+  request/response shapes); only the close and detail operations moved from a path
+  segment (`/close`, `/logs/{id}`) to a query param (`?action=close`, `?id={id}`) — see
+  finding #3 below for why.
 
 > **Implementation-time finding #1 — function count.** Deploying the four separate
-> route files planned above initially failed — the Vercel **Hobby** plan (confirmed via
+> route files originally planned failed — the Vercel **Hobby** plan (confirmed via
 > `vercel teams ls`) caps a deployment at **12 Serverless Functions**, and Session 4
 > alone already used exactly 12. The failure was silent from the build log's
 > perspective (build completed successfully; the deployment then failed at the
@@ -475,14 +482,25 @@ implementation time):**
 > *optional* catch-all syntax (`api/chat/[[...route]].ts`, matching zero-or-more
 > segments). Once deployed, `POST /api/chat` (zero segments) 404'd, and
 > `GET /api/chat/logs` was incorrectly landing in the zero-segment ("send") handler
-> instead of the logs one — `req.query.route` was not being populated as expected for
-> this deployment. Rather than spend further round-trips debugging an edge case of an
-> uncommon routing form, split back into two more conventional files: a literal
-> `index.ts` for the exact root path, and a **standard** (non-optional, ≥1 segment)
-> catch-all `[...route].ts` for everything else — the same bracket mechanism already
-> proven working elsewhere in this codebase (`api/calls/session/[id].ts`). This landed
-> the function count at exactly 12 (the confirmed ceiling) rather than 11 — tight, but
-> verified working live (§23).
+> instead of the logs one.
+>
+> **Implementation-time finding #3 — standard catch-all also misbehaved.** The second
+> attempt split into a literal `index.ts` plus a **standard** (non-optional, ≥1
+> segment) catch-all `[...route].ts`. Live diagnostic (`?debug=1`) revealed two further
+> platform-specific quirks in this deployment: (a) the catch-all segment arrived under
+> the literal query key `"...route"` (including the ellipsis) rather than the
+> documented `"route"`; (b) once that was corrected, the catch-all still matched only
+> **exactly one** path segment — `GET /api/chat/logs/{id}` (two segments) 404'd at the
+> platform level, never reaching the function at all. Given two different dynamic-path
+> mechanisms both behaved contrary to documented Vercel behavior in this specific
+> deployment, the final design abandons path-segment dynamic routing for Chat entirely
+> in favor of literal paths with query-param dispatch (`?action=`, `?id=`) — proven
+> reliable, and this also holds the function count at exactly 12. Session 1-4's
+> existing dynamic-segment files (`api/calls/session/[id].ts`,
+> `api/customers/[id]/index.ts`, etc.) were NOT touched or re-verified — they were
+> already live and working before this session, so there was no reason to suspect them,
+> and this finding is specific to catch-all (`[...x]`/`[[...x]]`) segments, not the
+> single non-catch-all `[id]` form those files use.
 
 **New frontend:**
 - `src/types/api/chat.ts`, `src/types/chat.ts`

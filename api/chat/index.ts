@@ -5,22 +5,42 @@ import { supabaseChatRepository } from '../../src/server/chat/supabaseChatReposi
 import type { ChatRequestDto, ChatResponseDto } from '../../src/types/api/chat.js';
 
 /**
- * POST /api/chat — send one Chat turn (plan §7). Split from the
- * sub-paths below (api/chat/[...route].ts) into its own literal file —
- * Vercel's optional catch-all ([[...route]].ts) did not correctly match
- * the zero-segment root path in this deployment (confirmed live: the
- * root POST 404'd and GET /api/chat/logs fell into the root handler
- * instead of the logs one), so the root and the sub-paths are now two
- * separate, more conventional route files instead of one exotic one.
+ * POST /api/chat                    — send one Chat turn (plan §7)
+ * POST /api/chat?action=close       — close a session (plan §7/§9)
+ *
+ * Both on this one literal file, dispatched by a query param, rather
+ * than a separate /close path file. This deployment's dynamic-segment
+ * routing proved unreliable for BOTH the optional catch-all
+ * ([[...route]].ts, matched the wrong branch) and the standard catch-all
+ * ([...route].ts, only matched exactly one path segment and delivered
+ * it under the literal query key "...route" instead of "route",
+ * confirmed via a live diagnostic) — so Chat's remaining routes use
+ * literal paths + query-param dispatch instead of path segments, which
+ * is what's actually been proven reliable in this environment. This
+ * also keeps the total Vercel function count within the confirmed
+ * 12-function Hobby-plan ceiling (see docs/CALL_CENTRE_SESSION4_5_CHAT_PLAN.md §17).
  */
-export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
+async function handleClose(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     res.status(405).json({ detail: 'Method not allowed. Use POST.' });
     return;
   }
+  const chatSessionId = (req.body as { chatSessionId?: string } | undefined)?.chatSessionId;
+  if (!chatSessionId) {
+    res.status(400).json({ detail: 'chatSessionId is required' });
+    return;
+  }
+  await supabaseChatRepository.closeSession(chatSessionId);
+  res.status(200).json({ ok: true });
+}
 
-  noStore(res);
+async function handleSend(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({ detail: 'Method not allowed. Use POST.' });
+    return;
+  }
 
   const body = req.body as ChatRequestDto | undefined;
   const message = body?.message;
@@ -78,4 +98,16 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   }
 
   res.status(200).json({ ...dto, chatSessionId, persisted });
+}
+
+export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
+  noStore(res);
+
+  const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
+
+  if (action === 'close') {
+    await handleClose(req, res);
+    return;
+  }
+  await handleSend(req, res);
 });

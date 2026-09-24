@@ -43,8 +43,9 @@ export async function sendChatMessage(
 }
 
 export async function closeChatSession(role: string, chatSessionId: string): Promise<void> {
-  await request<{ ok: boolean }>('/chat/close', {
+  await request<{ ok: boolean }>('/chat', {
     method: 'POST',
+    query: { action: 'close' },
     body: { chatSessionId },
     headers: roleHeaders(role),
   });
@@ -62,8 +63,9 @@ export async function fetchChatLogs(
 }
 
 export async function fetchChatSessionDetail(role: string, chatSessionId: string): Promise<ChatSessionDetail> {
-  return request<ChatSessionDetail>(`/chat/logs/${encodeURIComponent(chatSessionId)}`, {
+  return request<ChatSessionDetail>('/chat/logs', {
     method: 'GET',
+    query: { id: chatSessionId },
     headers: roleHeaders(role),
   });
 }

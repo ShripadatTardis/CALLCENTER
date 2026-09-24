@@ -1,15 +1,17 @@
 /**
- * DTOs for GET /api/v1/analytics/metrics, confirmed via Swagger
- * (2026-09-24 reconciliation — see docs/CALL_CENTRE_BACKEND_CAPABILITY_RECONCILIATION.md).
+ * DTOs for GET /api/v1/analytics/metrics.
  *
- * This endpoint is date-ranged-only (no status/direction/outcome/search
- * filters, unlike call-data) and aggregates over COMPLETED calls only —
- * it has no active-call count. Active Calls must keep coming from
- * call-data's summary, not this endpoint.
- *
- * Only the fields explicitly confirmed are typed here — no padding with
- * guessed metrics (e.g. no CSAT, no per-stage timing — both confirmed
- * absent in the reconciliation pass).
+ * CORRECTED against a real live response (2026-09-24, Session 3
+ * verification) — the actual shape is
+ * `{success, filters, metrics: {...}, charts: {...}, outcomes,
+ * calls_by_agent, aht_distribution}`, not the `data`-wrapped or flat
+ * shape assumed from the Swagger summary alone. Only `metrics` is
+ * typed/consumed here for Session 3's Dashboard scope; `charts`,
+ * `outcomes`, `calls_by_agent`, and `aht_distribution` are real,
+ * observed, richer capabilities (including avg_intent_accuracy,
+ * live_concurrent_calls, peak_concurrency, avg/p95 turn latency) not
+ * consumed yet — left for a future session's scope, not implemented
+ * speculatively now.
  */
 export interface AnalyticsMetricsQueryDto {
   date_from?: string;
@@ -25,13 +27,7 @@ export interface AnalyticsMetricsFields {
   escalated_count: number;
 }
 
-/**
- * Whether the response wraps the metrics in a `data` envelope (like
- * call-data does) or returns them flat (like the agents/trigger-call
- * responses do inconsistently) was not specified in what was confirmed.
- * Typed permissively here; the service layer unwraps defensively at
- * runtime rather than assuming one shape. Revise once directly observed.
- */
-export type AnalyticsMetricsResponseDto =
-  | (AnalyticsMetricsFields & { success?: boolean })
-  | { success: boolean; data: AnalyticsMetricsFields };
+export interface AnalyticsMetricsResponseDto {
+  success: boolean;
+  metrics: AnalyticsMetricsFields;
+}

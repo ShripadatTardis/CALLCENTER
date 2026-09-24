@@ -448,30 +448,41 @@ implementation time):**
 - `src/server/chat/supabaseChatRepository.ts` (adapter — the only new file allowed to
   import `@supabase/supabase-js` for this domain)
 
-**New transport layer — amended at implementation time (see note below):**
-- `api/chat/[[...route]].ts` — one consolidated Vercel function covering
-  `POST /api/chat` (send turn), `POST /api/chat/close` (mark a session closed),
-  `GET /api/chat/logs` (paginated session list), `GET /api/chat/logs/{id}` (session +
-  ordered messages). Public URL paths are exactly as originally planned; only the
-  physical file layout changed.
+**New transport layer — amended twice at implementation time (see notes below):**
+- `api/chat/index.ts` — `POST /api/chat` (send turn) — its own literal file.
+- `api/chat/[...route].ts` — a standard (non-optional) Vercel catch-all covering
+  `POST /api/chat/close`, `GET /api/chat/logs`, `GET /api/chat/logs/{id}`. Public URL
+  paths are exactly as originally planned; only the physical file layout changed.
 
-> **Implementation-time finding:** deploying the four separate route files planned
-> above initially failed — the Vercel **Hobby** plan (confirmed via `vercel teams ls`)
-> caps a deployment at **12 Serverless Functions**, and Session 4 alone already used
-> exactly 12. The failure was silent from the build log's perspective (build completed
-> successfully; the deployment then failed at the platform's "Deploying outputs" stage
-> with no per-file error), discovered only by noticing the live deployment used was an
-> older, pre-Session-4.5 build. Fixed by consolidating the four Chat routes into one
-> Vercel optional-catch-all function (`api/chat/[[...route]].ts`), and — since that
-> alone still left the count at 13 — additionally consolidating Session 4's three
-> lowest-traffic, admin-token-gated routes (`backfill`, `reconcile`, `seedCategories`)
-> into one `api/customers/admin.ts?action=...` function, bringing the total to 11 with
-> headroom to spare. No logical behavior changed in either consolidation — same routes'
-> request/response shapes, same gating, same jobs; purely a deployment-capacity fix.
+> **Implementation-time finding #1 — function count.** Deploying the four separate
+> route files planned above initially failed — the Vercel **Hobby** plan (confirmed via
+> `vercel teams ls`) caps a deployment at **12 Serverless Functions**, and Session 4
+> alone already used exactly 12. The failure was silent from the build log's
+> perspective (build completed successfully; the deployment then failed at the
+> platform's "Deploying outputs" stage with no per-file error), discovered only by
+> noticing the live deployment used was an older, pre-Session-4.5 build. Also
+> consolidated Session 4's three lowest-traffic, admin-token-gated routes (`backfill`,
+> `reconcile`, `seedCategories`) into one `api/customers/admin.ts?action=...` function.
+> No logical behavior changed in either consolidation — same routes' request/response
+> shapes, same gating, same jobs; purely a deployment-capacity fix.
 > `scripts/backfillCustomers.mjs` and `scripts/seedCustomer360Categories.mjs` were
 > updated to call the new `?action=` path. This is a genuine, now-confirmed answer to
 > the Vercel-plan-tier question plan §24 (Session 4) and §19/§20 (this plan) both
 > listed as unconfirmed — worth remembering for any future session adding more routes.
+>
+> **Implementation-time finding #2 — optional catch-all didn't route correctly.** The
+> first fix attempt consolidated all four Chat routes into a single file using Vercel's
+> *optional* catch-all syntax (`api/chat/[[...route]].ts`, matching zero-or-more
+> segments). Once deployed, `POST /api/chat` (zero segments) 404'd, and
+> `GET /api/chat/logs` was incorrectly landing in the zero-segment ("send") handler
+> instead of the logs one — `req.query.route` was not being populated as expected for
+> this deployment. Rather than spend further round-trips debugging an edge case of an
+> uncommon routing form, split back into two more conventional files: a literal
+> `index.ts` for the exact root path, and a **standard** (non-optional, ≥1 segment)
+> catch-all `[...route].ts` for everything else — the same bracket mechanism already
+> proven working elsewhere in this codebase (`api/calls/session/[id].ts`). This landed
+> the function count at exactly 12 (the confirmed ceiling) rather than 11 — tight, but
+> verified working live (§23).
 
 **New frontend:**
 - `src/types/api/chat.ts`, `src/types/chat.ts`

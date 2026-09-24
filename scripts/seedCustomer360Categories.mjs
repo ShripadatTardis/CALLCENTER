@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Drives POST /api/customers/seedCategories — plan §17/§22. Safe to
- * re-run: never overwrites an existing agent→category mapping.
+ * Drives POST /api/customers/admin?action=seedCategories — plan §17/§22.
+ * Safe to re-run: never overwrites an existing agent→category mapping.
+ * Route consolidated under /admin during Session 4.5 (Vercel Hobby
+ * plan's 12-function-per-deployment limit — see api/customers/admin.ts).
  *
  * Usage:
  *   CUSTOMER360_ADMIN_TOKEN=... node scripts/seedCustomer360Categories.mjs [baseUrl]
@@ -14,7 +16,7 @@ if (!token) {
   process.exit(1);
 }
 
-const res = await fetch(`${baseUrl}/api/customers/seedCategories`, {
+const res = await fetch(`${baseUrl}/api/customers/admin?action=seedCategories`, {
   method: 'POST',
   headers: { 'x-admin-token': token },
 });

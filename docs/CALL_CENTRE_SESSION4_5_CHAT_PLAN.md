@@ -448,15 +448,36 @@ implementation time):**
 - `src/server/chat/supabaseChatRepository.ts` (adapter — the only new file allowed to
   import `@supabase/supabase-js` for this domain)
 
-**New transport layer:**
-- `api/chat/index.ts` — `POST` (send turn: call `/api/v1/chat`, then persist)
-- `api/chat/close.ts` — `POST` (mark a session closed)
-- `api/chat/logs/index.ts` — `GET` (paginated session list)
-- `api/chat/logs/[id]/index.ts` — `GET` (session + ordered messages)
+**New transport layer — amended at implementation time (see note below):**
+- `api/chat/[[...route]].ts` — one consolidated Vercel function covering
+  `POST /api/chat` (send turn), `POST /api/chat/close` (mark a session closed),
+  `GET /api/chat/logs` (paginated session list), `GET /api/chat/logs/{id}` (session +
+  ordered messages). Public URL paths are exactly as originally planned; only the
+  physical file layout changed.
+
+> **Implementation-time finding:** deploying the four separate route files planned
+> above initially failed — the Vercel **Hobby** plan (confirmed via `vercel teams ls`)
+> caps a deployment at **12 Serverless Functions**, and Session 4 alone already used
+> exactly 12. The failure was silent from the build log's perspective (build completed
+> successfully; the deployment then failed at the platform's "Deploying outputs" stage
+> with no per-file error), discovered only by noticing the live deployment used was an
+> older, pre-Session-4.5 build. Fixed by consolidating the four Chat routes into one
+> Vercel optional-catch-all function (`api/chat/[[...route]].ts`), and — since that
+> alone still left the count at 13 — additionally consolidating Session 4's three
+> lowest-traffic, admin-token-gated routes (`backfill`, `reconcile`, `seedCategories`)
+> into one `api/customers/admin.ts?action=...` function, bringing the total to 11 with
+> headroom to spare. No logical behavior changed in either consolidation — same routes'
+> request/response shapes, same gating, same jobs; purely a deployment-capacity fix.
+> `scripts/backfillCustomers.mjs` and `scripts/seedCustomer360Categories.mjs` were
+> updated to call the new `?action=` path. This is a genuine, now-confirmed answer to
+> the Vercel-plan-tier question plan §24 (Session 4) and §19/§20 (this plan) both
+> listed as unconfirmed — worth remembering for any future session adding more routes.
 
 **New frontend:**
 - `src/types/api/chat.ts`, `src/types/chat.ts`
-- `src/services/chat/chatService.ts`, `src/services/chat/chatMapper.ts`
+- `src/services/chat/chatService.ts` (no separate `chatMapper.ts` — the `/api/chat/*`
+  responses are already this app's own normalized shape, same precedent as Customer
+  360's `customersService.ts`)
 - `src/hooks/chat/useChatSession.ts`, `useChatLogs.ts`, `useChatSessionDetail.ts`
 - `src/pages/ChatConsole.tsx`, `src/pages/ChatLogs.tsx`
 - `src/components/chat/ChatBubble.tsx`, `ChatComposer.tsx`,

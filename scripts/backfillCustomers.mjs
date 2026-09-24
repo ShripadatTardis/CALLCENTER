@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Drives POST /api/customers/backfill in bounded batches until
- * nextCursor is null — plan §5/§22. Optional; the progressive model
- * (aggregationService.ts) does not depend on this having run.
+ * Drives POST /api/customers/admin?action=backfill in bounded batches
+ * until nextCursor is null — plan §5/§22. Optional; the progressive
+ * model (aggregationService.ts) does not depend on this having run.
+ * Route consolidated under /admin during Session 4.5 (Vercel Hobby
+ * plan's 12-function-per-deployment limit — see api/customers/admin.ts).
  *
  * Usage:
  *   CUSTOMER360_ADMIN_TOKEN=... node scripts/backfillCustomers.mjs [baseUrl] [batchSize]
@@ -18,7 +20,7 @@ if (!token) {
 }
 
 async function runBatch(cursor) {
-  const url = `${baseUrl}/api/customers/backfill?cursor=${cursor}&batchSize=${batchSize}`;
+  const url = `${baseUrl}/api/customers/admin?action=backfill&cursor=${cursor}&batchSize=${batchSize}`;
   const res = await fetch(url, { method: 'POST', headers: { 'x-admin-token': token } });
   const body = await res.json();
   if (!res.ok) {

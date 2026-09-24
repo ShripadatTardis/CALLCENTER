@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Play, FileText, TrendingUp, Clock, Target, Users, Loader2 } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { Interaction } from '@/types/interaction';
+import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
+import { formatDurationExact, formatDurationLong, formatPercent, formatPhoneNumber } from '@/lib/format';
 
 function toCsv(interactions: Interaction[]): string {
   const headers = [
@@ -37,10 +39,15 @@ const CallLogs: React.FC = () => {
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [showDetail, setShowDetail] = useState(false);
 
-  const { data, isLoading, isError } = useCallData({ status: 'inactive', page_size: 50, ...filters });
+  const { data, isLoading, isError, error, refetch, isFetching } = useCallData({
+    status: 'inactive',
+    page_size: 50,
+    ...filters,
+  });
 
   const interactions = data?.interactions ?? [];
   const summary = data?.summary;
+  const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '');
 
   const handleViewDetail = (interaction: Interaction) => {
     setSelectedInteraction(interaction);
@@ -71,7 +78,7 @@ const CallLogs: React.FC = () => {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary ? `${summary.fcr_rate.toFixed(1)}%` : '—'}</div>
+              <div className="text-2xl font-bold">{formatPercent(summary?.fcr_rate)}</div>
               <p className="text-xs text-muted-foreground">
                 {summary ? `${summary.resolved_count} of ${summary.total_calls} calls resolved` : ''}
               </p>
@@ -84,8 +91,11 @@ const CallLogs: React.FC = () => {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {summary ? `${Math.floor(summary.avg_aht_seconds / 60)}m ${summary.avg_aht_seconds % 60}s` : '—'}
+              <div
+                className="text-2xl font-bold"
+                title={formatDurationExact(summary?.avg_aht_seconds)}
+              >
+                {formatDurationLong(summary?.avg_aht_seconds)}
               </div>
               <p className="text-xs text-muted-foreground">Across all calls</p>
             </CardContent>
@@ -97,7 +107,7 @@ const CallLogs: React.FC = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary ? `${summary.avg_intent_accuracy.toFixed(1)}%` : '—'}</div>
+              <div className="text-2xl font-bold">{formatPercent(summary?.avg_intent_accuracy)}</div>
               <p className="text-xs text-muted-foreground">AI understanding rate</p>
             </CardContent>
           </Card>
@@ -108,7 +118,7 @@ const CallLogs: React.FC = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{summary ? `${summary.escalation_rate.toFixed(1)}%` : '—'}</div>
+              <div className="text-2xl font-bold">{formatPercent(summary?.escalation_rate)}</div>
               <p className="text-xs text-muted-foreground">
                 {summary ? `${summary.escalated_count} calls escalated` : ''}
               </p>
@@ -117,6 +127,15 @@ const CallLogs: React.FC = () => {
         </div>
 
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
+
+        {isError && (
+          <QueryErrorBanner
+            error={error}
+            onRetry={() => void refetch()}
+            hasStaleData={interactions.length > 0}
+            isFetching={isFetching}
+          />
+        )}
 
         {/* Call Logs Cards */}
         <div className="space-y-4">
@@ -128,10 +147,16 @@ const CallLogs: React.FC = () => {
             <div className="flex justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : isError ? (
-            <p className="text-sm text-destructive">Failed to load call logs.</p>
+          ) : isError && interactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Call logs are unavailable right now — see the error above.
+            </p>
           ) : interactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No calls match the current filters.</p>
+            <p className="text-sm text-muted-foreground">
+              {hasActiveFilters
+                ? 'No calls match the current filters. Try widening or clearing them.'
+                : 'No completed calls yet.'}
+            </p>
           ) : (
             <div className="space-y-3">
               {interactions.map((call) => (
@@ -155,11 +180,14 @@ const CallLogs: React.FC = () => {
                         </Badge>
                       </div>
 
-                      <div className="text-sm text-muted-foreground mb-2">
-                        {call.interactionId} • {call.phoneNumber} •{' '}
-                        {call.durationSeconds !== undefined
-                          ? `${Math.floor(call.durationSeconds / 60)}m ${call.durationSeconds % 60}s`
-                          : '—'}
+                      <div className="text-sm text-muted-foreground mb-2 break-all">
+                        <span className="font-mono text-xs">{call.interactionId}</span>
+                        {' • '}
+                        {formatPhoneNumber(call.phoneNumber)}
+                        {' • '}
+                        <span title={formatDurationExact(call.durationSeconds)}>
+                          {formatDurationLong(call.durationSeconds)}
+                        </span>
                       </div>
 
                       <p className="text-sm mb-3 text-gray-700">
@@ -184,11 +212,18 @@ const CallLogs: React.FC = () => {
                           size="sm"
                           disabled={!call.recording?.url}
                           onClick={() => handleViewDetail(call)}
-                          title={call.recording?.url ? 'Play recording' : 'No recording available'}
+                          title={call.recording?.url ? 'Play call recording' : 'No recording available for this call'}
+                          aria-label={call.recording?.url ? 'Play call recording' : 'No recording available'}
                         >
                           <Play className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleViewDetail(call)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetail(call)}
+                          title="View call details and transcript"
+                          aria-label="View call details and transcript"
+                        >
                           <FileText className="h-4 w-4" />
                         </Button>
                       </div>
@@ -202,9 +237,7 @@ const CallLogs: React.FC = () => {
                         </div>
                         <div className="flex items-center space-x-1">
                           <span>Intent:</span>
-                          <span className="font-medium">
-                            {call.intentAccuracy !== undefined ? `${call.intentAccuracy.toFixed(0)}%` : '—'}
-                          </span>
+                          <span className="font-medium">{formatPercent(call.intentAccuracy, 0)}</span>
                           {call.intentAccuracy !== undefined && (
                             <div
                               className={`w-2 h-2 rounded-full ${

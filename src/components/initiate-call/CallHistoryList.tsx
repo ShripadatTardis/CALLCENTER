@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Phone, User, History, Loader2 } from 'lucide-react';
 import { Interaction } from '@/types/interaction';
+import { formatTimestamp, formatStatusLabel, formatPhoneNumber } from '@/lib/format';
 
 interface CallHistoryListProps {
   callHistory: Interaction[];
@@ -11,18 +12,6 @@ interface CallHistoryListProps {
 }
 
 export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, isLoading }) => {
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return timestamp;
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  };
-
   return (
     <Card className="w-full bg-white shadow-lg border border-gray-200 min-h-[200px] max-h-[600px] flex flex-col">
       <CardHeader className="pb-4">
@@ -60,10 +49,10 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, i
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-1">
                       <span className="font-medium text-gray-900 truncate">
-                        {call.phoneNumber}
+                        {formatPhoneNumber(call.phoneNumber)}
                       </span>
-                      <Badge variant="secondary" className="text-xs">
-                        {call.status}
+                      <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                        {formatStatusLabel(call.status)}
                       </Badge>
                     </div>
                     <div className="flex items-center space-x-4 text-sm text-gray-600">

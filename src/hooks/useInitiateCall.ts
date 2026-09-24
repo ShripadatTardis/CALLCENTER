@@ -4,24 +4,45 @@ import { CallConfiguration } from '@/types/initiateCall';
 import { validatePhoneNumber } from '@/utils/initiateCallValidation';
 import { useTriggerCall } from '@/hooks/calls/useTriggerCall';
 import { useCallData } from '@/hooks/calls/useCallData';
+import { useAgents } from '@/hooks/agents/useAgents';
+import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
+import { isApiError } from '@/services/transport/errors';
+
+export interface LastTriggeredCall {
+  interactionId: string;
+  phoneNumber: string;
+  agentId: string;
+  agentDisplayName: string;
+  initialStatus: string;
+}
+
+function errorMessage(error: unknown): string {
+  if (isApiError(error)) return error.message;
+  if (error instanceof Error) return error.message;
+  return 'Failed to initiate call';
+}
 
 /**
- * Session 2: replaces the Vapi fetch (src/utils/initiateCallApi.ts,
- * removed) with the live POST /api/calls/trigger mutation, and replaces
- * localStorage call history with the same live call-data query Call
- * Logs uses (small page size, no filters) — see the Session 2 plan §3
- * for why: history was never a real system of record, and a
- * just-triggered call now surfaces here naturally once the mutation
- * invalidates the calls list.
+ * Session 2 built the live trigger-call mutation and the reusable
+ * post-trigger polling hook (useInteractionTranscript with poll: true),
+ * but never actually wired the polling into this hook's return value or
+ * into InitiateCall.tsx — closing that gap here per Session 3.5 §3.
  */
 export const useInitiateCall = () => {
   const [config, setConfig] = useState<CallConfiguration>({
     phoneNumber: '',
     selectedAgent: '',
   });
+  const [lastTriggeredCall, setLastTriggeredCall] = useState<LastTriggeredCall | null>(null);
 
   const triggerCallMutation = useTriggerCall();
   const recentCalls = useCallData({ page_size: 5 });
+  const agents = useAgents();
+
+  const statusPoll = useInteractionTranscript(lastTriggeredCall?.interactionId, {
+    enabled: Boolean(lastTriggeredCall),
+    poll: Boolean(lastTriggeredCall),
+  });
 
   const updatePhoneNumber = (phoneNumber: string) => {
     setConfig((prev) => ({ ...prev, phoneNumber }));
@@ -47,22 +68,32 @@ export const useInitiateCall = () => {
       return;
     }
 
+    const agentDisplayName =
+      agents.data?.agents.find((a) => a.agentId === config.selectedAgent)?.displayName ?? config.selectedAgent;
+    const phoneNumber = config.phoneNumber;
+
     try {
       const result = await triggerCallMutation.mutateAsync({
-        to_phone_number: config.phoneNumber,
+        to_phone_number: phoneNumber,
         agent_id: config.selectedAgent,
       });
 
       if (result.success) {
-        toast.success(`Call initiated — status: ${result.status}`);
+        setLastTriggeredCall({
+          interactionId: result.interactionId,
+          phoneNumber,
+          agentId: config.selectedAgent,
+          agentDisplayName,
+          initialStatus: result.status,
+        });
+        toast.success(`Call initiated to ${phoneNumber} — status: ${result.status}`);
         setConfig((prev) => ({ ...prev, phoneNumber: '' }));
       } else {
         toast.error('Call was not accepted by the backend');
       }
     } catch (error) {
       console.error('Trigger call error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to initiate call';
-      toast.error(message);
+      toast.error(errorMessage(error));
     }
   };
 
@@ -77,11 +108,19 @@ export const useInitiateCall = () => {
     isLoading: triggerCallMutation.isPending,
     callHistory: recentCalls.data?.interactions ?? [],
     isCallHistoryLoading: recentCalls.isLoading,
+    callHistoryError: recentCalls.isError ? recentCalls.error : null,
+    refetchCallHistory: recentCalls.refetch,
     updatePhoneNumber,
     updateSelectedAgent,
     initiateCall,
     isInitiateCallDisabled,
-    /** Result of the most recent trigger, for the short-lived post-trigger poll (see InitiateCall.tsx). */
-    lastTriggeredInteractionId: triggerCallMutation.data?.interactionId,
+    // Post-trigger status feedback (Session 3.5 §3).
+    lastTriggeredCall,
+    dismissLastTriggeredCall: () => setLastTriggeredCall(null),
+    triggerError: triggerCallMutation.isError ? errorMessage(triggerCallMutation.error) : null,
+    postTriggerStatus: statusPoll.data?.status,
+    isPostTriggerPollCapped: statusPoll.isPollingCapped,
+    isPostTriggerPolling: statusPoll.isFetching,
+    refetchPostTriggerStatus: statusPoll.refetch,
   };
 };

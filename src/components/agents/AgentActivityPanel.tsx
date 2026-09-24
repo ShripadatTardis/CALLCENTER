@@ -24,6 +24,13 @@ interface AgentActivityPanelProps {
  * call-data?status=active rows by agent_id. No status label is shown
  * for an agent with zero active calls — "0 active calls" is a fact,
  * not an inferred "Idle" state.
+ *
+ * Session 3.5: name and count badge are on separate rows (not a
+ * cramped flex-justify-between) — the default shadcn Badge is
+ * rounded-full, and squeezing "N active calls" next to a long agent
+ * name wrapped it into an overlapping circular blob at narrower card
+ * widths. whitespace-nowrap + its own row fixes this regardless of
+ * name length or viewport width.
  */
 export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   agents,
@@ -49,17 +56,18 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
         ) : agents.length === 0 ? (
           <p className="text-sm text-muted-foreground">No agents available.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {agents.map((agent) => {
               const activeCount = activeCounts.get(agent.agentId) ?? 0;
               return (
-                <div key={agent.agentId} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">{agent.displayName}</h3>
-                    <Badge variant={activeCount > 0 ? 'default' : 'outline'}>
-                      {activeCount} active call{activeCount === 1 ? '' : 's'}
-                    </Badge>
-                  </div>
+                <div key={agent.agentId} className="min-w-0 border rounded-lg p-4 space-y-2">
+                  <h3 className="font-semibold break-words leading-snug">{agent.displayName}</h3>
+                  <Badge
+                    variant={activeCount > 0 ? 'default' : 'outline'}
+                    className="whitespace-nowrap"
+                  >
+                    {activeCount} active call{activeCount === 1 ? '' : 's'}
+                  </Badge>
                   <div className="text-sm text-muted-foreground space-y-0.5">
                     <div>Direction: {agent.direction}</div>
                     {agent.language && <div>Language: {agent.language}</div>}

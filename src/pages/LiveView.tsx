@@ -13,6 +13,13 @@ import { Users, Phone, Clock, AlertTriangle, Search, Filter, Monitor, UserPlus, 
 import { useLiveCallData } from '@/hooks/calls/useLiveCallData';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { AgentActivityPanel } from '@/components/agents/AgentActivityPanel';
+import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
+import {
+  formatDurationExact,
+  formatDurationLong,
+  formatFractionAsPercent,
+  formatPhoneNumber,
+} from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
 
 /**
@@ -60,13 +67,6 @@ const LiveView: React.FC = () => {
 
   const uniqueIntents = [...new Set(calls.map((c) => c.intent).filter((v): v is string => Boolean(v)))];
 
-  const formatDuration = (seconds?: number) => {
-    if (seconds === undefined) return '—';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const getSentimentColor = (score?: number) => {
     if (score === undefined) return 'text-slate-500';
     if (score >= 0.7) return 'text-green-600';
@@ -85,13 +85,22 @@ const LiveView: React.FC = () => {
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-2 text-sm text-slate-500">
               <div className={`w-2 h-2 rounded-full ${live.isFetching ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
-              <span>Live Updates</span>
+              <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
             </div>
           </div>
         </div>
 
+        {live.isError && (
+          <QueryErrorBanner
+            error={live.error}
+            onRetry={() => void live.refetch()}
+            hasStaleData={calls.length > 0}
+            isFetching={live.isFetching}
+          />
+        )}
+
         {/* Summary Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Calls</CardTitle>
@@ -124,8 +133,11 @@ const LiveView: React.FC = () => {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">
-                {live.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatDuration(summary?.avg_handle_time_seconds)}
+              <div
+                className="text-2xl font-bold text-purple-600"
+                title={formatDurationExact(summary?.avg_handle_time_seconds)}
+              >
+                {live.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatDurationLong(summary?.avg_handle_time_seconds)}
               </div>
               <p className="text-xs text-muted-foreground">Current active calls</p>
             </CardContent>
@@ -201,10 +213,16 @@ const LiveView: React.FC = () => {
               <div className="flex justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : live.isError ? (
-              <p className="text-sm text-destructive">Failed to load live calls.</p>
-            ) : filteredCalls.length === 0 ? (
+            ) : live.isError && calls.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Live calls are unavailable right now — see the error above.
+              </p>
+            ) : calls.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No active calls right now.</p>
+            ) : filteredCalls.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                No active calls match the current search/filters.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -222,25 +240,30 @@ const LiveView: React.FC = () => {
                   <TableBody>
                     {filteredCalls.slice(0, 20).map((call) => (
                       <TableRow key={call.interactionId}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium text-slate-900">{call.callerName || '—'}</div>
-                            <div className="text-sm text-slate-500">{call.phoneNumber}</div>
+                        <TableCell className="max-w-[180px]">
+                          <div className="min-w-0">
+                            <div className="font-medium text-slate-900 truncate">{call.callerName || '—'}</div>
+                            <div className="text-sm text-slate-500 truncate">{formatPhoneNumber(call.phoneNumber)}</div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{call.intent || '—'}</Badge>
+                          <Badge variant="outline" className="whitespace-nowrap">{call.intent || '—'}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[140px]">
+                          <span className="text-sm text-slate-700 truncate block">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-slate-700">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-slate-700">{formatDuration(call.durationSeconds)}</span>
+                          <span
+                            className="font-mono text-slate-700 whitespace-nowrap"
+                            title={formatDurationExact(call.durationSeconds)}
+                          >
+                            {formatDurationLong(call.durationSeconds)}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <span className={`font-medium ${getSentimentColor(call.sentimentScore)}`}>
-                              {call.sentimentScore !== undefined ? `${(call.sentimentScore * 100).toFixed(0)}%` : '—'}
+                            <span className={`font-medium whitespace-nowrap ${getSentimentColor(call.sentimentScore)}`}>
+                              {formatFractionAsPercent(call.sentimentScore)}
                             </span>
                             {call.sentimentScore !== undefined && (
                               <div className="w-12 bg-slate-200 rounded-full h-2">
@@ -282,9 +305,11 @@ const LiveView: React.FC = () => {
                                   <div className="space-y-2">
                                     <Label className="text-sm font-medium">Call Details</Label>
                                     <div className="text-sm bg-slate-50 p-3 rounded-lg">
-                                      <p><strong>Duration:</strong> {formatDuration(call.durationSeconds)}</p>
+                                      <p title={formatDurationExact(call.durationSeconds)}>
+                                        <strong>Duration:</strong> {formatDurationLong(call.durationSeconds)}
+                                      </p>
                                       <p><strong>Stage:</strong> {call.stage ?? call.status}</p>
-                                      <p><strong>Sentiment:</strong> {call.sentimentScore !== undefined ? `${(call.sentimentScore * 100).toFixed(0)}%` : '—'}</p>
+                                      <p><strong>Sentiment:</strong> {formatFractionAsPercent(call.sentimentScore)}</p>
                                       <p><strong>Agent:</strong> {call.agentDisplayName ?? call.agentId ?? '—'}</p>
                                     </div>
                                   </div>
@@ -343,11 +368,16 @@ const LiveView: React.FC = () => {
             <CardContent>
               <div className="space-y-3">
                 {transferredCalls.map((call) => (
-                  <div key={call.interactionId} className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
-                    <div>
-                      <div className="font-medium text-orange-900">{call.callerName || call.phoneNumber}</div>
-                      <div className="text-sm text-orange-700">Trigger: {call.escalation?.trigger}</div>
-                      <div className="text-xs text-orange-600">Duration: {formatDuration(call.durationSeconds)}</div>
+                  <div key={call.interactionId} className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200 gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-orange-900 truncate">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
+                      <div className="text-sm text-orange-700 truncate">Trigger: {call.escalation?.trigger}</div>
+                      <div
+                        className="text-xs text-orange-600"
+                        title={formatDurationExact(call.durationSeconds)}
+                      >
+                        Duration: {formatDurationLong(call.durationSeconds)}
+                      </div>
                     </div>
                   </div>
                 ))}

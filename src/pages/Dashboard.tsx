@@ -10,6 +10,14 @@ import { useCallData } from '@/hooks/calls/useCallData';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { AgentActivityPanel } from '@/components/agents/AgentActivityPanel';
 import { countActiveCallsByAgent } from '@/components/agents/agentActivity';
+import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
+import {
+  formatDurationExact,
+  formatDurationLong,
+  formatPercent,
+  formatPhoneNumber,
+  formatStatusLabel,
+} from '@/lib/format';
 
 /**
  * Session 3: live data throughout. Metrics tiles are limited to what's
@@ -31,11 +39,6 @@ const Dashboard: React.FC = () => {
   const agentRoster = agents.data?.agents ?? [];
   const activeAgentCount = countActiveCallsByAgent(activeInteractions).size;
 
-  const formatDuration = (seconds?: number) => {
-    if (seconds === undefined) return '—';
-    return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-  };
-
   return (
     <Layout>
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -43,8 +46,21 @@ const Dashboard: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         </div>
 
+        {(recent.isError || agents.isError || metrics.isError) && (
+          <QueryErrorBanner
+            error={recent.error ?? agents.error ?? metrics.error}
+            onRetry={() => {
+              void recent.refetch();
+              void agents.refetch();
+              void metrics.refetch();
+            }}
+            hasStaleData={interactions.length > 0 || agentRoster.length > 0 || Boolean(metrics.data)}
+            isFetching={recent.isFetching || agents.isFetching || metrics.isFetching}
+          />
+        )}
+
         {/* Top Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           <Card className="bg-white border border-gray-200">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Active Calls</CardTitle>
@@ -82,7 +98,7 @@ const Dashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                {metrics.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : `${metrics.data?.fcrRate.toFixed(1)}%`}
+                {metrics.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatPercent(metrics.data?.fcrRate)}
               </div>
               <p className="text-xs text-gray-500">First call resolution</p>
             </CardContent>
@@ -95,7 +111,7 @@ const Dashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                {metrics.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : `${metrics.data?.escalationRate.toFixed(1)}%`}
+                {metrics.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatPercent(metrics.data?.escalationRate)}
               </div>
               <p className="text-xs text-gray-500">
                 {metrics.data ? `${metrics.data.escalatedCount} calls escalated` : ''}
@@ -109,8 +125,11 @@ const Dashboard: React.FC = () => {
               <Clock className="h-4 w-4 text-gray-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {metrics.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatDuration(metrics.data?.avgAhtSeconds)}
+              <div
+                className="text-2xl font-bold text-gray-900"
+                title={formatDurationExact(metrics.data?.avgAhtSeconds)}
+              >
+                {metrics.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatDurationLong(metrics.data?.avgAhtSeconds)}
               </div>
               <p className="text-xs text-gray-500">Per completed call</p>
             </CardContent>
@@ -138,16 +157,24 @@ const Dashboard: React.FC = () => {
                       key={call.interactionId}
                       className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0"
                     >
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{call.callerName || call.phoneNumber}</div>
-                        <div className="text-sm text-gray-500">{call.intent || '—'}</div>
-                        <div className="text-xs text-gray-400">{call.phoneNumber}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
+                        <div className="text-sm text-gray-500 truncate">{call.intent || '—'}</div>
+                        <div className="text-xs text-gray-400 truncate">{formatPhoneNumber(call.phoneNumber)}</div>
                       </div>
-                      <div className="text-right">
-                        <Badge variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'destructive' : 'default'}>
-                          {call.outcome ?? call.status}
+                      <div className="text-right ml-3 flex-shrink-0">
+                        <Badge
+                          variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'destructive' : 'default'}
+                          className="whitespace-nowrap"
+                        >
+                          {formatStatusLabel(call.outcome ?? call.status)}
                         </Badge>
-                        <div className="text-xs text-gray-500 mt-1">{formatDuration(call.durationSeconds)}</div>
+                        <div
+                          className="text-xs text-gray-500 mt-1"
+                          title={formatDurationExact(call.durationSeconds)}
+                        >
+                          {formatDurationLong(call.durationSeconds)}
+                        </div>
                       </div>
                     </div>
                   ))}

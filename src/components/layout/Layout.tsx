@@ -20,7 +20,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     <LayoutProvider>
       <div className="flex h-screen bg-white">
         <Sidebar />
-        <main className="flex-1 overflow-auto bg-gray-50">
+        {/* min-w-0 is required on a flex child that contains wide content
+            (grids, tables) — without it, flex items refuse to shrink below
+            their content's intrinsic width, and the whole page overflows
+            horizontally instead of scrolling within `main`. */}
+        <main className="flex-1 min-w-0 overflow-auto bg-gray-50">
           {children}
         </main>
       </div>

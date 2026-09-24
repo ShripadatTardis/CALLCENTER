@@ -7,18 +7,20 @@ import { Badge } from '@/components/ui/badge';
 import { Search } from 'lucide-react';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
+import {
+  formatDurationExact,
+  formatDurationLong,
+  formatFractionAsPercent,
+  formatPercent,
+  formatPhoneNumber,
+  formatStatusLabel,
+  formatTimestamp,
+} from '@/lib/format';
 
 interface InteractionDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   interaction: Interaction | null;
-}
-
-function formatDuration(seconds?: number): string {
-  if (seconds === undefined) return '—';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}m ${secs}s`;
 }
 
 function getSpeakerColor(speaker: string) {
@@ -93,22 +95,23 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
         {/* Metadata */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 p-4 rounded-lg text-sm">
-          <div><span className="text-slate-500">Phone:</span> {interaction.phoneNumber}</div>
+          <div><span className="text-slate-500">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
           <div><span className="text-slate-500">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
           <div><span className="text-slate-500">Direction:</span> {interaction.direction ?? '—'}</div>
-          <div><span className="text-slate-500">Status:</span> {interaction.status}</div>
-          <div><span className="text-slate-500">Duration:</span> {formatDuration(interaction.durationSeconds)}</div>
+          <div><span className="text-slate-500">Status:</span> {formatStatusLabel(interaction.status)}</div>
+          <div title={formatDurationExact(interaction.durationSeconds)}>
+            <span className="text-slate-500">Duration:</span> {formatDurationLong(interaction.durationSeconds)}
+          </div>
           <div><span className="text-slate-500">Outcome:</span> {interaction.outcome ?? '—'}</div>
           <div><span className="text-slate-500">FCR:</span> {interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No'}</div>
           <div><span className="text-slate-500">Intent:</span> {interaction.intent ?? '—'}</div>
           <div>
-            <span className="text-slate-500">Intent accuracy:</span>{' '}
-            {interaction.intentAccuracy === undefined ? '—' : `${interaction.intentAccuracy.toFixed(0)}%`}
+            <span className="text-slate-500">Intent accuracy:</span> {formatPercent(interaction.intentAccuracy, 0)}
           </div>
           <div><span className="text-slate-500">Sentiment:</span> {interaction.sentiment ?? '—'}</div>
           <div>
             <span className="text-slate-500">Sentiment score:</span>{' '}
-            {interaction.sentimentScore === undefined ? '—' : interaction.sentimentScore.toFixed(2)}
+            {formatFractionAsPercent(interaction.sentimentScore)}
           </div>
           <div><span className="text-slate-500">Campaign:</span> {interaction.campaignName ?? '—'}</div>
           <div>
@@ -120,7 +123,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
                 : 'No'}
           </div>
           <div><span className="text-slate-500">Escalation:</span> {interaction.escalation?.trigger ?? 'None'}</div>
-          <div><span className="text-slate-500">Started:</span> {interaction.startTime}</div>
+          <div><span className="text-slate-500">Started:</span> {formatTimestamp(interaction.startTime)}</div>
           <div className="col-span-2 md:col-span-4">
             <span className="text-slate-500">Summary:</span> {interaction.summary || 'No summary available'}
           </div>
@@ -177,6 +180,15 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         <div className="flex-1 overflow-auto space-y-3">
           {liveTranscript.isLoading && needsLiveFetch && transcript.length === 0 ? (
             <p className="text-sm text-slate-500">Loading transcript…</p>
+          ) : liveTranscript.isError && transcript.length === 0 ? (
+            <div className="text-sm text-amber-700 flex items-center justify-between gap-2">
+              <span>Could not load the transcript from the backend.</span>
+              <Button variant="outline" size="sm" onClick={() => liveTranscript.refetch()}>
+                Retry
+              </Button>
+            </div>
+          ) : filteredTranscript.length === 0 && searchTerm ? (
+            <p className="text-sm text-slate-500">No transcript entries match "{searchTerm}".</p>
           ) : filteredTranscript.length === 0 ? (
             <p className="text-sm text-slate-500">No transcript available for this interaction.</p>
           ) : (
@@ -189,7 +201,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
                     <span className={`text-xs ${getSentimentColor(entry.sentiment)}`}>{entry.sentiment}</span>
                   )}
                   {entry.confidence !== undefined && (
-                    <span className="text-xs text-slate-400">{(entry.confidence * 100).toFixed(0)}% confidence</span>
+                    <span className="text-xs text-slate-400">{formatFractionAsPercent(entry.confidence)} confidence</span>
                   )}
                 </div>
                 <p className="text-slate-800 leading-relaxed">

@@ -3,6 +3,8 @@ import React from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { CallConfigurationForm } from '@/components/initiate-call/CallConfigurationForm';
 import { CallHistoryList } from '@/components/initiate-call/CallHistoryList';
+import { PostTriggerStatusCard } from '@/components/initiate-call/PostTriggerStatusCard';
+import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInitiateCall } from '@/hooks/useInitiateCall';
 
@@ -12,10 +14,19 @@ const InitiateCall: React.FC = () => {
     isLoading,
     callHistory,
     isCallHistoryLoading,
+    callHistoryError,
+    refetchCallHistory,
     updatePhoneNumber,
     updateSelectedAgent,
     initiateCall,
-    isInitiateCallDisabled
+    isInitiateCallDisabled,
+    lastTriggeredCall,
+    dismissLastTriggeredCall,
+    triggerError,
+    postTriggerStatus,
+    isPostTriggerPollCapped,
+    isPostTriggerPolling,
+    refetchPostTriggerStatus,
   } = useInitiateCall();
 
   return (
@@ -28,13 +39,30 @@ const InitiateCall: React.FC = () => {
           </p>
         </div>
 
+        {triggerError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Call could not be initiated: {triggerError}
+          </div>
+        )}
+
+        {lastTriggeredCall && (
+          <PostTriggerStatusCard
+            call={lastTriggeredCall}
+            liveStatus={postTriggerStatus}
+            isPolling={isPostTriggerPolling}
+            isPollCapped={isPostTriggerPollCapped}
+            onRefresh={() => refetchPostTriggerStatus()}
+            onDismiss={dismissLastTriggeredCall}
+          />
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Call Configuration</CardTitle>
             </CardHeader>
             <CardContent>
-              <CallConfigurationForm 
+              <CallConfigurationForm
                 config={config}
                 onPhoneNumberChange={updatePhoneNumber}
                 onAgentChange={updateSelectedAgent}
@@ -49,7 +77,14 @@ const InitiateCall: React.FC = () => {
             <CardHeader>
               <CardTitle>Recent Calls</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {callHistoryError && (
+                <QueryErrorBanner
+                  error={callHistoryError}
+                  onRetry={() => refetchCallHistory()}
+                  hasStaleData={callHistory.length > 0}
+                />
+              )}
               <CallHistoryList callHistory={callHistory} isLoading={isCallHistoryLoading} />
             </CardContent>
           </Card>

@@ -101,6 +101,11 @@ async function handleGetLog(id: string, req: VercelRequest, res: VercelResponse)
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
 
+  if (req.query.debug === '1') {
+    res.status(200).json({ url: req.url, query: req.query });
+    return;
+  }
+
   const raw = req.query.route;
   const route = Array.isArray(raw) ? raw : raw ? [raw] : [];
 

@@ -22,6 +22,7 @@ import QAReview from "./pages/QAReview";
 import WhatsAppHub from "./pages/WhatsAppHub";
 import FormattingHub from "./pages/FormattingHub";
 import AIAgents from "./pages/AIAgents";
+import AgentDetail from "./pages/AgentDetail";
 import Analytics from "./pages/Analytics";
 import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
@@ -57,6 +58,7 @@ const App = () => (
           <Route path="/whatsapp-hub" element={<ProtectedRoute><WhatsAppHub /></ProtectedRoute>} />
           <Route path="/formatting-hub" element={<ProtectedRoute><FormattingHub /></ProtectedRoute>} />
           <Route path="/ai-agents" element={<ProtectedRoute><AIAgents /></ProtectedRoute>} />
+          <Route path="/ai-agents/:agentId" element={<ProtectedRoute><AgentDetail /></ProtectedRoute>} />
           <Route path="/orchestrator" element={<ProtectedRoute><Orchestrator /></ProtectedRoute>} />
           <Route path="/orchestrator/new" element={<ProtectedRoute><OrchestratorNew /></ProtectedRoute>} />
           <Route path="/orchestrator/flow/:flowId" element={<ProtectedRoute><OrchestratorFlow /></ProtectedRoute>} />

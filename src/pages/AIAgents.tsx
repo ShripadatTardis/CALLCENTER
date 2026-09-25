@@ -1,113 +1,90 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { AgentConfiguration } from '@/components/ai-agents/AgentConfiguration';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Settings, Play, Pause } from 'lucide-react';
-import { useIndustryData, useIndustryTerminology } from '@/hooks/useIndustryData';
+import { Loader2 } from 'lucide-react';
+import { useAgents } from '@/hooks/agents/useAgents';
+import { formatStatusLabel } from '@/lib/format';
 
+/**
+ * Real /api/v1/agents roster — replaces the previous entirely-mock page
+ * (fake status by row index, Math.random() success rate/calls/engagement
+ * time, no-op Create/Configure/Play/Pause controls; see
+ * docs/CALL_CENTRE_SESSION6_AGENTS_QUALITY_PLAN.md §1/§2). The roster is
+ * read-only (no documented create/update/delete API) — there is no
+ * "Create Agent" action, and each row links to a real operational
+ * AgentDetail view instead of a no-op configuration dialog.
+ */
 const AIAgents: React.FC = () => {
-  const { agents } = useIndustryData();
-  const { getTerminology } = useIndustryTerminology();
-  const [showConfiguration, setShowConfiguration] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState(null);
-
-  const handleConfigureAgent = (agent: any) => {
-    setSelectedAgent(agent);
-    setShowConfiguration(true);
-  };
-
-  const handleCreateAgent = () => {
-    setSelectedAgent(null);
-    setShowConfiguration(true);
-  };
-
-  // Convert industry agents to display format
-  const displayAgents = agents.map((agent, index) => ({
-    id: agent.id,
-    name: agent.name,
-    intentCluster: agent.capabilities?.[0] || agent.description || 'General Support',
-    status: index === 0 ? 'engaged' : index === 1 ? 'idle' : 'awaiting_input',
-    successRate: (Math.random() * 0.2 + 0.8), // Random between 0.8-1.0
-    totalCalls: Math.floor(Math.random() * 100) + 50,
-    engagementTime: Math.floor(Math.random() * 300) + 60
-  }));
+  const navigate = useNavigate();
+  const { data, isLoading, isError } = useAgents();
+  const agents = data?.agents ?? [];
 
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">AI Agents</h1>
-            <p className="text-muted-foreground">
-              Manage and configure your voice AI agents
-            </p>
-          </div>
-          <Button onClick={handleCreateAgent}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Agent
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold">AI Agents</h1>
+          <p className="text-muted-foreground">
+            The live agent roster used across Voice, Chat, Customer 360 and Campaigns.
+          </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Active Agents</CardTitle>
+            <CardTitle>Agent Roster</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Intent Cluster</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Success Rate</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {displayAgents.map((agent) => (
-                  <TableRow key={agent.id}>
-                    <TableCell className="font-medium">{agent.name}</TableCell>
-                    <TableCell>{agent.intentCluster}</TableCell>
-                    <TableCell>
-                      <Badge variant={agent.status === 'engaged' ? 'default' : 'secondary'}>
-                        {agent.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{(agent.successRate * 100).toFixed(1)}%</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleConfigureAgent(agent)}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          {agent.status === 'engaged' ? (
-                            <Pause className="h-4 w-4" />
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : isError ? (
+              <p className="text-sm text-destructive">Could not load the agent roster.</p>
+            ) : agents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No agents available.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Persona</TableHead>
+                    <TableHead>Direction</TableHead>
+                    <TableHead>Language</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {agents.map((agent) => (
+                    <TableRow key={agent.agentId}>
+                      <TableCell className="font-medium">
+                        {agent.displayName}
+                        {agent.isDefault && (
+                          <Badge variant="outline" className="ml-2">
+                            Default
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{agent.personaName || '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{formatStatusLabel(agent.direction)}</Badge>
+                      </TableCell>
+                      <TableCell>{agent.language || '—'}</TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/ai-agents/${agent.agentId}`)}>
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
-
-        <AgentConfiguration
-          isOpen={showConfiguration}
-          onClose={() => setShowConfiguration(false)}
-          agentId={selectedAgent?.id || ''}
-          agentName={selectedAgent?.name || 'New Agent'}
-        />
       </div>
     </Layout>
   );

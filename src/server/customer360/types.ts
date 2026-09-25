@@ -89,7 +89,15 @@ export interface RoleAccess {
 export interface SourceInteraction {
   interactionId: string;
   channel: string;
-  phoneNumber: string;
+  /** Null when the source has no phone identity for this row (Session 5.2) — e.g. a chat session keyed only by an external customer_id/contact_id. */
+  phoneNumber: string | null;
+  /**
+   * Authoritative backend customer_id/CIF, when the source provides one
+   * (Session 5.2). Always null for voice today — GET /call-data does not
+   * return a customer_id on its read path (confirmed via CallDataEntryDto,
+   * Session 4). Never fabricated; only ever set from a real backend field.
+   */
+  externalCustomerId: string | null;
   direction: string | null;
   agentId: string | null;
   agentDisplayName: string | null;

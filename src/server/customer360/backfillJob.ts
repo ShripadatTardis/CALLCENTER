@@ -1,6 +1,6 @@
 import type { CustomerRepository } from './customerRepository.js';
 import type { InteractionSourceAdapter } from './interactionSourceAdapter.js';
-import { normalizePhoneNumber } from '../../lib/phoneIdentity.js';
+import { resolveCustomerIdentity } from './identityResolver.js';
 
 /**
  * Optional historical backfill — plan §5. A scheduler-independent
@@ -41,29 +41,19 @@ export async function runBackfillBatch(
     pagesProcessed++;
 
     for (const row of rows) {
-      const normalized = normalizePhoneNumber(row.phoneNumber);
-      if (!normalized) continue;
-
-      let contactPoint = await repo.findContactPoint('phone', normalized);
-      let customerId: string;
-      if (contactPoint) {
-        customerId = contactPoint.customerId;
-      } else {
-        const now = new Date().toISOString();
-        const created = await repo.createCustomerWithContactPoint({
-          type: 'phone',
-          rawValue: row.phoneNumber,
-          normalizedValue: normalized,
-          displayName: null,
-          now,
-        });
-        contactPoint = created.contactPoint;
-        customerId = created.customer.id;
-      }
+      // Session 5.2: shared identity resolver (external CIF precedence
+      // over normalized phone) — see identityResolver.ts. Behaviorally
+      // unchanged for Voice (never supplies a CIF today).
+      const resolved = await resolveCustomerIdentity(
+        repo,
+        { externalCustomerId: row.externalCustomerId, phoneNumber: row.phoneNumber },
+        new Date().toISOString(),
+      );
+      if (!resolved) continue;
 
       const result = await repo.upsertInteraction({
-        customerId,
-        contactPointId: contactPoint.id,
+        customerId: resolved.customerId,
+        contactPointId: resolved.contactPointId,
         interactionId: row.interactionId,
         channel: row.channel,
         direction: row.direction,
@@ -82,7 +72,7 @@ export async function runBackfillBatch(
       });
       if (result.inserted) {
         interactionsInserted++;
-        touchedCustomerIds.add(customerId);
+        touchedCustomerIds.add(resolved.customerId);
       }
     }
 

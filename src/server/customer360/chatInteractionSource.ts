@@ -13,11 +13,12 @@ import type { SourceInteraction } from './types.js';
  * the Session 5.1 prompt) — listPage() below maps the session list
  * directly, one row in, one row out.
  *
- * A session with no phone_number cannot be turned into a SourceInteraction
- * (phoneNumber is a required field — Customer 360 identity is phone-keyed
- * today, same as voice) and is skipped; this is an expected, honest gap,
- * not a bug — see the Session 5.1 plan amendment for the backend
- * customer_id (CIF) linkage gap this leaves open.
+ * Session 5.2 update: a session with a phone_number OR a backend
+ * customer_id (CIF) is now materializable — CIF-only sessions (no phone
+ * at all) resolve via the shared identityResolver's external-identity
+ * path (see identityResolver.ts, reconcileJob.ts). A session with
+ * NEITHER is still skipped — there is no identity signal at all to
+ * attach it to.
  */
 
 const RETRY_ATTEMPTS = 3;
@@ -91,11 +92,12 @@ async function fetchSessions(query: Record<string, string>): Promise<ChatSession
 }
 
 function mapRow(dto: ChatSessionRowDto): SourceInteraction | null {
-  if (!dto.phone_number) return null; // no phone identity — cannot materialize a customer/contact (see file doc comment)
+  if (!dto.phone_number && !dto.customer_id) return null; // no identity signal at all — cannot materialize a customer/contact
   return {
     interactionId: dto.session_id,
     channel: 'chat',
     phoneNumber: dto.phone_number,
+    externalCustomerId: dto.customer_id,
     direction: null, // chat has no inbound/outbound concept
     agentId: dto.agent_id,
     agentDisplayName: dto.agent_name,

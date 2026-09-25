@@ -323,4 +323,61 @@ export const supabaseCustomerRepository: CustomerRepository = {
     });
     return count ?? 0;
   },
+
+  async findCustomerByExternalIdentity(source, identityType, identityValue) {
+    const row = await rpc<CustomerRow | null>('call_center_find_customer_by_external_identity', {
+      p_source: source,
+      p_identity_type: identityType,
+      p_identity_value: identityValue,
+    });
+    return row ? mapCustomer(row) : null;
+  },
+
+  async attachExternalIdentity(customerId, source, identityType, identityValue, now) {
+    await rpc<null>('call_center_attach_external_identity', {
+      p_customer_id: customerId,
+      p_source: source,
+      p_identity_type: identityType,
+      p_identity_value: identityValue,
+      p_now: now,
+    });
+  },
+
+  async addContactPointToCustomer(customerId, type, rawValue, normalizedValue, now) {
+    const row = await rpc<ContactPointRow>('call_center_add_contact_point_to_customer', {
+      p_customer_id: customerId,
+      p_type: type,
+      p_raw: rawValue,
+      p_normalized: normalizedValue,
+      p_now: now,
+    });
+    return mapContactPoint(row);
+  },
+
+  async createCustomer(now) {
+    const row = await rpc<CustomerRow>('call_center_create_customer', { p_now: now });
+    return mapCustomer(row);
+  },
+
+  async mergeCustomers(survivorId, loserId, now, reason) {
+    const result = await rpc<{
+      survivor: CustomerRow;
+      interactionsMoved: number;
+      contactPointsMoved: number;
+      campaignTargetsMoved: number;
+      externalIdentitiesMoved: number;
+    }>('call_center_merge_customers', {
+      p_survivor_id: survivorId,
+      p_loser_id: loserId,
+      p_now: now,
+      p_reason: reason,
+    });
+    return {
+      survivor: mapCustomer(result.survivor),
+      interactionsMoved: result.interactionsMoved ?? 0,
+      contactPointsMoved: result.contactPointsMoved ?? 0,
+      campaignTargetsMoved: result.campaignTargetsMoved ?? 0,
+      externalIdentitiesMoved: result.externalIdentitiesMoved ?? 0,
+    };
+  },
 };

@@ -1,6 +1,6 @@
 import type { CustomerRepository } from './customerRepository.js';
 import type { InteractionSourceAdapter } from './interactionSourceAdapter.js';
-import { normalizePhoneNumber } from '../../lib/phoneIdentity.js';
+import { resolveCustomerIdentity } from './identityResolver.js';
 
 /**
  * Optional periodic reconciliation — plan §5. A scheduler-independent
@@ -72,30 +72,24 @@ export async function runReconciliation(
     interactionsScanned += relevant.length;
 
     for (const row of relevant) {
-      const normalized = normalizePhoneNumber(row.phoneNumber);
-      if (!normalized) continue;
+      // Session 5.2: identity resolution (external CIF, if the source
+      // supplies one, precedence over normalized phone) now goes through
+      // the one shared resolver — see identityResolver.ts. Voice rows
+      // never carry a CIF today, so this is behaviorally unchanged for
+      // Voice; Chat rows can now unify onto an existing phone-derived
+      // customer, or trigger a deterministic merge, per the resolver's
+      // documented precedence.
+      const resolved = await resolveCustomerIdentity(
+        repo,
+        { externalCustomerId: row.externalCustomerId, phoneNumber: row.phoneNumber },
+        new Date().toISOString(),
+      );
+      if (!resolved) continue; // no identity signal at all — cannot materialize (unchanged skip behavior)
       if (row.startedAt > maxStartedAt) maxStartedAt = row.startedAt;
 
-      let contactPoint = await repo.findContactPoint('phone', normalized);
-      let customerId: string;
-      if (contactPoint) {
-        customerId = contactPoint.customerId;
-      } else {
-        const now = new Date().toISOString();
-        const created = await repo.createCustomerWithContactPoint({
-          type: 'phone',
-          rawValue: row.phoneNumber,
-          normalizedValue: normalized,
-          displayName: null,
-          now,
-        });
-        contactPoint = created.contactPoint;
-        customerId = created.customer.id;
-      }
-
       const result = await repo.upsertInteraction({
-        customerId,
-        contactPointId: contactPoint.id,
+        customerId: resolved.customerId,
+        contactPointId: resolved.contactPointId,
         interactionId: row.interactionId,
         channel: row.channel,
         direction: row.direction,
@@ -114,7 +108,7 @@ export async function runReconciliation(
       });
       if (result.inserted) {
         interactionsInserted++;
-        await repo.recomputeCustomerAggregate(customerId, new Date().toISOString());
+        await repo.recomputeCustomerAggregate(resolved.customerId, new Date().toISOString());
       }
     }
 

@@ -99,4 +99,45 @@ export interface CustomerRepository {
 
   /** Distinct customer_ids whose category_id cache may be stale relative to the current agent→category mapping — used by reconciliation, never by authorization (plan §16). */
   refreshInteractionCategoryCache(agentId: string, categoryId: string | null): Promise<number>;
+
+  // --- External identity unification (Session 5.2) ---
+
+  /** Looks up a customer by an authoritative external identity (e.g. backend CIF). Null if no customer has this exact (source, identityType, identityValue). */
+  findCustomerByExternalIdentity(source: string, identityType: string, identityValue: string): Promise<Customer | null>;
+
+  /** Idempotently attaches an external identity to a customer. Caller must have already resolved any cross-customer collision via mergeCustomers — this never reassigns an identity already attached elsewhere. */
+  attachExternalIdentity(customerId: string, source: string, identityType: string, identityValue: string, now: string): Promise<void>;
+
+  /** Adds an additional (non-primary) contact point to an already-existing customer — distinct from createCustomerWithContactPoint, which always creates a new customer. */
+  addContactPointToCustomer(
+    customerId: string,
+    type: ContactPointType,
+    rawValue: string,
+    normalizedValue: string,
+    now: string,
+  ): Promise<ContactPoint>;
+
+  /** Creates a bare customer with no contact point yet — for the edge case where an authoritative external identity arrives with no phone at all. */
+  createCustomer(now: string): Promise<Customer>;
+
+  /**
+   * Deterministic, atomic, all-or-nothing merge of loserId into
+   * survivorId: moves interactions, contact points, campaign targets and
+   * external identities, verifies zero orphaned references remain, then
+   * deletes the loser row — all inside one transaction. Does NOT
+   * recompute the survivor's aggregate; the caller must call
+   * recomputeCustomerAggregate afterward.
+   */
+  mergeCustomers(
+    survivorId: string,
+    loserId: string,
+    now: string,
+    reason: string,
+  ): Promise<{
+    survivor: Customer;
+    interactionsMoved: number;
+    contactPointsMoved: number;
+    campaignTargetsMoved: number;
+    externalIdentitiesMoved: number;
+  }>;
 }

@@ -984,3 +984,73 @@ No existing screen's deploy behavior changes.
 
 Stop after this revised plan. No implementation code has been written. Waiting for
 approval before beginning Session 4.
+
+---
+
+## 25. Session 5.2 — Customer Identity Unification (implemented)
+
+Closes item 6 above (and the Session 5.1 chat-linkage gap it restated): the enhanced
+Chat API returns an authoritative backend `customer_id`/CIF and explicitly states it's
+"the same customer identity used to group Chat with Voice." This addendum adds
+authoritative external-identity resolution to Customer 360, on top of (never replacing)
+the existing phone-based model.
+
+**Implementation-note deliverable, per the Session 5.2 prompt's instruction to inspect
+the existing schema first**: the existing `customers.source_customer_ref` text column
+(added in Session 4, already read by `Customers.tsx`/`CustomerDetail.tsx` and by
+`campaignRunner.ts`'s Trigger Call `customer_id` field) is a single free-text ref with
+no source/type provenance and no uniqueness constraint — not suitable as the identity
+model's source of truth on its own. The prompt's proposed
+`call_center.customer_external_identities` table (id, customer_id, source,
+identity_type, identity_value, created_at, updated_at, unique on
+`(source, identity_type, identity_value)`) was implemented as-proposed, with no
+deviation. `customers.source_customer_ref` is kept as a **denormalized display/campaign
+cache**, refreshed automatically by `call_center_attach_external_identity` whenever
+`identity_type = 'customer_id'` — so the UI and `campaignRunner.ts` need zero changes
+and keep working unchanged.
+
+**Identity precedence (deterministic, no fuzzy/name/transcript/agent/category
+matching)**: authoritative external `customer_id`/CIF → normalized contact point →
+create new customer. Implemented as one shared resolver,
+`src/server/customer360/identityResolver.ts`'s `resolveCustomerIdentity()`, used by
+**both** `reconcileJob.ts` and `backfillJob.ts` — no separate Chat-specific identity
+path, per the prompt's explicit instruction. `aggregationService.ts`'s UI-triggered
+progressive phone search is intentionally left untouched: it is Voice-only, and Voice's
+`GET /call-data` still has no `customer_id` field (confirmed again this session via
+`CallDataEntryDto`), so routing it through the resolver would produce identical
+behavior to today at extra risk for zero benefit.
+
+**Merge logic**: `call_center_merge_customers` (new SECURITY DEFINER RPC) is atomic and
+all-or-nothing — moves `customer_interactions`, `customer_contact_points`,
+`campaign_targets`, and `customer_external_identities` from the loser to the survivor,
+verifies zero rows still reference the loser, records a `customer_merge_log` provenance
+row (reason, per-table move counts, timestamp), and only then deletes the loser — all
+inside one transaction, so a failed verification rolls back the entire merge rather
+than leaving a partial state. Survivor tie-break (documented in
+`identityResolver.ts`): prefer more total interactions; on an exact tie, prefer the
+earlier `firstSeen`. Campaign business data (`campaign_executions`, `campaign_results`,
+`is_success` values) is never touched — only the `campaign_targets.customer_id` FK is
+repointed, per Session 5's reconciliation-integrity rules.
+
+**Migration/backfill result**: inspected `chat_sessions.backend_customer_id` (Session
+5.1's column, the one place an authoritative CIF could already be stored), Voice
+Call Data (confirmed no `customer_id` field), and campaign source references. At
+migration time, **zero rows anywhere carried an authoritative CIF** — the Voice Agent
+backend was down for most of Sessions 5.1/5.2, so no chat session had actually
+round-tripped a real `customer_id` yet. No backfill was executed because there was
+nothing eligible to backfill; the resolver and merge machinery are fully implemented
+and verified (below), ready to activate the moment a real CIF-bearing chat session is
+ingested.
+
+**Verification**: all 10 scenarios from the prompt were verified against the live
+AuditAI Supabase project (via a temporary Node/tsx script exercising
+`identityResolver.ts` + `supabaseCustomerRepository.ts` directly, and the Supabase MCP
+for the campaign-target scenario), since the Voice Agent backend was down for the live
+end-to-end checks (creating a real chat session, etc.) — all 10 passed; see the
+Session 5.2 completion report for the itemized results. All synthetic test data was
+cleaned up afterward; nothing above was left in production.
+
+**Remaining gap, unchanged from item 6 above**: Voice still does not expose
+`customer_id`/CIF on any read path — Voice stays phone-based until that changes. A
+later Chat interaction with an authoritative CIF for the same phone-derived customer
+will still unify it correctly (verified: scenario 7).

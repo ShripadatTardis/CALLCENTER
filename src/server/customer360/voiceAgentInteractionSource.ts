@@ -62,6 +62,10 @@ function mapEntry(dto: CallDataEntryDto): SourceInteraction {
     interactionId: dto.call_id,
     channel: dto.channel,
     phoneNumber: dto.caller_number,
+    // Voice never supplies a customer_id/CIF on its read path today
+    // (CallDataEntryDto has no such field — confirmed Session 4/5.2).
+    // Never fabricated; stays null until the backend actually returns one.
+    externalCustomerId: null,
     direction: dto.direction ?? null,
     agentId: dto.ai_agent_id || dto.agent_id || null,
     agentDisplayName: dto.ai_agent_name || null,

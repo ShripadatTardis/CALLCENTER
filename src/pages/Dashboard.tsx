@@ -209,20 +209,28 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-gray-500 text-left">Monitor ongoing interactions</p>
               </Button>
 
-              <Button variant="outline" className="justify-start h-auto p-4 flex-col items-start space-y-2">
+              <Button
+                variant="outline"
+                className="justify-start h-auto p-4 flex-col items-start space-y-2"
+                onClick={() => navigate('/qa-review')}
+              >
                 <div className="flex items-center space-x-2">
                   <AlertTriangle className="h-5 w-5 text-orange-600" />
                   <span className="font-medium text-orange-600">Review Escalations</span>
                 </div>
-                <p className="text-sm text-gray-500 text-left">Handle escalated cases</p>
+                <p className="text-sm text-gray-500 text-left">Open Interaction Quality (escalation/outcome signals)</p>
               </Button>
 
-              <Button variant="outline" className="justify-start h-auto p-4 flex-col items-start space-y-2">
+              <Button
+                variant="outline"
+                className="justify-start h-auto p-4 flex-col items-start space-y-2"
+                onClick={() => navigate('/analytics')}
+              >
                 <div className="flex items-center space-x-2">
                   <BarChart3 className="h-5 w-5 text-purple-600" />
                   <span className="font-medium text-purple-600">Analytics Report</span>
                 </div>
-                <p className="text-sm text-gray-500 text-left">Generate performance report</p>
+                <p className="text-sm text-gray-500 text-left">Open Analytics (historical/trend reporting)</p>
               </Button>
             </div>
           </CardContent>

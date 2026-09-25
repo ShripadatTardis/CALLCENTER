@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,19 +6,20 @@ import { Search } from 'lucide-react';
 interface CampaignFiltersProps {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  selectedCampaignType: string;
-  setSelectedCampaignType: (type: string) => void;
   selectedStatus: string;
   setSelectedStatus: (status: string) => void;
 }
 
+/**
+ * "Campaign type" filter removed (plan §25) — that free-text concept
+ * had no real backend meaning and is retired in favor of agent_id +
+ * result-rule configuration.
+ */
 export const CampaignFilters: React.FC<CampaignFiltersProps> = ({
   searchTerm,
   setSearchTerm,
-  selectedCampaignType,
-  setSelectedCampaignType,
   selectedStatus,
-  setSelectedStatus
+  setSelectedStatus,
 }) => {
   return (
     <Card>
@@ -35,18 +35,6 @@ export const CampaignFilters: React.FC<CampaignFiltersProps> = ({
             />
           </div>
           <select
-            value={selectedCampaignType}
-            onChange={(e) => setSelectedCampaignType(e.target.value)}
-            className="border border-slate-300 rounded-md px-3 py-2 text-sm"
-          >
-            <option value="all">All Types</option>
-            <option value="loan_emi_reminder">EMI Reminder</option>
-            <option value="overdue_loan_followup">Overdue Follow-up</option>
-            <option value="document_reminder">Document Reminder</option>
-            <option value="cross_sell">Cross-sell</option>
-            <option value="welcome_call">Welcome Call</option>
-          </select>
-          <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="border border-slate-300 rounded-md px-3 py-2 text-sm"
@@ -55,8 +43,10 @@ export const CampaignFilters: React.FC<CampaignFiltersProps> = ({
             <option value="draft">Draft</option>
             <option value="scheduled">Scheduled</option>
             <option value="running">Running</option>
-            <option value="completed">Completed</option>
             <option value="paused">Paused</option>
+            <option value="completed">Completed</option>
+            <option value="stopped">Stopped</option>
+            <option value="failed">Failed</option>
           </select>
         </div>
       </CardContent>

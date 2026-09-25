@@ -1,70 +1,95 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { OutboundCampaign, CampaignContact, CallScript } from '@/types/auth';
-import { Users, PhoneCall, TrendingUp } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { CampaignStatusBadge } from './CampaignStatusBadge';
+import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
+import { useCallData } from '@/hooks/calls/useCallData';
+import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import { formatTimestamp } from '@/lib/format';
+import type { CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
+import type { Interaction } from '@/types/interaction';
 
-interface CampaignDetailProps {
-  campaign: OutboundCampaign;
-  contacts: CampaignContact[];
-  script: CallScript | undefined;
-  onBack: () => void;
-  onTranscriptClick: (contact: CampaignContact) => void;
-  onRecordingClick: (contact: CampaignContact) => void;
+/**
+ * Reuses the existing InteractionDetailDialog rather than a
+ * campaign-local transcript/recording viewer (plan §19) — the exact
+ * pattern CustomerDetail.tsx already established in Session 4. Only
+ * shown for a target with a reconciled interactionId; a target with no
+ * reconciled call has nothing to show yet, honestly (plan §19).
+ */
+const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => void }> = ({ interactionId, onClose }) => {
+  const { data, isLoading, isError } = useCallData({ search: interactionId, page_size: 1 });
+  const interaction = data?.interactions.find((i) => i.interactionId === interactionId) ?? data?.interactions[0];
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="bg-white rounded-lg p-6 flex items-center gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Loading interaction…
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !interaction) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+        <div className="bg-white rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+          Could not load full interaction detail for {interactionId} right now.
+          <div className="mt-3">
+            <Button size="sm" variant="outline" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <InteractionDetailDialog isOpen onClose={onClose} interaction={interaction as Interaction} />;
+};
+
+function reconciliationLabel(target: CampaignTargetRow): string {
+  if (target.effectiveResultId) return target.campaignResultLabel ?? 'Classified';
+  switch (target.latestReconciliationStatus) {
+    case 'reconciled':
+      return 'Reconciled';
+    case 'unresolved':
+      return 'Could not be matched to a call';
+    case 'error':
+      return 'Reconciliation error';
+    case 'pending':
+      return target.latestExecutionStatus ? 'Awaiting reconciliation' : 'Not yet contacted';
+    default:
+      return 'Not yet contacted';
+  }
 }
 
-export const CampaignDetail: React.FC<CampaignDetailProps> = ({
-  campaign,
-  contacts,
-  script,
-  onBack,
-  onTranscriptClick,
-  onRecordingClick
-}) => {
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
-      scheduled: { color: 'bg-blue-100 text-blue-800', label: 'Scheduled' },
-      running: { color: 'bg-green-100 text-green-800', label: 'Running' },
-      completed: { color: 'bg-purple-100 text-purple-800', label: 'Completed' },
-      paused: { color: 'bg-yellow-100 text-yellow-800', label: 'Paused' }
-    };
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
-    return <Badge className={config.color}>{config.label}</Badge>;
-  };
+interface CampaignDetailProps {
+  campaign: CampaignDetailType;
+  targets: CampaignTargetRow[];
+  onBack: () => void;
+  onRefetch: () => void;
+}
 
-  const getCampaignTypeLabel = (campaignType: string) => {
-    const labels = {
-      loan_emi_reminder: 'EMI Reminder',
-      overdue_loan_followup: 'Overdue Follow-up',
-      document_reminder: 'Document Reminder',
-      cross_sell: 'Cross-sell',
-      welcome_call: 'Welcome Call'
-    };
-    return labels[campaignType as keyof typeof labels] || campaignType;
-  };
+export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, targets, onBack, onRefetch }) => {
+  const actions = useCampaignActions(campaign.id);
+  const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+  const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
+  const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
+
+  const runAction = (mutation: { mutateAsync: (id: string) => Promise<unknown> }) => {
+    mutation.mutateAsync(campaign.id).then(onRefetch);
   };
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center space-x-4">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="flex items-center space-x-2"
-          >
+          <Button variant="outline" onClick={onBack} className="flex items-center space-x-2">
             <span>← Back to Campaigns</span>
           </Button>
           <div>
@@ -72,84 +97,71 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({
             <p className="text-slate-600">{campaign.description}</p>
           </div>
         </div>
-        <div className="flex space-x-2">
-          {getStatusBadge(campaign.status)}
+        <div className="flex items-center gap-2">
+          <CampaignStatusBadge status={campaign.status} />
+          {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+            <Button size="sm" onClick={() => runAction(actions.start)} disabled={actions.start.isPending}>
+              Start
+            </Button>
+          )}
+          {campaign.status === 'running' && (
+            <Button size="sm" variant="outline" onClick={() => runAction(actions.pause)} disabled={actions.pause.isPending}>
+              Pause
+            </Button>
+          )}
+          {campaign.status === 'paused' && (
+            <Button size="sm" onClick={() => runAction(actions.resume)} disabled={actions.resume.isPending}>
+              Resume
+            </Button>
+          )}
+          {(campaign.status === 'running' || campaign.status === 'paused') && (
+            <Button size="sm" variant="destructive" onClick={() => runAction(actions.stop)} disabled={actions.stop.isPending}>
+              Stop
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Campaign Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Targets</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{campaign.totalContacts}</div>
+            <div className="text-2xl font-bold">{campaign.stats.targetCount}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Calls Made</CardTitle>
-            <PhoneCall className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Calls Triggered</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{campaign.callsMade}</div>
+            <div className="text-2xl font-bold">{campaign.stats.triggeredCount}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{campaign.successRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{rate === null ? '—' : `${rate.toFixed(1)}%`}</div>
+            <div className="text-xs text-muted-foreground mt-1">{unclassified} unclassified / pending</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Campaign Type</CardTitle>
-            <Badge className="text-xs">{getCampaignTypeLabel(campaign.campaignType)}</Badge>
+            <CardTitle className="text-sm font-medium">Agent</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground">
-              Created by {campaign.createdBy}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {formatDate(campaign.launchDate)}
-            </div>
+            <div className="text-sm text-muted-foreground">{campaign.agentId}</div>
+            <div className="text-xs text-muted-foreground">Created {formatTimestamp(campaign.createdAt)}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Script Preview */}
-      {script && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Campaign Script: {script.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-slate-50 p-4 rounded-lg">
-              <p className="text-sm text-slate-700">{script.content}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {script.placeholders.map((placeholder) => (
-                  <Badge key={placeholder} variant="outline" className="text-xs">
-                    {`{{${placeholder}}}`}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Customer List */}
       <Card>
         <CardHeader>
-          <CardTitle>Customer List ({contacts.length} contacts)</CardTitle>
+          <CardTitle>Targets ({targets.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -157,68 +169,74 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({
               <thead>
                 <tr className="border-b border-slate-200">
                   <th className="text-left py-2 font-medium text-slate-700">Name</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Mobile</th>
+                  <th className="text-left py-2 font-medium text-slate-700">Phone</th>
                   <th className="text-left py-2 font-medium text-slate-700">Status</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Action Taken</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Call Time</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Duration</th>
+                  <th className="text-left py-2 font-medium text-slate-700">Campaign Result</th>
+                  <th className="text-left py-2 font-medium text-slate-700">Next Action</th>
+                  <th className="text-left py-2 font-medium text-slate-700">Attempts</th>
                   <th className="text-center py-2 font-medium text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {contacts.map((contact) => (
-                  <tr key={contact.id} className="border-b border-slate-100">
-                    <td className="py-2 text-slate-700">{contact.name}</td>
-                    <td className="py-2 text-slate-600">{contact.mobileNumber}</td>
+                {targets.map((target) => (
+                  <tr key={target.id} className="border-b border-slate-100">
+                    <td className="py-2 text-slate-700">{target.customerDisplayName ?? '—'}</td>
+                    <td className="py-2 text-slate-600">{target.contactRawValue}</td>
                     <td className="py-2">
-                      <Badge variant="outline" className={
-                        contact.status === 'completed' ? 'text-green-700 border-green-300' :
-                        contact.status === 'not_answered' ? 'text-yellow-700 border-yellow-300' :
-                        'text-gray-700 border-gray-300'
-                      }>
-                        {contact.status.replace('_', ' ')}
-                      </Badge>
+                      <Badge variant="outline">{target.status.replace('_', ' ')}</Badge>
                     </td>
                     <td className="py-2 text-slate-600">
-                      {contact.actionTaken ? contact.actionTaken.replace('_', ' ') : '-'}
+                      {target.effectiveResultId ? (
+                        <span className={target.resultIsSuccess === true ? 'text-green-700' : target.resultIsSuccess === false ? 'text-red-700' : ''}>
+                          {reconciliationLabel(target)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{reconciliationLabel(target)}</span>
+                      )}
                     </td>
-                    <td className="py-2 text-slate-600">
-                      {contact.callTimestamp ? formatDate(contact.callTimestamp) : '-'}
-                    </td>
-                    <td className="py-2 text-slate-600">
-                      {contact.callDuration ? `${Math.floor(contact.callDuration / 60)}:${(contact.callDuration % 60).toString().padStart(2, '0')}` : '-'}
-                    </td>
+                    <td className="py-2 text-slate-600">{target.resultNextAction ?? '-'}</td>
+                    <td className="py-2 text-slate-600">{target.attemptCount}</td>
                     <td className="py-2 text-center">
-                      <div className="flex justify-center space-x-1">
-                        {contact.transcriptId && (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                      <div className="flex justify-center gap-1">
+                        {target.latestReconciledInteractionId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
                             className="text-xs"
-                            onClick={() => onTranscriptClick(contact)}
+                            onClick={() => setOpenInteractionId(target.latestReconciledInteractionId)}
                           >
-                            Transcript
+                            Transcript / Recording
                           </Button>
                         )}
-                        {contact.recordingId && (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                        {(target.status === 'failed' || target.status === 'follow_up_due') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
                             className="text-xs"
-                            onClick={() => onRecordingClick(contact)}
+                            disabled={actions.retry.isPending}
+                            onClick={() => actions.retry.mutateAsync(target.id).then(onRefetch)}
                           >
-                            Recording
+                            Retry
                           </Button>
                         )}
                       </div>
                     </td>
                   </tr>
                 ))}
+                {targets.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-500">
+                      No targets imported yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+
+      {openInteractionId && <InteractionLookupDialog interactionId={openInteractionId} onClose={() => setOpenInteractionId(null)} />}
     </div>
   );
 };

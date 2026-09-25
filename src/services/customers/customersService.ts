@@ -44,16 +44,17 @@ export async function fetchCustomerInteractions(
   customerId: string,
   opts: { page?: number; pageSize?: number } = {},
 ): Promise<CustomerInteractionsResponse> {
-  return request<CustomerInteractionsResponse>(`/customers/${encodeURIComponent(customerId)}/interactions`, {
+  return request<CustomerInteractionsResponse>(`/customers/${encodeURIComponent(customerId)}`, {
     method: 'GET',
-    query: { page: opts.page, pageSize: opts.pageSize },
+    query: { action: 'interactions', page: opts.page, pageSize: opts.pageSize },
     headers: roleHeaders(role),
   });
 }
 
 export async function refreshCustomer(role: string, customerId: string): Promise<CustomerDetailResponse> {
-  return request<CustomerDetailResponse>(`/customers/${encodeURIComponent(customerId)}/refresh`, {
+  return request<CustomerDetailResponse>(`/customers/${encodeURIComponent(customerId)}`, {
     method: 'POST',
+    query: { action: 'refresh' },
     headers: roleHeaders(role),
   });
 }

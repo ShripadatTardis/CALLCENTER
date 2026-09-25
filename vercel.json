@@ -2,5 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/((?!api/|@|src/|node_modules/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/customers/admin?action=reconcile&maxPages=2",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

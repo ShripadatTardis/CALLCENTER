@@ -14,16 +14,35 @@ import { normalizePhoneNumber } from '../../lib/phoneIdentity.js';
 
 const OVERLAP_MS = 60 * 60 * 1000;
 
+/**
+ * Amended 2026-09-25 (Customer 360 closure pass): the original MAX_PAGES=20
+ * bound, combined with a single setHighWaterMark call at the very end of the
+ * function, meant a Vercel-killed invocation (function duration limit) made
+ * ZERO durable progress — every retry re-scanned from the same stale
+ * high-water-mark. Fixed by (a) shrinking the per-invocation page bound so
+ * one invocation reliably completes well within the deployment's duration
+ * limit, and (b) persisting the high-water-mark after each fully-processed
+ * page, not just at the end — reusing the exact same
+ * getHighWaterMark/setHighWaterMark primitives already proven in this file,
+ * just checkpointed more granularly. This mirrors backfillJob.ts's own
+ * bounded/resumable pattern rather than inventing a new one. A caller
+ * (the admin route, or a scheduler) simply re-invokes this on a cadence;
+ * each invocation always resumes from the last durably-persisted mark.
+ */
+const DEFAULT_MAX_PAGES = 2;
+
 export interface ReconciliationResult {
   interactionsScanned: number;
   interactionsInserted: number;
   categoryCacheRowsUpdated: number;
   newHighWaterMark: string;
+  pagesProcessed: number;
 }
 
 export async function runReconciliation(
   repo: CustomerRepository,
   source: InteractionSourceAdapter,
+  maxPages: number = DEFAULT_MAX_PAGES,
 ): Promise<ReconciliationResult> {
   const lastHighWaterMark = await repo.getHighWaterMark();
   const since = lastHighWaterMark
@@ -33,13 +52,13 @@ export async function runReconciliation(
   let interactionsScanned = 0;
   let interactionsInserted = 0;
   let maxStartedAt = lastHighWaterMark ?? new Date(0).toISOString();
+  let pagesProcessed = 0;
 
   // Reconciliation scans by page (not per-contact-point — it exists
   // precisely to catch interactions no known contact point triggered a
-  // refresh for), bounded to a modest number of pages per run since it
-  // is explicitly infrequent and non-blocking for the primary model.
-  const MAX_PAGES = 20;
-  for (let page = 1; page <= MAX_PAGES; page++) {
+  // refresh for), bounded to a small number of pages per run so one
+  // invocation reliably completes and checkpoints (see amendment above).
+  for (let page = 1; page <= maxPages; page++) {
     const { rows, totalPages } = await source.listPage(page, 100);
     const relevant = since ? rows.filter((r) => r.startedAt >= since) : rows;
     interactionsScanned += relevant.length;
@@ -91,6 +110,12 @@ export async function runReconciliation(
       }
     }
 
+    pagesProcessed++;
+    // Checkpoint after each fully-processed page, not just at the end,
+    // so a duration-limited kill on a later page still keeps this page's
+    // progress durably (see amendment note above).
+    await repo.setHighWaterMark(maxStartedAt);
+
     if (page >= totalPages) break;
   }
 
@@ -101,7 +126,5 @@ export async function runReconciliation(
     categoryCacheRowsUpdated += await repo.refreshInteractionCategoryCache(agentId, categoryId);
   }
 
-  await repo.setHighWaterMark(maxStartedAt);
-
-  return { interactionsScanned, interactionsInserted, categoryCacheRowsUpdated, newHighWaterMark: maxStartedAt };
+  return { interactionsScanned, interactionsInserted, categoryCacheRowsUpdated, newHighWaterMark: maxStartedAt, pagesProcessed };
 }

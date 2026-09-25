@@ -28,8 +28,9 @@ async function handleBackfill(req: VercelRequest, res: VercelResponse): Promise<
   res.status(200).json(result);
 }
 
-async function handleReconcile(_req: VercelRequest, res: VercelResponse): Promise<void> {
-  const result = await runReconciliation(repo, source);
+async function handleReconcile(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const maxPages = readIntQuery(req, 'maxPages', 2);
+  const result = await runReconciliation(repo, source, maxPages);
   res.status(200).json(result);
 }
 
@@ -59,7 +60,39 @@ async function handleSeedCategories(_req: VercelRequest, res: VercelResponse): P
   res.status(200).json({ created, skipped, totalAgents: dto.agents.length });
 }
 
+/**
+ * Vercel Cron only ever issues a GET request and cannot set custom
+ * headers — it can't drive the normal POST + X-Admin-Token admin path
+ * above. Vercel's own documented mechanism for authenticating its own
+ * Cron requests is a `CRON_SECRET` env var: when set, Vercel
+ * automatically attaches `Authorization: Bearer <CRON_SECRET>` to every
+ * Cron invocation of this deployment. This check accepts ONLY that,
+ * ONLY for GET, and ONLY for action=reconcile — the one job safe/cheap
+ * enough to run unattended on a schedule (see vercel.json's `crons`
+ * entry). Manual/admin invocation of any action, including reconcile,
+ * still requires the existing POST + X-Admin-Token path — this is a
+ * narrow, additive authentication path for the scheduler adapter only,
+ * not a replacement for it.
+ */
+function isAuthorizedCronRequest(req: VercelRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return req.headers.authorization === `Bearer ${secret}`;
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
+  const action = (Array.isArray(req.query.action) ? req.query.action[0] : req.query.action) ?? '';
+
+  if (req.method === 'GET' && action === 'reconcile') {
+    if (!isAuthorizedCronRequest(req)) {
+      res.status(401).json({ detail: 'Invalid or missing cron authorization' });
+      return;
+    }
+    noStore(res);
+    await handleReconcile(req, res);
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     res.status(405).json({ detail: 'Method not allowed. Use POST.' });
@@ -68,8 +101,6 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   if (!requireAdminToken(req, res)) return;
 
   noStore(res);
-
-  const action = (Array.isArray(req.query.action) ? req.query.action[0] : req.query.action) ?? '';
 
   switch (action) {
     case 'backfill':

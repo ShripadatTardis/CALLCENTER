@@ -81,6 +81,8 @@ export interface CustomerDetailResponse {
   customer: Pick<CustomerSummary, 'id' | 'displayName' | 'sourceCustomerRef' | 'firstSeen' | 'lastSeen'>;
   aggregate: AuthorizedAggregate;
   refresh: RefreshStatus;
+  /** Raw phone contact-point values — used to look up a Voice interaction's full call-data row (see CustomerDetail.tsx). */
+  phoneNumbers: string[];
 }
 
 export interface CustomerInteractionsResponse {

@@ -59,6 +59,17 @@ export interface AuthorizedCustomerView {
   customer: Pick<Customer, 'id' | 'displayName' | 'sourceCustomerRef' | 'firstSeen' | 'lastSeen'>;
   /** Authorized-subset aggregate (plan §12) — NEVER the full customers.* row. */
   aggregate: ComputedAggregate;
+  /**
+   * Raw phone contact-point values for this customer — identity data,
+   * not category-gated content, so it is not filtered by `access`
+   * (same reasoning `listContactPoints` already applies internally in
+   * aggregationService.ts). Added so the frontend can look up a Voice
+   * interaction's full call-data row by phone (the only call-data
+   * filter that actually works — call_id has no direct lookup param,
+   * see docs/CALL_CENTRE_BACKEND_CAPABILITY_RECONCILIATION.md) instead
+   * of guessing at an id-based search that silently returns nothing.
+   */
+  phoneNumbers: string[];
 }
 
 /**
@@ -76,6 +87,7 @@ export async function buildAuthorizedCustomerView(
 ): Promise<AuthorizedCustomerView> {
   const rows = await repo.listAllInteractions(customer.id, access.authorizedAgentIds);
   const aggregate = computeAggregate(rows);
+  const contactPoints = await repo.listContactPoints(customer.id);
   return {
     customer: {
       id: customer.id,
@@ -85,6 +97,7 @@ export async function buildAuthorizedCustomerView(
       lastSeen: customer.lastSeen,
     },
     aggregate,
+    phoneNumbers: contactPoints.filter((cp) => cp.type === 'phone').map((cp) => cp.rawValue),
   };
 }
 

@@ -8,9 +8,11 @@ import { ArrowLeft, Loader2, Phone, RefreshCw } from 'lucide-react';
 import { useCustomerDetail } from '@/hooks/customers/useCustomerDetail';
 import { useCustomerInteractions } from '@/hooks/customers/useCustomerInteractions';
 import { useRefreshCustomer } from '@/hooks/customers/useRefreshCustomer';
-import { useCallData } from '@/hooks/calls/useCallData';
+import { useQuery } from '@tanstack/react-query';
+import { fetchCallData } from '@/services/calls/callsService';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
 import {
   formatDurationExact,
   formatDurationLong,
@@ -20,22 +22,61 @@ import {
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
 
+const MAX_LOOKUP_PAGES = 3;
+const LOOKUP_PAGE_SIZE = 100;
+
 /**
- * Reuses the existing InteractionDetailDialog (Session 2/3) rather than
- * building a second transcript/recording viewer, per plan §9's UX
- * requirement. A Customer 360 timeline row only has the fields this
- * app's own customer_interactions table stores (no recording URL, no
- * transcript, no full status/stage) — so opening a row does a small,
- * targeted lookup against the already-live call-data search to get the
- * full Interaction shape the dialog expects, then hands that to the
- * dialog unmodified.
+ * /call-data has no call_id-keyed lookup param — only `search`, which
+ * matches caller_number/caller_name, not call_id (confirmed live; see
+ * docs/CALL_CENTRE_LIVE_VERIFICATION_POST_OUTAGE.md). So a Voice lookup
+ * searches by the customer's own phone number(s) — the one field
+ * `search` actually matches — and filters the (bounded, paged) results
+ * down to the exact call_id. Reuses the same fetchCallData the rest of
+ * the app already uses; no new endpoint.
  */
-const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => void }> = ({
-  interactionId,
-  onClose,
-}) => {
-  const { data, isLoading, isError } = useCallData({ search: interactionId, page_size: 1 });
-  const interaction = data?.interactions.find((i) => i.interactionId === interactionId) ?? data?.interactions[0];
+async function findCallByPhoneAndId(phoneNumbers: string[], callId: string) {
+  for (const phone of phoneNumbers) {
+    for (let page = 1; page <= MAX_LOOKUP_PAGES; page += 1) {
+      const result = await fetchCallData({ search: phone, page: page, page_size: LOOKUP_PAGE_SIZE });
+      const match = result.interactions.find((i) => i.interactionId === callId);
+      if (match) return match;
+      if (page >= result.pagination.total_pages) break;
+    }
+  }
+  return null;
+}
+
+/**
+ * Reuses the existing InteractionDetailDialog (Session 2/3) and
+ * ChatSessionDetailDialog (Session 5.1) rather than building a second
+ * transcript/recording viewer, per plan §9's UX requirement. A Customer
+ * 360 timeline row only has the fields this app's own
+ * customer_interactions table stores (no recording URL, no transcript,
+ * no full status/stage) — so opening a row does a small, targeted
+ * lookup to get the shape each dialog expects, then hands that to the
+ * dialog unmodified. Chat rows carry their own authoritative session_id
+ * already (Session 5.1's chatInteractionSource writes it straight from
+ * the backend), so they go directly to ChatSessionDetailDialog with no
+ * extra lookup at all.
+ */
+const InteractionLookupDialog: React.FC<{
+  interactionId: string;
+  channel: string;
+  phoneNumbers: string[];
+  onClose: () => void;
+}> = ({ interactionId, channel, phoneNumbers, onClose }) => {
+  const isChat = channel === 'chat';
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['customer360', 'voice-interaction-lookup', interactionId, phoneNumbers],
+    queryFn: () => findCallByPhoneAndId(phoneNumbers, interactionId),
+    enabled: !isChat,
+  });
+  const interaction = data;
+
+  if (isChat) {
+    return <ChatSessionDetailDialog isOpen onClose={onClose} sessionId={interactionId} />;
+  }
 
   if (isLoading) {
     return (
@@ -69,7 +110,7 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => 
 const CustomerDetail: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
-  const [selectedInteractionId, setSelectedInteractionId] = useState<string | null>(null);
+  const [selectedInteraction, setSelectedInteraction] = useState<{ id: string; channel: string } | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useCustomerDetail(customerId);
   const interactionsQuery = useCustomerInteractions(customerId);
@@ -169,7 +210,7 @@ const CustomerDetail: React.FC = () => {
                   interactions.map((row) => (
                     <button
                       key={row.id}
-                      onClick={() => setSelectedInteractionId(row.interactionId)}
+                      onClick={() => setSelectedInteraction({ id: row.interactionId, channel: row.channel })}
                       className="w-full text-left flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors"
                     >
                       <div className="min-w-0 flex-1">
@@ -206,10 +247,12 @@ const CustomerDetail: React.FC = () => {
           </>
         )}
 
-        {selectedInteractionId && (
+        {selectedInteraction && (
           <InteractionLookupDialog
-            interactionId={selectedInteractionId}
-            onClose={() => setSelectedInteractionId(null)}
+            interactionId={selectedInteraction.id}
+            channel={selectedInteraction.channel}
+            phoneNumbers={data?.phoneNumbers ?? []}
+            onClose={() => setSelectedInteraction(null)}
           />
         )}
       </div>

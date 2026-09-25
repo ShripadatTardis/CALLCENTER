@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, withErrorBoundary, noStore } from '../_voicebot.js';
-import { readIntQuery } from '../_customer360.js';
+import { readIntQuery, resolveAccessForRequest } from '../_customer360.js';
 import { supabaseChatRepository } from '../../src/server/chat/supabaseChatRepository.js';
 import type { ChatMessageRecord, ChatSessionRecord } from '../../src/server/chat/types.js';
 import type {
@@ -135,6 +135,15 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
 
   noStore(res);
 
+  // Session 6.2: same category/role authorization Customer 360 and
+  // api/calls/data.ts now apply — closes the audited gap where Chat
+  // Logs sent an x-user-role header that the server never read. See
+  // docs/CALL_CENTRE_SESSION6_2_INTERACTION_CLASSIFICATION_PLAN.md §5.
+  const access = await resolveAccessForRequest(req);
+  const authorizedAgentIds = access.allCategories || access.authorizedAgentIds === 'all' ? null : new Set(access.authorizedAgentIds);
+  const isAuthorized = (agentId: string | null | undefined) =>
+    authorizedAgentIds === null || (!!agentId && authorizedAgentIds.has(agentId));
+
   const idRaw = req.query.id;
   const sessionId = Array.isArray(idRaw) ? idRaw[0] : idRaw;
 
@@ -142,6 +151,10 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     try {
       const dto = await fetchLiveDetail(sessionId);
       const { messages, ...sessionRow } = dto.data;
+      if (!isAuthorized(sessionRow.agent_id)) {
+        res.status(404).json({ detail: 'Chat session not found' });
+        return;
+      }
       res.status(200).json({
         session: toSummaryFromLive(sessionRow),
         messages: messages.map((m) => ({
@@ -155,7 +168,7 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     } catch (err) {
       console.warn('Live chat session-detail fetch failed, falling back to local copy:', err);
       const local = await supabaseChatRepository.getSessionByUpstreamId(sessionId);
-      if (!local) {
+      if (!local || !isAuthorized(local.agentId)) {
         res.status(404).json({ detail: 'Chat session not found (live fetch failed and no local copy exists)' });
         return;
       }
@@ -172,6 +185,15 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   const customerId = typeof req.query.customerId === 'string' ? req.query.customerId : undefined;
   const contactId = typeof req.query.contactId === 'string' ? req.query.contactId : undefined;
 
+  // A requested ?agentId= filter is honored only when it's within the
+  // caller's authorized set (or the caller is all-access) — an
+  // unauthorized agentId never reaches the backend query, and never
+  // silently falls back to "no filter" either (that would leak volume).
+  if (agentId && authorizedAgentIds !== null && !authorizedAgentIds.has(agentId)) {
+    res.status(200).json({ data: [], pagination: { page, pageSize, totalCount: 0, totalPages: 1 }, source: 'live', scoped: true });
+    return;
+  }
+
   try {
     const query: Record<string, string> = { page: String(page), page_size: String(pageSize) };
     if (agentId) query.agent_id = agentId;
@@ -180,23 +202,33 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     if (contactId) query.contact_id = contactId;
 
     const dto = await fetchLiveList(query);
+    const rowsAll = dto.data.sessions;
+    const rows = authorizedAgentIds === null ? rowsAll : rowsAll.filter((r) => isAuthorized(r.agent_id));
+    const scoped = authorizedAgentIds !== null;
     res.status(200).json({
-      data: dto.data.sessions.map(toSummaryFromLive),
-      pagination: {
-        page: dto.data.pagination.page,
-        pageSize: dto.data.pagination.page_size,
-        totalCount: dto.data.pagination.total_records,
-        totalPages: dto.data.pagination.total_pages,
-      },
+      data: rows.map(toSummaryFromLive),
+      pagination: scoped
+        ? { page: dto.data.pagination.page, pageSize: dto.data.pagination.page_size, totalCount: rows.length, totalPages: 1 }
+        : {
+            page: dto.data.pagination.page,
+            pageSize: dto.data.pagination.page_size,
+            totalCount: dto.data.pagination.total_records,
+            totalPages: dto.data.pagination.total_pages,
+          },
       source: 'live',
+      ...(scoped ? { scoped: true } : {}),
     });
   } catch (err) {
     console.warn('Live chat session-list fetch failed, falling back to local copy:', err);
-    const { rows, totalCount } = await supabaseChatRepository.listSessions({ page, pageSize });
+    const { rows: rowsAll, totalCount: totalCountAll } = await supabaseChatRepository.listSessions({ page, pageSize });
+    const rows = authorizedAgentIds === null ? rowsAll : rowsAll.filter((r) => isAuthorized(r.agentId));
+    const scoped = authorizedAgentIds !== null;
+    const totalCount = scoped ? rows.length : totalCountAll;
     res.status(200).json({
       data: rows.map(toSummaryFromLocal),
       pagination: { page, pageSize, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)) },
       source: 'local-fallback',
+      ...(scoped ? { scoped: true } : {}),
     });
   }
 });

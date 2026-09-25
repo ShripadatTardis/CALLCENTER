@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ListChecks, Phone, MessageCircle } from 'lucide-react';
+import { Loader2, ListChecks, Phone, MessageCircle, LayoutList, Network } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { useChatLogs } from '@/hooks/chat/useChatLogs';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
@@ -20,10 +21,14 @@ import {
   formatStatusLabel,
   formatTimestamp,
 } from '@/lib/format';
+import { useClassification } from '@/hooks/classification/useClassification';
+import { groupInteractions } from '@/lib/interactionGrouping';
+import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 
 type QARow = {
   key: string;
   channel: 'voice' | 'chat';
+  agentId: string | null;
   agentName: string;
   startTime: string;
   durationSeconds?: number;
@@ -73,6 +78,10 @@ const QAReview: React.FC = () => {
   const [intentSearch, setIntentSearch] = useState('');
   const [campaignOnly, setCampaignOnly] = useState(false);
 
+  const [view, setView] = useState<'grouped' | 'table'>('grouped');
+  const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
+  const classification = useClassification();
+
   const isLoading = callsLoading || chatLoading;
   const isError = callsError || chatIsError;
 
@@ -80,6 +89,7 @@ const QAReview: React.FC = () => {
     const voiceRows: QARow[] = (callData?.interactions ?? []).map((call) => ({
       key: `voice-${call.interactionId}`,
       channel: 'voice',
+      agentId: call.agentId ?? null,
       agentName: call.agentDisplayName ?? call.agentId ?? '—',
       startTime: call.startTime,
       durationSeconds: call.durationSeconds,
@@ -98,6 +108,7 @@ const QAReview: React.FC = () => {
     const chatRows: QARow[] = (chatData?.data ?? []).map((session) => ({
       key: `chat-${session.sessionId}`,
       channel: 'chat',
+      agentId: session.agentId ?? null,
       agentName: session.agentName ?? session.agentId ?? '—',
       startTime: session.startedAt,
       outcome: formatStatusLabel(session.status),
@@ -112,6 +123,14 @@ const QAReview: React.FC = () => {
       (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
     );
   }, [callData, chatData]);
+
+  // Session 6.2 — the always-visible cross-channel Domain -> Category ->
+  // Agent -> Channel tree (plan §9: Interaction Quality is the natural
+  // combined-channel classified view since it already merges Voice+Chat).
+  const grouped = useMemo(
+    () => groupInteractions(rows.map((r) => ({ agentId: r.agentId, channel: r.channel })), classification.data, classification.agentsById),
+    [rows, classification.data, classification.agentsById],
+  );
 
   // Filter option sets are derived only from real values already present
   // in the fetched data — never a fabricated fixed enum.
@@ -129,6 +148,7 @@ const QAReview: React.FC = () => {
   );
 
   const filteredRows = rows.filter((r) => {
+    if (view === 'grouped' && selectedGroup && (r.agentId !== selectedGroup.agentId || r.channel !== selectedGroup.channel)) return false;
     if (channelFilter !== ALL && r.channel !== channelFilter) return false;
     if (agentFilter !== ALL && r.agentName !== agentFilter) return false;
     if (outcomeFilter !== ALL && r.outcome !== outcomeFilter) return false;
@@ -183,6 +203,31 @@ const QAReview: React.FC = () => {
             hasStaleData={rows.length > 0}
             isFetching={callsFetching || chatFetching}
           />
+        )}
+
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">By Domain / Category / Agent</h2>
+          <div className="flex gap-1">
+            <Button variant={view === 'grouped' ? 'default' : 'outline'} size="sm" onClick={() => setView('grouped')}>
+              <Network className="h-4 w-4 mr-1" />
+              Grouped View
+            </Button>
+            <Button
+              variant={view === 'table' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setView('table');
+                setSelectedGroup(null);
+              }}
+            >
+              <LayoutList className="h-4 w-4 mr-1" />
+              Table View
+            </Button>
+          </div>
+        </div>
+
+        {view === 'grouped' && !isLoading && rows.length > 0 && (
+          <GroupedInteractionTree group={grouped} selected={selectedGroup} onSelect={setSelectedGroup} countsAreExhaustive={false} />
         )}
 
         <Card>

@@ -1,16 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { AdvancedFilters, CallLogFilters } from '@/components/call-logs/AdvancedFilters';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, FileText, TrendingUp, Clock, Target, Users, Loader2 } from 'lucide-react';
+import { Play, FileText, TrendingUp, Clock, Target, Users, Loader2, LayoutList, Network } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { Interaction } from '@/types/interaction';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { formatDurationExact, formatDurationLong, formatPercent, formatPhoneNumber } from '@/lib/format';
+import { useClassification } from '@/hooks/classification/useClassification';
+import { groupInteractions } from '@/lib/interactionGrouping';
+import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 
 function toCsv(interactions: Interaction[]): string {
   const headers = [
@@ -38,16 +41,34 @@ const CallLogs: React.FC = () => {
   const [filters, setFilters] = useState<CallLogFilters>({});
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [view, setView] = useState<'grouped' | 'table'>('grouped');
+  const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useCallData({
     status: 'inactive',
     page_size: 50,
     ...filters,
   });
+  const classification = useClassification();
 
-  const interactions = data?.interactions ?? [];
+  const allInteractions = useMemo(() => data?.interactions ?? [], [data]);
   const summary = data?.summary;
   const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '');
+
+  const grouped = useMemo(
+    () =>
+      groupInteractions(
+        allInteractions.map((i) => ({ agentId: i.agentId ?? null, channel: 'voice' as const })),
+        classification.data,
+        classification.agentsById,
+      ),
+    [allInteractions, classification.data, classification.agentsById],
+  );
+
+  const interactions =
+    view === 'grouped' && selectedGroup
+      ? allInteractions.filter((i) => (i.agentId ?? null) === selectedGroup.agentId)
+      : allInteractions;
 
   const handleViewDetail = (interaction: Interaction) => {
     setSelectedInteraction(interaction);
@@ -140,8 +161,34 @@ const CallLogs: React.FC = () => {
         {/* Call Logs Cards */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Call History ({interactions.length})</h2>
+            <h2 className="text-xl font-semibold">
+              Call History ({interactions.length}
+              {view === 'grouped' && selectedGroup ? ` of ${allInteractions.length}` : ''})
+            </h2>
+            <div className="flex gap-1">
+              <Button
+                variant={view === 'grouped' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setView('grouped')}
+              >
+                <Network className="h-4 w-4 mr-1" />
+                Grouped View
+              </Button>
+              <Button variant={view === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setView('table')}>
+                <LayoutList className="h-4 w-4 mr-1" />
+                Table View
+              </Button>
+            </div>
           </div>
+
+          {view === 'grouped' && !isLoading && allInteractions.length > 0 && (
+            <GroupedInteractionTree
+              group={grouped}
+              selected={selectedGroup}
+              onSelect={setSelectedGroup}
+              countsAreExhaustive={false}
+            />
+          )}
 
           {isLoading ? (
             <div className="flex justify-center py-12">

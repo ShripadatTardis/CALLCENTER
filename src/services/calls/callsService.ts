@@ -24,18 +24,33 @@ export interface CallDataResult {
   summary: CallDataResponseDto['data']['summary'];
   interactions: Interaction[];
   pagination: CallDataResponseDto['data']['pagination'];
+  /** True when the server filtered rows/summary to the caller's authorized categories (Session 6.2). */
+  scoped: boolean;
 }
 
-export async function fetchCallData(query: CallDataQueryDto = {}): Promise<CallDataResult> {
-  const dto = await request<CallDataResponseDto>('/calls/data', {
-    method: 'GET',
-    query: query as Record<string, string | number | boolean | undefined>,
-  });
+/**
+ * `role` drives Session 6.2's server-side category authorization in
+ * api/calls/data.ts (x-user-role header — see api/_customer360.ts for
+ * the documented advisory-signal caveat). Optional and defaults to
+ * 'unauthenticated' (fail-closed server-side) so existing call sites
+ * that don't yet pass a role keep working, but every UI call site
+ * should pass the current session's role — see useCallData.
+ */
+export async function fetchCallData(query: CallDataQueryDto = {}, role = 'unauthenticated'): Promise<CallDataResult> {
+  const dto = await request<CallDataResponseDto & { data: { summary: CallDataResponseDto['data']['summary'] & { scoped?: boolean } } }>(
+    '/calls/data',
+    {
+      method: 'GET',
+      query: query as Record<string, string | number | boolean | undefined>,
+      headers: { 'x-user-role': role },
+    },
+  );
 
   return {
     summary: mapCallDataSummary(dto.data.summary),
     interactions: dto.data.calls.map(mapCallDataEntryToInteraction),
     pagination: dto.data.pagination,
+    scoped: Boolean(dto.data.summary.scoped),
   };
 }
 

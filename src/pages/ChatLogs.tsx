@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, MessageCircle, ChevronLeft, ChevronRight, LayoutList, Network } from 'lucide-react';
 import { useChatLogs } from '@/hooks/chat/useChatLogs';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
 import { formatFractionAsPercent, formatStatusLabel, formatTimestamp } from '@/lib/format';
+import { useClassification } from '@/hooks/classification/useClassification';
+import { groupInteractions } from '@/lib/interactionGrouping';
+import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 
 /**
  * Session 5.1 amendment: sourced from GET /api/v1/chat/sessions (the
@@ -20,10 +23,26 @@ const ChatLogs: React.FC = () => {
   const [page, setPage] = useState(1);
   const { data, isLoading, isError, error, refetch, isFetching } = useChatLogs(page);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [view, setView] = useState<'grouped' | 'table'>('grouped');
+  const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
+  const classification = useClassification();
 
-  const sessions = data?.data ?? [];
+  const allSessions = useMemo(() => data?.data ?? [], [data]);
   const pagination = data?.pagination;
   const isFallback = data?.source === 'local-fallback';
+
+  const grouped = useMemo(
+    () =>
+      groupInteractions(
+        allSessions.map((s) => ({ agentId: s.agentId ?? null, channel: 'chat' as const })),
+        classification.data,
+        classification.agentsById,
+      ),
+    [allSessions, classification.data, classification.agentsById],
+  );
+
+  const sessions =
+    view === 'grouped' && selectedGroup ? allSessions.filter((s) => (s.agentId ?? null) === selectedGroup.agentId) : allSessions;
 
   return (
     <Layout>
@@ -34,13 +53,31 @@ const ChatLogs: React.FC = () => {
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
-              Chat History {pagination ? `(${pagination.totalCount})` : ''}
+              Chat History {pagination ? `(${sessions.length} of ${pagination.totalCount})` : ''}
             </CardTitle>
+            <div className="flex gap-1">
+              <Button variant={view === 'grouped' ? 'default' : 'outline'} size="sm" onClick={() => setView('grouped')}>
+                <Network className="h-4 w-4 mr-1" />
+                Grouped View
+              </Button>
+              <Button variant={view === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setView('table')}>
+                <LayoutList className="h-4 w-4 mr-1" />
+                Table View
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {view === 'grouped' && !isLoading && allSessions.length > 0 && (
+              <GroupedInteractionTree
+                group={grouped}
+                selected={selectedGroup}
+                onSelect={setSelectedGroup}
+                countsAreExhaustive={false}
+              />
+            )}
             {isError && (
               <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={sessions.length > 0} isFetching={isFetching} />
             )}

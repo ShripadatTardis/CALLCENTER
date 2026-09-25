@@ -90,7 +90,17 @@ export const voiceAgentInteractionSource: InteractionSourceAdapter = {
       search: normalizedValue,
       page_size: '100',
     };
-    if (since) query.date_from = since;
+    // Live-verified defect (Session 4 population pass): the backend's
+    // date_from only accepts YYYY-MM-DD, not a full ISO timestamp — a
+    // full timestamp 400s the whole request ("date_from must be in
+    // YYYY-MM-DD format"), which previously surfaced as a 500 on every
+    // refresh of an already-known customer. Truncate to the date; this
+    // makes the "since" high-water-mark date-granular (not hour-granular)
+    // against this backend, so REFRESH_OVERLAP_MS's overlap in
+    // aggregationService.ts is a smaller safety margin than its name
+    // implies, but still correct — upsertInteraction is idempotent per
+    // interactionId, so a same-day re-scan cannot create duplicates.
+    if (since) query.date_from = since.slice(0, 10);
 
     const dto = await fetchCallData(query);
     return dto.data.calls.map(mapEntry);

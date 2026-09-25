@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,11 +6,13 @@ import { MessageSquarePlus, MessageCircle } from 'lucide-react';
 import { useChatSession } from '@/hooks/chat/useChatSession';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatComposer } from '@/components/chat/ChatComposer';
+import { ChatInteractionHeader } from '@/components/chat/ChatInteractionHeader';
 
 const ChatConsole: React.FC = () => {
-  const { messages, isSending, sendError, notPersisted, hasActiveSession, send, retry, startNewChat } =
+  const { messages, isSending, sendError, notPersisted, hasActiveSession, sessionId, send, retry, startNewChat } =
     useChatSession();
   const endRef = useRef<HTMLDivElement>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,6 +36,8 @@ const ChatConsole: React.FC = () => {
             New Chat
           </Button>
         </div>
+
+        <ChatInteractionHeader selectedAgentId={selectedAgentId} onAgentChange={setSelectedAgentId} sessionId={sessionId} />
 
         <Card className="flex flex-col h-[65vh]">
           <CardHeader className="pb-3">

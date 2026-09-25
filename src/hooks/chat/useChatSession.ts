@@ -80,6 +80,8 @@ export function useChatSession() {
     sendError,
     notPersisted,
     hasActiveSession: Boolean(upstreamSessionId),
+    /** The real /chat session_id, once the first turn has succeeded — null until then. Never fabricated. */
+    sessionId: upstreamSessionId ?? null,
     send,
     retry,
     startNewChat,

@@ -1,24 +1,47 @@
 import { request } from '@/services/transport/httpClient';
-import type { ChatResponseDto } from '@/types/api/chat';
-import type { ChatSendResult, ChatSessionDetail } from '@/types/chat';
+import type { ChatRequestDto, ChatResponseDto } from '@/types/api/chat';
+import type { ChatSendResult, ChatSessionDetail, ChatSessionSummary } from '@/types/chat';
 
 /**
- * Chat domain service — plan §6. Calls this app's own /api/chat/* routes
- * via the same shared httpClient every other domain service uses.
+ * Chat domain service — Session 5.1 amendment. Calls this app's own
+ * /api/chat/* routes via the same shared httpClient every other domain
+ * service uses.
  */
 
 function roleHeaders(role: string): Record<string, string> {
   return { 'x-user-role': role };
 }
 
+export interface SendChatMessageOptions {
+  agentId?: string;
+  customerId?: string;
+  contactId?: string;
+  callerName?: string;
+  phoneNumber?: string;
+}
+
 export async function sendChatMessage(
   role: string,
   message: string,
   sessionId: string | undefined,
+  opts: SendChatMessageOptions = {},
 ): Promise<ChatSendResult & { raw: ChatResponseDto }> {
+  const body: ChatRequestDto = { message, session_id: sessionId };
+  // agent_id/customer_id/contact_id/caller_name/phone_number are only
+  // meaningful on the first message of a session — agent_id binds then
+  // and every identity field is resolved once and kept on the session
+  // (Chat_Mode_API.docx). Never sent on a continuing turn.
+  if (!sessionId) {
+    if (opts.agentId) body.agent_id = opts.agentId;
+    if (opts.customerId) body.customer_id = opts.customerId;
+    if (opts.contactId) body.contact_id = opts.contactId;
+    if (opts.callerName) body.caller_name = opts.callerName;
+    if (opts.phoneNumber) body.phone_number = opts.phoneNumber;
+  }
+
   const dto = await request<ChatResponseDto & { chatSessionId: string | null; persisted: boolean }>('/chat', {
     method: 'POST',
-    body: { message, session_id: sessionId },
+    body,
     headers: roleHeaders(role),
   });
 
@@ -53,19 +76,23 @@ export async function closeChatSession(role: string, chatSessionId: string): Pro
 
 export async function fetchChatLogs(
   role: string,
-  opts: { page?: number; pageSize?: number } = {},
-): Promise<{ data: ChatSessionDetail['session'][]; pagination: { page: number; pageSize: number; totalCount: number } }> {
+  opts: { page?: number; pageSize?: number; agentId?: string; status?: string } = {},
+): Promise<{
+  data: ChatSessionSummary[];
+  pagination: { page: number; pageSize: number; totalCount: number; totalPages: number };
+  source: 'live' | 'local-fallback';
+}> {
   return request('/chat/logs', {
     method: 'GET',
-    query: { page: opts.page, pageSize: opts.pageSize },
+    query: { page: opts.page, pageSize: opts.pageSize, agentId: opts.agentId, status: opts.status },
     headers: roleHeaders(role),
   });
 }
 
-export async function fetchChatSessionDetail(role: string, chatSessionId: string): Promise<ChatSessionDetail> {
+export async function fetchChatSessionDetail(role: string, sessionId: string): Promise<ChatSessionDetail> {
   return request<ChatSessionDetail>('/chat/logs', {
     method: 'GET',
-    query: { id: chatSessionId },
+    query: { id: sessionId },
     headers: roleHeaders(role),
   });
 }

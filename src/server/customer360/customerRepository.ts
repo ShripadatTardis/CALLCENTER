@@ -93,8 +93,9 @@ export interface CustomerRepository {
 
   // --- Aggregation state (plan §5, optional reconciliation) ---
 
-  getHighWaterMark(): Promise<string | null>;
-  setHighWaterMark(iso: string): Promise<void>;
+  /** `source` defaults to 'voice' — each interaction source maintains its own independent checkpoint (§ Session 5.1 amendment) so Chat reconciliation cannot interfere with Voice's. */
+  getHighWaterMark(source?: string): Promise<string | null>;
+  setHighWaterMark(iso: string, source?: string): Promise<void>;
 
   /** Distinct customer_ids whose category_id cache may be stale relative to the current agent→category mapping — used by reconciliation, never by authorization (plan §16). */
   refreshInteractionCategoryCache(agentId: string, categoryId: string | null): Promise<number>;

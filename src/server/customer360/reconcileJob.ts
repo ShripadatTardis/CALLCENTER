@@ -39,12 +39,20 @@ export interface ReconciliationResult {
   pagesProcessed: number;
 }
 
+/**
+ * `checkpointSource` (Session 5.1 amendment) lets a second interaction
+ * source (Chat) reuse this exact function against its own independent
+ * checkpoint row, instead of sharing — and corrupting — Voice's
+ * high-water-mark. Defaults to 'voice' so every pre-existing call site
+ * is unaffected.
+ */
 export async function runReconciliation(
   repo: CustomerRepository,
   source: InteractionSourceAdapter,
   maxPages: number = DEFAULT_MAX_PAGES,
+  checkpointSource: string = 'voice',
 ): Promise<ReconciliationResult> {
-  const lastHighWaterMark = await repo.getHighWaterMark();
+  const lastHighWaterMark = await repo.getHighWaterMark(checkpointSource);
   const since = lastHighWaterMark
     ? new Date(new Date(lastHighWaterMark).getTime() - OVERLAP_MS).toISOString()
     : undefined;
@@ -114,7 +122,7 @@ export async function runReconciliation(
     // Checkpoint after each fully-processed page, not just at the end,
     // so a duration-limited kill on a later page still keeps this page's
     // progress durably (see amendment note above).
-    await repo.setHighWaterMark(maxStartedAt);
+    await repo.setHighWaterMark(maxStartedAt, checkpointSource);
 
     if (page >= totalPages) break;
   }

@@ -572,5 +572,199 @@ end-to-end send/receive/persist test of the deployed feature.
 
 ---
 
-Stop after this plan. No implementation code has been written. Waiting for approval
-before beginning Session 4.5.
+## 21. Session 5.1 amendment — enhanced Chat API confirmed and implemented
+
+**Status: implemented and deployed.** The backend team delivered
+`Chat_Mode_API.docx`, `Chat_Sessions_API.docx`, `Chat_Transcript_API.docx`, and
+`Analytics_Metrics_API.docx` (in `docs/`). This section supersedes §1/§2/§13/§19/§20
+above with the now-confirmed contract and records the implementation decisions. The
+Session 4.5 baseline (UI shape, persistence tables, Chat Logs/Session Detail as a
+dialog, the readability renderer) was kept — this was an extension, not a redesign.
+
+### 21.1 Confirmed contract (replaces §1)
+
+```text
+POST /api/v1/chat
+Request:  { message, session_id?, agent_id?, customer_id?, contact_id?,
+            caller_name?, phone_number? }
+Response: { success, response, session_id, agent_id, agent_name, customer_id,
+            contact_id, data_source, authenticated, intent, confidence,
+            detection_method, latency_ms }
+```
+
+`agent_id` binds on the first message and is ignored afterwards. `customer_id` is
+the bank CIF; `contact_id` is used when there's no `customer_id`; `phone_number`
+can associate chat with the same person as a voice call. Errors are the documented
+stable-code set (400 `invalid_agent`, 404 `invalid_session`/`customer_not_found`/
+`contact_not_found`, 422 `invalid_request`, 502 `backend_unavailable`, 500
+`processing_failed`, 401/403 auth), always `{success:false, error, message}` —
+already handled generically by the existing `normalizeApiError`/`isApiError`
+utilities (§12), so no new error-handling code was needed beyond forwarding the
+new fields through `POST /api/chat`.
+
+```text
+GET /api/v1/chat/sessions                — paginated list, filters: customer_id,
+                                            contact_id, agent_id, status, page,
+                                            page_size
+GET /api/v1/chat/sessions/{session_id}   — one session's full identity/metadata +
+                                            ordered messages
+```
+
+This is now the documented authoritative Chat equivalent of Call Logs + Call
+Transcript, including serving transcripts long after a session ends (from the
+durable transcript store via `history_doc_id`).
+
+### 21.2 Persistence decision (replaces §2's local-only model)
+
+**Decision: local persistence remains, as an operational audit/fallback copy —
+not deleted, not the primary read path.** `call_center.chat_sessions`/
+`chat_messages` are extended (new migration
+`20260927000000_chat_enhancement_5_1.sql`) with the newly-authoritative identity
+columns (`agent_name`, `backend_customer_id`, `backend_contact_id`, `caller_name`,
+`phone_number`, `is_bank_customer`, `upstream_status`, `history_doc_id`) —
+`backend_customer_id`/`backend_contact_id` are deliberately distinct columns from
+the pre-existing `customer_id` (uuid, this app's own internal Customer 360
+linkage) to avoid conflating "the bank's CIF" with "our internal customer row."
+Every turn still writes to `chat_messages` on `POST /api/chat`, exactly as before.
+
+Reasoning: `GET /api/v1/chat/sessions[/{id}]` is authoritative and durable, but
+this app's own local copy still adds three things the live API alone doesn't:
+(a) resilience when the backend is briefly unreachable (Chat Logs/Session Detail
+degrade to the local copy instead of an empty screen — clearly labeled
+`source: 'local-fallback'`, never presented as live data), (b) a record survives
+independently of the backend's own retention policy, and (c) it's the only
+integration point Customer 360 ingestion (§21.4) actually reads FROM for
+provenance/audit, even though the *live* list is what ingestion pages through for
+new sessions. **Chat Logs and Chat Session Detail now read the live backend as
+PRIMARY** (`api/chat/logs.ts`), falling back to the local copy only on a live-call
+failure — this is the opposite priority from a naive "always read local," chosen
+because the live endpoint is the one the backend team calls authoritative.
+
+### 21.3 Chat Console — real agent binding (replaces the Session 4.5 completion pass)
+
+The Agent selector (`ChatInteractionHeader.tsx`) now sends the selection as
+`agent_id` on the first message only; once a session is bound, the selector locks
+and shows the backend-returned `agent_name` instead — the old "not yet sent to the
+AI" tooltip is removed (`ChatConsole.tsx`, `useChatSession.ts`). Customer ID /
+Contact ID / Caller Name / Phone are plain operator-entered fields (this app has
+no other source of customer/contact context to prefill Chat Console from) sent
+only on the first message; after the first response, the header shows the
+backend-*returned* `customer_id`/`contact_id`, never the raw operator input again
+— avoids ever implying an unconfirmed guess is a confirmed identity.
+
+### 21.4 Customer 360 integration (replaces §13's "future model")
+
+**Implemented, phone-keyed, exactly parallel to voice**: a new
+`chatInteractionSource.ts` implements the same `InteractionSourceAdapter`
+interface `voiceAgentInteractionSource.ts` does, wrapping
+`GET /api/v1/chat/sessions` instead of `/call-data`. `reconcileJob.ts`'s existing
+`runReconciliation` function is reused **unchanged** against this new adapter —
+only a different adapter is plugged in, per the domain layer's original
+logical/deployment-split design goal (§0.3 of the Customer 360 plan). One chat
+*session* = one `SourceInteraction` = one `customer_interactions` row
+(`channel = 'chat'`, `interaction_id = session_id`), never one row per message —
+guaranteed by construction, since the adapter's `listPage`/`searchByContactPoint`
+already return one row per session. Category resolution reuses the existing
+agent_id → `customer360_category_agents` mapping with zero new code (the
+reconciliation pass's category-cache refresh is channel-agnostic already).
+
+Invoked via `POST /api/customers/admin?action=reconcileChat` (admin-token-gated,
+same file as the existing `backfill`/`reconcile`/`seedCategories` actions — no new
+route file). Not wired to a scheduler in this session (unlike voice's `reconcile`,
+which Vercel Cron drives) — manual/admin invocation only, per the instruction to
+keep new scope minimal.
+
+**Checkpoint isolation**: `customer_aggregation_state` was a hard singleton (one
+row, `id=1`) shared by everything that called `getHighWaterMark`/
+`setHighWaterMark`. Migrated to a `source`-keyed table (`'voice'` / `'chat'`, each
+with its own independent high-water-mark) so Chat's reconciliation checkpoint
+cannot corrupt or be corrupted by Voice's — `reconcileJob.ts`'s
+`runReconciliation` gained an optional `checkpointSource` parameter (defaults to
+`'voice'`, so every pre-existing call site is unaffected).
+
+**Genuine, documented gap — CIF linkage not yet wired**: the backend's own
+`customer_id` (a bank CIF, returned by both Chat and, per the docs, resolvable
+the same way for voice) is captured and stored on `chat_sessions` and
+`customer_interactions.source` metadata is available, but Customer 360's
+`customers.source_customer_ref` field (already present, unpopulated, reserved
+for exactly this) is not yet consulted or updated as a *lookup* key — today's
+`CustomerRepository` only supports lookup-by-normalized-phone
+(`findContactPoint`), not lookup-by-`sourceCustomerRef`. Wiring true
+CIF-based Chat↔Voice linkage (so the same backend customer_id merges chat and
+voice history under one Customer 360 row even when the phone numbers used for
+each channel differ) requires a new repository lookup method — a real,
+scoped follow-up, not implemented here to avoid redesigning the identity model
+mid-session. Phone-based materialization (identical to voice's mechanism,
+including the just-fixed `+`-prefix canonicalization) is what actually links chat
+today, and is deterministic and duplicate-free by the same guarantees voice has.
+
+### 21.5 Verification — live vs. deferred
+
+The Voice Agent backend was down (502) for most of this session's implementation
+window. Everything NOT requiring a live backend round-trip was verified:
+migration applied and grants confirmed via the Supabase MCP
+(`has_function_privilege` checks, same as every prior migration); `tsc --noEmit`,
+`npm run build`, `npm run lint` all clean (zero new errors); function count
+confirmed at exactly 11 (`api/customers/[id]/*` consolidation from Session 5 is
+untouched, `api/campaigns.ts` and the two Chat routes are the only additions since
+Session 4). **Deferred until the backend is reachable**: creating a real chat with
+a selected non-default agent and confirming the returned session binds to that
+agent; confirming Chat Logs shows a real live session (not the local fallback);
+confirming Chat Session Detail's full transcript renders from the live endpoint;
+confirming `customer_id`/`contact_id`/`phone_number` round-trip on a real
+multi-turn conversation; running `?action=reconcileChat` against real chat
+sessions and confirming one real session appears in Customer 360 as one chat
+interaction with the correct category; confirming repeated `reconcileChat`
+invocations are idempotent against real data (the checkpoint/idempotency
+*mechanism* itself is verified — it's the same, already-proven code path voice
+uses — but not yet exercised against a real Chat session).
+
+### 21.6 Analytics — Session 7 roadmap notes only (not implemented)
+
+Per instruction, Analytics is NOT implemented this session. The confirmed contract
+from `Analytics_Metrics_API.docx`, for Session 7 to build against instead of
+guessing:
+
+```text
+GET /api/v1/analytics/metrics
+Query:   window (1h|6h|12h|24h|7d|30d, takes precedence over date_from/date_to),
+         direction (inbound|outbound|both), date_from, date_to (YYYY-MM-DD)
+Response:
+  filters: { window, direction, date_from, date_to }   — echoes what was applied
+  metrics: total_calls, calls_in_window, fcr_rate, avg_aht_seconds,
+           escalation_rate, resolved_count, escalated_count,
+           avg_intent_accuracy, live_concurrent_calls, peak_concurrency,
+           avg_turn_latency_ms, p95_turn_latency_ms
+  charts:  call_volume[{t, started}], latency_over_time[{t, avg_ms}],
+           concurrency[{t, concurrent}]   — up to 200 buckets, >=1 min apart
+  outcomes[{name, value}]        — Resolved / Escalated / Other
+  calls_by_agent[{agent, count}]
+  aht_distribution[{bucket, count}]        — 0-30s, 30-60s, 1-2m, 2-3m, 3-5m, 5m+
+```
+
+Note `total_calls` (completed calls, the basis for every rate/average) vs.
+`calls_in_window` (every call that started in the window regardless of outcome —
+what the dashboard's "Total calls" tile actually shows) are genuinely different
+numbers; Session 7 must not conflate them. 400 on a malformed `date_from`/
+`date_to`; 401 on a missing/invalid key. No implementation, no route, no UI change
+made for this in Session 5.1 — notes only.
+
+### 21.7 Files changed (Session 5.1)
+
+New: `supabase/migrations/20260927000000_chat_enhancement_5_1.sql`,
+`src/server/customer360/chatInteractionSource.ts`.
+Modified: `src/server/chat/{types,chatRepository,supabaseChatRepository}.ts`,
+`src/server/customer360/{customerRepository,supabaseCustomerRepository,reconcileJob}.ts`,
+`api/chat/{index,logs}.ts`, `api/customers/admin.ts`,
+`src/types/{chat,api/chat}.ts`, `src/services/chat/chatService.ts`,
+`src/hooks/chat/{useChatSession,useChatSessionDetail}.ts`,
+`src/pages/{ChatConsole,ChatLogs}.tsx`,
+`src/components/chat/{ChatInteractionHeader,ChatSessionDetailDialog}.tsx`.
+Untouched: Session 5 campaign code/tables, WhatsApp, NPS, the readability renderer
+(`chatMessageFormatting.ts`/`ChatMessageContent.tsx` — no changes needed, already
+generic), `vapi-formatter.ts` (still never called).
+
+---
+
+Session 4.5 (baseline) and Session 5.1 (this amendment) are both implemented and
+deployed. Session 6/7 have not been started.

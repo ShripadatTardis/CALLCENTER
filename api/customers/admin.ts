@@ -3,6 +3,7 @@ import { repo, source, withErrorBoundary, noStore, requireAdminToken, readIntQue
 import { getBackendConfig } from '../_voicebot.js';
 import { runBackfillBatch } from '../../src/server/customer360/backfillJob.js';
 import { runReconciliation } from '../../src/server/customer360/reconcileJob.js';
+import { chatInteractionSource } from '../../src/server/customer360/chatInteractionSource.js';
 import type { AgentsResponseDto } from '../../src/types/api/agents.js';
 
 /**
@@ -31,6 +32,23 @@ async function handleBackfill(req: VercelRequest, res: VercelResponse): Promise<
 async function handleReconcile(req: VercelRequest, res: VercelResponse): Promise<void> {
   const maxPages = readIntQuery(req, 'maxPages', 2);
   const result = await runReconciliation(repo, source, maxPages);
+  res.status(200).json(result);
+}
+
+/**
+ * Session 5.1 — bounded/idempotent Chat ingestion (prompt item 6), reusing
+ * runReconciliation UNCHANGED against chatInteractionSource instead of
+ * the voice source, with its own checkpoint ('chat', never 'voice' — see
+ * reconcileJob.ts's checkpointSource param). One chat session = one
+ * customer_interactions row, never one per message, by construction
+ * (chatInteractionSource maps one SourceInteraction per session).
+ * Plain invokable admin action — no scheduler wired to this one in
+ * Session 5.1 (unlike ?action=reconcile, which Vercel Cron drives via
+ * the CRON_SECRET path below); manual/admin invocation only for now.
+ */
+async function handleReconcileChat(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const maxPages = readIntQuery(req, 'maxPages', 2);
+  const result = await runReconciliation(repo, chatInteractionSource, maxPages, 'chat');
   res.status(200).json(result);
 }
 
@@ -109,10 +127,13 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'reconcile':
       await handleReconcile(req, res);
       return;
+    case 'reconcileChat':
+      await handleReconcileChat(req, res);
+      return;
     case 'seedCategories':
       await handleSeedCategories(req, res);
       return;
     default:
-      res.status(400).json({ detail: 'Unknown or missing ?action= — use backfill, reconcile, or seedCategories' });
+      res.status(400).json({ detail: 'Unknown or missing ?action= — use backfill, reconcile, reconcileChat, or seedCategories' });
   }
 });

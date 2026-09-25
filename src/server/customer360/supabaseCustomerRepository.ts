@@ -308,12 +308,12 @@ export const supabaseCustomerRepository: CustomerRepository = {
     return { role: result.role, allCategories: result.allCategories, categoryIds: result.categoryIds ?? [] };
   },
 
-  async getHighWaterMark() {
-    return rpc<string | null>('call_center_get_high_water_mark', {});
+  async getHighWaterMark(source = 'voice') {
+    return rpc<string | null>('call_center_get_high_water_mark', { p_source: source });
   },
 
-  async setHighWaterMark(iso) {
-    await rpc<null>('call_center_set_high_water_mark', { p_iso: iso });
+  async setHighWaterMark(iso, source = 'voice') {
+    await rpc<null>('call_center_set_high_water_mark', { p_iso: iso, p_source: source });
   },
 
   async refreshInteractionCategoryCache(agentId, categoryId) {

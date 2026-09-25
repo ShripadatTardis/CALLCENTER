@@ -1,11 +1,13 @@
-import type { ChatDataSource } from './api/chat';
+import type { ChatDataSource, ChatSessionStatus } from './api/chat';
 
 /**
- * Normalized, UI-facing Chat types — plan §8. These are already this
- * app's own API response shapes (from /api/chat/*), not a third-party
- * DTO, so unlike calls/agents there is no separate mapper boundary at
- * the frontend layer for the *response* shapes below; the DTO→domain
- * mapping happens once, server-side, in src/services/chat/chatMapper.ts.
+ * Normalized, UI-facing Chat types — Session 5.1 amendment. Chat Logs and
+ * Chat Session Detail are now sourced from the authoritative backend
+ * endpoints (GET /api/v1/chat/sessions[/{id}]) as primary, with this
+ * app's own local persistence as a fallback only when the live call
+ * fails (see api/chat/logs.ts's doc comment for the exact policy).
+ * `sessionId` here is always the backend's own session_id — the single
+ * authoritative identifier — never this app's internal chat_sessions.id.
  */
 
 export interface ChatTurnMetadata {
@@ -26,20 +28,27 @@ export interface ChatMessage {
 }
 
 export interface ChatSessionSummary {
-  id: string;
-  upstreamSessionId: string;
-  startedAt: string;
-  lastActivityAt: string;
-  status: 'active' | 'closed';
+  sessionId: string;
+  agentId: string | null;
+  agentName: string | null;
+  customerId: string | null;
+  contactId: string | null;
+  callerName: string | null;
+  phoneNumber: string | null;
+  isBankCustomer: boolean | null;
+  status: ChatSessionStatus;
+  authenticated: boolean;
   messageCount: number;
+  historyDocId: string | null;
   latestIntent: string | null;
   latestConfidence: number | null;
-  latestAuthenticated: boolean | null;
   latestDataSource: ChatDataSource | null;
   latestDetectionMethod: string | null;
   latestLatencyMs: number | null;
-  customerId: string | null;
-  agentId: string | null;
+  startedAt: string;
+  updatedAt: string;
+  /** 'live' when sourced from the real backend just now; 'local-fallback' when the live call failed and this row came from this app's own persisted copy instead (never fabricated — see plan §2). */
+  source: 'live' | 'local-fallback';
 }
 
 export interface ChatSessionDetail {

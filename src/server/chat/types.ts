@@ -13,8 +13,18 @@ export interface ChatSessionRecord {
   startedAt: string;
   lastActivityAt: string;
   status: ChatSessionStatus;
+  /** This app's own internal Customer 360 linkage — set only by chat ingestion (§6), never by a chat turn directly. Distinct from backendCustomerId below. */
   customerId: string | null;
   agentId: string | null;
+  agentName: string | null;
+  /** Raw backend CIF from the Chat API's own customer_id field — NOT the same as customerId above. */
+  backendCustomerId: string | null;
+  backendContactId: string | null;
+  callerName: string | null;
+  phoneNumber: string | null;
+  isBankCustomer: boolean | null;
+  upstreamStatus: string | null;
+  historyDocId: string | null;
   createdBy: string | null;
   messageCount: number;
   latestIntent: string | null;
@@ -23,6 +33,18 @@ export interface ChatSessionRecord {
   latestDataSource: string | null;
   latestDetectionMethod: string | null;
   latestLatencyMs: number | null;
+}
+
+export interface NewChatSessionIdentity {
+  agentId?: string | null;
+  agentName?: string | null;
+  backendCustomerId?: string | null;
+  backendContactId?: string | null;
+  callerName?: string | null;
+  phoneNumber?: string | null;
+  isBankCustomer?: boolean | null;
+  upstreamStatus?: string | null;
+  historyDocId?: string | null;
 }
 
 export interface ChatMessageRecord {

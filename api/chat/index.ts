@@ -50,11 +50,24 @@ async function handleSend(req: VercelRequest, res: VercelResponse): Promise<void
   }
   const sessionId = typeof body?.session_id === 'string' ? body.session_id : undefined;
 
+  // Session 5.1: agent_id/customer_id/contact_id/caller_name/phone_number
+  // are only meaningful on the FIRST message (agent_id binds then and is
+  // ignored afterwards; the identity fields are resolved once and kept
+  // on the session per Chat_Mode_API.docx). The client (useChatSession)
+  // only ever sends these when sessionId is absent — this proxy forwards
+  // exactly what it's given rather than re-deciding that policy here.
+  const upstreamPayload: ChatRequestDto = { message, session_id: sessionId };
+  if (typeof body?.agent_id === 'string') upstreamPayload.agent_id = body.agent_id;
+  if (typeof body?.customer_id === 'string') upstreamPayload.customer_id = body.customer_id;
+  if (typeof body?.contact_id === 'string') upstreamPayload.contact_id = body.contact_id;
+  if (typeof body?.caller_name === 'string') upstreamPayload.caller_name = body.caller_name;
+  if (typeof body?.phone_number === 'string') upstreamPayload.phone_number = body.phone_number;
+
   const { baseUrl, apiKey } = getBackendConfig();
   const upstream = await fetch(`${baseUrl}/api/v1/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-    body: JSON.stringify({ message, session_id: sessionId }),
+    body: JSON.stringify(upstreamPayload),
   });
 
   const text = await upstream.text();
@@ -66,6 +79,15 @@ async function handleSend(req: VercelRequest, res: VercelResponse): Promise<void
   }
 
   if (!upstream.ok) {
+    // Documented stable error codes (Chat_Mode_API.docx): 400
+    // invalid_agent, 404 invalid_session/customer_not_found/
+    // contact_not_found, 422 invalid_request, 502 backend_unavailable,
+    // 500 processing_failed, 401/403 auth — all already the flat
+    // {success:false, error, message} shape the frontend's
+    // normalizeApiError() already understands generically. Relayed
+    // as-is; no speculative retry logic here (per explicit instruction
+    // not to retain any old retry semantics that predate this contract —
+    // there never was any in this proxy, so nothing to remove).
     res.status(upstream.status).json(parsedBody);
     return;
   }
@@ -78,7 +100,14 @@ async function handleSend(req: VercelRequest, res: VercelResponse): Promise<void
   let persisted = true;
   try {
     if (!dto.session_id) throw new Error('Upstream /chat response had no session_id to persist against');
-    const session = await supabaseChatRepository.createOrTouchSession(dto.session_id, now, role);
+    const session = await supabaseChatRepository.createOrTouchSession(dto.session_id, now, role, {
+      agentId: dto.agent_id ?? null,
+      agentName: dto.agent_name ?? null,
+      backendCustomerId: dto.customer_id ?? null,
+      backendContactId: dto.contact_id ?? null,
+      callerName: upstreamPayload.caller_name ?? null,
+      phoneNumber: upstreamPayload.phone_number ?? null,
+    });
     chatSessionId = session.id;
     await supabaseChatRepository.appendMessage(chatSessionId, { role: 'user', rawText: message, now });
     await supabaseChatRepository.appendMessage(chatSessionId, {

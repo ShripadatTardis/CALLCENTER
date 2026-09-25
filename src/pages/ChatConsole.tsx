@@ -9,10 +9,27 @@ import { ChatComposer } from '@/components/chat/ChatComposer';
 import { ChatInteractionHeader } from '@/components/chat/ChatInteractionHeader';
 
 const ChatConsole: React.FC = () => {
-  const { messages, isSending, sendError, notPersisted, hasActiveSession, sessionId, send, retry, startNewChat } =
-    useChatSession();
+  const {
+    messages,
+    isSending,
+    sendError,
+    notPersisted,
+    hasActiveSession,
+    sessionId,
+    boundAgentId,
+    boundAgentName,
+    customerId,
+    contactId,
+    send,
+    retry,
+    startNewChat,
+  } = useChatSession();
   const endRef = useRef<HTMLDivElement>(null);
   const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [callerName, setCallerName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [customerIdInput, setCustomerIdInput] = useState('');
+  const [contactIdInput, setContactIdInput] = useState('');
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -20,6 +37,34 @@ const ChatConsole: React.FC = () => {
 
   const lastMessage = messages[messages.length - 1];
   const lastFailed = Boolean(sendError) && lastMessage?.role === 'user';
+
+  const handleSend = (text: string) => {
+    // Identity is only ever meaningful on the first message — once a
+    // session is bound, useChatSession's send() only forwards session_id
+    // regardless of what's passed here, but we still stop passing stale
+    // operator input once bound so it's clear from this call site alone.
+    void send(
+      text,
+      hasActiveSession
+        ? undefined
+        : {
+            agentId: selectedAgentId || undefined,
+            customerId: customerIdInput.trim() || undefined,
+            contactId: contactIdInput.trim() || undefined,
+            callerName: callerName.trim() || undefined,
+            phoneNumber: phoneNumber.trim() || undefined,
+          },
+    );
+  };
+
+  const handleNewChat = () => {
+    startNewChat();
+    setSelectedAgentId('');
+    setCallerName('');
+    setPhoneNumber('');
+    setCustomerIdInput('');
+    setContactIdInput('');
+  };
 
   return (
     <Layout>
@@ -31,13 +76,29 @@ const ChatConsole: React.FC = () => {
               Start and continue a live AI text conversation — a separate channel from WhatsApp.
             </p>
           </div>
-          <Button variant="outline" onClick={startNewChat} disabled={messages.length === 0}>
+          <Button variant="outline" onClick={handleNewChat} disabled={messages.length === 0}>
             <MessageSquarePlus className="h-4 w-4 mr-1" />
             New Chat
           </Button>
         </div>
 
-        <ChatInteractionHeader selectedAgentId={selectedAgentId} onAgentChange={setSelectedAgentId} sessionId={sessionId} />
+        <ChatInteractionHeader
+          selectedAgentId={selectedAgentId}
+          onAgentChange={setSelectedAgentId}
+          sessionId={sessionId}
+          isBound={hasActiveSession}
+          boundAgentName={boundAgentName ?? boundAgentId}
+          callerName={callerName}
+          onCallerNameChange={setCallerName}
+          phoneNumber={phoneNumber}
+          onPhoneNumberChange={setPhoneNumber}
+          customerIdInput={customerIdInput}
+          onCustomerIdInputChange={setCustomerIdInput}
+          contactIdInput={contactIdInput}
+          onContactIdInputChange={setContactIdInput}
+          resolvedCustomerId={customerId}
+          resolvedContactId={contactId}
+        />
 
         <Card className="flex flex-col h-[65vh]">
           <CardHeader className="pb-3">
@@ -81,7 +142,7 @@ const ChatConsole: React.FC = () => {
             )}
 
             <div className="mt-3 pt-3 border-t">
-              <ChatComposer onSend={send} disabled={isSending} />
+              <ChatComposer onSend={handleSend} disabled={isSending} />
             </div>
           </CardContent>
         </Card>

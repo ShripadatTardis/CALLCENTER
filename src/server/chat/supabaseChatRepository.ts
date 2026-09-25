@@ -1,6 +1,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ChatRepository } from './chatRepository.js';
-import type { ChatMessageRecord, ChatSessionRecord, ChatSessionStatus, NewChatMessageInput } from './types.js';
+import type {
+  ChatMessageRecord,
+  ChatSessionRecord,
+  ChatSessionStatus,
+  NewChatMessageInput,
+  NewChatSessionIdentity,
+} from './types.js';
 
 /**
  * The current deployment's adapter for ChatRepository, per
@@ -44,6 +50,14 @@ interface SessionRow {
   status: ChatSessionStatus;
   customer_id: string | null;
   agent_id: string | null;
+  agent_name: string | null;
+  backend_customer_id: string | null;
+  backend_contact_id: string | null;
+  caller_name: string | null;
+  phone_number: string | null;
+  is_bank_customer: boolean | null;
+  upstream_status: string | null;
+  history_doc_id: string | null;
   created_by: string | null;
   message_count: number;
   latest_intent: string | null;
@@ -63,6 +77,14 @@ function mapSession(row: SessionRow): ChatSessionRecord {
     status: row.status,
     customerId: row.customer_id,
     agentId: row.agent_id,
+    agentName: row.agent_name,
+    backendCustomerId: row.backend_customer_id,
+    backendContactId: row.backend_contact_id,
+    callerName: row.caller_name,
+    phoneNumber: row.phone_number,
+    isBankCustomer: row.is_bank_customer,
+    upstreamStatus: row.upstream_status,
+    historyDocId: row.history_doc_id,
     createdBy: row.created_by,
     messageCount: row.message_count,
     latestIntent: row.latest_intent,
@@ -107,11 +129,20 @@ function mapMessage(row: MessageRow): ChatMessageRecord {
 }
 
 export const supabaseChatRepository: ChatRepository = {
-  async createOrTouchSession(upstreamSessionId, now, createdBy) {
+  async createOrTouchSession(upstreamSessionId, now, createdBy, identity: NewChatSessionIdentity = {}) {
     const row = await rpc<SessionRow>('call_center_chat_create_session', {
       p_upstream_session_id: upstreamSessionId,
       p_now: now,
       p_created_by: createdBy,
+      p_agent_id: identity.agentId ?? null,
+      p_agent_name: identity.agentName ?? null,
+      p_backend_customer_id: identity.backendCustomerId ?? null,
+      p_backend_contact_id: identity.backendContactId ?? null,
+      p_caller_name: identity.callerName ?? null,
+      p_phone_number: identity.phoneNumber ?? null,
+      p_is_bank_customer: identity.isBankCustomer ?? null,
+      p_upstream_status: identity.upstreamStatus ?? null,
+      p_history_doc_id: identity.historyDocId ?? null,
     });
     return mapSession(row);
   },

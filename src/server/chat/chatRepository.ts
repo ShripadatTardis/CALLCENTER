@@ -1,4 +1,4 @@
-import type { ChatMessageRecord, ChatSessionRecord, NewChatMessageInput } from './types.js';
+import type { ChatMessageRecord, ChatSessionRecord, NewChatMessageInput, NewChatSessionIdentity } from './types.js';
 
 /**
  * The persistent Chat repository — a logical interface, per
@@ -9,8 +9,18 @@ import type { ChatMessageRecord, ChatSessionRecord, NewChatMessageInput } from '
  * `@supabase/supabase-js`.
  */
 export interface ChatRepository {
-  /** Idempotent on upstreamSessionId — creating an already-known session just touches last_activity_at. */
-  createOrTouchSession(upstreamSessionId: string, now: string, createdBy: string | null): Promise<ChatSessionRecord>;
+  /**
+   * Idempotent on upstreamSessionId — creating an already-known session
+   * just touches last_activity_at and non-destructively refreshes any
+   * newly-known identity fields (§2/§5 amendment — a later turn's null
+   * never erases an earlier turn's known value).
+   */
+  createOrTouchSession(
+    upstreamSessionId: string,
+    now: string,
+    createdBy: string | null,
+    identity?: NewChatSessionIdentity,
+  ): Promise<ChatSessionRecord>;
 
   getSessionByUpstreamId(upstreamSessionId: string): Promise<ChatSessionRecord | null>;
 

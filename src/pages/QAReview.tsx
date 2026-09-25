@@ -24,6 +24,7 @@ import {
 import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
+import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 
 type QARow = {
   key: string;
@@ -307,6 +308,31 @@ const QAReview: React.FC = () => {
             </label>
           </CardContent>
         </Card>
+
+        <ActiveFilterChips
+          chips={[
+            ...(channelFilter !== ALL ? [{ key: 'channel', label: `Channel: ${channelFilter}`, onRemove: () => setChannelFilter(ALL) }] : []),
+            ...(agentFilter !== ALL ? [{ key: 'agent', label: `Agent: ${agentFilter}`, onRemove: () => setAgentFilter(ALL) }] : []),
+            ...(outcomeFilter !== ALL ? [{ key: 'outcome', label: `Outcome: ${outcomeFilter}`, onRemove: () => setOutcomeFilter(ALL) }] : []),
+            ...(escalationFilter !== ALL ? [{ key: 'escalation', label: `Escalation: ${escalationFilter}`, onRemove: () => setEscalationFilter(ALL) }] : []),
+            ...(fcrFilter !== ALL ? [{ key: 'fcr', label: `FCR: ${fcrFilter}`, onRemove: () => setFcrFilter(ALL) }] : []),
+            ...(sentimentFilter !== ALL ? [{ key: 'sentiment', label: `Sentiment: ${sentimentFilter}`, onRemove: () => setSentimentFilter(ALL) }] : []),
+            ...(intentSearch ? [{ key: 'intent', label: `Intent: ${intentSearch}`, onRemove: () => setIntentSearch('') }] : []),
+            ...(campaignOnly ? [{ key: 'campaign', label: 'Campaign interactions only', onRemove: () => setCampaignOnly(false) }] : []),
+            ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
+          ]}
+          onClearAll={() => {
+            setChannelFilter(ALL);
+            setAgentFilter(ALL);
+            setOutcomeFilter(ALL);
+            setEscalationFilter(ALL);
+            setFcrFilter(ALL);
+            setSentimentFilter(ALL);
+            setIntentSearch('');
+            setCampaignOnly(false);
+            setSelectedGroup(null);
+          }}
+        />
 
         <Card>
           <CardHeader>

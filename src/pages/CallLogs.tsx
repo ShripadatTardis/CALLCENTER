@@ -14,6 +14,9 @@ import { formatDurationExact, formatDurationLong, formatPercent, formatPhoneNumb
 import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
+import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 
 function toCsv(interactions: Interaction[]): string {
   const headers = [
@@ -37,12 +40,21 @@ function downloadCsv(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+type ClientFacet = 'any' | 'yes' | 'no';
+
 const CallLogs: React.FC = () => {
   const [filters, setFilters] = useState<CallLogFilters>({});
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [view, setView] = useState<'grouped' | 'table'>('grouped');
   const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
+  // Client-side facets — the backend call-data query has no fcr/escalation/
+  // authenticated/campaign filter params (Trigger_Call_API/Call_data_API
+  // docs), so these narrow only the currently-fetched page and are labeled
+  // as such, per plan §13's server-side-vs-client-side honesty rule.
+  const [fcrFacet, setFcrFacet] = useState<ClientFacet>('any');
+  const [authFacet, setAuthFacet] = useState<ClientFacet>('any');
+  const [campaignFacet, setCampaignFacet] = useState('');
 
   const { data, isLoading, isError, error, refetch, isFetching } = useCallData({
     status: 'inactive',
@@ -53,7 +65,8 @@ const CallLogs: React.FC = () => {
 
   const allInteractions = useMemo(() => data?.interactions ?? [], [data]);
   const summary = data?.summary;
-  const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '');
+  const clientFacetsActive = fcrFacet !== 'any' || authFacet !== 'any' || Boolean(campaignFacet);
+  const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '') || clientFacetsActive;
 
   const grouped = useMemo(
     () =>
@@ -65,10 +78,38 @@ const CallLogs: React.FC = () => {
     [allInteractions, classification.data, classification.agentsById],
   );
 
-  const interactions =
+  const groupFiltered =
     view === 'grouped' && selectedGroup
       ? allInteractions.filter((i) => (i.agentId ?? null) === selectedGroup.agentId)
       : allInteractions;
+
+  const interactions = groupFiltered.filter((i) => {
+    if (fcrFacet === 'yes' && i.fcr !== true) return false;
+    if (fcrFacet === 'no' && i.fcr !== false) return false;
+    if (authFacet === 'yes' && i.wasAuthenticated !== true) return false;
+    if (authFacet === 'no' && i.wasAuthenticated === true) return false;
+    if (campaignFacet && !(i.campaignName ?? '').toLowerCase().includes(campaignFacet.toLowerCase())) return false;
+    return true;
+  });
+
+  const activeChips: { key: string; label: string; onRemove: () => void }[] = [
+    ...(filters.search ? [{ key: 'search', label: `Search: ${filters.search}`, onRemove: () => setFilters((f) => ({ ...f, search: undefined })) }] : []),
+    ...(filters.date_from ? [{ key: 'date_from', label: `From ${filters.date_from}`, onRemove: () => setFilters((f) => ({ ...f, date_from: undefined })) }] : []),
+    ...(filters.date_to ? [{ key: 'date_to', label: `To ${filters.date_to}`, onRemove: () => setFilters((f) => ({ ...f, date_to: undefined })) }] : []),
+    ...(filters.outcome ? [{ key: 'outcome', label: `Outcome: ${filters.outcome}`, onRemove: () => setFilters((f) => ({ ...f, outcome: undefined })) }] : []),
+    ...(filters.direction ? [{ key: 'direction', label: `Direction: ${filters.direction}`, onRemove: () => setFilters((f) => ({ ...f, direction: undefined })) }] : []),
+    ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
+    ...(fcrFacet !== 'any' ? [{ key: 'fcr', label: `FCR: ${fcrFacet} (page)`, onRemove: () => setFcrFacet('any') }] : []),
+    ...(authFacet !== 'any' ? [{ key: 'auth', label: `Authenticated: ${authFacet} (page)`, onRemove: () => setAuthFacet('any') }] : []),
+    ...(campaignFacet ? [{ key: 'campaign', label: `Campaign: ${campaignFacet} (page)`, onRemove: () => setCampaignFacet('') }] : []),
+  ];
+  const clearAll = () => {
+    setFilters({});
+    setSelectedGroup(null);
+    setFcrFacet('any');
+    setAuthFacet('any');
+    setCampaignFacet('');
+  };
 
   const handleViewDetail = (interaction: Interaction) => {
     setSelectedInteraction(interaction);
@@ -148,6 +189,43 @@ const CallLogs: React.FC = () => {
         </div>
 
         <AdvancedFilters filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
+
+        {/* Client-side voice facets — no server query param exists for these (§13), so they narrow only the current page. */}
+        <div className="flex flex-wrap items-end gap-3 -mt-2">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">FCR (current page)</label>
+            <Select value={fcrFacet} onValueChange={(v) => setFcrFacet(v as ClientFacet)}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Authenticated (current page)</label>
+            <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as ClientFacet)}>
+              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Campaign contains (current page)</label>
+            <Input
+              className="h-8 w-48 text-xs"
+              value={campaignFacet}
+              onChange={(e) => setCampaignFacet(e.target.value)}
+              placeholder="Campaign name…"
+            />
+          </div>
+        </div>
+
+        <ActiveFilterChips chips={activeChips} onClearAll={clearAll} />
 
         {isError && (
           <QueryErrorBanner

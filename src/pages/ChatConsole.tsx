@@ -6,7 +6,8 @@ import { MessageSquarePlus, MessageCircle } from 'lucide-react';
 import { useChatSession } from '@/hooks/chat/useChatSession';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatComposer } from '@/components/chat/ChatComposer';
-import { ChatInteractionHeader } from '@/components/chat/ChatInteractionHeader';
+import { ChatIdentitySelector } from '@/components/chat/ChatIdentitySelector';
+import type { SendChatMessageOptions } from '@/services/chat/chatService';
 
 const ChatConsole: React.FC = () => {
   const {
@@ -25,11 +26,8 @@ const ChatConsole: React.FC = () => {
     startNewChat,
   } = useChatSession();
   const endRef = useRef<HTMLDivElement>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState('');
-  const [callerName, setCallerName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [customerIdInput, setCustomerIdInput] = useState('');
-  const [contactIdInput, setContactIdInput] = useState('');
+  const [identity, setIdentity] = useState<SendChatMessageOptions>({});
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,27 +41,13 @@ const ChatConsole: React.FC = () => {
     // session is bound, useChatSession's send() only forwards session_id
     // regardless of what's passed here, but we still stop passing stale
     // operator input once bound so it's clear from this call site alone.
-    void send(
-      text,
-      hasActiveSession
-        ? undefined
-        : {
-            agentId: selectedAgentId || undefined,
-            customerId: customerIdInput.trim() || undefined,
-            contactId: contactIdInput.trim() || undefined,
-            callerName: callerName.trim() || undefined,
-            phoneNumber: phoneNumber.trim() || undefined,
-          },
-    );
+    void send(text, hasActiveSession ? undefined : identity);
   };
 
   const handleNewChat = () => {
     startNewChat();
-    setSelectedAgentId('');
-    setCallerName('');
-    setPhoneNumber('');
-    setCustomerIdInput('');
-    setContactIdInput('');
+    setIdentity({});
+    setResetKey((k) => k + 1);
   };
 
   return (
@@ -82,22 +66,14 @@ const ChatConsole: React.FC = () => {
           </Button>
         </div>
 
-        <ChatInteractionHeader
-          selectedAgentId={selectedAgentId}
-          onAgentChange={setSelectedAgentId}
-          sessionId={sessionId}
+        <ChatIdentitySelector
           isBound={hasActiveSession}
           boundAgentName={boundAgentName ?? boundAgentId}
-          callerName={callerName}
-          onCallerNameChange={setCallerName}
-          phoneNumber={phoneNumber}
-          onPhoneNumberChange={setPhoneNumber}
-          customerIdInput={customerIdInput}
-          onCustomerIdInputChange={setCustomerIdInput}
-          contactIdInput={contactIdInput}
-          onContactIdInputChange={setContactIdInput}
+          sessionId={sessionId}
           resolvedCustomerId={customerId}
           resolvedContactId={contactId}
+          onIdentityChange={({ displayLabel: _displayLabel, ...next }) => setIdentity(next)}
+          resetKey={resetKey}
         />
 
         <Card className="flex flex-col h-[65vh]">

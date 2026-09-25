@@ -22,9 +22,20 @@ import {
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
 import { getCustomerDisplayLabel } from '@/lib/customerDisplayLabel';
+import { useClassification } from '@/hooks/classification/useClassification';
+import { groupInteractions } from '@/lib/interactionGrouping';
+import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 
 const MAX_LOOKUP_PAGES = 3;
 const LOOKUP_PAGE_SIZE = 100;
+/**
+ * Session 7.1 §17: the timeline grouping needs branch counts to sum to
+ * this customer's authorized visible total, so the grouping fetch uses
+ * a bounded page large enough to cover realistic per-customer interaction
+ * counts in one request (not an unbounded fetch-all loop) rather than
+ * the timeline's own default small page.
+ */
+const GROUPING_PAGE_SIZE = 500;
 
 /**
  * /call-data has no call_id-keyed lookup param — only `search`, which
@@ -112,13 +123,34 @@ const CustomerDetail: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
   const [selectedInteraction, setSelectedInteraction] = useState<{ id: string; channel: string } | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useCustomerDetail(customerId);
-  const interactionsQuery = useCustomerInteractions(customerId);
+  const interactionsQuery = useCustomerInteractions(customerId, 1, GROUPING_PAGE_SIZE);
   const refreshMutation = useRefreshCustomer(customerId);
+  const classification = useClassification();
 
   const aggregate = data?.aggregate;
-  const interactions = interactionsQuery.data?.data ?? [];
+  const allInteractions = interactionsQuery.data?.data ?? [];
+  const interactionsTotalCount = interactionsQuery.data?.pagination.totalCount ?? allInteractions.length;
+  // The grouping fetch itself may still be a partial page if a customer
+  // has more interactions than GROUPING_PAGE_SIZE — never silently
+  // present that as the true total (plan §17).
+  const groupingIsExhaustive = allInteractions.length >= interactionsTotalCount;
+
+  const grouped = React.useMemo(
+    () =>
+      groupInteractions(
+        allInteractions.map((i) => ({ agentId: i.agentId ?? null, channel: i.channel === 'chat' ? ('chat' as const) : ('voice' as const) })),
+        classification.data,
+        classification.agentsById,
+      ),
+    [allInteractions, classification.data, classification.agentsById],
+  );
+
+  const interactions = selectedGroup
+    ? allInteractions.filter((i) => (i.agentId ?? null) === selectedGroup.agentId && (i.channel === 'chat' ? 'chat' : 'voice') === selectedGroup.channel)
+    : allInteractions;
 
   return (
     <Layout>
@@ -203,17 +235,38 @@ const CustomerDetail: React.FC = () => {
             </div>
 
             <Card>
-              <CardHeader><CardTitle>Interaction Timeline</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Interaction Timeline</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Grouped by this customer's authorized Category/Agent/Channel (Session 6.2 classification).
+                  {!groupingIsExhaustive && ` Counts below cover the first ${allInteractions.length} of ${interactionsTotalCount} interactions.`}
+                </p>
+              </CardHeader>
               <CardContent className="space-y-3">
                 {interactionsQuery.isLoading ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
-                ) : interactions.length === 0 ? (
+                ) : allInteractions.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6 text-center">
                     No visible interactions for this customer.
                   </p>
                 ) : (
+                  <>
+                    <GroupedInteractionTree
+                      group={grouped}
+                      selected={selectedGroup}
+                      onSelect={setSelectedGroup}
+                      countsAreExhaustive={groupingIsExhaustive}
+                    />
+                    {interactions.length === 0 && (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        No interactions in the selected group.
+                      </p>
+                    )}
+                  </>
+                )}
+                {allInteractions.length > 0 && interactions.length > 0 && (
                   interactions.map((row) => (
                     <button
                       key={row.id}

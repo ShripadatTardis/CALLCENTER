@@ -12,6 +12,10 @@ import { formatFractionAsPercent, formatStatusLabel, formatTimestamp } from '@/l
 import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
+import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search } from 'lucide-react';
 
 /**
  * Session 5.1 amendment: sourced from GET /api/v1/chat/sessions (the
@@ -19,17 +23,39 @@ import { GroupedInteractionTree, type SelectedGroup } from '@/components/classif
  * real identity fields — no mock values. Falls back to this app's local
  * copy only when the live call fails (surfaced via the banner below).
  */
+type StatusFacet = 'any' | 'active' | 'completed';
+type YesNoFacet = 'any' | 'yes' | 'no';
+
 const ChatLogs: React.FC = () => {
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error, refetch, isFetching } = useChatLogs(page);
+  const [statusFacet, setStatusFacet] = useState<StatusFacet>('any');
+  const { data, isLoading, isError, error, refetch, isFetching } = useChatLogs(page, statusFacet === 'any' ? undefined : statusFacet);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [view, setView] = useState<'grouped' | 'table'>('grouped');
   const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
   const classification = useClassification();
 
-  const allSessions = useMemo(() => data?.data ?? [], [data]);
+  // Client-side — the backend chat/sessions list has no free-text search
+  // param (Chat_Sessions_API.docx: customer_id/contact_id/agent_id/status/
+  // page/page_size only), so this narrows the current fetched page only.
+  const [search, setSearch] = useState('');
+  const [authFacet, setAuthFacet] = useState<YesNoFacet>('any');
+
+  const allSessionsRaw = useMemo(() => data?.data ?? [], [data]);
   const pagination = data?.pagination;
   const isFallback = data?.source === 'local-fallback';
+
+  const allSessions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allSessionsRaw.filter((s) => {
+      if (authFacet === 'yes' && !s.authenticated) return false;
+      if (authFacet === 'no' && s.authenticated) return false;
+      if (!q) return true;
+      return [s.sessionId, s.customerId, s.contactId, s.callerName, s.phoneNumber, s.agentName, s.latestIntent]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
+    });
+  }, [allSessionsRaw, search, authFacet]);
 
   const grouped = useMemo(
     () =>
@@ -51,6 +77,53 @@ const ChatLogs: React.FC = () => {
           <h1 className="text-3xl font-bold">Chat Logs</h1>
           <p className="text-muted-foreground">Historical text-interaction sessions.</p>
         </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1 flex-1 min-w-[200px]">
+            <label className="text-xs text-muted-foreground">Search (current page)</label>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                className="h-8 pl-7 text-sm"
+                placeholder="Customer, CIF, session, agent, intent…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Status</label>
+            <Select value={statusFacet} onValueChange={(v) => { setStatusFacet(v as StatusFacet); setPage(1); }}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Authenticated (page)</label>
+            <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as YesNoFacet)}>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <ActiveFilterChips
+          chips={[
+            ...(search ? [{ key: 'search', label: `Search: ${search} (page)`, onRemove: () => setSearch('') }] : []),
+            ...(statusFacet !== 'any' ? [{ key: 'status', label: `Status: ${statusFacet}`, onRemove: () => setStatusFacet('any') }] : []),
+            ...(authFacet !== 'any' ? [{ key: 'auth', label: `Authenticated: ${authFacet} (page)`, onRemove: () => setAuthFacet('any') }] : []),
+            ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
+          ]}
+          onClearAll={() => { setSearch(''); setStatusFacet('any'); setAuthFacet('any'); setSelectedGroup(null); }}
+        />
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">

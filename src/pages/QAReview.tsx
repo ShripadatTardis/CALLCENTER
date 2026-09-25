@@ -1,375 +1,365 @@
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { QualityScoring } from '@/components/qa/QualityScoring';
-import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, Clock, AlertTriangle, Star, Filter } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, ListChecks, Phone, MessageCircle } from 'lucide-react';
+import { useCallData } from '@/hooks/calls/useCallData';
+import { useChatLogs } from '@/hooks/chat/useChatLogs';
+import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
+import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
+import { Interaction } from '@/types/interaction';
+import {
+  formatDurationLong,
+  formatFractionAsPercent,
+  formatPercent,
+  formatStatusLabel,
+  formatTimestamp,
+} from '@/lib/format';
 
+type QARow = {
+  key: string;
+  channel: 'voice' | 'chat';
+  agentName: string;
+  startTime: string;
+  durationSeconds?: number;
+  outcome?: string;
+  fcr?: boolean;
+  intent?: string | null;
+  intentAccuracyPct?: number;
+  chatConfidenceFraction?: number | null;
+  sentiment?: string;
+  escalationTrigger?: string;
+  authenticated?: boolean | null;
+  latencyMs?: number | null;
+  campaignName?: string;
+  voiceInteraction?: Interaction;
+  chatSessionId?: string;
+};
+
+const ALL = '__all__';
+
+/**
+ * Read-only Interaction Quality review — Session 6.1. Replaces the
+ * former QAReview/QualityScoring modules, which showed a fully
+ * fabricated review queue, reviewer assignments, and a weighted
+ * 0-100 "quality score" computed from a slider with no persistence
+ * (see docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md). No manual-review
+ * backend exists, so this screen is interaction-centric and factual:
+ * it surfaces the same real signals Call Logs/Chat Logs/Agent Detail
+ * already source, grouped as Operational / Conversation / Technical
+ * signals, with no composite score — that stays Session 6's explicit,
+ * separate design decision.
+ */
 const QAReview: React.FC = () => {
-  const [selectedCall, setSelectedCall] = useState<string | null>(null);
+  const { data: callData, isLoading: callsLoading, isError: callsError, error: callsErr, refetch: refetchCalls, isFetching: callsFetching } =
+    useCallData({ status: 'inactive', page_size: 50 });
+  const { data: chatData, isLoading: chatLoading, isError: chatIsError, error: chatErr, refetch: refetchChat, isFetching: chatFetching } =
+    useChatLogs(1);
 
-  const reviewQueue = [
-    {
-      id: 'call-001',
-      callId: 'CALL-20241217-001',
-      callerName: 'John Smith',
-      intent: 'Billing Inquiry',
-      duration: 245,
-      outcome: 'resolved',
-      priority: 'high',
-      assignedReviewer: 'Sarah Johnson',
-      status: 'pending',
-      submittedAt: '2024-12-17 09:30:00'
-    },
-    {
-      id: 'call-002',
-      callId: 'CALL-20241217-002',
-      callerName: 'Maria Garcia',
-      intent: 'Loan Status',
-      duration: 189,
-      outcome: 'escalated',
-      priority: 'urgent',
-      assignedReviewer: 'Mike Chen',
-      status: 'in_progress',
-      submittedAt: '2024-12-17 10:15:00'
-    },
-    {
-      id: 'call-003',
-      callId: 'CALL-20241217-003',
-      callerName: 'David Wilson',
-      intent: 'Technical Support',
-      duration: 367,
-      outcome: 'callback_scheduled',
-      priority: 'medium',
-      assignedReviewer: 'Sarah Johnson',
-      status: 'completed',
-      submittedAt: '2024-12-17 11:00:00',
-      score: 87
+  const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
+  const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
+
+  const [channelFilter, setChannelFilter] = useState(ALL);
+  const [agentFilter, setAgentFilter] = useState(ALL);
+  const [outcomeFilter, setOutcomeFilter] = useState(ALL);
+  const [escalationFilter, setEscalationFilter] = useState(ALL);
+  const [fcrFilter, setFcrFilter] = useState(ALL);
+  const [sentimentFilter, setSentimentFilter] = useState(ALL);
+  const [intentSearch, setIntentSearch] = useState('');
+  const [campaignOnly, setCampaignOnly] = useState(false);
+
+  const isLoading = callsLoading || chatLoading;
+  const isError = callsError || chatIsError;
+
+  const rows: QARow[] = useMemo(() => {
+    const voiceRows: QARow[] = (callData?.interactions ?? []).map((call) => ({
+      key: `voice-${call.interactionId}`,
+      channel: 'voice',
+      agentName: call.agentDisplayName ?? call.agentId ?? '—',
+      startTime: call.startTime,
+      durationSeconds: call.durationSeconds,
+      outcome: call.outcome ?? call.status,
+      fcr: call.fcr,
+      intent: call.intent ?? null,
+      intentAccuracyPct: call.intentAccuracy,
+      sentiment: call.sentiment,
+      escalationTrigger: call.escalation?.trigger,
+      authenticated: call.wasAuthenticated ?? null,
+      latencyMs: null, // no confirmed per-call/per-agent latency source for voice — never fabricated
+      campaignName: call.campaignName,
+      voiceInteraction: call,
+    }));
+
+    const chatRows: QARow[] = (chatData?.data ?? []).map((session) => ({
+      key: `chat-${session.sessionId}`,
+      channel: 'chat',
+      agentName: session.agentName ?? session.agentId ?? '—',
+      startTime: session.startedAt,
+      outcome: formatStatusLabel(session.status),
+      intent: session.latestIntent,
+      chatConfidenceFraction: session.latestConfidence,
+      authenticated: session.authenticated,
+      latencyMs: session.latestLatencyMs,
+      chatSessionId: session.sessionId,
+    }));
+
+    return [...voiceRows, ...chatRows].sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
+    );
+  }, [callData, chatData]);
+
+  // Filter option sets are derived only from real values already present
+  // in the fetched data — never a fabricated fixed enum.
+  const agentOptions = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.agentName).filter((a) => a && a !== '—'))).sort(),
+    [rows],
+  );
+  const outcomeOptions = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.outcome).filter(Boolean))) as string[],
+    [rows],
+  );
+  const sentimentOptions = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.sentiment).filter(Boolean))) as string[],
+    [rows],
+  );
+
+  const filteredRows = rows.filter((r) => {
+    if (channelFilter !== ALL && r.channel !== channelFilter) return false;
+    if (agentFilter !== ALL && r.agentName !== agentFilter) return false;
+    if (outcomeFilter !== ALL && r.outcome !== outcomeFilter) return false;
+    if (escalationFilter !== ALL) {
+      const hasEscalation = Boolean(r.escalationTrigger);
+      if (escalationFilter === 'yes' && !hasEscalation) return false;
+      if (escalationFilter === 'no' && hasEscalation) return false;
     }
-  ];
-
-  const completedReviews = [
-    {
-      id: 'review-001',
-      callId: 'CALL-20241216-045',
-      callerName: 'Lisa Anderson',
-      intent: 'Billing Inquiry',
-      reviewer: 'Sarah Johnson',
-      score: 92,
-      completedAt: '2024-12-16 16:30:00',
-      feedback: 'Excellent intent recognition and resolution. Minor improvement needed in empathy expression.'
-    },
-    {
-      id: 'review-002',
-      callId: 'CALL-20241216-046',
-      callerName: 'Robert Taylor',
-      intent: 'Loan Status',
-      reviewer: 'Mike Chen',
-      score: 78,
-      completedAt: '2024-12-16 17:15:00',
-      feedback: 'Good resolution but escalation could have been avoided with better clarification questions.'
+    if (fcrFilter !== ALL) {
+      if (fcrFilter === 'yes' && r.fcr !== true) return false;
+      if (fcrFilter === 'no' && r.fcr !== false) return false;
     }
-  ];
+    if (sentimentFilter !== ALL && r.sentiment !== sentimentFilter) return false;
+    if (intentSearch && !(r.intent ?? '').toLowerCase().includes(intentSearch.toLowerCase())) return false;
+    if (campaignOnly && !r.campaignName) return false;
+    return true;
+  });
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleRowClick = (row: QARow) => {
+    if (row.channel === 'voice' && row.voiceInteraction) {
+      setSelectedInteraction(row.voiceInteraction);
+    } else if (row.channel === 'chat' && row.chatSessionId) {
+      setSelectedChatSessionId(row.chatSessionId);
     }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending': return <Clock className="h-4 w-4 text-yellow-600" />;
-      case 'in_progress': return <AlertTriangle className="h-4 w-4 text-orange-600" />;
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      default: return <Clock className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-green-600';
-    if (score >= 80) return 'text-blue-600';
-    if (score >= 70) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleSaveScoring = (criteria: any[], overallScore: number, feedback: string) => {
-    console.log('Saving QA scoring:', { criteria, overallScore, feedback });
-    setSelectedCall(null);
   };
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Quality Assurance Review</h1>
-            <p className="text-slate-600">Review and score AI agent interactions for continuous improvement</p>
-          </div>
-          <Button variant="outline" className="flex items-center space-x-2">
-            <Filter className="h-4 w-4" />
-            <span>Filter Reviews</span>
-          </Button>
+      <div className="container mx-auto p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Interaction Quality</h1>
+          <p className="text-muted-foreground max-w-3xl">
+            Read-only review of real Voice and Chat interactions — grouped as{' '}
+            <span className="font-medium text-foreground">Operational Signals</span> (outcome, FCR,
+            escalation), <span className="font-medium text-foreground">Conversation Signals</span>{' '}
+            (intent, confidence/accuracy, sentiment, authentication), and{' '}
+            <span className="font-medium text-foreground">Technical Signals</span> (duration, latency
+            where available). There is no composite quality score here — see AI Agents for the
+            agent-level Business Outcome / Conversational / Technical Performance breakdown. No manual
+            review, reviewer assignment, or approval workflow exists yet; see the roadmap notes in
+            docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md.
+          </p>
         </div>
 
-        {/* QA Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Pending Reviews</p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {reviewQueue.filter(r => r.status === 'pending').length}
-                  </p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">In Progress</p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {reviewQueue.filter(r => r.status === 'in_progress').length}
-                  </p>
-                </div>
-                <AlertTriangle className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Completed Today</p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {reviewQueue.filter(r => r.status === 'completed').length}
-                  </p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-600">Avg Quality Score</p>
-                  <p className="text-2xl font-bold text-green-600">85.7</p>
-                </div>
-                <Star className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="queue" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="queue">Review Queue</TabsTrigger>
-            <TabsTrigger value="completed">Completed Reviews</TabsTrigger>
-            <TabsTrigger value="analytics">QA Analytics</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="queue" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Calls Awaiting Review</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {reviewQueue.map((call) => (
-                    <div key={call.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="font-semibold text-slate-900">{call.callerName}</h3>
-                            <Badge variant="outline">{call.intent}</Badge>
-                            <Badge className={getPriorityColor(call.priority)}>
-                              {call.priority}
-                            </Badge>
-                            <div className="flex items-center space-x-1">
-                              {getStatusIcon(call.status)}
-                              <span className="text-sm capitalize">{call.status.replace('_', ' ')}</span>
-                            </div>
-                          </div>
-                          <div className="text-sm text-slate-500 mb-2">
-                            Call ID: {call.callId} • Duration: {formatDuration(call.duration)} • Outcome: {call.outcome}
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            Assigned to: {call.assignedReviewer} • Submitted: {new Date(call.submittedAt).toLocaleString()}
-                          </div>
-                          {call.score && (
-                            <div className="mt-2">
-                              <span className="text-sm text-slate-500">Quality Score: </span>
-                              <span className={`font-medium ${getScoreColor(call.score)}`}>{call.score}/100</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex space-x-2">
-                          {call.status !== 'completed' && (
-                            <Button 
-                              size="sm" 
-                              onClick={() => setSelectedCall(call.callId)}
-                            >
-                              {call.status === 'pending' ? 'Start Review' : 'Continue Review'}
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm">
-                            View Call
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="completed" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recently Completed Reviews</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {completedReviews.map((review) => (
-                    <div key={review.id} className="border border-slate-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h3 className="font-semibold text-slate-900">{review.callerName}</h3>
-                            <Badge variant="outline">{review.intent}</Badge>
-                            <div className="flex items-center space-x-1">
-                              <Star className="h-4 w-4 text-yellow-500" />
-                              <span className={`font-medium ${getScoreColor(review.score)}`}>
-                                {review.score}/100
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-sm text-slate-500 mb-2">
-                            Call ID: {review.callId} • Reviewed by: {review.reviewer}
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            Completed: {new Date(review.completedAt).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-slate-50 rounded-md p-3">
-                        <p className="text-sm text-slate-700">{review.feedback}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quality Score Distribution</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Excellent (90-100)</span>
-                        <span className="text-sm text-slate-500">23%</span>
-                      </div>
-                      <Progress value={23} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Good (80-89)</span>
-                        <span className="text-sm text-slate-500">45%</span>
-                      </div>
-                      <Progress value={45} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Fair (70-79)</span>
-                        <span className="text-sm text-slate-500">22%</span>
-                      </div>
-                      <Progress value={22} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Poor (Below 70)</span>
-                        <span className="text-sm text-slate-500">10%</span>
-                      </div>
-                      <Progress value={10} className="h-2" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Improvement Trends</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-900">+5.3%</div>
-                      <div className="text-sm text-green-700">Quality Score Improvement</div>
-                      <div className="text-xs text-green-600 mt-1">vs last month</div>
-                    </div>
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-900">89.2%</div>
-                      <div className="text-sm text-blue-700">Intent Accuracy</div>
-                      <div className="text-xs text-blue-600 mt-1">↑ 2.1% this week</div>
-                    </div>
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-900">4.2</div>
-                      <div className="text-sm text-purple-700">Avg Reviews/Day</div>
-                      <div className="text-xs text-purple-600 mt-1">per reviewer</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Quality Scoring Modal */}
-        {selectedCall && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
-              <div className="p-6">
-                <QualityScoring
-                  callId={selectedCall}
-                  onSave={handleSaveScoring}
-                />
-                <div className="flex justify-end mt-6">
-                  <Button variant="outline" onClick={() => setSelectedCall(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+        {isError && (
+          <QueryErrorBanner
+            error={callsError ? callsErr : chatErr}
+            onRetry={() => {
+              void refetchCalls();
+              void refetchChat();
+            }}
+            hasStaleData={rows.length > 0}
+            isFetching={callsFetching || chatFetching}
+          />
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3 items-center">
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="w-36"><SelectValue placeholder="Channel" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All channels</SelectItem>
+                <SelectItem value="voice">Voice</SelectItem>
+                <SelectItem value="chat">Chat</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={agentFilter} onValueChange={setAgentFilter}>
+              <SelectTrigger className="w-48"><SelectValue placeholder="Agent" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All agents</SelectItem>
+                {agentOptions.map((a) => (
+                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Outcome" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All outcomes</SelectItem>
+                {outcomeOptions.map((o) => (
+                  <SelectItem key={o} value={o}>{formatStatusLabel(o)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={escalationFilter} onValueChange={setEscalationFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Escalation" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Escalation: any</SelectItem>
+                <SelectItem value="yes">Escalated</SelectItem>
+                <SelectItem value="no">Not escalated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={fcrFilter} onValueChange={setFcrFilter}>
+              <SelectTrigger className="w-32"><SelectValue placeholder="FCR" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>FCR: any</SelectItem>
+                <SelectItem value="yes">FCR: Yes</SelectItem>
+                <SelectItem value="no">FCR: No</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {sentimentOptions.length > 0 && (
+              <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                <SelectTrigger className="w-36"><SelectValue placeholder="Sentiment" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All sentiment</SelectItem>
+                  {sentimentOptions.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <Input
+              placeholder="Search intent…"
+              value={intentSearch}
+              onChange={(e) => setIntentSearch(e.target.value)}
+              className="w-44"
+            />
+
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={campaignOnly} onCheckedChange={(v) => setCampaignOnly(Boolean(v))} />
+              Campaign interactions only
+            </label>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ListChecks className="h-4 w-4" />
+              Interactions ({filteredRows.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                No interactions match the current filters.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Channel</TableHead>
+                      <TableHead>Agent</TableHead>
+                      <TableHead>Outcome</TableHead>
+                      <TableHead>FCR</TableHead>
+                      <TableHead>Escalation</TableHead>
+                      <TableHead>Intent</TableHead>
+                      <TableHead>Accuracy / Confidence</TableHead>
+                      <TableHead>Sentiment</TableHead>
+                      <TableHead>Authenticated</TableHead>
+                      <TableHead>Duration / Latency</TableHead>
+                      <TableHead>Campaign</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRows.map((row) => (
+                      <TableRow
+                        key={row.key}
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => handleRowClick(row)}
+                      >
+                        <TableCell className="whitespace-nowrap text-xs">{formatTimestamp(row.startTime)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                            {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
+                            {row.channel}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{row.agentName}</TableCell>
+                        <TableCell>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                        <TableCell>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                        <TableCell>
+                          {row.escalationTrigger ? (
+                            <Badge variant="destructive" className="text-xs">{row.escalationTrigger}</Badge>
+                          ) : row.channel === 'voice' ? 'No' : '—'}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{row.intent ?? '—'}</TableCell>
+                        <TableCell>
+                          {row.channel === 'voice'
+                            ? formatPercent(row.intentAccuracyPct, 0)
+                            : row.chatConfidenceFraction != null
+                              ? formatFractionAsPercent(row.chatConfidenceFraction)
+                              : '—'}
+                        </TableCell>
+                        <TableCell>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                        <TableCell>
+                          {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {row.channel === 'voice'
+                            ? formatDurationLong(row.durationSeconds)
+                            : row.latencyMs != null
+                              ? `${row.latencyMs}ms`
+                              : '—'}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{row.campaignName ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      <InteractionDetailDialog
+        isOpen={Boolean(selectedInteraction)}
+        onClose={() => setSelectedInteraction(null)}
+        interaction={selectedInteraction}
+      />
+      <ChatSessionDetailDialog
+        isOpen={Boolean(selectedChatSessionId)}
+        onClose={() => setSelectedChatSessionId(null)}
+        sessionId={selectedChatSessionId}
+      />
     </Layout>
   );
 };

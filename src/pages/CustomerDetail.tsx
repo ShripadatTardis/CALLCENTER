@@ -142,7 +142,13 @@ const CustomerDetail: React.FC = () => {
           <p className="text-sm text-muted-foreground py-8 text-center">
             Customer not found, or not visible under your current access.
           </p>
-        ) : (
+        ) : (() => {
+          const displayLabel = getCustomerDisplayLabel({
+            displayName: data.customer.displayName,
+            sourceCustomerRef: data.customer.sourceCustomerRef,
+            rawPrimaryPhone: data.phoneNumbers?.[0] ?? null,
+          });
+          return (
           <>
             {data.refresh.failed && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -152,14 +158,8 @@ const CustomerDetail: React.FC = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">
-                  {getCustomerDisplayLabel({
-                    displayName: data.customer.displayName,
-                    sourceCustomerRef: data.customer.sourceCustomerRef,
-                    rawPrimaryPhone: data.phoneNumbers?.[0] ?? null,
-                  })}
-                </h1>
-                {data.customer.sourceCustomerRef && (
+                <h1 className="text-3xl font-bold">{displayLabel}</h1>
+                {data.customer.sourceCustomerRef && data.customer.sourceCustomerRef !== displayLabel && (
                   <p className="text-muted-foreground">Ref: {data.customer.sourceCustomerRef}</p>
                 )}
               </div>
@@ -252,7 +252,8 @@ const CustomerDetail: React.FC = () => {
               </CardContent>
             </Card>
           </>
-        )}
+          );
+        })()}
 
         {selectedInteraction && (
           <InteractionLookupDialog

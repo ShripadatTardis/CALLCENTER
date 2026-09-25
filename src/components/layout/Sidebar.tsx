@@ -36,7 +36,7 @@ const sidebarItems = [
   { name: 'Outbound Campaigns', href: '/outbound-campaigns', icon: MessageSquare, permission: 'manage_outbound_campaigns' },
   { name: 'WhatsApp Hub', href: '/whatsapp-hub', icon: MessageCircle, permission: 'manage_whatsapp_messages' },
   { name: 'Formatting Hub', href: '/formatting-hub', icon: PenTool, permission: 'view_all_dashboards' },
-  { name: 'QA Review', href: '/qa-review', icon: ClipboardCheck, permission: 'review_transcripts' },
+  { name: 'Interaction Quality', href: '/qa-review', icon: ClipboardCheck, permission: 'review_transcripts' },
   { name: 'AI Agents', href: '/ai-agents', icon: Bot, permission: 'view_all_dashboards' },
   { name: 'AI Orchestrator', href: '/orchestrator', icon: Workflow, permission: 'orchestrator_view' },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'view_analytics' },

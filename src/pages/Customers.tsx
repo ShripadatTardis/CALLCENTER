@@ -8,6 +8,7 @@ import { Loader2, Search, Users, AlertTriangle } from 'lucide-react';
 import { useCustomers } from '@/hooks/customers/useCustomers';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { formatFractionAsPercent, formatStatusLabel, formatTimestamp } from '@/lib/format';
+import { getCustomerDisplayLabel } from '@/lib/customerDisplayLabel';
 
 /**
  * Customer 360 list (plan §13/§14 of the revised Customer 360 plan).
@@ -94,7 +95,11 @@ const Customers: React.FC = () => {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-gray-900 truncate">
-                        {c.displayName || 'Unknown customer'}
+                        {getCustomerDisplayLabel({
+                          displayName: c.displayName,
+                          sourceCustomerRef: c.sourceCustomerRef,
+                          primaryPhoneMasked: c.primaryPhoneMasked,
+                        })}
                         {c.sourceCustomerRef && (
                           <span className="text-xs text-muted-foreground ml-2">Ref: {c.sourceCustomerRef}</span>
                         )}

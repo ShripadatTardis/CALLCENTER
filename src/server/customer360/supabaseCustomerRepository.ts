@@ -76,6 +76,8 @@ interface CustomerRow {
   auth_summary: { everAuthenticated: boolean; lastAuthenticatedAt: string | null } | null;
   aggregation_version: number;
   aggregated_at: string;
+  /** Only present on call_center_list_customers rows — see mapCustomer. */
+  primary_phone_masked?: string | null;
 }
 
 function mapCustomer(row: CustomerRow): Customer {
@@ -83,6 +85,7 @@ function mapCustomer(row: CustomerRow): Customer {
     id: row.id,
     displayName: row.display_name,
     sourceCustomerRef: row.source_customer_ref,
+    primaryPhoneMasked: row.primary_phone_masked ?? null,
     firstSeen: row.first_seen,
     lastSeen: row.last_seen,
     totalInteractions: row.total_interactions,

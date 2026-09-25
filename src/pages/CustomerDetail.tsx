@@ -21,6 +21,7 @@ import {
   formatTimestamp,
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
+import { getCustomerDisplayLabel } from '@/lib/customerDisplayLabel';
 
 const MAX_LOOKUP_PAGES = 3;
 const LOOKUP_PAGE_SIZE = 100;
@@ -151,7 +152,13 @@ const CustomerDetail: React.FC = () => {
 
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">{data.customer.displayName || 'Unknown customer'}</h1>
+                <h1 className="text-3xl font-bold">
+                  {getCustomerDisplayLabel({
+                    displayName: data.customer.displayName,
+                    sourceCustomerRef: data.customer.sourceCustomerRef,
+                    rawPrimaryPhone: data.phoneNumbers?.[0] ?? null,
+                  })}
+                </h1>
                 {data.customer.sourceCustomerRef && (
                   <p className="text-muted-foreground">Ref: {data.customer.sourceCustomerRef}</p>
                 )}

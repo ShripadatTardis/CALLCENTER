@@ -10,6 +10,8 @@ export interface CustomerSummary {
   id: string;
   displayName: string | null;
   sourceCustomerRef: string | null;
+  /** Last-4-digits-masked primary phone — never the full number. See src/lib/customerDisplayLabel.ts. */
+  primaryPhoneMasked: string | null;
   firstSeen: string;
   lastSeen: string;
   totalInteractions: number;

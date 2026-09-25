@@ -11,6 +11,8 @@ export interface Customer {
   id: string;
   displayName: string | null;
   sourceCustomerRef: string | null;
+  /** Last-4-digits-masked primary phone — only populated by listCustomers (Customers-list display label). Never the full number. */
+  primaryPhoneMasked: string | null;
   firstSeen: string;
   lastSeen: string;
   totalInteractions: number;

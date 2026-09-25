@@ -66,7 +66,11 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
       return;
     }
 
-    const customer = await repo.getCustomer(contactPoint.customerId);
+    // Authorized aggregate only — never the unfiltered customers.* row
+    // (plan §12; this exact call site was a confirmed category-authorization
+    // leak, fixed by reusing the same per-row authorized-aggregate logic
+    // call_center_list_customers already uses).
+    const customer = await repo.getCustomerAuthorized(contactPoint.customerId, access.authorizedAgentIds);
     res.status(200).json({
       data: customer ? [customer] : [],
       pagination: { page: 1, pageSize, totalCount: customer ? 1 : 0 },

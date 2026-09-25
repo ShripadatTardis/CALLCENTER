@@ -20,6 +20,15 @@ import type {
 export interface CustomerRepository {
   getCustomer(customerId: string): Promise<Customer | null>;
 
+  /**
+   * Like getCustomer, but the aggregate fields are computed only from
+   * interactions visible under authorizedAgentIds — never the full,
+   * unfiltered customers.* aggregate. Use this (never getCustomer) for
+   * any API response reachable by a role-scoped client request (plan
+   * §12). Returns null if the customer has zero visible interactions.
+   */
+  getCustomerAuthorized(customerId: string, authorizedAgentIds: string[] | 'all'): Promise<Customer | null>;
+
   findContactPoint(type: ContactPointType, normalizedValue: string): Promise<ContactPoint | null>;
 
   listContactPoints(customerId: string): Promise<ContactPoint[]>;

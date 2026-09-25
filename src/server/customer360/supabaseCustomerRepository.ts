@@ -184,6 +184,16 @@ export const supabaseCustomerRepository: CustomerRepository = {
     return row ? mapCustomer(row) : null;
   },
 
+  async getCustomerAuthorized(customerId, authorizedAgentIds) {
+    const { p_agent_ids, p_all } = agentIdsArg(authorizedAgentIds);
+    const row = await rpc<CustomerRow | null>('call_center_get_customer_authorized', {
+      p_id: customerId,
+      p_agent_ids,
+      p_all,
+    });
+    return row ? mapCustomer(row) : null;
+  },
+
   async findContactPoint(type, normalizedValue) {
     const row = await rpc<ContactPointRow | null>('call_center_find_contact_point', {
       p_type: type,

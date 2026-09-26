@@ -132,7 +132,7 @@ Used the connected Claude-in-Chrome browser capability (Playwright remains unava
 
 ## 21. Deployment status
 
-Deployed via `npx vercel --prod --yes` after local build + browser verification passed and no campaign-behavior regression was found. Deployment `dpl_D6u2DFtfu7JTfkNXcQfv1HEhhY5t` — READY, aliased to `https://callcenter-three-livid.vercel.app`.
+Deployed via `npx vercel --prod --yes` after local build + browser verification passed and no campaign-behavior regression was found. First deploy: `dpl_D6u2DFtfu7JTfkNXcQfv1HEhhY5t`. A second `--prod` deploy followed after the HIG-review contrast fix (§14/§19) so the shipped version includes it — both READY, aliased to `https://callcenter-three-livid.vercel.app`. Function count re-confirmed at 11 after the final deploy.
 
 **Post-deploy live production re-verification** (closes the local-only gap noted in §17): navigated to the real production app, already-authenticated as the all-access demo role.
 - Outbound Campaigns list rendered a real campaign (`myOutC01`, draft, EMI Reminder, 3 targets, 3 unclassified — the amber warning indicator correctly appeared) — confirms the compact table renders real production data correctly, not just an empty state.

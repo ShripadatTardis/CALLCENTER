@@ -13,7 +13,7 @@ interface CallHistoryListProps {
 
 export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, isLoading }) => {
   return (
-    <Card className="w-full bg-white shadow-lg border border-gray-200 min-h-[200px] max-h-[600px] flex flex-col">
+    <Card className="w-full bg-card shadow-lg border border-gray-200 min-h-[200px] max-h-[600px] flex flex-col">
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <History className="h-5 w-5 text-blue-600" />

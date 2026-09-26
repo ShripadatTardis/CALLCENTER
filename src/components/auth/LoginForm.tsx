@@ -47,7 +47,7 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-card">
       {/* Hero Section with Background Pattern */}
       <div className="h-screen flex overflow-hidden">
         {/* Left Side - Hero Content */}
@@ -63,7 +63,7 @@ export const LoginForm: React.FC = () => {
               <p className="text-slate-600 mt-1">Call Center Management</p>
             </div>
 
-            <Card className="shadow-xl border-0 bg-white">
+            <Card className="shadow-xl border-0 bg-card">
               <CardHeader className="space-y-3 text-center lg:text-left">
                 {/* Logo positioned above Welcome back for desktop */}
                 <div className="hidden lg:block">
@@ -103,7 +103,7 @@ export const LoginForm: React.FC = () => {
                     onSubmit={handleSubmit}
                   />
 
-                  <div className="text-center text-xs text-slate-500">
+                  <div className="text-center text-xs text-muted-foreground">
                     Demo credentials are automatically filled when selecting a user above
                   </div>
                 </div>

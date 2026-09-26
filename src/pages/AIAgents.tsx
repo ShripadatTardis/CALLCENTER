@@ -24,26 +24,26 @@ const AIAgents: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
-        <div className="text-xs text-slate-500 px-1">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+        <div className="text-xs text-muted-foreground px-1">
           Live agent roster — used across Voice, Chat, Customer 360 and Campaigns.
         </div>
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : isError ? (
           <p className="text-sm text-red-400 px-1">Could not load the agent roster.</p>
         ) : agents.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">No agents available.</p>
+          <p className="text-sm text-muted-foreground px-1">No agents available.</p>
         ) : (
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   {['Name', 'Persona', 'Direction', 'Language', ''].map((h) => (
-                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                    <TableHead key={h} className="text-muted-foreground text-xs">{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -51,24 +51,24 @@ const AIAgents: React.FC = () => {
                 {agents.map((agent) => (
                   <TableRow
                     key={agent.agentId}
-                    className="cursor-pointer border-slate-800/60 hover:bg-slate-900/60 focus-within:bg-slate-900/60"
+                    className="cursor-pointer border-border/60 hover:bg-card focus-within:bg-card"
                   >
-                    <TableCell className="font-medium text-slate-100">
+                    <TableCell className="font-medium text-foreground">
                       {agent.displayName}
                       {agent.isDefault && (
-                        <Badge variant="outline" className="ml-2 text-xs border-slate-600 text-slate-300">Default</Badge>
+                        <Badge variant="outline" className="ml-2 text-xs border-slate-600 text-foreground">Default</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-slate-300">{agent.personaName || '—'}</TableCell>
+                    <TableCell className="text-foreground">{agent.personaName || '—'}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">{formatStatusLabel(agent.direction)}</Badge>
                     </TableCell>
-                    <TableCell className="text-slate-300">{agent.language || '—'}</TableCell>
+                    <TableCell className="text-foreground">{agent.language || '—'}</TableCell>
                     <TableCell className="text-right pr-3">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-slate-800"
+                        className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-muted"
                         onClick={() => navigate(`/ai-agents/${agent.agentId}`)}
                       >
                         View →

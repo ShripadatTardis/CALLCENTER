@@ -93,7 +93,7 @@ const InteractionLookupDialog: React.FC<{
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-        <div className="bg-white rounded-lg p-6 flex items-center gap-2">
+        <div className="bg-card rounded-lg p-6 flex items-center gap-2">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading interaction…
         </div>
@@ -104,7 +104,7 @@ const InteractionLookupDialog: React.FC<{
   if (isError || !interaction) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-        <div className="bg-white rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-card rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
           Could not load full interaction detail for {interactionId} right now.
           <div className="mt-3">
             <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
@@ -154,8 +154,8 @@ const CustomerDetail: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
-        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-slate-400 hover:text-white hover:bg-slate-900" onClick={() => navigate('/customers')}>
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/customers')}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back to Customers
         </Button>
@@ -166,10 +166,10 @@ const CustomerDetail: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : !data ? (
-          <p className="text-sm text-slate-500 px-1">Customer not found, or not visible under your current access.</p>
+          <p className="text-sm text-muted-foreground px-1">Customer not found, or not visible under your current access.</p>
         ) : (() => {
           const displayLabel = getCustomerDisplayLabel({
             displayName: data.customer.displayName,
@@ -188,13 +188,13 @@ const CustomerDetail: React.FC = () => {
               <div>
                 <h1 className="text-lg font-semibold text-slate-50">{displayLabel}</h1>
                 {data.customer.sourceCustomerRef && data.customer.sourceCustomerRef !== displayLabel && (
-                  <p className="text-xs text-slate-500">Ref: {data.customer.sourceCustomerRef}</p>
+                  <p className="text-xs text-muted-foreground">Ref: {data.customer.sourceCustomerRef}</p>
                 )}
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
                 onClick={() => refreshMutation.mutate()}
                 disabled={refreshMutation.isPending}
               >
@@ -215,16 +215,16 @@ const CustomerDetail: React.FC = () => {
             />
 
             <div className="space-y-2">
-              <p className="text-xs text-slate-500 px-1">
+              <p className="text-xs text-muted-foreground px-1">
                 Interaction timeline — grouped by authorized Category/Agent/Channel.
                 {!groupingIsExhaustive && ` Counts cover the first ${allInteractions.length} of ${interactionsTotalCount} interactions.`}
               </p>
               {interactionsQuery.isLoading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : allInteractions.length === 0 ? (
-                <p className="text-sm text-slate-500 px-1 py-4">No visible interactions for this customer.</p>
+                <p className="text-sm text-muted-foreground px-1 py-4">No visible interactions for this customer.</p>
               ) : (
                 <>
                   <GroupedInteractionTree
@@ -234,15 +234,15 @@ const CustomerDetail: React.FC = () => {
                     countsAreExhaustive={groupingIsExhaustive}
                   />
                   {interactions.length === 0 && (
-                    <p className="text-sm text-slate-500 px-1 py-4">No interactions in the selected group.</p>
+                    <p className="text-sm text-muted-foreground px-1 py-4">No interactions in the selected group.</p>
                   )}
                 </>
               )}
               {allInteractions.length > 0 && interactions.length > 0 && (
-                <div className="rounded-md border border-slate-800 overflow-x-auto">
+                <div className="rounded-md border border-border overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+                      <tr className="border-b border-border text-left text-xs text-muted-foreground">
                         <th className="px-3 py-2 font-medium">Time</th>
                         <th className="px-3 py-2 font-medium">Channel</th>
                         <th className="px-3 py-2 font-medium">Agent</th>
@@ -256,7 +256,7 @@ const CustomerDetail: React.FC = () => {
                       {interactions.map((row) => (
                         <tr
                           key={row.id}
-                          className="cursor-pointer border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                          className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
                           role="button"
                           tabIndex={0}
                           onClick={() => setSelectedInteraction({ id: row.interactionId, channel: row.channel })}
@@ -267,14 +267,14 @@ const CustomerDetail: React.FC = () => {
                             }
                           }}
                         >
-                          <td className="px-3 py-2 whitespace-nowrap text-slate-300">{formatTimestamp(row.startedAt)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-foreground">{formatTimestamp(row.startedAt)}</td>
                           <td className="px-3 py-2">
-                            <Badge variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-slate-300">{row.channel}</Badge>
+                            <Badge variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-foreground">{row.channel}</Badge>
                             {row.direction && <Badge variant="secondary" className="text-xs whitespace-nowrap ml-1">{row.direction}</Badge>}
                           </td>
-                          <td className="px-3 py-2 text-slate-200 whitespace-nowrap">{row.agentDisplayName ?? row.agentId ?? 'Unknown agent'}</td>
-                          <td className="px-3 py-2 text-slate-300">{row.intent ?? '—'}</td>
-                          <td className="px-3 py-2 text-slate-300 whitespace-nowrap" title={formatDurationExact(row.durationSeconds ?? undefined)}>
+                          <td className="px-3 py-2 text-foreground whitespace-nowrap">{row.agentDisplayName ?? row.agentId ?? 'Unknown agent'}</td>
+                          <td className="px-3 py-2 text-foreground">{row.intent ?? '—'}</td>
+                          <td className="px-3 py-2 text-foreground whitespace-nowrap" title={formatDurationExact(row.durationSeconds ?? undefined)}>
                             {formatDurationLong(row.durationSeconds ?? undefined)}
                           </td>
                           <td className="px-3 py-2">
@@ -286,7 +286,7 @@ const CustomerDetail: React.FC = () => {
                               <span className="text-slate-600">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
+                          <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                             {row.sentimentScore !== null ? formatFractionAsPercent(row.sentimentScore) : '—'}
                           </td>
                         </tr>

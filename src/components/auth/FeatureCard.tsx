@@ -18,7 +18,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
   iconColor,
 }) => {
   return (
-    <div className="flex items-center space-x-4 p-4 bg-white/50 rounded-lg backdrop-blur-sm">
+    <div className="flex items-center space-x-4 p-4 bg-card/50 rounded-lg backdrop-blur-sm">
       <div className={`p-3 ${iconBgColor} rounded-lg`}>
         <Icon className={`h-6 w-6 ${iconColor}`} />
       </div>

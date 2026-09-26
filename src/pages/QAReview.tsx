@@ -193,8 +193,8 @@ const QAReview: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
-        <p className="text-xs text-slate-500 max-w-3xl">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+        <p className="text-xs text-muted-foreground max-w-3xl">
           Read-only review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
           Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
           (duration, latency where available). No composite quality score — see AI Agents for the agent-level
@@ -219,11 +219,11 @@ const QAReview: React.FC = () => {
               placeholder="Search intent…"
               value={intentSearch}
               onChange={(e) => setIntentSearch(e.target.value)}
-              className="h-8 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+              className="h-8 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Select value={channelFilter} onValueChange={setChannelFilter}>
-            <SelectTrigger className="h-8 w-32 text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue placeholder="Channel" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-32 text-xs border-border bg-card text-foreground"><SelectValue placeholder="Channel" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All channels</SelectItem>
               <SelectItem value="voice">Voice</SelectItem>
@@ -233,7 +233,7 @@ const QAReview: React.FC = () => {
           <FilterPopover activeCount={activeFilterCount} onClear={clearAdvanced}>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium mb-1.5 block text-slate-400">Agent</label>
+                <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Agent</label>
                 <Select value={agentFilter} onValueChange={setAgentFilter}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Agent" /></SelectTrigger>
                   <SelectContent>
@@ -245,7 +245,7 @@ const QAReview: React.FC = () => {
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium mb-1.5 block text-slate-400">Outcome</label>
+                <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Outcome</label>
                 <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Outcome" /></SelectTrigger>
                   <SelectContent>
@@ -258,7 +258,7 @@ const QAReview: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-slate-400">Escalation</label>
+                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Escalation</label>
                   <Select value={escalationFilter} onValueChange={setEscalationFilter}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Escalation" /></SelectTrigger>
                     <SelectContent>
@@ -269,7 +269,7 @@ const QAReview: React.FC = () => {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-slate-400">FCR</label>
+                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">FCR</label>
                   <Select value={fcrFilter} onValueChange={setFcrFilter}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="FCR" /></SelectTrigger>
                     <SelectContent>
@@ -282,7 +282,7 @@ const QAReview: React.FC = () => {
               </div>
               {sentimentOptions.length > 0 && (
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-slate-400">Sentiment</label>
+                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Sentiment</label>
                   <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sentiment" /></SelectTrigger>
                     <SelectContent>
@@ -294,7 +294,7 @@ const QAReview: React.FC = () => {
                   </Select>
                 </div>
               )}
-              <label className="flex items-center gap-2 text-xs text-slate-300">
+              <label className="flex items-center gap-2 text-xs text-foreground">
                 <Checkbox checked={campaignOnly} onCheckedChange={(v) => setCampaignOnly(Boolean(v))} />
                 Campaign interactions only
               </label>
@@ -304,7 +304,7 @@ const QAReview: React.FC = () => {
           <Button
             variant={view === 'grouped' ? 'default' : 'outline'}
             size="sm"
-            className={view === 'grouped' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            className={view === 'grouped' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
             onClick={() => setView('grouped')}
           >
             <Network className="h-3.5 w-3.5 mr-1.5" />
@@ -313,7 +313,7 @@ const QAReview: React.FC = () => {
           <Button
             variant={view === 'table' ? 'default' : 'outline'}
             size="sm"
-            className={view === 'table' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            className={view === 'table' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
             onClick={() => { setView('table'); setSelectedGroup(null); }}
           >
             <LayoutList className="h-3.5 w-3.5 mr-1.5" />
@@ -350,24 +350,24 @@ const QAReview: React.FC = () => {
           }}
         />
 
-        <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
           <ListChecks className="h-3.5 w-3.5" />
           Interactions — {filteredRows.length} shown
         </div>
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : filteredRows.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">No interactions match the current filters.</p>
+          <p className="text-sm text-muted-foreground px-1">No interactions match the current filters.</p>
         ) : (
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   {['Time', 'Channel', 'Agent', 'Outcome', 'FCR', 'Escalation', 'Intent', 'Accuracy/Confidence', 'Sentiment', 'Auth', 'Duration/Latency', 'Campaign'].map((h) => (
-                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                    <TableHead key={h} className="text-muted-foreground text-xs">{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -375,7 +375,7 @@ const QAReview: React.FC = () => {
                 {filteredRows.map((row) => (
                   <TableRow
                     key={row.key}
-                    className="cursor-pointer border-slate-800/60 hover:bg-slate-900/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                    className="cursor-pointer border-border/60 hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
                     role="button"
                     tabIndex={0}
                     onClick={() => handleRowClick(row)}
@@ -386,43 +386,43 @@ const QAReview: React.FC = () => {
                       }
                     }}
                   >
-                    <TableCell className="whitespace-nowrap text-xs text-slate-400">{formatTimestamp(row.startTime)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatTimestamp(row.startTime)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs border-slate-600 text-slate-300">
+                      <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs border-slate-600 text-foreground">
                         {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
                         {row.channel}
                       </Badge>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-slate-200">{row.agentName}</TableCell>
-                    <TableCell className="text-slate-300">{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
-                    <TableCell className="text-slate-300">{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-foreground">{row.agentName}</TableCell>
+                    <TableCell className="text-foreground">{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                    <TableCell className="text-foreground">{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
                     <TableCell>
                       {row.escalationTrigger ? (
                         <Badge variant="destructive" className="text-xs">{row.escalationTrigger}</Badge>
                       ) : (
-                        <span className="text-slate-500">{row.channel === 'voice' ? 'No' : '—'}</span>
+                        <span className="text-muted-foreground">{row.channel === 'voice' ? 'No' : '—'}</span>
                       )}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-slate-300">{row.intent ?? '—'}</TableCell>
-                    <TableCell className="text-slate-300">
+                    <TableCell className="whitespace-nowrap text-foreground">{row.intent ?? '—'}</TableCell>
+                    <TableCell className="text-foreground">
                       {row.channel === 'voice'
                         ? formatPercent(row.intentAccuracyPct, 0)
                         : row.chatConfidenceFraction != null
                           ? formatFractionAsPercent(row.chatConfidenceFraction)
                           : '—'}
                     </TableCell>
-                    <TableCell className="text-slate-300">{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
-                    <TableCell className="text-slate-300">
+                    <TableCell className="text-foreground">{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                    <TableCell className="text-foreground">
                       {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-slate-300">
+                    <TableCell className="whitespace-nowrap text-foreground">
                       {row.channel === 'voice'
                         ? formatDurationLong(row.durationSeconds)
                         : row.latencyMs != null
                           ? `${row.latencyMs}ms`
                           : '—'}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-slate-400">{row.campaignName ?? '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">{row.campaignName ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -43,28 +43,28 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
           <p className="text-sm text-destructive">Could not load this chat session.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-slate-900 p-4 rounded-lg text-sm">
-              <div><span className="text-slate-500 dark:text-slate-400">Agent:</span> {data.session.agentName ?? data.session.agentId ?? '—'}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Customer:</span> {data.session.resolvedCustomerLabel ?? '—'}</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-card p-4 rounded-lg text-sm">
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Agent:</span> {data.session.agentName ?? data.session.agentId ?? '—'}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Customer:</span> {data.session.resolvedCustomerLabel ?? '—'}</div>
               {data.session.resolvedCustomerLabel && !data.session.customerId && (
-                <div><span className="text-slate-500 dark:text-slate-400">Backend Customer ID:</span> —</div>
+                <div><span className="text-muted-foreground dark:text-muted-foreground">Backend Customer ID:</span> —</div>
               )}
-              <div><span className="text-slate-500 dark:text-slate-400">Contact / Phone:</span> {data.session.contactId ?? data.session.phoneNumber ?? '—'}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Status:</span> {formatStatusLabel(data.session.status)}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Started:</span> {formatTimestamp(data.session.startedAt)}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Last activity:</span> {formatTimestamp(data.session.updatedAt)}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Messages:</span> {data.session.messageCount}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Authenticated:</span> {data.session.authenticated ? 'Yes' : 'No'}</div>
-              <div><span className="text-slate-500 dark:text-slate-400">Latest intent:</span> {data.session.latestIntent ?? '—'}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Contact / Phone:</span> {data.session.contactId ?? data.session.phoneNumber ?? '—'}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Status:</span> {formatStatusLabel(data.session.status)}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Started:</span> {formatTimestamp(data.session.startedAt)}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Last activity:</span> {formatTimestamp(data.session.updatedAt)}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Messages:</span> {data.session.messageCount}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Authenticated:</span> {data.session.authenticated ? 'Yes' : 'No'}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Latest intent:</span> {data.session.latestIntent ?? '—'}</div>
               <div>
-                <span className="text-slate-500 dark:text-slate-400">Latest confidence:</span>{' '}
+                <span className="text-muted-foreground dark:text-muted-foreground">Latest confidence:</span>{' '}
                 {data.session.latestConfidence !== null ? formatFractionAsPercent(data.session.latestConfidence) : '—'}
               </div>
               <div>
-                <span className="text-slate-500 dark:text-slate-400">Data source:</span>{' '}
+                <span className="text-muted-foreground dark:text-muted-foreground">Data source:</span>{' '}
                 {data.session.latestDataSource ? <Badge variant="outline" className="text-xs">{data.session.latestDataSource}</Badge> : '—'}
               </div>
-              <div><span className="text-slate-500 dark:text-slate-400">Latency:</span> {data.session.latestLatencyMs !== null ? `${data.session.latestLatencyMs}ms` : '—'}</div>
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Latency:</span> {data.session.latestLatencyMs !== null ? `${data.session.latestLatencyMs}ms` : '—'}</div>
             </div>
             {data.session.source === 'local-fallback' && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">

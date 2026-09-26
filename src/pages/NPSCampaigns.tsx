@@ -186,7 +186,7 @@ const NPSCampaigns: React.FC = () => {
   return (
     <Layout>
       <TooltipProvider>
-        <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <div className="bg-background min-h-full text-foreground p-4 space-y-3">
           <div className="rounded-md border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
             Demo data — NPS Campaigns has no real backend/execution engine yet (Session 5/9 audits). Shown for illustration only; actions below do not persist or place real calls.
           </div>
@@ -211,18 +211,18 @@ const NPSCampaigns: React.FC = () => {
 
           <div className="flex flex-wrap gap-2">
             <div className="relative w-64">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 h-3.5 w-3.5" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
               <Input
                 placeholder="Search campaigns…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 pl-7 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+                className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
               />
             </div>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="h-8 border border-slate-700 bg-slate-900 text-slate-300 rounded-md px-2 text-xs"
+              className="h-8 border border-border bg-card text-foreground rounded-md px-2 text-xs"
             >
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
@@ -234,7 +234,7 @@ const NPSCampaigns: React.FC = () => {
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
-              className="h-8 border border-slate-700 bg-slate-900 text-slate-300 rounded-md px-2 text-xs"
+              className="h-8 border border-border bg-card text-foreground rounded-md px-2 text-xs"
             >
               <option value="all">All Channels</option>
               <option value="voice">Voice</option>
@@ -244,28 +244,28 @@ const NPSCampaigns: React.FC = () => {
             </select>
           </div>
 
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-800 text-xs">
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Campaign Name</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Status</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Channel</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">NPS Score</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Participants</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Responses</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Start Date</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-500">Actions</th>
+                    <tr className="border-b border-border text-xs">
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Status</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Channel</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">NPS Score</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Participants</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Responses</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
+                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCampaigns.map((campaign) => (
-                      <tr key={campaign.id} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60">
+                      <tr key={campaign.id} className="border-b border-border/60 last:border-0 hover:bg-card">
                         <td className="py-2 px-3">
                           <div>
-                            <div className="font-medium text-slate-100">{campaign.name}</div>
-                            <div className="text-xs text-slate-500">{campaign.description}</div>
+                            <div className="font-medium text-foreground">{campaign.name}</div>
+                            <div className="text-xs text-muted-foreground">{campaign.description}</div>
                           </div>
                         </td>
                         <td className="py-2 px-3">
@@ -274,7 +274,7 @@ const NPSCampaigns: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="py-2 px-3">
-                          <div className="flex items-center space-x-2 text-slate-300">
+                          <div className="flex items-center space-x-2 text-foreground">
                             {getChannelIcon(campaign.targetChannel)}
                             <span className="capitalize">{campaign.targetChannel}</span>
                           </div>
@@ -282,14 +282,14 @@ const NPSCampaigns: React.FC = () => {
                         <td className="py-2 px-3">
                           <NPSBadge score={campaign.npsScore} variant="compact" />
                         </td>
-                        <td className="py-2 px-3 text-slate-200">{campaign.totalContacts}</td>
+                        <td className="py-2 px-3 text-foreground">{campaign.totalContacts}</td>
                         <td className="py-2 px-3">
-                          <div className="text-slate-200">{campaign.responseCount}</div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-foreground">{campaign.responseCount}</div>
+                          <div className="text-xs text-muted-foreground">
                             {Math.round((campaign.responseCount / campaign.totalContacts) * 100)}% response rate
                           </div>
                         </td>
-                        <td className="py-2 px-3 text-slate-400">
+                        <td className="py-2 px-3 text-muted-foreground">
                           {format(campaign.launchDate, 'MMM dd, yyyy')}
                         </td>
                         <td className="py-3">

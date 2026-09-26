@@ -29,7 +29,7 @@ const UserManagement: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
         <div className="flex items-center justify-end">
           <Button size="sm" className="h-8 bg-cyan-600 hover:bg-cyan-500">
             <Plus className="h-3.5 w-3.5 mr-1.5" />
@@ -39,18 +39,18 @@ const UserManagement: React.FC = () => {
 
         <div className="flex flex-wrap gap-2">
           <div className="relative w-64">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 h-3.5 w-3.5" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
             <Input
               placeholder="Search by name or email…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-8 pl-7 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+              className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <select
             value={selectedRole}
             onChange={(e) => setSelectedRole(e.target.value)}
-            className="h-8 border border-slate-700 bg-slate-900 text-slate-300 rounded-md px-2 text-xs"
+            className="h-8 border border-border bg-card text-foreground rounded-md px-2 text-xs"
           >
             <option value="all">All Roles</option>
             <option value="call_center_head">Call Center Head</option>
@@ -60,10 +60,10 @@ const UserManagement: React.FC = () => {
           </select>
         </div>
 
-        <div className="rounded-md border border-slate-800 overflow-x-auto">
+        <div className="rounded-md border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">User</th>
                 <th className="px-3 py-2 font-medium">Role</th>
                 <th className="px-3 py-2 font-medium">Permissions</th>
@@ -73,25 +73,25 @@ const UserManagement: React.FC = () => {
             </thead>
             <tbody>
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60">
+                <tr key={user.id} className="border-b border-border/60 last:border-0 hover:bg-card">
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                       <div className="h-7 w-7 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-xs font-semibold shrink-0">
                         {user.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium text-slate-100 truncate">{user.name}</div>
-                        <div className="text-xs text-slate-500 truncate">{user.email}</div>
+                        <div className="font-medium text-foreground truncate">{user.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">{user.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-3 py-2">
-                    <Badge variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-slate-300">{getRoleDisplayName(user.role)}</Badge>
+                    <Badge variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-foreground">{getRoleDisplayName(user.role)}</Badge>
                   </td>
                   <td className="px-3 py-2 max-w-xs">
                     <div className="flex flex-wrap gap-1">
                       {rolePermissions[user.role as keyof typeof rolePermissions]?.slice(0, 2).map((permission, index) => (
-                        <Badge key={index} variant="outline" className="text-[10px] border-slate-600 text-slate-400">{permission}</Badge>
+                        <Badge key={index} variant="outline" className="text-[10px] border-slate-600 text-muted-foreground">{permission}</Badge>
                       ))}
                     </div>
                   </td>
@@ -102,10 +102,10 @@ const UserManagement: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-white" title="Edit" aria-label={`Edit ${user.name}`}>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Edit" aria-label={`Edit ${user.name}`}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-white" title="Permissions" aria-label={`Manage permissions for ${user.name}`}>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" title="Permissions" aria-label={`Manage permissions for ${user.name}`}>
                       <Shield className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-400 hover:text-red-300" title="Remove" aria-label={`Remove ${user.name}`}>
@@ -119,7 +119,7 @@ const UserManagement: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">Role Distribution &amp; Access Matrix</div>
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Role Distribution &amp; Access Matrix</div>
           <MetricStrip
             items={[
               { label: 'Call Center Head', value: 1, hint: 'Full access' },
@@ -129,10 +129,10 @@ const UserManagement: React.FC = () => {
             ]}
           />
 
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-xs text-slate-500">
+                <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="text-left px-3 py-2 font-medium">Permission</th>
                   <th className="text-center px-3 py-2 font-medium">Call Center Head</th>
                   <th className="text-center px-3 py-2 font-medium">QA Reviewer</th>
@@ -150,8 +150,8 @@ const UserManagement: React.FC = () => {
                   'Manage AI Agents',
                   'System Settings'
                 ].map((permission) => (
-                  <tr key={permission} className="border-b border-slate-800/60 last:border-0">
-                    <td className="px-3 py-2 text-slate-300">{permission}</td>
+                  <tr key={permission} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2 text-foreground">{permission}</td>
                     <td className="text-center py-2">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full mx-auto" />
                     </td>

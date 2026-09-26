@@ -77,20 +77,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => 
   }
 
   return (
-    <div className="p-4 border-t border-gray-700">
+    <div className="p-4 border-t border-border">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-gray-700">
+          <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-accent">
             <div className="flex items-center space-x-3">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="bg-blue-600 text-white text-sm">
+                <AvatarFallback className="bg-cyan-600 text-white text-sm">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-white">{user.name}</p>
-                <p className="text-xs text-gray-300">{user.role}</p>
+                <p className="text-sm font-medium text-foreground">{user.name}</p>
+                <p className="text-xs text-muted-foreground">{user.role}</p>
               </div>
             </div>
           </Button>

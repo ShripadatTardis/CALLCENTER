@@ -20,12 +20,12 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
 
 /** Dark operational palette (Session 10.1) — same lifecycle states, no new business states. */
 const STATUS_CONFIG_DARK: Record<string, { color: string; label: string }> = {
-  draft: { color: 'bg-slate-800 text-slate-300', label: 'Draft' },
+  draft: { color: 'bg-muted text-foreground', label: 'Draft' },
   scheduled: { color: 'bg-cyan-950 text-cyan-300', label: 'Scheduled' },
   running: { color: 'bg-green-950 text-green-400', label: 'Running' },
   paused: { color: 'bg-amber-950 text-amber-400', label: 'Paused' },
   completed: { color: 'bg-cyan-950 text-cyan-300', label: 'Completed' },
-  stopped: { color: 'bg-slate-800 text-slate-400', label: 'Stopped' },
+  stopped: { color: 'bg-muted text-muted-foreground', label: 'Stopped' },
   failed: { color: 'bg-red-950 text-red-400', label: 'Failed' },
 };
 

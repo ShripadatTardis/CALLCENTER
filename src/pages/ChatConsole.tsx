@@ -52,7 +52,7 @@ const ChatConsole: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-2 flex flex-col" style={{ height: 'calc(100vh - 44px)' }}>
+      <div className="bg-background min-h-full text-foreground p-4 space-y-2 flex flex-col" style={{ height: 'calc(100vh - 44px)' }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex-1 min-w-0">
             <ChatIdentitySelector
@@ -68,7 +68,7 @@ const ChatConsole: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 shrink-0 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="h-8 shrink-0 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
             onClick={handleNewChat}
             disabled={messages.length === 0}
           >
@@ -77,11 +77,11 @@ const ChatConsole: React.FC = () => {
           </Button>
         </div>
 
-        <Card className="flex-1 min-h-0 flex flex-col bg-slate-900 border-slate-800">
-          <CardHeader className="py-2 border-b border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+        <Card className="flex-1 min-h-0 flex flex-col bg-card border-border">
+          <CardHeader className="py-2 border-b border-border">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <MessageCircle className="h-3.5 w-3.5" />
-              Conversation {hasActiveSession && <span className="text-xs text-slate-500 font-normal">(active session)</span>}
+              Conversation {hasActiveSession && <span className="text-xs text-muted-foreground font-normal">(active session)</span>}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col min-h-0 pt-3">

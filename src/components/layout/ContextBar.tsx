@@ -19,16 +19,16 @@ export const ContextBar: React.FC<ContextBarProps> = ({ children }) => {
   const match = findPillarAndItemForPath(location.pathname);
 
   return (
-    <div className="h-11 shrink-0 flex items-center justify-between px-4 border-b bg-white">
+    <div className="h-11 shrink-0 flex items-center justify-between px-4 border-b border-border bg-card">
       <div className="flex items-center gap-1.5 text-sm min-w-0">
         {match ? (
           <>
-            <span className="text-slate-500">{match.pillar.label}</span>
-            <span className="text-slate-300">/</span>
-            <span className="text-slate-900 font-medium truncate">{match.item.name}</span>
+            <span className="text-muted-foreground">{match.pillar.label}</span>
+            <span className="text-muted-foreground/50">/</span>
+            <span className="text-foreground font-medium truncate">{match.item.name}</span>
           </>
         ) : (
-          <span className="text-slate-900 font-medium">VoiceForce</span>
+          <span className="text-foreground font-medium">VoiceForce</span>
         )}
       </div>
       {children && <div className="flex items-center gap-3 text-xs shrink-0">{children}</div>}

@@ -26,7 +26,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, failed, notPers
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`max-w-[85%] md:max-w-[70%] px-4 py-2.5 rounded-lg shadow-sm ${
-          isUser ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-slate-100'
+          isUser ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-muted text-gray-900 dark:text-foreground'
         } ${failed ? 'border-2 border-destructive' : ''}`}
       >
         {isUser ? (
@@ -36,7 +36,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, failed, notPers
         )}
 
         <div className="mt-1 flex items-center justify-between gap-2">
-          <span className={`text-xs ${isUser ? 'text-blue-100' : 'text-gray-500 dark:text-slate-400'}`}>
+          <span className={`text-xs ${isUser ? 'text-blue-100' : 'text-gray-500 dark:text-muted-foreground'}`}>
             {formatTimestamp(message.timestamp)}
           </span>
           {notPersisted && (

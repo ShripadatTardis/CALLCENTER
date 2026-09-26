@@ -69,7 +69,7 @@ const LiveView: React.FC = () => {
   const uniqueIntents = [...new Set(calls.map((c) => c.intent).filter((v): v is string => Boolean(v)))];
 
   const getSentimentColor = (score?: number) => {
-    if (score === undefined) return 'text-slate-500';
+    if (score === undefined) return 'text-muted-foreground';
     if (score >= 0.7) return 'text-green-600';
     if (score >= 0.4) return 'text-yellow-600';
     return 'text-red-600';
@@ -77,8 +77,8 @@ const LiveView: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
-        <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
           <div className={`w-1.5 h-1.5 rounded-full ${live.isFetching ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
           <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
         </div>
@@ -110,16 +110,16 @@ const LiveView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-64">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search by name, number, or intent…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-8 pl-7 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+              className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-32 text-xs border-slate-700 bg-slate-900 text-slate-300">
+            <SelectTrigger className="h-8 w-32 text-xs border-border bg-card text-foreground">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -130,7 +130,7 @@ const LiveView: React.FC = () => {
             </SelectContent>
           </Select>
           <Select value={intentFilter} onValueChange={setIntentFilter}>
-            <SelectTrigger className="h-8 w-40 text-xs border-slate-700 bg-slate-900 text-slate-300">
+            <SelectTrigger className="h-8 w-40 text-xs border-border bg-card text-foreground">
               <SelectValue placeholder="Intent" />
             </SelectTrigger>
             <SelectContent>
@@ -140,46 +140,46 @@ const LiveView: React.FC = () => {
               ))}
             </SelectContent>
           </Select>
-          <span className="text-xs text-slate-500 ml-1">{filteredCalls.length} shown</span>
+          <span className="text-xs text-muted-foreground ml-1">{filteredCalls.length} shown</span>
         </div>
 
         {live.isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : live.isError && calls.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">Live calls are unavailable right now — see the error above.</p>
+          <p className="text-sm text-muted-foreground px-1">Live calls are unavailable right now — see the error above.</p>
         ) : calls.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">No active calls right now.</p>
+          <p className="text-sm text-muted-foreground px-1">No active calls right now.</p>
         ) : filteredCalls.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">No active calls match the current search/filters.</p>
+          <p className="text-sm text-muted-foreground px-1">No active calls match the current search/filters.</p>
         ) : (
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   {['Caller', 'Intent', 'Agent', 'Duration', 'Sentiment', 'Status', 'Actions'].map((h) => (
-                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                    <TableHead key={h} className="text-muted-foreground text-xs">{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredCalls.slice(0, 20).map((call) => (
-                  <TableRow key={call.interactionId} className="border-slate-800/60 hover:bg-slate-900/60">
+                  <TableRow key={call.interactionId} className="border-border/60 hover:bg-card">
                     <TableCell className="max-w-[180px]">
                       <div className="min-w-0">
-                        <div className="font-medium text-slate-100 truncate">{call.callerName || '—'}</div>
-                        <div className="text-xs text-slate-500 truncate">{formatPhoneNumber(call.phoneNumber)}</div>
+                        <div className="font-medium text-foreground truncate">{call.callerName || '—'}</div>
+                        <div className="text-xs text-muted-foreground truncate">{formatPhoneNumber(call.phoneNumber)}</div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="whitespace-nowrap text-xs border-slate-600 text-slate-300">{call.intent || '—'}</Badge>
+                      <Badge variant="outline" className="whitespace-nowrap text-xs border-slate-600 text-foreground">{call.intent || '—'}</Badge>
                     </TableCell>
                     <TableCell className="max-w-[140px]">
-                      <span className="text-sm text-slate-300 truncate block">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
+                      <span className="text-sm text-foreground truncate block">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-slate-300 whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
+                      <span className="font-mono text-foreground whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
                         {formatDurationLong(call.durationSeconds)}
                       </span>
                     </TableCell>
@@ -189,7 +189,7 @@ const LiveView: React.FC = () => {
                           {formatFractionAsPercent(call.sentimentScore)}
                         </span>
                         {call.sentimentScore !== undefined && (
-                          <div className="w-10 bg-slate-800 rounded-full h-1.5">
+                          <div className="w-10 bg-muted rounded-full h-1.5">
                             <div
                               className="bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 h-1.5 rounded-full"
                               style={{ width: `${call.sentimentScore * 100}%` }}
@@ -204,7 +204,7 @@ const LiveView: React.FC = () => {
                     <TableCell>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => setSelectedCall(call)}>
+                          <Button variant="outline" size="sm" className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setSelectedCall(call)}>
                             <Monitor className="h-3.5 w-3.5 mr-1" />
                             Monitor
                           </Button>
@@ -247,7 +247,7 @@ const LiveView: React.FC = () => {
                                         </p>
                                       ))
                                     ) : (
-                                      <p className="text-slate-500">No transcript available yet for this call.</p>
+                                      <p className="text-muted-foreground">No transcript available yet for this call.</p>
                                     )}
                                   </div>
                                 </div>

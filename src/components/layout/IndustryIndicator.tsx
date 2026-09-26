@@ -21,7 +21,7 @@ export const IndustryIndicator: React.FC = () => {
   return (
     <Badge 
       variant="outline" 
-      className="flex items-center gap-2 px-4 py-2 bg-white border-2 shadow-sm"
+      className="flex items-center gap-2 px-4 py-2 bg-card border-2 shadow-sm"
       style={{ 
         borderColor: industryConfig.primaryColor,
         color: industryConfig.primaryColor 

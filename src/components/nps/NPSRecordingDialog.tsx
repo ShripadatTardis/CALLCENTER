@@ -125,17 +125,17 @@ export const NPSRecordingDialog: React.FC<NPSRecordingDialogProps> = ({
             <CardContent>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-slate-500" />
+                  <User className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Participant:</span>
                   <span>{response.name}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-slate-500" />
+                  <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Phone:</span>
                   <span>{response.mobileNumber}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Clock className="h-4 w-4 text-slate-500" />
+                  <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Duration:</span>
                   <span>{response.callDuration} seconds</span>
                 </div>
@@ -173,7 +173,7 @@ export const NPSRecordingDialog: React.FC<NPSRecordingDialogProps> = ({
                     onValueChange={handleSeek}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-slate-500">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
@@ -213,7 +213,7 @@ export const NPSRecordingDialog: React.FC<NPSRecordingDialogProps> = ({
 
                 {/* Volume Control */}
                 <div className="flex items-center space-x-3">
-                  <Volume2 className="h-4 w-4 text-slate-500" />
+                  <Volume2 className="h-4 w-4 text-muted-foreground" />
                   <Slider
                     value={volume}
                     max={1}

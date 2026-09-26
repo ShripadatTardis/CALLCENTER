@@ -18,17 +18,17 @@ interface CampaignGridProps {
 export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCampaign }) => {
   if (campaigns.length === 0) {
     return (
-      <div className="border border-slate-800 rounded-md p-8 text-center text-sm text-slate-400 bg-slate-900/40">
+      <div className="border border-border rounded-md p-8 text-center text-sm text-muted-foreground bg-card/40">
         No campaigns yet. Create one to get started.
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto border border-slate-800 rounded-md bg-slate-900/40">
-      <table className="w-full text-[13px] text-slate-200">
+    <div className="overflow-x-auto border border-border rounded-md bg-card/40">
+      <table className="w-full text-[13px] text-foreground">
         <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-800">
+          <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
             <th className="text-left py-2 px-3 font-medium">Campaign</th>
             <th className="text-left py-2 px-3 font-medium">Status</th>
             <th className="text-left py-2 px-3 font-medium">Call Agent</th>
@@ -49,7 +49,7 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
               <tr
                 key={campaign.id}
                 onClick={() => onViewCampaign(campaign)}
-                className="border-b border-slate-800/60 last:border-b-0 hover:bg-slate-800/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+                className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
                 tabIndex={0}
                 role="button"
                 aria-label={`Open campaign ${campaign.name}`}
@@ -61,16 +61,16 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                 }}
               >
                 <td className="py-2 px-3">
-                  <div className="font-medium text-white">{campaign.name}</div>
-                  <div className="text-[11px] text-slate-400">by {campaign.createdBy ?? 'unknown'}</div>
+                  <div className="font-medium text-foreground">{campaign.name}</div>
+                  <div className="text-[11px] text-muted-foreground">by {campaign.createdBy ?? 'unknown'}</div>
                 </td>
                 <td className="py-2 px-3">
                   <CampaignStatusBadge status={campaign.status} dark />
                 </td>
-                <td className="py-2 px-3 text-slate-300">{campaign.agentName ?? campaign.agentId}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-300">{campaign.stats.targetCount}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-300">{campaign.stats.triggeredCount}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-slate-300">{campaign.stats.classifiedCount}</td>
+                <td className="py-2 px-3 text-foreground">{campaign.agentName ?? campaign.agentId}</td>
+                <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.targetCount}</td>
+                <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.triggeredCount}</td>
+                <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.classifiedCount}</td>
                 <td className="py-2 px-3 text-right tabular-nums">
                   {unclassified > 0 ? (
                     <span className="inline-flex items-center gap-1 text-amber-400">
@@ -78,11 +78,11 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                       {unclassified}
                     </span>
                   ) : (
-                    <span className="text-slate-400">0</span>
+                    <span className="text-muted-foreground">0</span>
                   )}
                 </td>
-                <td className="py-2 px-3 text-right tabular-nums text-white">
-                  {rate === null ? <span className="text-slate-400">—</span> : `${rate.toFixed(0)}%`}
+                <td className="py-2 px-3 text-right tabular-nums text-foreground">
+                  {rate === null ? <span className="text-muted-foreground">—</span> : `${rate.toFixed(0)}%`}
                 </td>
                 <td className="py-2 pr-3 text-right">
                   <ChevronRight size={14} className="text-slate-600" aria-hidden="true" />

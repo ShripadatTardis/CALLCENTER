@@ -19,7 +19,7 @@ function renderInline(nodes: InlineNode[], keyPrefix: string): React.ReactNode {
         return <React.Fragment key={key}>{node.value}</React.Fragment>;
       case 'code':
         return (
-          <code key={key} className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm font-mono break-words">
+          <code key={key} className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-foreground text-sm font-mono break-words">
             {node.value}
           </code>
         );
@@ -43,7 +43,7 @@ function renderInline(nodes: InlineNode[], keyPrefix: string): React.ReactNode {
         );
       case 'bulletSep':
         return (
-          <span key={key} className="text-slate-400 mx-0.5" aria-hidden>
+          <span key={key} className="text-muted-foreground mx-0.5" aria-hidden>
             •
           </span>
         );
@@ -93,7 +93,7 @@ function renderBlock(block: Block, index: number): React.ReactNode {
       );
     case 'code':
       return (
-        <pre key={key} className="bg-slate-900 text-slate-100 rounded-md p-3 text-xs overflow-x-auto">
+        <pre key={key} className="bg-card text-foreground rounded-md p-3 text-xs overflow-x-auto">
           <code>{block.text}</code>
         </pre>
       );

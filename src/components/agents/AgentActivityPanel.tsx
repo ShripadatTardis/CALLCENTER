@@ -40,31 +40,31 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   const activeCounts = countActiveCallsByAgent(activeInteractions);
 
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-900/60 p-3 space-y-2">
-      <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+    <div className="rounded-md border border-border bg-card p-3 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
         <Bot className="h-3.5 w-3.5" />
         {title}
       </div>
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : agents.length === 0 ? (
-        <p className="text-sm text-slate-500">No agents available.</p>
+        <p className="text-sm text-muted-foreground">No agents available.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
           {agents.map((agent) => {
             const activeCount = activeCounts.get(agent.agentId) ?? 0;
             return (
-              <div key={agent.agentId} className="min-w-0 border border-slate-800 rounded-md p-2.5 space-y-1.5 bg-slate-950/40">
-                <h3 className="font-medium text-sm text-slate-100 break-words leading-snug">{agent.displayName}</h3>
+              <div key={agent.agentId} className="min-w-0 border border-border rounded-md p-2.5 space-y-1.5 bg-background/40">
+                <h3 className="font-medium text-sm text-foreground break-words leading-snug">{agent.displayName}</h3>
                 <Badge
                   variant={activeCount > 0 ? 'default' : 'outline'}
                   className="whitespace-nowrap text-xs"
                 >
                   {activeCount} active call{activeCount === 1 ? '' : 's'}
                 </Badge>
-                <div className="text-xs text-slate-500 space-y-0.5">
+                <div className="text-xs text-muted-foreground space-y-0.5">
                   <div>Direction: {agent.direction}</div>
                   {agent.language && <div>Language: {agent.language}</div>}
                   {agent.personaName && <div>Persona: {agent.personaName}</div>}

@@ -63,7 +63,7 @@ export const CSATRating: React.FC<CSATRatingProps> = ({
   };
 
   if (!displayScore) {
-    return <span className="text-slate-400 text-sm">No rating</span>;
+    return <span className="text-muted-foreground text-sm">No rating</span>;
   }
 
   return (

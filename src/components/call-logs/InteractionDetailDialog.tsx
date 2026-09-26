@@ -94,38 +94,38 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </DialogHeader>
 
         {/* Metadata */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-slate-900 p-4 rounded-lg text-sm">
-          <div><span className="text-slate-500 dark:text-slate-400">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
-          <div><span className="text-slate-500 dark:text-slate-400">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
-          <div><span className="text-slate-500 dark:text-slate-400">Direction:</span> {interaction.direction ?? '—'}</div>
-          <div><span className="text-slate-500 dark:text-slate-400">Status:</span> {formatStatusLabel(interaction.status)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-card p-4 rounded-lg text-sm">
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Direction:</span> {interaction.direction ?? '—'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Status:</span> {formatStatusLabel(interaction.status)}</div>
           <div title={formatDurationExact(interaction.durationSeconds)}>
-            <span className="text-slate-500 dark:text-slate-400">Duration:</span> {formatDurationLong(interaction.durationSeconds)}
+            <span className="text-muted-foreground dark:text-muted-foreground">Duration:</span> {formatDurationLong(interaction.durationSeconds)}
           </div>
-          <div><span className="text-slate-500 dark:text-slate-400">Outcome:</span> {interaction.outcome ?? '—'}</div>
-          <div><span className="text-slate-500 dark:text-slate-400">FCR:</span> {interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No'}</div>
-          <div><span className="text-slate-500 dark:text-slate-400">Intent:</span> {interaction.intent ?? '—'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Outcome:</span> {interaction.outcome ?? '—'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">FCR:</span> {interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Intent:</span> {interaction.intent ?? '—'}</div>
           <div>
-            <span className="text-slate-500 dark:text-slate-400">Intent accuracy:</span> {formatPercent(interaction.intentAccuracy, 0)}
+            <span className="text-muted-foreground dark:text-muted-foreground">Intent accuracy:</span> {formatPercent(interaction.intentAccuracy, 0)}
           </div>
-          <div><span className="text-slate-500 dark:text-slate-400">Sentiment:</span> {interaction.sentiment ?? '—'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Sentiment:</span> {interaction.sentiment ?? '—'}</div>
           <div>
-            <span className="text-slate-500 dark:text-slate-400">Sentiment score:</span>{' '}
+            <span className="text-muted-foreground dark:text-muted-foreground">Sentiment score:</span>{' '}
             {formatFractionAsPercent(interaction.sentimentScore)}
           </div>
-          <div><span className="text-slate-500 dark:text-slate-400">Campaign:</span> {interaction.campaignName ?? '—'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Campaign:</span> {interaction.campaignName ?? '—'}</div>
           <div>
-            <span className="text-slate-500 dark:text-slate-400">Authenticated:</span>{' '}
+            <span className="text-muted-foreground dark:text-muted-foreground">Authenticated:</span>{' '}
             {interaction.wasAuthenticated === null || interaction.wasAuthenticated === undefined
               ? 'N/A'
               : interaction.wasAuthenticated
                 ? 'Yes'
                 : 'No'}
           </div>
-          <div><span className="text-slate-500 dark:text-slate-400">Escalation:</span> {interaction.escalation?.trigger ?? 'None'}</div>
-          <div><span className="text-slate-500 dark:text-slate-400">Started:</span> {formatTimestamp(interaction.startTime)}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Escalation:</span> {interaction.escalation?.trigger ?? 'None'}</div>
+          <div><span className="text-muted-foreground dark:text-muted-foreground">Started:</span> {formatTimestamp(interaction.startTime)}</div>
           <div className="col-span-2 md:col-span-4">
-            <span className="text-slate-500 dark:text-slate-400">Summary:</span> {interaction.summary || 'No summary available'}
+            <span className="text-muted-foreground dark:text-muted-foreground">Summary:</span> {interaction.summary || 'No summary available'}
           </div>
           {interaction.tags && interaction.tags.length > 0 && (
             <div className="col-span-2 md:col-span-4 flex flex-wrap gap-1">
@@ -137,13 +137,13 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </div>
 
         {/* Recording */}
-        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
+        <div className="bg-slate-50 dark:bg-card p-4 rounded-lg">
           {interaction.recording?.url ? (
             <audio controls className="w-full" src={interaction.recording.url}>
               Your browser does not support the audio element.
             </audio>
           ) : (
-            <p className="text-sm text-slate-500">Recording not available for this interaction.</p>
+            <p className="text-sm text-muted-foreground">Recording not available for this interaction.</p>
           )}
         </div>
 
@@ -156,7 +156,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
         {/* Search */}
         <div className="relative mb-2">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Search transcript..."
             value={searchTerm}
@@ -179,7 +179,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         {/* Transcript */}
         <div className="flex-1 overflow-auto space-y-3">
           {liveTranscript.isLoading && needsLiveFetch && transcript.length === 0 ? (
-            <p className="text-sm text-slate-500">Loading transcript…</p>
+            <p className="text-sm text-muted-foreground">Loading transcript…</p>
           ) : liveTranscript.isError && transcript.length === 0 ? (
             <div className="text-sm text-amber-700 flex items-center justify-between gap-2">
               <span>Could not load the transcript from the backend.</span>
@@ -188,23 +188,23 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
               </Button>
             </div>
           ) : filteredTranscript.length === 0 && searchTerm ? (
-            <p className="text-sm text-slate-500">No transcript entries match "{searchTerm}".</p>
+            <p className="text-sm text-muted-foreground">No transcript entries match "{searchTerm}".</p>
           ) : filteredTranscript.length === 0 ? (
-            <p className="text-sm text-slate-500">No transcript available for this interaction.</p>
+            <p className="text-sm text-muted-foreground">No transcript available for this interaction.</p>
           ) : (
             filteredTranscript.map((entry, index) => (
               <div key={index} className="border-l-4 border-slate-200 pl-4 py-2">
                 <div className="flex items-center space-x-2 mb-2">
                   <Badge className={getSpeakerColor(entry.speaker)}>{entry.speaker.toUpperCase()}</Badge>
-                  <span className="text-sm text-slate-500">{entry.timestamp}</span>
+                  <span className="text-sm text-muted-foreground">{entry.timestamp}</span>
                   {entry.sentiment && (
                     <span className={`text-xs ${getSentimentColor(entry.sentiment)}`}>{entry.sentiment}</span>
                   )}
                   {entry.confidence !== undefined && (
-                    <span className="text-xs text-slate-400">{formatFractionAsPercent(entry.confidence)} confidence</span>
+                    <span className="text-xs text-muted-foreground">{formatFractionAsPercent(entry.confidence)} confidence</span>
                   )}
                 </div>
-                <p className="text-slate-800 dark:text-slate-200 leading-relaxed">
+                <p className="text-slate-800 dark:text-foreground leading-relaxed">
                   {searchTerm
                     ? entry.text
                         .split(new RegExp(`(${searchTerm})`, 'gi'))

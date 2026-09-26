@@ -128,7 +128,7 @@ const CallLogs: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
         {summary && (
           <MetricStrip
             items={[
@@ -146,7 +146,7 @@ const CallLogs: React.FC = () => {
             <CallLogsSearch value={filters.search ?? ''} onChange={(v) => setFilters((f) => ({ ...f, search: v || undefined }))} />
           </div>
           <Select value={fcrFacet} onValueChange={(v) => setFcrFacet(v as ClientFacet)}>
-            <SelectTrigger className="h-8 w-[124px] text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue placeholder="FCR (page)" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[124px] text-xs border-border bg-card text-foreground"><SelectValue placeholder="FCR (page)" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">FCR: any</SelectItem>
               <SelectItem value="yes">FCR: yes</SelectItem>
@@ -154,7 +154,7 @@ const CallLogs: React.FC = () => {
             </SelectContent>
           </Select>
           <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as ClientFacet)}>
-            <SelectTrigger className="h-8 w-[150px] text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue placeholder="Authenticated (page)" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-[150px] text-xs border-border bg-card text-foreground"><SelectValue placeholder="Authenticated (page)" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">Auth: any</SelectItem>
               <SelectItem value="yes">Auth: yes</SelectItem>
@@ -162,7 +162,7 @@ const CallLogs: React.FC = () => {
             </SelectContent>
           </Select>
           <Input
-            className="h-8 w-40 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+            className="h-8 w-40 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
             value={campaignFacet}
             onChange={(e) => setCampaignFacet(e.target.value)}
             placeholder="Campaign (page)…"
@@ -174,7 +174,7 @@ const CallLogs: React.FC = () => {
           <Button
             variant={view === 'grouped' ? 'default' : 'outline'}
             size="sm"
-            className={view === 'grouped' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            className={view === 'grouped' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
             onClick={() => setView('grouped')}
           >
             <Network className="h-3.5 w-3.5 mr-1.5" />
@@ -183,13 +183,13 @@ const CallLogs: React.FC = () => {
           <Button
             variant={view === 'table' ? 'default' : 'outline'}
             size="sm"
-            className={view === 'table' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            className={view === 'table' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
             onClick={() => setView('table')}
           >
             <LayoutList className="h-3.5 w-3.5 mr-1.5" />
             Table
           </Button>
-          <Button variant="outline" size="sm" className="h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={handleExport} title="Exports the currently loaded/filtered page only">
+          <Button variant="outline" size="sm" className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={handleExport} title="Exports the currently loaded/filtered page only">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Export
           </Button>
@@ -215,26 +215,26 @@ const CallLogs: React.FC = () => {
           />
         )}
 
-        <div className="text-xs text-slate-500 px-1">
+        <div className="text-xs text-muted-foreground px-1">
           Call history — {interactions.length}
           {view === 'grouped' && selectedGroup ? ` of ${allInteractions.length}` : ''} shown
         </div>
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : isError && interactions.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">Call logs are unavailable right now — see the error above.</p>
+          <p className="text-sm text-muted-foreground px-1">Call logs are unavailable right now — see the error above.</p>
         ) : interactions.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">
+          <p className="text-sm text-muted-foreground px-1">
             {hasActiveFilters ? 'No calls match the current filters. Try widening or clearing them.' : 'No completed calls yet.'}
           </p>
         ) : (
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Caller / Intent</th>
                   <th className="px-3 py-2 font-medium">Phone</th>
                   <th className="px-3 py-2 font-medium">Duration</th>
@@ -246,13 +246,13 @@ const CallLogs: React.FC = () => {
               </thead>
               <tbody>
                 {interactions.map((call) => (
-                  <tr key={call.interactionId} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60">
+                  <tr key={call.interactionId} className="border-b border-border/60 last:border-0 hover:bg-card">
                     <td className="px-3 py-2">
-                      <div className="font-medium text-slate-100">{call.callerName || call.phoneNumber}</div>
-                      <div className="text-xs text-slate-500">{call.intent || 'General'} · <span className="font-mono">{call.interactionId.slice(0, 8)}</span></div>
+                      <div className="font-medium text-foreground">{call.callerName || call.phoneNumber}</div>
+                      <div className="text-xs text-muted-foreground">{call.intent || 'General'} · <span className="font-mono">{call.interactionId.slice(0, 8)}</span></div>
                     </td>
-                    <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{formatPhoneNumber(call.phoneNumber)}</td>
-                    <td className="px-3 py-2 text-slate-300 whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
+                    <td className="px-3 py-2 text-foreground whitespace-nowrap">{formatPhoneNumber(call.phoneNumber)}</td>
+                    <td className="px-3 py-2 text-foreground whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
                       {formatDurationLong(call.durationSeconds)}
                     </td>
                     <td className="px-3 py-2">
@@ -267,7 +267,7 @@ const CallLogs: React.FC = () => {
                       <span className={call.fcr ? 'text-emerald-400' : 'text-red-400'}>{call.fcr ? 'Yes' : 'No'}</span>
                     </td>
                     <td className="px-3 py-2">
-                      <span className="flex items-center gap-1.5 text-slate-300">
+                      <span className="flex items-center gap-1.5 text-foreground">
                         {formatPercent(call.intentAccuracy, 0)}
                         {call.intentAccuracy !== undefined && (
                           <span
@@ -282,7 +282,7 @@ const CallLogs: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-30"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground disabled:opacity-30"
                         disabled={!call.recording?.url}
                         onClick={() => handleViewDetail(call)}
                         title={call.recording?.url ? 'Play call recording' : 'No recording available for this call'}
@@ -293,7 +293,7 @@ const CallLogs: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 text-slate-400 hover:text-white"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => handleViewDetail(call)}
                         title="View call details and transcript"
                         aria-label="View call details and transcript"

@@ -72,7 +72,7 @@ export const Sidebar: React.FC = () => {
   return (
     <div className="relative flex h-screen shrink-0">
       {/* Permanent icon rail — ~52px, the only persistent navigation chrome. */}
-      <div className="flex flex-col items-center w-[52px] shrink-0 bg-slate-900 py-2 gap-1 border-r border-slate-800">
+      <div className="flex flex-col items-center w-[52px] shrink-0 bg-sidebar py-2 gap-1 border-r border-sidebar-border">
         <button
           ref={toggleRef}
           type="button"
@@ -80,7 +80,7 @@ export const Sidebar: React.FC = () => {
           aria-expanded={navOpen}
           aria-controls="app-nav-overlay"
           onClick={() => setNavOpen((v) => !v)}
-          className="w-9 h-9 rounded flex items-center justify-center text-white hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 mb-1"
+          className="w-9 h-9 rounded flex items-center justify-center text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 mb-1"
         >
           <Menu size={18} aria-hidden="true" />
         </button>
@@ -105,7 +105,9 @@ export const Sidebar: React.FC = () => {
                 onClick={() => setNavOpen(true)}
                 className={cn(
                   'w-9 h-9 rounded flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
-                  isActive ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  isActive
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )}
               >
                 <Icon size={16} aria-hidden="true" />
@@ -130,18 +132,18 @@ export const Sidebar: React.FC = () => {
             ref={overlayRef}
             role="dialog"
             aria-label="Product navigation"
-            className="absolute left-[52px] top-0 h-full w-64 bg-slate-900 border-r border-slate-800 shadow-2xl z-50 flex flex-col text-slate-100"
+            className="absolute left-[52px] top-0 h-full w-64 bg-sidebar border-r border-sidebar-border shadow-2xl z-50 flex flex-col text-sidebar-foreground"
           >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 shrink-0">
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-sidebar-border shrink-0">
               <div>
                 <div className="text-sm font-bold leading-tight">TARDIS VoiceForce</div>
-                <div className="text-[11px] text-slate-400">{industryConfig.name}</div>
+                <div className="text-[11px] text-sidebar-foreground/60">{industryConfig.name}</div>
               </div>
               <button
                 type="button"
                 aria-label="Close navigation"
                 onClick={closeNav}
-                className="p-1 rounded hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+                className="p-1 rounded hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
               >
                 <X size={16} aria-hidden="true" />
               </button>
@@ -154,7 +156,7 @@ export const Sidebar: React.FC = () => {
                     <div
                       className={cn(
                         'text-[11px] font-semibold uppercase tracking-wide mb-0.5',
-                        isPillarActive ? 'text-cyan-400' : 'text-slate-400'
+                        isPillarActive ? 'text-cyan-500 dark:text-cyan-400' : 'text-sidebar-foreground/60'
                       )}
                     >
                       {pillar.label}
@@ -169,8 +171,10 @@ export const Sidebar: React.FC = () => {
                           to={item.href}
                           onClick={closeNav}
                           className={cn(
-                            'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
-                            isActive ? 'bg-slate-800 text-cyan-300 font-medium' : 'text-slate-300'
+                            'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
+                            isActive
+                              ? 'bg-sidebar-accent text-cyan-600 dark:text-cyan-300 font-medium'
+                              : 'text-sidebar-foreground/90'
                           )}
                         >
                           <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />

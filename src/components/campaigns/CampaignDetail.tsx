@@ -24,7 +24,7 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => 
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-        <div className="bg-white rounded-lg p-6 flex items-center gap-2">
+        <div className="bg-card rounded-lg p-6 flex items-center gap-2">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading interaction…
         </div>
@@ -35,10 +35,10 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => 
   if (isError || !interaction) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-        <div className="bg-white rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-card rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
           Could not load full interaction detail for {interactionId} right now.
           <div className="mt-3">
-            <Button size="sm" variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={onClose}>
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
               Close
             </Button>
           </div>
@@ -85,15 +85,15 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   };
 
   return (
-    <div className="min-h-full bg-slate-950 p-4 space-y-3 text-slate-200">
+    <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" size="sm" onClick={onBack}>
+          <Button variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" size="sm" onClick={onBack}>
             ← Campaigns
           </Button>
           <div>
-            <h1 className="text-base font-semibold text-white">{campaign.name}</h1>
-            {campaign.description && <p className="text-[12px] text-slate-400">{campaign.description}</p>}
+            <h1 className="text-base font-semibold text-foreground">{campaign.name}</h1>
+            {campaign.description && <p className="text-[12px] text-muted-foreground">{campaign.description}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             </Button>
           )}
           {campaign.status === 'running' && (
-            <Button size="sm" variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => runAction(actions.pause)} disabled={actions.pause.isPending}>
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => runAction(actions.pause)} disabled={actions.pause.isPending}>
               Pause
             </Button>
           )}
@@ -121,37 +121,37 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-slate-800 rounded-md bg-slate-900/40 text-[13px]">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-border rounded-md bg-card/40 text-[13px]">
         <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold tabular-nums text-white">{campaign.stats.targetCount}</span>
-          <span className="text-slate-400 text-[11px]">targets</span>
+          <span className="font-semibold tabular-nums text-foreground">{campaign.stats.targetCount}</span>
+          <span className="text-muted-foreground text-[11px]">targets</span>
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold tabular-nums text-white">{campaign.stats.triggeredCount}</span>
-          <span className="text-slate-400 text-[11px]">calls triggered</span>
+          <span className="font-semibold tabular-nums text-foreground">{campaign.stats.triggeredCount}</span>
+          <span className="text-muted-foreground text-[11px]">calls triggered</span>
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold tabular-nums text-white">{rate === null ? '—' : `${rate.toFixed(1)}%`}</span>
-          <span className="text-slate-400 text-[11px]">success rate</span>
+          <span className="font-semibold tabular-nums text-foreground">{rate === null ? '—' : `${rate.toFixed(1)}%`}</span>
+          <span className="text-muted-foreground text-[11px]">success rate</span>
         </div>
         {unclassified > 0 && (
           <div className="flex items-baseline gap-1.5">
             <span className="font-semibold tabular-nums text-amber-400">{unclassified}</span>
-            <span className="text-slate-400 text-[11px]">unclassified / pending</span>
+            <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
           </div>
         )}
-        <div className="h-4 w-px bg-slate-800" aria-hidden="true" />
+        <div className="h-4 w-px bg-muted" aria-hidden="true" />
         <div className="flex items-baseline gap-1.5">
-          <span className="text-slate-300">{campaign.agentName ?? campaign.agentId}</span>
-          <span className="text-slate-400 text-[11px] font-mono">{campaign.agentId}</span>
+          <span className="text-foreground">{campaign.agentName ?? campaign.agentId}</span>
+          <span className="text-muted-foreground text-[11px] font-mono">{campaign.agentId}</span>
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-slate-400 text-[11px]">Created {formatTimestamp(campaign.createdAt)}</span>
+          <span className="text-muted-foreground text-[11px]">Created {formatTimestamp(campaign.createdAt)}</span>
         </div>
       </div>
 
       {campaign.agentContractSnapshot && campaign.agentContractSnapshot.contractCompleteness !== 'complete' && (
-        <p className="text-[12px] text-slate-400 px-3">
+        <p className="text-[12px] text-muted-foreground px-3">
           Agent contract: partial / legacy — expected input, outcome and output metadata are not currently exposed
           by Call Centre for this agent. This is a Call Centre capability state, not an application error; the
           campaign uses the existing legacy Trigger Call contract.
@@ -159,11 +159,11 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
       )}
 
       <div>
-        <h2 className="text-[13px] font-semibold text-slate-300 mb-1.5 px-0.5">Targets ({targets.length})</h2>
-        <div className="overflow-x-auto border border-slate-800 rounded-md bg-slate-900/40">
-          <table className="w-full text-[13px] text-slate-200">
+        <h2 className="text-[13px] font-semibold text-foreground mb-1.5 px-0.5">Targets ({targets.length})</h2>
+        <div className="overflow-x-auto border border-border rounded-md bg-card/40">
+          <table className="w-full text-[13px] text-foreground">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-800">
+              <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
                 <th className="text-left py-2 px-3 font-medium">Name</th>
                 <th className="text-left py-2 px-3 font-medium">Phone</th>
                 <th className="text-left py-2 px-3 font-medium">Status</th>
@@ -176,11 +176,11 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             </thead>
             <tbody>
               {targets.map((target) => (
-                <tr key={target.id} className="border-b border-slate-800/60 last:border-b-0">
-                  <td className="py-2 px-3 text-slate-200">{target.customerDisplayName ?? '—'}</td>
-                  <td className="py-2 px-3 text-slate-400">{target.contactRawValue}</td>
+                <tr key={target.id} className="border-b border-border/60 last:border-b-0">
+                  <td className="py-2 px-3 text-foreground">{target.customerDisplayName ?? '—'}</td>
+                  <td className="py-2 px-3 text-muted-foreground">{target.contactRawValue}</td>
                   <td className="py-2 px-3">
-                    <Badge variant="outline" className="border-slate-700 text-slate-300">
+                    <Badge variant="outline" className="border-border text-foreground">
                       {target.status.replace('_', ' ')}
                     </Badge>
                   </td>
@@ -192,23 +192,23 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                             ? 'text-green-400'
                             : target.resultIsSuccess === false
                               ? 'text-red-400'
-                              : 'text-slate-400'
+                              : 'text-muted-foreground'
                         }
                       >
                         {reconciliationLabel(target)}
                       </span>
                     ) : (
-                      <span className="text-slate-400 inline-flex items-center gap-1">
+                      <span className="text-muted-foreground inline-flex items-center gap-1">
                         {target.latestReconciliationStatus === 'unresolved' && <AlertTriangle size={11} className="text-amber-400" aria-hidden="true" />}
                         {reconciliationLabel(target)}
                       </span>
                     )}
                   </td>
-                  <td className="py-2 px-3 text-slate-400">{target.resultNextAction ?? '—'}</td>
-                  <td className="py-2 px-3 text-slate-400">
+                  <td className="py-2 px-3 text-muted-foreground">{target.resultNextAction ?? '—'}</td>
+                  <td className="py-2 px-3 text-muted-foreground">
                     {target.status === 'follow_up_due' && target.nextActionAt ? formatTimestamp(target.nextActionAt) : '—'}
                   </td>
-                  <td className="py-2 px-3 text-right tabular-nums text-slate-400">{target.attemptCount}</td>
+                  <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{target.attemptCount}</td>
                   <td className="py-2 px-3 text-center">
                     <div className="flex justify-center gap-1">
                       {target.latestReconciledInteractionId && (
@@ -238,7 +238,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
               ))}
               {targets.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
                     No targets imported yet.
                   </td>
                 </tr>

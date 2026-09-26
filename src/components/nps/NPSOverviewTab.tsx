@@ -124,17 +124,17 @@ export const NPSOverviewTab: React.FC<NPSOverviewTabProps> = ({ campaign }) => {
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{campaign.promoters}</div>
               <div className="text-sm text-slate-600">Promoters (9-10)</div>
-              <div className="text-xs text-slate-500">{promoterRate}%</div>
+              <div className="text-xs text-muted-foreground">{promoterRate}%</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">{campaign.passives}</div>
               <div className="text-sm text-slate-600">Passives (7-8)</div>
-              <div className="text-xs text-slate-500">{passiveRate}%</div>
+              <div className="text-xs text-muted-foreground">{passiveRate}%</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">{campaign.detractors}</div>
               <div className="text-sm text-slate-600">Detractors (0-6)</div>
-              <div className="text-xs text-slate-500">{detractorRate}%</div>
+              <div className="text-xs text-muted-foreground">{detractorRate}%</div>
             </div>
           </div>
         </CardContent>

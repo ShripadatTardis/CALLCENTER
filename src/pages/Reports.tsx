@@ -186,7 +186,7 @@ const Reports: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Search reports by name or description..."
                   value={searchTerm}
@@ -318,14 +318,14 @@ const Reports: React.FC = () => {
                             }}
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-slate-400'}`} />
+                            <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
                           </Button>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <p className="text-sm text-slate-600 line-clamp-2">{report.description}</p>
                         
-                        <div className="flex items-center justify-between text-xs text-slate-500">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <div className="flex items-center space-x-1">
                             <Clock className="h-3 w-3" />
                             <span>{report.estimatedTime}</span>
@@ -373,7 +373,7 @@ const Reports: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="text-center py-12">
-                <BarChart3 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-slate-900 mb-2">No reports found</h3>
                 <p className="text-slate-600 mb-4">
                   Try adjusting your search terms or category filter.

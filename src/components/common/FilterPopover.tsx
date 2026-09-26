@@ -24,7 +24,7 @@ export const FilterPopover: React.FC<{
         <Button
           variant="outline"
           size="sm"
-          className={dark ? 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white' : 'h-8'}
+          className={dark ? 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground' : 'h-8'}
         >
           <Filter className="h-3.5 w-3.5 mr-1.5" />
           Filters
@@ -37,10 +37,10 @@ export const FilterPopover: React.FC<{
       </PopoverTrigger>
       <PopoverContent
         align={align}
-        className={`w-[340px] max-h-[70vh] overflow-y-auto p-4 space-y-4 ${dark ? 'bg-slate-900 border-slate-700 text-slate-200' : ''}`}
+        className={`w-[340px] max-h-[70vh] overflow-y-auto p-4 space-y-4 ${dark ? 'bg-card border-border text-foreground' : ''}`}
       >
         <div className="flex items-center justify-between">
-          <span className={`text-sm font-semibold ${dark ? 'text-slate-100' : ''}`}>Advanced filters</span>
+          <span className={`text-sm font-semibold ${dark ? 'text-foreground' : ''}`}>Advanced filters</span>
           {onClear && activeCount > 0 && (
             <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onClear}>
               <X className="h-3 w-3 mr-1" />

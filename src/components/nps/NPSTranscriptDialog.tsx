@@ -90,17 +90,17 @@ Customer: Thank you, goodbye.
             <CardContent>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-slate-500" />
+                  <User className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Participant:</span>
                   <span>{response.name}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-slate-500" />
+                  <Phone className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Phone:</span>
                   <span>{response.mobileNumber}</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Clock className="h-4 w-4 text-slate-500" />
+                  <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Duration:</span>
                   <span>{response.callDuration} seconds</span>
                 </div>
@@ -139,7 +139,7 @@ Customer: Thank you, goodbye.
                         Hello {response.name}, thank you for taking time to participate in our Net Promoter Score survey. On a scale of 0 to 10, how likely are you to recommend our bank to a friend or colleague?
                       </p>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {format(response.responseTimestamp, 'HH:mm:ss')}
                     </div>
                   </div>
@@ -155,7 +155,7 @@ Customer: Thank you, goodbye.
                         I would rate it a {response.npsScore}.
                       </p>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {format(new Date(response.responseTimestamp.getTime() + 15000), 'HH:mm:ss')}
                     </div>
                   </div>
@@ -171,7 +171,7 @@ Customer: Thank you, goodbye.
                         Thank you for that rating. Could you please tell us what influenced your decision to give us that score?
                       </p>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {format(new Date(response.responseTimestamp.getTime() + 25000), 'HH:mm:ss')}
                     </div>
                   </div>
@@ -186,7 +186,7 @@ Customer: Thank you, goodbye.
                       <div className="bg-green-50 rounded-lg p-3">
                         <p className="text-sm">{response.feedback}</p>
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         {format(new Date(response.responseTimestamp.getTime() + 45000), 'HH:mm:ss')}
                       </div>
                     </div>
@@ -203,7 +203,7 @@ Customer: Thank you, goodbye.
                         Thank you for your valuable feedback. This helps us improve our services. Have a great day!
                       </p>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {format(new Date(response.responseTimestamp.getTime() + 65000), 'HH:mm:ss')}
                     </div>
                   </div>

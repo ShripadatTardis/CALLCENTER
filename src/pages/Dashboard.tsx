@@ -42,7 +42,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
         {(recent.isError || agents.isError || metrics.isError) && (
           <QueryErrorBanner
             error={recent.error ?? agents.error ?? metrics.error}
@@ -76,27 +76,27 @@ const Dashboard: React.FC = () => {
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader className="py-3">
-              <CardTitle className="text-sm font-semibold text-slate-100">Recent Calls</CardTitle>
+              <CardTitle className="text-sm font-semibold text-foreground">Recent Calls</CardTitle>
             </CardHeader>
             <CardContent>
               {recent.isLoading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : interactions.length === 0 ? (
-                <p className="text-sm text-slate-500">No calls yet.</p>
+                <p className="text-sm text-muted-foreground">No calls yet.</p>
               ) : (
                 <div className="space-y-0.5">
                   {interactions.map((call) => (
                     <div
                       key={call.interactionId}
-                      className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0"
+                      className="flex items-center justify-between py-2 border-b border-border/60 last:border-0"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-slate-100 truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
-                        <div className="text-xs text-slate-500 truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</div>
+                        <div className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
+                        <div className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</div>
                       </div>
                       <div className="text-right ml-3 flex-shrink-0">
                         <Badge
@@ -105,7 +105,7 @@ const Dashboard: React.FC = () => {
                         >
                           {formatStatusLabel(call.outcome ?? call.status)}
                         </Badge>
-                        <div className="text-xs text-slate-500 mt-1" title={formatDurationExact(call.durationSeconds)}>
+                        <div className="text-xs text-muted-foreground mt-1" title={formatDurationExact(call.durationSeconds)}>
                           {formatDurationLong(call.durationSeconds)}
                         </div>
                       </div>
@@ -127,7 +127,7 @@ const Dashboard: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
             onClick={() => navigate('/live-view')}
           >
             <TrendingUp className="h-3.5 w-3.5 mr-1.5 text-cyan-400" />
@@ -136,7 +136,7 @@ const Dashboard: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
             onClick={() => navigate('/qa-review')}
           >
             <AlertTriangle className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
@@ -145,7 +145,7 @@ const Dashboard: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
             onClick={() => navigate('/analytics')}
           >
             <BarChart3 className="h-3.5 w-3.5 mr-1.5 text-violet-400" />

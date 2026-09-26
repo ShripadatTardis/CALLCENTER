@@ -21,7 +21,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   // replacing the old permanently-expanded sidebar.
   return (
     <LayoutProvider>
-      <div className="flex h-screen bg-white">
+      <div className="flex h-screen bg-background">
         <Sidebar />
         <div className="flex-1 min-w-0 flex flex-col">
           <ContextBar />
@@ -29,7 +29,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               (grids, tables) — without it, flex items refuse to shrink below
               their content's intrinsic width, and the whole page overflows
               horizontally instead of scrolling within `main`. */}
-          <main className="flex-1 min-w-0 overflow-auto bg-gray-50">
+          <main className="flex-1 min-w-0 overflow-auto bg-background">
             {children}
           </main>
         </div>

@@ -16,8 +16,8 @@ export const WhatsAppSidebar: React.FC = () => {
         <CardContent>
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-slate-300">Sandbox Number:</p>
-              <p className="text-lg font-mono bg-gray-100 dark:bg-slate-800 dark:text-slate-100 p-2 rounded">+1 415 523 8886</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-foreground">Sandbox Number:</p>
+              <p className="text-lg font-mono bg-gray-100 dark:bg-muted dark:text-foreground p-2 rounded">+1 415 523 8886</p>
             </div>
             <div className="bg-blue-50 dark:bg-blue-950/40 p-3 rounded-lg">
               <div className="flex items-start gap-2">
@@ -46,7 +46,7 @@ export const WhatsAppSidebar: React.FC = () => {
         <CardContent>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-700 dark:text-slate-300">Connected to Sandbox</span>
+            <span className="text-sm text-gray-700 dark:text-foreground">Connected to Sandbox</span>
           </div>
         </CardContent>
       </Card>

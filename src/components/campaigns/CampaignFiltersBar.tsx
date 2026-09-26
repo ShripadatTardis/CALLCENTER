@@ -24,19 +24,19 @@ export const CampaignFiltersBar: React.FC<CampaignFiltersBarProps> = ({
   return (
     <div className="flex flex-col sm:flex-row gap-2">
       <div className="relative flex-1 max-w-sm">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 h-3.5 w-3.5" aria-hidden="true" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" aria-hidden="true" />
         <Input
           placeholder="Search campaigns…"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-8 h-8 text-[13px] bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-400"
+          className="pl-8 h-8 text-[13px] bg-card border-border text-foreground placeholder:text-muted-foreground"
         />
       </div>
       <select
         aria-label="Filter by status"
         value={selectedStatus}
         onChange={(e) => setSelectedStatus(e.target.value)}
-        className="border border-slate-700 bg-slate-900 text-slate-200 rounded-md px-2 h-8 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+        className="border border-border bg-card text-foreground rounded-md px-2 h-8 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
       >
         <option value="all">All statuses</option>
         <option value="draft">Draft</option>

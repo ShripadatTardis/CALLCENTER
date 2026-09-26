@@ -35,17 +35,17 @@ export const CampaignStatStrip: React.FC<CampaignStatStripProps> = ({ campaigns 
 
   return (
     <TooltipProvider>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-slate-800 rounded-md bg-slate-900/40 text-[13px]">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-border rounded-md bg-card/40 text-[13px]">
         {items.map((item) => (
           <div key={item.label} className="flex items-baseline gap-1.5">
-            <span className={`font-semibold tabular-nums ${item.tone ?? 'text-white'}`}>{item.value}</span>
-            <span className="text-slate-400 text-[11px]">{item.label}</span>
+            <span className={`font-semibold tabular-nums ${item.tone ?? 'text-foreground'}`}>{item.value}</span>
+            <span className="text-muted-foreground text-[11px]">{item.label}</span>
           </div>
         ))}
-        <div className="h-4 w-px bg-slate-800" aria-hidden="true" />
+        <div className="h-4 w-px bg-muted" aria-hidden="true" />
         <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold tabular-nums text-white">{successRate === null ? '—' : `${successRate.toFixed(1)}%`}</span>
-          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+          <span className="font-semibold tabular-nums text-foreground">{successRate === null ? '—' : `${successRate.toFixed(1)}%`}</span>
+          <span className="text-muted-foreground text-[11px] flex items-center gap-1">
             success rate
             <Tooltip>
               <TooltipTrigger asChild>
@@ -62,7 +62,7 @@ export const CampaignStatStrip: React.FC<CampaignStatStripProps> = ({ campaigns 
         {totalUnclassified > 0 && (
           <div className="flex items-baseline gap-1.5">
             <span className="font-semibold tabular-nums text-amber-400">{totalUnclassified.toLocaleString()}</span>
-            <span className="text-slate-400 text-[11px]">unclassified / pending</span>
+            <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
           </div>
         )}
       </div>

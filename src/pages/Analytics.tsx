@@ -37,16 +37,16 @@ const Analytics: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
         <AnalyticsTimeWindowControl query={query} onChange={setQuery} />
 
         <Tabs defaultValue="overview">
-          <TabsList className="bg-slate-900 border border-slate-800 h-9">
-            <TabsTrigger value="overview" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Overview</TabsTrigger>
-            <TabsTrigger value="voice" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Voice</TabsTrigger>
-            <TabsTrigger value="chat" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Chat</TabsTrigger>
-            <TabsTrigger value="campaigns" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Campaigns</TabsTrigger>
-            <TabsTrigger value="customers" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Customers</TabsTrigger>
+          <TabsList className="bg-card border border-border h-9">
+            <TabsTrigger value="overview" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="voice" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Voice</TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Chat</TabsTrigger>
+            <TabsTrigger value="campaigns" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Campaigns</TabsTrigger>
+            <TabsTrigger value="customers" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Customers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-3">

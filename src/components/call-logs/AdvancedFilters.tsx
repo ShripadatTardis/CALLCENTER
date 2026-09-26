@@ -40,11 +40,11 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs font-medium mb-1.5 block text-slate-400">Date range</label>
+        <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Date range</label>
         <div className="flex gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="flex-1 justify-start text-left border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white">
+              <Button variant="outline" size="sm" className="flex-1 justify-start text-left border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground">
                 <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                 {filters.date_from ? filters.date_from : 'Start'}
               </Button>
@@ -59,7 +59,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
           </Popover>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="flex-1 justify-start text-left border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white">
+              <Button variant="outline" size="sm" className="flex-1 justify-start text-left border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground">
                 <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                 {filters.date_to ? filters.date_to : 'End'}
               </Button>
@@ -77,7 +77,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium mb-1.5 block text-slate-400">Outcome</label>
+          <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Outcome</label>
           <Select
             value={filters.outcome ?? 'any'}
             onValueChange={(value) => update({ outcome: value === 'any' ? undefined : (value as 'resolved' | 'escalated') })}
@@ -91,7 +91,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
           </Select>
         </div>
         <div>
-          <label className="text-xs font-medium mb-1.5 block text-slate-400">Direction</label>
+          <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Direction</label>
           <Select
             value={filters.direction ?? 'any'}
             onValueChange={(value) => update({ direction: value === 'any' ? undefined : (value as 'inbound' | 'outbound') })}
@@ -107,7 +107,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
       </div>
 
       <div>
-        <label className="text-xs font-medium mb-1.5 block text-slate-400">
+        <label className="text-xs font-medium mb-1.5 block text-muted-foreground">
           Duration ({Math.floor(durationRange[0] / 60)}m – {Math.floor(durationRange[1] / 60)}m)
         </label>
         <Slider
@@ -133,6 +133,6 @@ export const CallLogsSearch: React.FC<{ value: string; onChange: (v: string) => 
     placeholder="Search caller name, phone, intent, summary…"
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="h-8 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+    className="h-8 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
   />
 );

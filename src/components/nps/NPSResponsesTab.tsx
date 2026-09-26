@@ -56,7 +56,7 @@ export const NPSResponsesTab: React.FC<NPSResponsesTabProps> = ({
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <User className="h-6 w-6 text-slate-400" />
+                    <User className="h-6 w-6 text-muted-foreground" />
                     <div>
                       <div className="font-medium">{response.name}</div>
                       <div className="text-sm text-slate-600">Feedback provided</div>

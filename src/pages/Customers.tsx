@@ -34,18 +34,18 @@ const Customers: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
         <div className="flex items-center gap-2">
           <div className="relative w-72">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              className="h-8 pl-7 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+              className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
               placeholder="Search by phone, name, or CIF…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <span className="text-xs text-slate-500">{customers.length} shown</span>
+          <span className="text-xs text-muted-foreground">{customers.length} shown</span>
         </div>
 
         {isError && (
@@ -61,21 +61,21 @@ const Customers: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : isError && customers.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">Customers are unavailable right now — see the error above.</p>
+          <p className="text-sm text-muted-foreground px-1">Customers are unavailable right now — see the error above.</p>
         ) : customers.length === 0 ? (
-          <p className="text-sm text-slate-500 px-1">
+          <p className="text-sm text-muted-foreground px-1">
             {debouncedSearch
               ? 'No customer found for that search — either nobody with that phone number/name has called yet, or you are not authorized to see their interaction categories.'
               : 'No customers yet.'}
           </p>
         ) : (
-          <div className="rounded-md border border-slate-800 overflow-x-auto">
+          <div className="rounded-md border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Customer</th>
                   <th className="px-3 py-2 font-medium">Interactions</th>
                   <th className="px-3 py-2 font-medium">Last seen</th>
@@ -94,7 +94,7 @@ const Customers: React.FC = () => {
                   return (
                     <tr
                       key={c.id}
-                      className="cursor-pointer border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                      className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
                       role="button"
                       tabIndex={0}
                       onClick={() => navigate(`/customers/${c.id}`)}
@@ -106,13 +106,13 @@ const Customers: React.FC = () => {
                       }}
                     >
                       <td className="px-3 py-2">
-                        <div className="font-medium text-slate-100">
+                        <div className="font-medium text-foreground">
                           {label}
-                          {showRef && <span className="text-xs text-slate-500 ml-2">Ref: {c.sourceCustomerRef}</span>}
+                          {showRef && <span className="text-xs text-muted-foreground ml-2">Ref: {c.sourceCustomerRef}</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-slate-300">{c.totalInteractions}</td>
-                      <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{formatTimestamp(c.lastSeen)}</td>
+                      <td className="px-3 py-2 text-foreground">{c.totalInteractions}</td>
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{formatTimestamp(c.lastSeen)}</td>
                       <td className="px-3 py-2">
                         {c.latestOutcome ? (
                           <Badge variant={c.latestOutcome === 'escalated' ? 'destructive' : 'secondary'} className="whitespace-nowrap text-xs">
@@ -122,7 +122,7 @@ const Customers: React.FC = () => {
                           <span className="text-slate-600">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
+                      <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
                         {c.latestSentimentScore !== null ? formatFractionAsPercent(c.latestSentimentScore) : '—'}
                       </td>
                     </tr>

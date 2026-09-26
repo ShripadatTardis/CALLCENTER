@@ -6,7 +6,7 @@ import { FormattingHub as FormattingHubComponent } from '@/components/formatting
 const FormattingHub: React.FC = () => {
   return (
     <Layout>
-      <div className="bg-slate-950 min-h-full text-slate-200">
+      <div className="bg-background min-h-full text-foreground">
         <FormattingHubComponent />
       </div>
     </Layout>

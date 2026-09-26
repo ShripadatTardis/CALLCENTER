@@ -138,13 +138,13 @@ const CreateCampaign: React.FC = () => {
 
   return (
     <Layout>
-      <div className="min-h-full bg-slate-950 text-slate-200">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800">
+      <div className="min-h-full bg-background text-foreground">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
           <div>
-            <h1 className="text-base font-semibold text-white">Create Campaign</h1>
-            <p className="text-[12px] text-slate-400">Set up a new outbound call campaign.</p>
+            <h1 className="text-base font-semibold text-foreground">Create Campaign</h1>
+            <p className="text-[12px] text-muted-foreground">Set up a new outbound call campaign.</p>
           </div>
-          <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" size="sm" onClick={() => navigate('/outbound-campaigns')}>
+          <Button variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" size="sm" onClick={() => navigate('/outbound-campaigns')}>
             Cancel
           </Button>
         </div>
@@ -164,7 +164,7 @@ const CreateCampaign: React.FC = () => {
                   onClick={() => !locked && setStep(i)}
                   aria-current={i === step ? 'step' : undefined}
                   className={`w-full text-left px-2.5 py-2 rounded text-[13px] flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed ${
-                    i === step ? 'bg-cyan-600 text-white' : state === 'completed' ? 'text-cyan-300 hover:bg-slate-900' : 'text-slate-400 hover:bg-slate-900'
+                    i === step ? 'bg-cyan-600 text-foreground' : state === 'completed' ? 'text-cyan-300 hover:bg-card' : 'text-muted-foreground hover:bg-card'
                   }`}
                 >
                   <span className="w-4 h-4 shrink-0 flex items-center justify-center rounded-full text-[10px] border border-current">
@@ -177,13 +177,13 @@ const CreateCampaign: React.FC = () => {
           </nav>
 
           {/* Current-stage workspace — one bounded surface, not nested cards. */}
-          <div className="flex-1 min-w-0 border border-slate-800 rounded-md bg-slate-900/40 p-4">
-            <h2 className="text-[13px] font-semibold text-slate-300 mb-3">{STAGES[step]}</h2>
+          <div className="flex-1 min-w-0 border border-border rounded-md bg-card/40 p-4">
+            <h2 className="text-[13px] font-semibold text-foreground mb-3">{STAGES[step]}</h2>
 
             {step === 0 && (
               <div className="space-y-3 max-w-md">
                 <div className="space-y-1.5">
-                  <Label htmlFor="campaign-name" className="text-slate-300">
+                  <Label htmlFor="campaign-name" className="text-foreground">
                     Campaign Name
                   </Label>
                   <Input
@@ -191,11 +191,11 @@ const CreateCampaign: React.FC = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. October EMI Reminders"
-                    className="bg-slate-950 border-slate-700 text-slate-100"
+                    className="bg-background border-border text-foreground"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="campaign-description" className="text-slate-300">
+                  <Label htmlFor="campaign-description" className="text-foreground">
                     Description
                   </Label>
                   <Textarea
@@ -203,7 +203,7 @@ const CreateCampaign: React.FC = () => {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
-                    className="bg-slate-950 border-slate-700 text-slate-100"
+                    className="bg-background border-border text-foreground"
                   />
                 </div>
               </div>
@@ -211,9 +211,9 @@ const CreateCampaign: React.FC = () => {
 
             {step === 1 && (
               <div className="space-y-1.5 max-w-md">
-                <Label className="text-slate-300">Call Agent</Label>
+                <Label className="text-foreground">Call Agent</Label>
                 <Select value={agentId} onValueChange={setAgentId}>
-                  <SelectTrigger className="bg-slate-950 border-slate-700 text-slate-100">
+                  <SelectTrigger className="bg-background border-border text-foreground">
                     <SelectValue placeholder={isAgentsLoading ? 'Loading agents…' : 'Select a Call Agent'} />
                   </SelectTrigger>
                   <SelectContent>
@@ -224,50 +224,50 @@ const CreateCampaign: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[12px] text-slate-400">Required — every campaign target is called with this agent.</p>
+                <p className="text-[12px] text-muted-foreground">Required — every campaign target is called with this agent.</p>
               </div>
             )}
 
             {step === 2 && (
               <div className="space-y-3 text-[13px] max-w-lg">
-                <p className="text-slate-400 text-[12px]">
+                <p className="text-muted-foreground text-[12px]">
                   Immutable snapshot of the selected Call Agent's contract, captured now so a later change to the
                   agent's live roster entry never silently rewrites what this campaign was configured against.
                 </p>
                 {agentContract ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-white">{agentContract.agentName}</span>
-                      <Badge variant="outline" className="text-[11px] border-slate-700 text-slate-300">
+                      <span className="font-medium text-foreground">{agentContract.agentName}</span>
+                      <Badge variant="outline" className="text-[11px] border-border text-foreground">
                         {agentContract.contractCompleteness === 'complete' ? 'Complete contract' : 'Partial contract (legacy)'}
                       </Badge>
                     </div>
-                    <div className="text-slate-400 font-mono text-[11px]">{agentContract.agentId}</div>
+                    <div className="text-muted-foreground font-mono text-[11px]">{agentContract.agentId}</div>
                     {agentContract.contractCompleteness === 'partial' && (
-                      <p className="text-[12px] text-slate-400 border-t border-slate-800 pt-2">
+                      <p className="text-[12px] text-muted-foreground border-t border-border pt-2">
                         Expected inputs and outcomes are not currently exposed by Call Centre for this agent. This
                         campaign uses the existing Trigger Call contract.
                       </p>
                     )}
                   </div>
                 ) : (
-                  <p className="text-slate-400">Select a Call Agent first.</p>
+                  <p className="text-muted-foreground">Select a Call Agent first.</p>
                 )}
               </div>
             )}
 
             {step === 3 && (
               <div className="space-y-3 max-w-lg">
-                <Label className="text-slate-300">Audience (CSV)</Label>
-                <div className="border-2 border-dashed border-slate-700 rounded-lg p-5 text-center bg-slate-950/60">
+                <Label className="text-foreground">Audience (CSV)</Label>
+                <div className="border-2 border-dashed border-border rounded-lg p-5 text-center bg-background/60">
                   <Upload className="h-6 w-6 mx-auto text-slate-600 mb-2" aria-hidden="true" />
                   <input
                     type="file"
                     accept=".csv"
                     onChange={(e) => void handleCsvChange(e.target.files?.[0] ?? null)}
-                    className="text-[12px] text-slate-300"
+                    className="text-[12px] text-foreground"
                   />
-                  <p className="text-[11px] text-slate-400 mt-2">
+                  <p className="text-[11px] text-muted-foreground mt-2">
                     Columns: <code>name, phone, customer_reference</code> (optional), plus extra columns captured as
                     campaign-specific attributes.
                   </p>
@@ -281,20 +281,20 @@ const CreateCampaign: React.FC = () => {
                 )}
                 {csvRows.length > 0 && (
                   <div className="text-[12px]">
-                    <p className="font-medium text-slate-300 mb-1.5">
+                    <p className="font-medium text-foreground mb-1.5">
                       {csvRows.length} rows parsed from Customer 360 + CSV. Preview:
                     </p>
-                    <div className="overflow-x-auto border border-slate-800 rounded">
+                    <div className="overflow-x-auto border border-border rounded">
                       <table className="w-full text-[11px]">
                         <thead>
-                          <tr className="border-b border-slate-800 text-slate-400">
+                          <tr className="border-b border-border text-muted-foreground">
                             <th className="text-left p-1.5">Name</th>
                             <th className="text-left p-1.5">Phone</th>
                           </tr>
                         </thead>
                         <tbody>
                           {csvRows.slice(0, 5).map((row, i) => (
-                            <tr key={i} className="border-b border-slate-800/60 last:border-b-0 text-slate-300">
+                            <tr key={i} className="border-b border-border/60 last:border-b-0 text-foreground">
                               <td className="p-1.5">{row.name ?? '—'}</td>
                               <td className="p-1.5">{row.phone}</td>
                             </tr>
@@ -309,49 +309,49 @@ const CreateCampaign: React.FC = () => {
 
             {step === 4 && (
               <div className="space-y-2 text-[13px] max-w-lg">
-                <p className="text-slate-400 text-[12px]">
+                <p className="text-muted-foreground text-[12px]">
                   Maps the selected Call Agent's expected input fields to Customer 360 or CSV data. Campaign start
                   is blocked, deterministically, if a required field is left unmapped — never guessed by an AI.
                 </p>
                 {agentContract && agentContract.expectedInputFields.length === 0 ? (
-                  <p className="text-[12px] text-slate-400 border border-slate-800 rounded p-2.5 bg-slate-950/60">
+                  <p className="text-[12px] text-muted-foreground border border-border rounded p-2.5 bg-background/60">
                     Call Centre has not yet declared any expected input fields for this agent — there is nothing to
                     map. The campaign will call each target using its phone number, the selected agent, and its
                     Customer 360 reference where known, exactly as it does today.
                   </p>
                 ) : (
-                  <p className="text-[12px] text-slate-400">Select a Call Agent with a discovered contract first.</p>
+                  <p className="text-[12px] text-muted-foreground">Select a Call Agent with a discovered contract first.</p>
                 )}
               </div>
             )}
 
             {step === 5 && (
               <div className="space-y-2 text-[13px] max-w-2xl">
-                <p className="text-slate-400 text-[12px]">
+                <p className="text-muted-foreground text-[12px]">
                   Call Centre determines the actual outcome of every call. These deterministic rules — seeded with
                   generic conservative defaults, not this agent's real expected outcomes (Call Centre does not yet
                   expose those) — decide what VoiceForce does with it. No AI interpretation happens here.
                 </p>
                 {rules.map((rule, i) => (
-                  <div key={i} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end border border-slate-800 rounded p-2.5">
+                  <div key={i} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end border border-border rounded p-2.5">
                     <div>
-                      <Label className="text-[11px] text-slate-400">Match field</Label>
+                      <Label className="text-[11px] text-muted-foreground">Match field</Label>
                       <Input
                         value={rule.matchField}
                         onChange={(e) => setRules((prev) => prev.map((r, j) => (j === i ? { ...r, matchField: e.target.value } : r)))}
-                        className="h-8 bg-slate-950 border-slate-700 text-slate-100 text-[12px]"
+                        className="h-8 bg-background border-border text-foreground text-[12px]"
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-slate-400">Match value</Label>
+                      <Label className="text-[11px] text-muted-foreground">Match value</Label>
                       <Input
                         value={rule.matchValue}
                         onChange={(e) => setRules((prev) => prev.map((r, j) => (j === i ? { ...r, matchValue: e.target.value } : r)))}
-                        className="h-8 bg-slate-950 border-slate-700 text-slate-100 text-[12px]"
+                        className="h-8 bg-background border-border text-foreground text-[12px]"
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-slate-400">Result label</Label>
+                      <Label className="text-[11px] text-muted-foreground">Result label</Label>
                       <Input
                         value={rule.resultLabel}
                         onChange={(e) =>
@@ -359,18 +359,18 @@ const CreateCampaign: React.FC = () => {
                             prev.map((r, j) => (j === i ? { ...r, resultLabel: e.target.value, resultCode: e.target.value.toLowerCase().replace(/\s+/g, '_') } : r)),
                           )
                         }
-                        className="h-8 bg-slate-950 border-slate-700 text-slate-100 text-[12px]"
+                        className="h-8 bg-background border-border text-foreground text-[12px]"
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-slate-400">Is success</Label>
+                      <Label className="text-[11px] text-muted-foreground">Is success</Label>
                       <Select
                         value={rule.isSuccess === null ? 'null' : String(rule.isSuccess)}
                         onValueChange={(v) =>
                           setRules((prev) => prev.map((r, j) => (j === i ? { ...r, isSuccess: v === 'null' ? null : v === 'true' } : r)))
                         }
                       >
-                        <SelectTrigger className="h-8 bg-slate-950 border-slate-700 text-slate-100 text-[12px]">
+                        <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -380,14 +380,14 @@ const CreateCampaign: React.FC = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button size="sm" variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}>
+                    <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}>
                       Remove
                     </Button>
                   </div>
                 ))}
                 <Button
                   size="sm"
-                  variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+                  variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
                   onClick={() =>
                     setRules((prev) => [
                       ...prev,
@@ -431,7 +431,7 @@ const CreateCampaign: React.FC = () => {
 
                 <div className="flex gap-2 pt-3">
                   <Button
-                    variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+                    variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
                     size="sm"
                     disabled={create.isPending || importMutation.isPending}
                     onClick={() => void handleLaunch(false)}
@@ -447,8 +447,8 @@ const CreateCampaign: React.FC = () => {
               </div>
             )}
 
-            <div className="flex justify-between mt-4 pt-3 border-t border-slate-800">
-              <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" size="sm" onClick={() => (step === 0 ? navigate('/outbound-campaigns') : setStep((s) => s - 1))}>
+            <div className="flex justify-between mt-4 pt-3 border-t border-border">
+              <Button variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" size="sm" onClick={() => (step === 0 ? navigate('/outbound-campaigns') : setStep((s) => s - 1))}>
                 {step === 0 ? 'Cancel' : 'Back'}
               </Button>
               {step < STAGES.length - 1 && (
@@ -465,9 +465,9 @@ const CreateCampaign: React.FC = () => {
 };
 
 const ReviewRow: React.FC<{ label: string; value: string; status: 'ready' | 'info' | 'blocker' }> = ({ label, value, status }) => (
-  <div className="flex items-center justify-between border-b border-slate-800/60 py-1.5 last:border-b-0">
-    <span className="text-slate-400">{label}</span>
-    <span className="flex items-center gap-2 text-slate-200">
+  <div className="flex items-center justify-between border-b border-border/60 py-1.5 last:border-b-0">
+    <span className="text-muted-foreground">{label}</span>
+    <span className="flex items-center gap-2 text-foreground">
       {value}
       <span
         className={`w-1.5 h-1.5 rounded-full ${status === 'ready' ? 'bg-green-400' : status === 'info' ? 'bg-cyan-400' : 'bg-red-400'}`}

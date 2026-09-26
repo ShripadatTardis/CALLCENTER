@@ -1,17 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-
-export type AppearancePreference = 'light' | 'dark' | 'system';
-type ResolvedTheme = 'light' | 'dark';
+import React, { useEffect, useState, useCallback } from 'react';
+import { ThemeContext, type AppearancePreference, type ResolvedTheme } from './themeContextObject';
 
 const STORAGE_KEY = 'voiceforce.appearance';
-
-interface ThemeContextValue {
-  preference: AppearancePreference;
-  resolvedTheme: ResolvedTheme;
-  setPreference: (pref: AppearancePreference) => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === 'undefined' || !window.matchMedia) return 'dark';
@@ -77,8 +67,4 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 };
 
-export function useTheme(): ThemeContextValue {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
-  return ctx;
-}
+export type { AppearancePreference } from './themeContextObject';

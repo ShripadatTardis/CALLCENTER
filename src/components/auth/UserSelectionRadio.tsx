@@ -21,7 +21,7 @@ export const UserSelectionRadio: React.FC<UserSelectionRadioProps> = ({
       </h4>
       <RadioGroup value={selectedUser} onValueChange={onUserSelection} className="space-y-3">
         {sampleUsers.map((user) => (
-          <div key={user.id} className="flex items-center space-x-3 p-2 rounded hover:bg-white transition-colors">
+          <div key={user.id} className="flex items-center space-x-3 p-2 rounded hover:bg-card transition-colors">
             <RadioGroupItem value={user.id} id={user.id} />
             <Label htmlFor={user.id} className="flex-1 cursor-pointer">
               <div className="flex justify-between items-center">
@@ -30,7 +30,7 @@ export const UserSelectionRadio: React.FC<UserSelectionRadioProps> = ({
                   {getRoleDisplayName(user.role)}
                 </span>
               </div>
-              <div className="text-xs text-slate-500 mt-1">{user.email}</div>
+              <div className="text-xs text-muted-foreground mt-1">{user.email}</div>
             </Label>
           </div>
         ))}

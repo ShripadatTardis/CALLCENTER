@@ -36,7 +36,7 @@ const OutboundCampaigns: React.FC = () => {
     if (detailQuery.isLoading || targetsQuery.isLoading) {
       return (
         <Layout>
-          <div className="min-h-full bg-slate-950 p-4 flex items-center gap-2 text-slate-400 text-sm">
+          <div className="min-h-full bg-background p-4 flex items-center gap-2 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading campaign…
           </div>
@@ -47,7 +47,7 @@ const OutboundCampaigns: React.FC = () => {
     if (detailQuery.isError || !detailQuery.data) {
       return (
         <Layout>
-          <div className="min-h-full bg-slate-950 p-4 space-y-4">
+          <div className="min-h-full bg-background p-4 space-y-4">
             <Button variant="outline" onClick={() => setSelectedCampaignId(null)}>
               ← Back to Campaigns
             </Button>
@@ -79,12 +79,12 @@ const OutboundCampaigns: React.FC = () => {
 
   return (
     <Layout>
-      <div className="min-h-full bg-slate-950 p-4 space-y-3">
+      <div className="min-h-full bg-background p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-base font-semibold text-white">Outbound Campaigns</h1>
+            <h1 className="text-base font-semibold text-foreground">Outbound Campaigns</h1>
             {data?.scoped && (
-              <p className="text-[11px] text-slate-400 mt-0.5">Showing campaigns for your authorized categories only.</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Showing campaigns for your authorized categories only.</p>
             )}
           </div>
           <Button size="sm" onClick={() => navigate('/outbound-campaigns/create')}>
@@ -107,7 +107,7 @@ const OutboundCampaigns: React.FC = () => {
         />
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-slate-400 text-sm p-4">
+          <div className="flex items-center gap-2 text-muted-foreground text-sm p-4">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading campaigns…
           </div>

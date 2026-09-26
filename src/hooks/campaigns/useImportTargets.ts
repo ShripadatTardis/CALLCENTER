@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Papa from 'papaparse';
+import { useAuth } from '@/contexts/AuthContext';
 import { campaignsKeys } from './useCampaigns';
 import { importCampaignTargets } from '@/services/campaigns/campaignsService';
 import type { ImportTargetRow } from '@/types/campaign';
@@ -38,8 +39,10 @@ export function parseTargetsCsv(file: File): Promise<{ rows: ImportTargetRow[]; 
 
 export function useImportTargets(campaignId: string | undefined) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
   return useMutation({
-    mutationFn: (rows: ImportTargetRow[]) => importCampaignTargets(campaignId as string, rows),
+    mutationFn: (rows: ImportTargetRow[]) => importCampaignTargets(campaignId as string, rows, role),
     onSuccess: () => {
       if (campaignId) {
         queryClient.invalidateQueries({ queryKey: campaignsKeys.detail(campaignId) });

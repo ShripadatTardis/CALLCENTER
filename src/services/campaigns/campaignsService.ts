@@ -23,76 +23,144 @@ import type {
  * Campaigns domain service. Calls this app's own /api/campaigns route
  * (docs/CALL_CENTRE_SESSION5_CAMPAIGNS_PLAN.md §21), one consolidated
  * file dispatched by ?action= — same pattern as Chat's chatService.ts.
+ *
+ * Session 9.2: every function takes an optional `role`, which drives
+ * the SAME server-side category authorization Call Logs/Chat Logs
+ * already have (Session 6.2) — `x-user-role` header, fail-closed to
+ * 'unauthenticated' server-side when omitted. See useCampaigns.ts /
+ * useCampaignDetail.ts / useCampaignActions.ts for the real call sites,
+ * which always pass the current session's role.
  */
 
-export async function fetchCampaigns(opts: { page?: number; pageSize?: number } = {}): Promise<CampaignListResponse> {
+function roleHeaders(role: string): Record<string, string> {
+  return { 'x-user-role': role };
+}
+
+export async function fetchCampaigns(
+  opts: { page?: number; pageSize?: number } = {},
+  role = 'unauthenticated',
+): Promise<CampaignListResponse> {
   return request<CampaignListResponse>('/campaigns', {
     method: 'GET',
     query: { action: 'list', page: opts.page, pageSize: opts.pageSize },
+    headers: roleHeaders(role),
   });
 }
 
-export async function fetchCampaignDetail(id: string): Promise<CampaignDetail> {
-  return request<CampaignDetail>('/campaigns', { method: 'GET', query: { action: 'get', id } });
+export async function fetchCampaignDetail(id: string, role = 'unauthenticated'): Promise<CampaignDetail> {
+  return request<CampaignDetail>('/campaigns', {
+    method: 'GET',
+    query: { action: 'get', id },
+    headers: roleHeaders(role),
+  });
 }
 
 export async function fetchCampaignTargets(
   id: string,
   opts: { page?: number; pageSize?: number } = {},
+  role = 'unauthenticated',
 ): Promise<CampaignTargetsResponse> {
   return request<CampaignTargetsResponse>('/campaigns', {
     method: 'GET',
     query: { action: 'listTargets', id, page: opts.page, pageSize: opts.pageSize },
+    headers: roleHeaders(role),
   });
 }
 
-export async function createCampaign(input: CreateCampaignInput): Promise<CampaignWithStats> {
-  return request<CampaignWithStats>('/campaigns', { method: 'POST', query: { action: 'create' }, body: input });
+export async function createCampaign(input: CreateCampaignInput, role = 'unauthenticated'): Promise<CampaignWithStats> {
+  return request<CampaignWithStats>('/campaigns', {
+    method: 'POST',
+    query: { action: 'create' },
+    body: input,
+    headers: roleHeaders(role),
+  });
 }
 
-export async function importCampaignTargets(id: string, rows: ImportTargetRow[]): Promise<ImportTargetsResult> {
+export async function importCampaignTargets(
+  id: string,
+  rows: ImportTargetRow[],
+  role = 'unauthenticated',
+): Promise<ImportTargetsResult> {
   return request<ImportTargetsResult>('/campaigns', {
     method: 'POST',
     query: { action: 'importTargets', id },
     body: { rows },
+    headers: roleHeaders(role),
   });
 }
 
 export async function setCampaignInputMappings(
   id: string,
   mappings: NewCampaignAgentInputMappingInput[],
+  role = 'unauthenticated',
 ): Promise<CampaignAgentInputMapping[]> {
-  return request('/campaigns', { method: 'POST', query: { action: 'setInputMappings', id }, body: { mappings } });
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'setInputMappings', id },
+    body: { mappings },
+    headers: roleHeaders(role),
+  });
 }
 
-export async function startCampaign(id: string): Promise<CampaignWithStats> {
-  return request<CampaignWithStats>('/campaigns', { method: 'POST', query: { action: 'start', id } });
+export async function startCampaign(id: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
+  return request<CampaignWithStats>('/campaigns', {
+    method: 'POST',
+    query: { action: 'start', id },
+    headers: roleHeaders(role),
+  });
 }
 
-export async function pauseCampaign(id: string): Promise<CampaignWithStats> {
-  return request<CampaignWithStats>('/campaigns', { method: 'POST', query: { action: 'pause', id } });
+export async function pauseCampaign(id: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
+  return request<CampaignWithStats>('/campaigns', {
+    method: 'POST',
+    query: { action: 'pause', id },
+    headers: roleHeaders(role),
+  });
 }
 
-export async function resumeCampaign(id: string): Promise<CampaignWithStats> {
-  return request<CampaignWithStats>('/campaigns', { method: 'POST', query: { action: 'resume', id } });
+export async function resumeCampaign(id: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
+  return request<CampaignWithStats>('/campaigns', {
+    method: 'POST',
+    query: { action: 'resume', id },
+    headers: roleHeaders(role),
+  });
 }
 
-export async function stopCampaign(id: string): Promise<CampaignWithStats> {
-  return request<CampaignWithStats>('/campaigns', { method: 'POST', query: { action: 'stop', id } });
+export async function stopCampaign(id: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
+  return request<CampaignWithStats>('/campaigns', {
+    method: 'POST',
+    query: { action: 'stop', id },
+    headers: roleHeaders(role),
+  });
 }
 
-export async function retryTarget(targetId: string): Promise<{ targetId: string; status: string }> {
-  return request('/campaigns', { method: 'POST', query: { action: 'retryTarget', targetId } });
+export async function retryTarget(
+  targetId: string,
+  role = 'unauthenticated',
+): Promise<{ targetId: string; status: string }> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'retryTarget', targetId },
+    headers: roleHeaders(role),
+  });
 }
 
-export async function scheduleFollowup(input: {
-  targetId: string;
-  resultId?: string | null;
-  type: 'retry' | 'scheduled_contact' | 'move_to_campaign' | 'manual_review';
-  dueAt: string;
-  nextCampaignId?: string | null;
-  notes?: string | null;
-}): Promise<unknown> {
-  return request('/campaigns', { method: 'POST', query: { action: 'scheduleFollowup' }, body: input });
+export async function scheduleFollowup(
+  input: {
+    targetId: string;
+    resultId?: string | null;
+    type: 'retry' | 'scheduled_contact' | 'move_to_campaign' | 'manual_review';
+    dueAt: string;
+    nextCampaignId?: string | null;
+    notes?: string | null;
+  },
+  role = 'unauthenticated',
+): Promise<unknown> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'scheduleFollowup' },
+    body: input,
+    headers: roleHeaders(role),
+  });
 }
 

@@ -484,4 +484,11 @@ export const supabaseCampaignRepository: CampaignRepository = {
   async retryTarget(targetId, now) {
     return rpc('call_center_campaign_retry_target', { p_target_id: targetId, p_now: now });
   },
+
+  async getTargetContext(targetId) {
+    return rpc<{ targetId: string; campaignId: string; agentId: string } | null>(
+      'call_center_campaign_get_target_context',
+      { p_target_id: targetId },
+    );
+  },
 };

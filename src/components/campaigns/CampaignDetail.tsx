@@ -154,12 +154,20 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           </CardHeader>
           <CardContent>
             <div className="text-sm text-muted-foreground">{campaign.agentName ?? campaign.agentId}</div>
+            <div className="text-xs text-muted-foreground font-mono">{campaign.agentId}</div>
             {campaign.agentContractSnapshot && (
-              <div className="text-xs text-muted-foreground">
-                Contract: {campaign.agentContractSnapshot.contractSource} / {campaign.agentContractSnapshot.contractCompleteness}
+              <div className="text-xs text-muted-foreground mt-1">
+                Contract: {campaign.agentContractSnapshot.contractCompleteness === 'complete' ? 'Complete' : 'Partial / Legacy'}
+                {campaign.agentContractSnapshot.contractCompleteness !== 'complete' && (
+                  <span className="block">
+                    Expected input, outcome, and output field metadata are not currently exposed by Call Centre for
+                    this agent. This is a Call Centre capability state, not an application error — the campaign
+                    uses the existing legacy Trigger Call contract.
+                  </span>
+                )}
               </div>
             )}
-            <div className="text-xs text-muted-foreground">Created {formatTimestamp(campaign.createdAt)}</div>
+            <div className="text-xs text-muted-foreground mt-1">Created {formatTimestamp(campaign.createdAt)}</div>
           </CardContent>
         </Card>
       </div>
@@ -178,6 +186,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                   <th className="text-left py-2 font-medium text-slate-700">Status</th>
                   <th className="text-left py-2 font-medium text-slate-700">Campaign Result</th>
                   <th className="text-left py-2 font-medium text-slate-700">Next Action</th>
+                  <th className="text-left py-2 font-medium text-slate-700">Follow-up Due</th>
                   <th className="text-left py-2 font-medium text-slate-700">Attempts</th>
                   <th className="text-center py-2 font-medium text-slate-700">Actions</th>
                 </tr>
@@ -200,6 +209,11 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                       )}
                     </td>
                     <td className="py-2 text-slate-600">{target.resultNextAction ?? '-'}</td>
+                    <td className="py-2 text-slate-600">
+                      {target.status === 'follow_up_due' && target.nextActionAt
+                        ? formatTimestamp(target.nextActionAt)
+                        : '—'}
+                    </td>
                     <td className="py-2 text-slate-600">{target.attemptCount}</td>
                     <td className="py-2 text-center">
                       <div className="flex justify-center gap-1">
@@ -230,7 +244,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                 ))}
                 {targets.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500">
+                    <td colSpan={8} className="py-8 text-center text-slate-500">
                       No targets imported yet.
                     </td>
                   </tr>

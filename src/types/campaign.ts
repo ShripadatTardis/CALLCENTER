@@ -161,6 +161,8 @@ export interface CampaignTargetRow {
 export interface CampaignListResponse {
   data: CampaignWithStats[];
   pagination: { page: number; pageSize: number; totalCount: number };
+  /** Session 9.2 — true when the server filtered rows to the caller's authorized categories (same convention as Call Logs, see src/services/calls/callsService.ts). */
+  scoped?: boolean;
 }
 
 export interface CampaignTargetsResponse {

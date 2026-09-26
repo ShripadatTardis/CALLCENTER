@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Upload } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { parseTargetsCsv, useImportTargets } from '@/hooks/campaigns/useImportTargets';
@@ -38,6 +39,8 @@ const STEPS = [
  */
 const CreateCampaign: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
   const [step, setStep] = useState(0);
 
   const [name, setName] = useState('');
@@ -46,7 +49,6 @@ const CreateCampaign: React.FC = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvRows, setCsvRows] = useState<ImportTargetRow[]>([]);
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
-  const [scheduledStartAt, setScheduledStartAt] = useState('');
   const [rules, setRules] = useState<NewResultRuleInput[]>(defaultResultRules());
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -97,11 +99,11 @@ const CreateCampaign: React.FC = () => {
       });
 
       if (csvRows.length > 0) {
-        await importCampaignTargets(campaign.id, csvRows);
+        await importCampaignTargets(campaign.id, csvRows, role);
       }
 
       if (launchImmediately) {
-        await startCampaign(campaign.id);
+        await startCampaign(campaign.id, role);
       }
 
       navigate('/outbound-campaigns');
@@ -278,11 +280,15 @@ const CreateCampaign: React.FC = () => {
 
             {step === 5 && (
               <div className="space-y-2">
-                <Label htmlFor="scheduled-start">Scheduled Start (optional)</Label>
-                <Input id="scheduled-start" type="datetime-local" value={scheduledStartAt} onChange={(e) => setScheduledStartAt(e.target.value)} />
+                <Label>Execution</Label>
+                <p className="text-sm text-muted-foreground">
+                  There is no automatic campaign scheduler yet — a campaign starts only when explicitly launched
+                  below or started later from Campaign Detail. Save as a draft to configure now and start manually
+                  when ready.
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Leave blank to launch immediately, or save as a draft and start manually later. Retry/callback scheduling
-                  is handled automatically via the result rules below.
+                  Retry/callback scheduling for individual targets is handled automatically via the result rules
+                  below once a campaign is running.
                 </p>
               </div>
             )}

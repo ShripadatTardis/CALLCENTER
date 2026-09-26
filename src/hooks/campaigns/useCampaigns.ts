@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { fetchCampaigns } from '@/services/campaigns/campaignsService';
 
 export const campaignsKeys = {
@@ -10,10 +11,18 @@ export const campaignsKeys = {
   targets: (id: string) => [...campaignsKeys.all, 'targets', id] as const,
 };
 
-/** Live campaign list — replaces industryCampaignGenerator.ts (plan §1/§25). */
+/**
+ * Live campaign list — replaces industryCampaignGenerator.ts (plan §1/§25).
+ * Session 9.2: sends the current session's role so the server can apply
+ * the same category authorization Call Logs/Chat Logs already have (see
+ * api/campaigns.ts) — included in the query key so switching role never
+ * serves another role's cached page.
+ */
 export function useCampaigns(opts: { page?: number; pageSize?: number } = {}) {
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
   return useQuery({
-    queryKey: campaignsKeys.list(opts.page, opts.pageSize),
-    queryFn: () => fetchCampaigns(opts),
+    queryKey: [...campaignsKeys.list(opts.page, opts.pageSize), role],
+    queryFn: () => fetchCampaigns(opts, role),
   });
 }

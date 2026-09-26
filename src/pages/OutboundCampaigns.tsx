@@ -102,6 +102,12 @@ const OutboundCampaigns: React.FC = () => {
             <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={campaigns.length > 0} isFetching={isFetching} />
           )}
 
+          {data?.scoped && (
+            <p className="text-xs text-muted-foreground">
+              Showing campaigns for your authorized categories only.
+            </p>
+          )}
+
           <CampaignOverviewStats campaigns={campaigns} />
 
           <CampaignFilters

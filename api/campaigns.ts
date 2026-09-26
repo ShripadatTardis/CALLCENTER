@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore } from './_voicebot.js';
-import { requireAdminToken, readIntQuery } from './_customer360.js';
+import { requireAdminToken, readIntQuery, resolveAccessForRequest } from './_customer360.js';
+import type { AuthorizedAccess } from '../src/server/customer360/authorizationService.js';
 import { supabaseCampaignRepository } from '../src/server/campaigns/supabaseCampaignRepository.js';
 import { runCampaignBatch, voiceAgentCallBackend } from '../src/server/campaigns/campaignRunner.js';
 import { reconcilePendingExecutions } from '../src/server/campaigns/reconcileExecutions.js';
@@ -8,6 +9,7 @@ import { defaultResultRules } from '../src/server/campaigns/resultRules.js';
 import type {
   CallAgentContract,
   CampaignStatus,
+  CampaignWithStats,
   InputMappingSourceType,
   NewCampaignAgentInputMappingInput,
   NewTargetRow,
@@ -29,6 +31,14 @@ import type {
  *   POST /api/campaigns?action=scheduleFollowup
  *   POST /api/campaigns?action=runBatch      [admin-gated]
  *   POST /api/campaigns?action=reconcile     [admin-gated]
+ *
+ * Session 9.2: applies the SAME category/role authorization already
+ * proven for Call Logs/Chat Logs (Session 6.2) — a campaign's own
+ * `agent_id` plays the identical role a call/chat's `agent_id` already
+ * plays for `resolveAccessForRequest`. Read actions are filtered/404'd,
+ * management actions are 403/404'd, admin/internal actions (runBatch,
+ * reconcile) keep their existing, stronger, separate admin-token gate —
+ * unchanged and never weakened by this.
  */
 
 const repo = supabaseCampaignRepository;
@@ -38,14 +48,38 @@ function queryStr(req: VercelRequest, key: string): string | undefined {
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
-async function handleList(req: VercelRequest, res: VercelResponse): Promise<void> {
+function isAgentAuthorized(access: AuthorizedAccess, agentId: string): boolean {
+  return access.allCategories || access.authorizedAgentIds === 'all' || access.authorizedAgentIds.includes(agentId);
+}
+
+/** 404, not 403, for a resource that exists but isn't authorized — same "don't confirm existence" precedent Chat Session Detail already established (Session 6.2). */
+function notFound(res: VercelResponse): void {
+  res.status(404).json({ detail: 'Campaign not found' });
+}
+
+async function handleList(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const page = readIntQuery(req, 'page', 1);
   const pageSize = readIntQuery(req, 'pageSize', 25);
   const { rows, totalCount } = await repo.listCampaigns(page, pageSize);
-  res.status(200).json({ data: rows, pagination: { page, pageSize, totalCount } });
+
+  if (access.allCategories || access.authorizedAgentIds === 'all') {
+    res.status(200).json({ data: rows, pagination: { page, pageSize, totalCount } });
+    return;
+  }
+
+  const authorized = new Set(access.authorizedAgentIds);
+  const scopedRows: CampaignWithStats[] = rows.filter((c) => authorized.has(c.agentId));
+  // Honest page-scoped total, exactly the same limitation calls/data.ts
+  // already documents — no authorized-aggregate RPC exists for campaigns
+  // (plan Phase A/§17), so this counts only the current fetched page.
+  res.status(200).json({
+    data: scopedRows,
+    pagination: { page, pageSize, totalCount: scopedRows.length },
+    scoped: true,
+  });
 }
 
-async function handleGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleGet(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const id = queryStr(req, 'id');
   if (!id) {
     res.status(400).json({ detail: 'id is required' });
@@ -53,16 +87,25 @@ async function handleGet(req: VercelRequest, res: VercelResponse): Promise<void>
   }
   const campaign = await repo.getCampaign(id);
   if (!campaign) {
-    res.status(404).json({ detail: 'Campaign not found' });
+    notFound(res);
+    return;
+  }
+  if (!isAgentAuthorized(access, campaign.agentId)) {
+    notFound(res);
     return;
   }
   res.status(200).json(campaign);
 }
 
-async function handleListTargets(req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleListTargets(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const id = queryStr(req, 'id');
   if (!id) {
     res.status(400).json({ detail: 'id is required' });
+    return;
+  }
+  const campaign = await repo.getCampaign(id);
+  if (!campaign || !isAgentAuthorized(access, campaign.agentId)) {
+    notFound(res);
     return;
   }
   const page = readIntQuery(req, 'page', 1);
@@ -100,10 +143,14 @@ interface CreateCampaignBody {
   }>;
 }
 
-async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleCreate(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const body = req.body as CreateCampaignBody | undefined;
   if (!body?.name || !body?.agentId) {
     res.status(400).json({ detail: 'name and agentId are required' });
+    return;
+  }
+  if (!isAgentAuthorized(access, body.agentId)) {
+    res.status(403).json({ detail: 'Not authorized to create a campaign for this agent' });
     return;
   }
   const now = new Date().toISOString();
@@ -139,42 +186,69 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
   res.status(201).json(campaign);
 }
 
-async function handleSetInputMappings(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const id = queryStr(req, 'id');
+/** Shared "fetch campaign, check authorization, 404 if either fails" guard for every id-scoped management action. */
+async function requireAuthorizedCampaign(
+  id: string | undefined,
+  res: VercelResponse,
+  access: AuthorizedAccess,
+): Promise<string | null> {
+  if (!id) {
+    res.status(400).json({ detail: 'id is required' });
+    return null;
+  }
+  const campaign = await repo.getCampaign(id);
+  if (!campaign || !isAgentAuthorized(access, campaign.agentId)) {
+    notFound(res);
+    return null;
+  }
+  return id;
+}
+
+async function handleSetInputMappings(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
   const mappings = (req.body as { mappings?: NewCampaignAgentInputMappingInput[] } | undefined)?.mappings;
-  if (!id || !mappings || !Array.isArray(mappings)) {
-    res.status(400).json({ detail: 'id (query) and mappings (body) are required' });
+  if (!mappings || !Array.isArray(mappings)) {
+    res.status(400).json({ detail: 'mappings (body) is required' });
     return;
   }
   const result = await repo.setInputMappings(id, mappings);
   res.status(200).json(result);
 }
 
-async function handleImportTargets(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const id = queryStr(req, 'id');
+async function handleImportTargets(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
   const rows = (req.body as { rows?: NewTargetRow[] } | undefined)?.rows;
-  if (!id || !rows || !Array.isArray(rows)) {
-    res.status(400).json({ detail: 'id (query) and rows (body) are required' });
+  if (!rows || !Array.isArray(rows)) {
+    res.status(400).json({ detail: 'rows (body) is required' });
     return;
   }
   const result = await repo.importTargets(id, rows, new Date().toISOString());
   res.status(200).json(result);
 }
 
-async function handleStatusTransition(req: VercelRequest, res: VercelResponse, status: string): Promise<void> {
-  const id = queryStr(req, 'id');
-  if (!id) {
-    res.status(400).json({ detail: 'id is required' });
-    return;
-  }
+async function handleStatusTransition(
+  req: VercelRequest,
+  res: VercelResponse,
+  access: AuthorizedAccess,
+  status: string,
+): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
   const campaign = await repo.updateCampaignStatus(id, status as CampaignStatus, new Date().toISOString());
   res.status(200).json(campaign);
 }
 
-async function handleRetryTarget(req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleRetryTarget(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const targetId = queryStr(req, 'targetId');
   if (!targetId) {
     res.status(400).json({ detail: 'targetId is required' });
+    return;
+  }
+  const context = await repo.getTargetContext(targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
     return;
   }
   const result = await repo.retryTarget(targetId, new Date().toISOString());
@@ -190,10 +264,15 @@ interface ScheduleFollowupBody {
   notes?: string | null;
 }
 
-async function handleScheduleFollowup(req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleScheduleFollowup(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const body = req.body as ScheduleFollowupBody | undefined;
   if (!body?.targetId || !body?.type || !body?.dueAt) {
     res.status(400).json({ detail: 'targetId, type, and dueAt are required' });
+    return;
+  }
+  const context = await repo.getTargetContext(body.targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
     return;
   }
   const followup = await repo.createFollowup({
@@ -244,42 +323,48 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
+  // Admin/internal actions (runBatch, reconcile) keep their existing,
+  // stronger, separate admin-token gate and never resolve a per-role
+  // category access — they operate across every campaign by design,
+  // exactly like Customer 360's backfill/reconcile jobs.
+  const access = ADMIN_ACTIONS.has(action) ? null : await resolveAccessForRequest(req);
+
   switch (action) {
     case 'list':
-      await handleList(req, res);
+      await handleList(req, res, access as AuthorizedAccess);
       return;
     case 'get':
-      await handleGet(req, res);
+      await handleGet(req, res, access as AuthorizedAccess);
       return;
     case 'listTargets':
-      await handleListTargets(req, res);
+      await handleListTargets(req, res, access as AuthorizedAccess);
       return;
     case 'create':
-      await handleCreate(req, res);
+      await handleCreate(req, res, access as AuthorizedAccess);
       return;
     case 'importTargets':
-      await handleImportTargets(req, res);
+      await handleImportTargets(req, res, access as AuthorizedAccess);
       return;
     case 'setInputMappings':
-      await handleSetInputMappings(req, res);
+      await handleSetInputMappings(req, res, access as AuthorizedAccess);
       return;
     case 'start':
-      await handleStatusTransition(req, res, 'running');
+      await handleStatusTransition(req, res, access as AuthorizedAccess, 'running');
       return;
     case 'pause':
-      await handleStatusTransition(req, res, 'paused');
+      await handleStatusTransition(req, res, access as AuthorizedAccess, 'paused');
       return;
     case 'resume':
-      await handleStatusTransition(req, res, 'running');
+      await handleStatusTransition(req, res, access as AuthorizedAccess, 'running');
       return;
     case 'stop':
-      await handleStatusTransition(req, res, 'stopped');
+      await handleStatusTransition(req, res, access as AuthorizedAccess, 'stopped');
       return;
     case 'retryTarget':
-      await handleRetryTarget(req, res);
+      await handleRetryTarget(req, res, access as AuthorizedAccess);
       return;
     case 'scheduleFollowup':
-      await handleScheduleFollowup(req, res);
+      await handleScheduleFollowup(req, res, access as AuthorizedAccess);
       return;
     case 'runBatch':
       await handleRunBatch(req, res);

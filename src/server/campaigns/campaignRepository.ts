@@ -88,4 +88,12 @@ export interface CampaignRepository {
   }): Promise<CampaignFollowup>;
 
   retryTarget(targetId: string, now: string): Promise<{ targetId: string; status: string }>;
+
+  /**
+   * Session 9.2 — the minimal lookup needed to authorize retryTarget/
+   * scheduleFollowup (which take only a campaign_target id) against the
+   * campaign's own agentId, without trusting a client-supplied
+   * campaignId. Returns null if the target doesn't exist.
+   */
+  getTargetContext(targetId: string): Promise<{ targetId: string; campaignId: string; agentId: string } | null>;
 }

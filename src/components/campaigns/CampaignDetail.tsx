@@ -153,7 +153,12 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             <CardTitle className="text-sm font-medium">Agent</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground">{campaign.agentId}</div>
+            <div className="text-sm text-muted-foreground">{campaign.agentName ?? campaign.agentId}</div>
+            {campaign.agentContractSnapshot && (
+              <div className="text-xs text-muted-foreground">
+                Contract: {campaign.agentContractSnapshot.contractSource} / {campaign.agentContractSnapshot.contractCompleteness}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">Created {formatTimestamp(campaign.createdAt)}</div>
           </CardContent>
         </Card>

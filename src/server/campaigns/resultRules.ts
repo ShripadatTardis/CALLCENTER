@@ -35,6 +35,12 @@ export function deriveCampaignResult(callData: CallDataEntryDto, rules: Campaign
       resultSource: 'rule_match',
       nextAction: null,
       nextActionType: null,
+      // Session 9.1 Phase 7 — filled in by the caller (reconcileExecutions.ts)
+      // from the campaign's own agent snapshot; this pure function never
+      // has campaign context, so it always defaults these to null.
+      agentId: null,
+      agentName: null,
+      structuredOutputs: null,
     };
   }
 
@@ -54,6 +60,9 @@ export function deriveCampaignResult(callData: CallDataEntryDto, rules: Campaign
     resultSource: 'rule_match',
     nextAction,
     nextActionType: match.nextActionType,
+    agentId: null,
+    agentName: null,
+    structuredOutputs: null,
   };
 }
 

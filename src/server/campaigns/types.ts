@@ -25,11 +25,99 @@ export type ReconciliationStatus = 'pending' | 'reconciled' | 'unresolved' | 'er
 
 export type NextActionType = 'retry' | 'follow_up' | 'close' | 'escalate' | 'move_campaign';
 
+/**
+ * Session 9.1 — VoiceForce Outbound Campaign Domain Build
+ * (docs/SESSION_9_1_OUTBOUND_CAMPAIGN_DOMAIN_BUILD.md,
+ * VOICEFORCE_OUTBOUND_CAMPAIGN_DESIGN_v2.docx).
+ *
+ * A Call Agent is defined and owned by Call Centre, identified by an
+ * immutable `agentId` — a material definition change means a NEW
+ * agentId, never an `agentVersion` field. `agentName` is human-readable
+ * only. VoiceForce (this app) selects a Call Agent and snapshots its
+ * contract; it never defines the agent, its prompt, or its expected
+ * outcomes.
+ */
+export type AgentContractSource = 'partner_api' | 'legacy';
+export type AgentContractCompleteness = 'complete' | 'partial';
+
+export interface AgentInputField {
+  fieldCode: string;
+  displayName: string;
+  dataType?: string;
+  required: boolean;
+  description?: string;
+  allowedValues?: string[];
+}
+
+export interface AgentOutcomeDefinition {
+  outcomeCode: string;
+  displayName: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface AgentOutputField {
+  fieldCode: string;
+  displayName: string;
+  dataType?: string;
+  description?: string;
+}
+
+/**
+ * Immutable snapshot of the selected Call Agent's contract, captured at
+ * campaign creation time so a later `/agents` response can never
+ * silently rewrite what a campaign was configured against.
+ *
+ * Today's live `/agents` endpoint (src/types/api/agents.ts) is a roster
+ * only — agent_id/display_name/persona_name/direction/language/
+ * is_default — with no expected-input/outcome/output metadata. Every
+ * contract built from it is therefore honestly `contractSource: 'legacy'`
+ * and `contractCompleteness: 'partial'`, with all three field arrays
+ * empty. Nothing here is invented to fill that gap.
+ */
+export interface CallAgentContract {
+  agentId: string;
+  agentName: string;
+  status?: string;
+  direction?: string;
+  description?: string;
+  expectedInputFields: AgentInputField[];
+  expectedOutcomes: AgentOutcomeDefinition[];
+  outputFields: AgentOutputField[];
+  contractSource: AgentContractSource;
+  contractCompleteness: AgentContractCompleteness;
+}
+
+/** The three source classes this build supports (plan Phase 4) — no generic CRM connector. */
+export type InputMappingSourceType = 'customer360' | 'csv' | 'campaign_field';
+
+export interface CampaignAgentInputMapping {
+  id: string;
+  campaignId: string;
+  agentInputFieldCode: string;
+  sourceType: InputMappingSourceType;
+  sourceField: string;
+  required: boolean;
+  dataType: string | null;
+}
+
+export type NewCampaignAgentInputMappingInput = Omit<CampaignAgentInputMapping, 'id' | 'campaignId'>;
+
+/** Deterministic (non-LLM) validation of one campaign's mapping against its agent contract. */
+export interface InputMappingValidationResult {
+  valid: boolean;
+  missingRequiredFieldCodes: string[];
+}
+
 export interface Campaign {
   id: string;
   name: string;
   description: string | null;
   agentId: string;
+  /** Human-readable snapshot only — never used for identity or correlation. */
+  agentName: string | null;
+  /** Immutable, captured at create time (Phase 2) — never re-derived from a live /agents call. */
+  agentContractSnapshot: CallAgentContract | null;
   status: CampaignStatus;
   createdBy: string | null;
   createdAt: string;
@@ -54,6 +142,7 @@ export interface CampaignWithStats extends Campaign {
 
 export interface CampaignDetail extends Campaign {
   rules: CampaignResultRule[];
+  mappings: CampaignAgentInputMapping[];
   stats: CampaignStats;
 }
 
@@ -105,6 +194,13 @@ export interface CampaignExecution {
   triggeredAt: string | null;
   errorDetail: string | null;
   createdAt: string;
+  /**
+   * The deterministic Trigger Call payload actually sent for this
+   * execution (Session 9.1 Phase 3/5/7) — an audit/stability snapshot,
+   * not re-derived from current Customer 360 state. Null for executions
+   * created before this field existed.
+   */
+  requestPayloadSnapshot: Record<string, unknown> | null;
 }
 
 export interface PendingReconciliation extends CampaignExecution {
@@ -144,6 +240,10 @@ export interface CampaignResult {
   resultSource: 'rule_match' | 'manual';
   resultRecordedAt: string;
   nextAction: string | null;
+  /** Historical traceability (Session 9.1 Phase 7) — populated only when supplied, never fabricated. */
+  agentId: string | null;
+  agentName: string | null;
+  structuredOutputs: Record<string, unknown> | null;
 }
 
 /** The derived-result payload passed into update_reconciliation_status on a 'reconciled' transition (plan §10/§22). */
@@ -158,6 +258,15 @@ export interface DerivedCampaignResult {
   resultSource: 'rule_match' | 'manual';
   nextAction: string | null;
   nextActionType: NextActionType | null;
+  /**
+   * Session 9.1 Phase 7 additions — a plain copy of the campaign's own
+   * agent snapshot at reconciliation time (never an LLM-derived value,
+   * never fabricated when the agent contract has no structured outputs
+   * to offer, which is every campaign today since /agents is roster-only).
+   */
+  agentId: string | null;
+  agentName: string | null;
+  structuredOutputs: Record<string, unknown> | null;
 }
 
 export interface CampaignFollowup {

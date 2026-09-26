@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { CampaignRepository } from './campaignRepository.js';
 import type {
   Campaign,
+  CampaignAgentInputMapping,
   CampaignDetail,
   CampaignExecution,
   CampaignExecutionStatus,
@@ -12,6 +13,7 @@ import type {
   CampaignTargetRow,
   CampaignTargetStatus,
   CampaignWithStats,
+  InputMappingSourceType,
   ReconciliationStatus,
   RunnableTarget,
 } from './types.js';
@@ -56,6 +58,8 @@ interface CampaignRow {
   name: string;
   description: string | null;
   agent_id: string;
+  agent_name: string | null;
+  agent_contract_snapshot: Campaign['agentContractSnapshot'];
   status: CampaignStatus;
   created_by: string | null;
   created_at: string;
@@ -72,6 +76,8 @@ function mapCampaign(row: CampaignRow): Campaign {
     name: row.name,
     description: row.description,
     agentId: row.agent_id,
+    agentName: row.agent_name ?? null,
+    agentContractSnapshot: row.agent_contract_snapshot ?? null,
     status: row.status,
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -128,6 +134,28 @@ function mapRule(row: RuleRow): CampaignResultRule {
     nextActionType: row.next_action_type,
     nextActionDelayDays: row.next_action_delay_days,
     active: row.active,
+  };
+}
+
+interface MappingRow {
+  id: string;
+  campaign_id: string;
+  agent_input_field_code: string;
+  source_type: InputMappingSourceType;
+  source_field: string;
+  required: boolean;
+  data_type: string | null;
+}
+
+function mapMapping(row: MappingRow): CampaignAgentInputMapping {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    agentInputFieldCode: row.agent_input_field_code,
+    sourceType: row.source_type,
+    sourceField: row.source_field,
+    required: row.required,
+    dataType: row.data_type,
   };
 }
 
@@ -232,6 +260,7 @@ interface ExecutionRow {
   triggered_at: string | null;
   error_detail: string | null;
   created_at: string;
+  request_payload_snapshot: Record<string, unknown> | null;
 }
 
 function mapExecution(row: ExecutionRow): CampaignExecution {
@@ -248,6 +277,7 @@ function mapExecution(row: ExecutionRow): CampaignExecution {
     triggeredAt: row.triggered_at,
     errorDetail: row.error_detail,
     createdAt: row.created_at,
+    requestPayloadSnapshot: row.request_payload_snapshot ?? null,
   };
 }
 
@@ -282,7 +312,7 @@ function mapFollowup(row: {
 }
 
 export const supabaseCampaignRepository: CampaignRepository = {
-  async createCampaign({ name, description, agentId, createdBy, sourceMeta, now, rules }) {
+  async createCampaign({ name, description, agentId, createdBy, sourceMeta, now, rules, agentName, agentContractSnapshot, mappings }) {
     const row = await rpc<CampaignRow>('call_center_campaign_create', {
       p_name: name,
       p_description: description,
@@ -301,8 +331,31 @@ export const supabaseCampaignRepository: CampaignRepository = {
         nextActionDelayDays: r.nextActionDelayDays,
         active: r.active,
       })),
+      p_agent_name: agentName ?? null,
+      p_agent_contract_snapshot: agentContractSnapshot ?? null,
+      p_mappings: (mappings ?? []).map((m) => ({
+        agentInputFieldCode: m.agentInputFieldCode,
+        sourceType: m.sourceType,
+        sourceField: m.sourceField,
+        required: m.required,
+        dataType: m.dataType,
+      })),
     });
     return mapCampaign(row);
+  },
+
+  async setInputMappings(campaignId, mappings) {
+    const rows = await rpc<MappingRow[]>('call_center_campaign_set_input_mappings', {
+      p_campaign_id: campaignId,
+      p_mappings: mappings.map((m) => ({
+        agentInputFieldCode: m.agentInputFieldCode,
+        sourceType: m.sourceType,
+        sourceField: m.sourceField,
+        required: m.required,
+        dataType: m.dataType,
+      })),
+    });
+    return (rows ?? []).map(mapMapping);
   },
 
   async listCampaigns(page, pageSize) {
@@ -318,13 +371,15 @@ export const supabaseCampaignRepository: CampaignRepository = {
   },
 
   async getCampaign(id) {
-    const result = await rpc<(CampaignRow & { rules: RuleRow[]; stats: StatsRow }) | null>('call_center_campaign_get', {
-      p_id: id,
-    });
+    const result = await rpc<(CampaignRow & { rules: RuleRow[]; mappings: MappingRow[]; stats: StatsRow }) | null>(
+      'call_center_campaign_get',
+      { p_id: id },
+    );
     if (!result) return null;
     const detail: CampaignDetail = {
       ...mapCampaign(result),
       rules: (result.rules ?? []).map(mapRule),
+      mappings: (result.mappings ?? []).map(mapMapping),
       stats: mapStats(result.stats),
     };
     return detail;
@@ -357,8 +412,12 @@ export const supabaseCampaignRepository: CampaignRepository = {
     return (rows ?? []).map(mapRunnableTarget);
   },
 
-  async createExecution(targetId, now) {
-    const row = await rpc<ExecutionRow>('call_center_campaign_create_execution', { p_target_id: targetId, p_now: now });
+  async createExecution(targetId, now, requestPayloadSnapshot) {
+    const row = await rpc<ExecutionRow>('call_center_campaign_create_execution', {
+      p_target_id: targetId,
+      p_now: now,
+      p_request_payload_snapshot: requestPayloadSnapshot ?? null,
+    });
     return mapExecution(row);
   },
 
@@ -393,6 +452,9 @@ export const supabaseCampaignRepository: CampaignRepository = {
           resultSource: result.resultSource,
           nextAction: result.nextAction,
           nextActionType: result.nextActionType,
+          agentId: result.agentId,
+          agentName: result.agentName,
+          structuredOutputs: result.structuredOutputs,
         }
       : null;
     const outcome = await rpc<{ targetId: string; resultId: string | null }>('call_center_campaign_update_reconciliation_status', {

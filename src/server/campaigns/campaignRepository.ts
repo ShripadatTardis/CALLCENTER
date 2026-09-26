@@ -6,8 +6,11 @@ import type {
   CampaignStatus,
   CampaignTargetRow,
   CampaignWithStats,
+  CallAgentContract,
+  CampaignAgentInputMapping,
   DerivedCampaignResult,
   ImportTargetsResult,
+  NewCampaignAgentInputMappingInput,
   NewCampaignResultRuleInput,
   NewTargetRow,
   PendingReconciliation,
@@ -31,7 +34,12 @@ export interface CampaignRepository {
     sourceMeta: Record<string, unknown> | null;
     now: string;
     rules: NewCampaignResultRuleInput[];
+    agentName?: string | null;
+    agentContractSnapshot?: CallAgentContract | null;
+    mappings?: NewCampaignAgentInputMappingInput[];
   }): Promise<Campaign>;
+
+  setInputMappings(campaignId: string, mappings: NewCampaignAgentInputMappingInput[]): Promise<CampaignAgentInputMapping[]>;
 
   listCampaigns(page: number, pageSize: number): Promise<{ rows: CampaignWithStats[]; totalCount: number }>;
 
@@ -45,7 +53,7 @@ export interface CampaignRepository {
 
   selectRunnableTargets(batchSize: number): Promise<RunnableTarget[]>;
 
-  createExecution(targetId: string, now: string): Promise<CampaignExecution>;
+  createExecution(targetId: string, now: string, requestPayloadSnapshot?: Record<string, unknown> | null): Promise<CampaignExecution>;
 
   markExecutionTriggered(executionId: string, callSid: string, now: string): Promise<void>;
 

@@ -5,7 +5,14 @@ import { supabaseCampaignRepository } from '../src/server/campaigns/supabaseCamp
 import { runCampaignBatch, voiceAgentCallBackend } from '../src/server/campaigns/campaignRunner.js';
 import { reconcilePendingExecutions } from '../src/server/campaigns/reconcileExecutions.js';
 import { defaultResultRules } from '../src/server/campaigns/resultRules.js';
-import type { CampaignStatus, NewTargetRow, NextActionType } from '../src/server/campaigns/types.js';
+import type {
+  CallAgentContract,
+  CampaignStatus,
+  InputMappingSourceType,
+  NewCampaignAgentInputMappingInput,
+  NewTargetRow,
+  NextActionType,
+} from '../src/server/campaigns/types.js';
 
 /**
  * One consolidated route for every Campaign operation, dispatched by
@@ -81,6 +88,16 @@ interface CreateCampaignBody {
     nextActionDelayDays?: number | null;
     active?: boolean;
   }>;
+  /** Session 9.1 — immutable Agent Contract snapshot, captured at create time. */
+  agentName?: string;
+  agentContractSnapshot?: CallAgentContract;
+  mappings?: Array<{
+    agentInputFieldCode: string;
+    sourceType: InputMappingSourceType;
+    sourceField: string;
+    required?: boolean;
+    dataType?: string | null;
+  }>;
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -109,8 +126,28 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     sourceMeta: body.sourceMeta ?? null,
     now,
     rules,
+    agentName: body.agentName ?? null,
+    agentContractSnapshot: body.agentContractSnapshot ?? null,
+    mappings: (body.mappings ?? []).map((m) => ({
+      agentInputFieldCode: m.agentInputFieldCode,
+      sourceType: m.sourceType,
+      sourceField: m.sourceField,
+      required: m.required ?? false,
+      dataType: m.dataType ?? null,
+    })),
   });
   res.status(201).json(campaign);
+}
+
+async function handleSetInputMappings(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const id = queryStr(req, 'id');
+  const mappings = (req.body as { mappings?: NewCampaignAgentInputMappingInput[] } | undefined)?.mappings;
+  if (!id || !mappings || !Array.isArray(mappings)) {
+    res.status(400).json({ detail: 'id (query) and mappings (body) are required' });
+    return;
+  }
+  const result = await repo.setInputMappings(id, mappings);
+  res.status(200).json(result);
 }
 
 async function handleImportTargets(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -223,6 +260,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'importTargets':
       await handleImportTargets(req, res);
       return;
+    case 'setInputMappings':
+      await handleSetInputMappings(req, res);
+      return;
     case 'start':
       await handleStatusTransition(req, res, 'running');
       return;
@@ -250,7 +290,7 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     default:
       res.status(400).json({
         detail:
-          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, or reconcile',
+          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, or reconcile',
       });
   }
 });

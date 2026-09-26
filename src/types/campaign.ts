@@ -21,6 +21,71 @@ export type CampaignExecutionStatus = 'queued' | 'triggering' | 'triggered' | 'f
 export type ReconciliationStatus = 'pending' | 'reconciled' | 'unresolved' | 'error';
 export type NextActionType = 'retry' | 'follow_up' | 'close' | 'escalate' | 'move_campaign';
 
+/**
+ * Session 9.1 — VoiceForce Outbound Campaign Domain Build. Mirrors
+ * src/server/campaigns/types.ts's Agent Contract model (no shared
+ * import across the client/server boundary, same convention as every
+ * other domain in this project — see src/types/customer.ts).
+ */
+export type AgentContractSource = 'partner_api' | 'legacy';
+export type AgentContractCompleteness = 'complete' | 'partial';
+
+export interface AgentInputField {
+  fieldCode: string;
+  displayName: string;
+  dataType?: string;
+  required: boolean;
+  description?: string;
+  allowedValues?: string[];
+}
+
+export interface AgentOutcomeDefinition {
+  outcomeCode: string;
+  displayName: string;
+  description?: string;
+  active?: boolean;
+}
+
+export interface AgentOutputField {
+  fieldCode: string;
+  displayName: string;
+  dataType?: string;
+  description?: string;
+}
+
+export interface CallAgentContract {
+  agentId: string;
+  agentName: string;
+  status?: string;
+  direction?: string;
+  description?: string;
+  expectedInputFields: AgentInputField[];
+  expectedOutcomes: AgentOutcomeDefinition[];
+  outputFields: AgentOutputField[];
+  contractSource: AgentContractSource;
+  contractCompleteness: AgentContractCompleteness;
+}
+
+export type InputMappingSourceType = 'customer360' | 'csv' | 'campaign_field';
+
+export interface CampaignAgentInputMapping {
+  id: string;
+  campaignId: string;
+  agentInputFieldCode: string;
+  sourceType: InputMappingSourceType;
+  sourceField: string;
+  required: boolean;
+  dataType: string | null;
+}
+
+export interface NewCampaignAgentInputMappingInput {
+  agentInputFieldCode: string;
+  sourceType: InputMappingSourceType;
+  sourceField: string;
+  required?: boolean;
+  dataType?: string | null;
+}
+
 export interface CampaignStats {
   targetCount: number;
   triggeredCount: number;
@@ -33,6 +98,8 @@ export interface Campaign {
   name: string;
   description: string | null;
   agentId: string;
+  agentName: string | null;
+  agentContractSnapshot: CallAgentContract | null;
   status: CampaignStatus;
   createdBy: string | null;
   createdAt: string;
@@ -63,6 +130,7 @@ export interface CampaignResultRule {
 
 export interface CampaignDetail extends Campaign {
   rules: CampaignResultRule[];
+  mappings: CampaignAgentInputMapping[];
   stats: CampaignStats;
 }
 
@@ -119,6 +187,9 @@ export interface CreateCampaignInput {
   createdBy?: string;
   sourceMeta?: Record<string, unknown>;
   rules?: NewResultRuleInput[];
+  agentName?: string;
+  agentContractSnapshot?: CallAgentContract;
+  mappings?: NewCampaignAgentInputMappingInput[];
 }
 
 export interface ImportTargetRow {

@@ -1,5 +1,6 @@
 import { request } from '@/services/transport/httpClient';
 import type {
+  CampaignAgentInputMapping,
   CampaignDetail,
   CampaignListResponse,
   CampaignTargetsResponse,
@@ -7,6 +8,7 @@ import type {
   CreateCampaignInput,
   ImportTargetRow,
   ImportTargetsResult,
+  NewCampaignAgentInputMappingInput,
 } from '@/types/campaign';
 
 /**
@@ -54,6 +56,13 @@ export async function importCampaignTargets(id: string, rows: ImportTargetRow[])
     query: { action: 'importTargets', id },
     body: { rows },
   });
+}
+
+export async function setCampaignInputMappings(
+  id: string,
+  mappings: NewCampaignAgentInputMappingInput[],
+): Promise<CampaignAgentInputMapping[]> {
+  return request('/campaigns', { method: 'POST', query: { action: 'setInputMappings', id }, body: { mappings } });
 }
 
 export async function startCampaign(id: string): Promise<CampaignWithStats> {

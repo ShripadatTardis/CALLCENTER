@@ -98,14 +98,14 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
   const pending = await repo.listPendingReconciliations(limit);
   const now = Date.now();
 
-  const rulesByCampaign = new Map<string, CampaignResultRule[]>();
-  async function getRules(campaignId: string): Promise<CampaignResultRule[]> {
-    const cached = rulesByCampaign.get(campaignId);
+  const campaignByCampaign = new Map<string, { rules: CampaignResultRule[]; agentId: string | null; agentName: string | null }>();
+  async function getCampaignInfo(campaignId: string) {
+    const cached = campaignByCampaign.get(campaignId);
     if (cached) return cached;
     const campaign = await repo.getCampaign(campaignId);
-    const rules = campaign?.rules ?? [];
-    rulesByCampaign.set(campaignId, rules);
-    return rules;
+    const entry = { rules: campaign?.rules ?? [], agentId: campaign?.agentId ?? null, agentName: campaign?.agentName ?? null };
+    campaignByCampaign.set(campaignId, entry);
+    return entry;
   }
 
   let reconciled = 0;
@@ -128,8 +128,14 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
         : null;
 
       if (match) {
-        const rules = await getRules(execution.campaignId);
-        const derived = deriveCampaignResult(match, rules);
+        const { rules, agentId, agentName } = await getCampaignInfo(execution.campaignId);
+        const derivedBase = deriveCampaignResult(match, rules);
+        // Session 9.1 Phase 7 — a plain copy of the campaign's own agent
+        // snapshot, never an LLM-derived or fabricated value. No real
+        // structured-output field exists on today's call-data response
+        // (CallDataEntryDto), so this stays null until Call Centre
+        // exposes one (see docs/SESSION_9_1_OUTBOUND_CAMPAIGN_DOMAIN_BUILD.md).
+        const derived = { ...derivedBase, agentId, agentName, structuredOutputs: null };
         await repo.updateReconciliationStatus(execution.id, 'reconciled', match.call_id, candidate, new Date().toISOString(), derived);
         reconciled++;
         continue;

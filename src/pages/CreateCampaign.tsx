@@ -13,10 +13,20 @@ import { useAgents } from '@/hooks/agents/useAgents';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { parseTargetsCsv, useImportTargets } from '@/hooks/campaigns/useImportTargets';
 import { defaultResultRules } from '@/lib/defaultResultRules';
+import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import { importCampaignTargets, startCampaign } from '@/services/campaigns/campaignsService';
 import type { ImportTargetRow, NewResultRuleInput } from '@/types/campaign';
 
-const STEPS = ['Basic Info', 'Agent', 'Target Audience', 'Scheduling', 'Result Mapping', 'Review & Launch'] as const;
+const STEPS = [
+  'Basic Info',
+  'Agent',
+  'Agent Contract',
+  'Target Audience',
+  'Input Mapping',
+  'Scheduling',
+  'Result Mapping',
+  'Review & Launch',
+] as const;
 
 /**
  * Kept as the existing step-wizard shell (plan §13/§20), rewired to real
@@ -46,10 +56,16 @@ const CreateCampaign: React.FC = () => {
   const { create } = useCampaignActions();
   const importMutation = useImportTargets(undefined);
 
+  const selectedAgent = agents.find((a) => a.agentId === agentId);
+  const agentContract = selectedAgent ? buildAgentContractFromRoster(selectedAgent) : null;
+
   const canProceed = () => {
     if (step === 0) return name.trim().length > 0;
     if (step === 1) return agentId.length > 0;
-    if (step === 2) return csvRows.length > 0;
+    // step 2 = Agent Contract — informational only, always OK to proceed.
+    if (step === 3) return csvRows.length > 0;
+    // step 4 = Input Mapping — no required fields exist on today's
+    // partial/legacy contract, so nothing to block here yet either.
     return true;
   };
 
@@ -76,6 +92,8 @@ const CreateCampaign: React.FC = () => {
         agentId,
         rules,
         sourceMeta: csvFile ? { originalFilename: csvFile.name, rowCount: csvRows.length } : undefined,
+        agentName: selectedAgent?.displayName,
+        agentContractSnapshot: agentContract ?? undefined,
       });
 
       if (csvRows.length > 0) {
@@ -146,6 +164,52 @@ const CreateCampaign: React.FC = () => {
             )}
 
             {step === 2 && (
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  Immutable snapshot of the selected Call Agent's contract — captured now, so a later change to the
+                  agent's live roster entry never silently rewrites what this campaign was configured against.
+                </p>
+                {agentContract ? (
+                  <div className="border rounded p-3 space-y-2">
+                    <div>
+                      <span className="font-medium">Agent ID</span> — <code className="text-xs">{agentContract.agentId}</code>
+                    </div>
+                    <div>
+                      <span className="font-medium">Agent Name</span> — {agentContract.agentName}
+                    </div>
+                    <div>
+                      <span className="font-medium">Source</span> —{' '}
+                      <Badge variant="outline" className="text-xs">
+                        {agentContract.contractSource}
+                      </Badge>{' '}
+                      <Badge variant={agentContract.contractCompleteness === 'complete' ? 'default' : 'secondary'} className="text-xs">
+                        {agentContract.contractCompleteness}
+                      </Badge>
+                    </div>
+                    {agentContract.contractCompleteness === 'partial' && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                        Call Centre's Partner API does not yet expose expected input fields, expected outcomes, or
+                        structured output fields for this agent — only its roster identity. The campaign will run
+                        using today's legacy call fields (phone number, agent, and customer reference where known),
+                        not a full input-mapping contract. This is honest, not a bug.
+                      </p>
+                    )}
+                    <div>
+                      <span className="font-medium">Expected inputs</span> —{' '}
+                      {agentContract.expectedInputFields.length === 0 ? 'none discovered' : agentContract.expectedInputFields.length}
+                    </div>
+                    <div>
+                      <span className="font-medium">Expected outcomes</span> —{' '}
+                      {agentContract.expectedOutcomes.length === 0 ? 'none discovered' : agentContract.expectedOutcomes.length}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Select an agent first.</p>
+                )}
+              </div>
+            )}
+
+            {step === 3 && (
               <div className="space-y-3">
                 <Label>Target Audience (CSV)</Label>
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
@@ -194,7 +258,25 @@ const CreateCampaign: React.FC = () => {
               </div>
             )}
 
-            {step === 3 && (
+            {step === 4 && (
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  Maps the selected Call Agent's expected input fields to Customer 360 or CSV data. Campaign start is
+                  blocked if a required field is left unmapped — deterministically, never by an AI guess.
+                </p>
+                {agentContract && agentContract.expectedInputFields.length === 0 ? (
+                  <p className="text-xs text-muted-foreground bg-slate-50 border rounded p-2">
+                    Call Centre has not yet declared any expected input fields for this agent — there is nothing to
+                    map. The campaign will call each target using its phone number, the selected agent, and its
+                    Customer 360 reference where known, exactly as it does today.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Select an agent with a discovered contract first.</p>
+                )}
+              </div>
+            )}
+
+            {step === 5 && (
               <div className="space-y-2">
                 <Label htmlFor="scheduled-start">Scheduled Start (optional)</Label>
                 <Input id="scheduled-start" type="datetime-local" value={scheduledStartAt} onChange={(e) => setScheduledStartAt(e.target.value)} />
@@ -205,7 +287,7 @@ const CreateCampaign: React.FC = () => {
               </div>
             )}
 
-            {step === 4 && (
+            {step === 6 && (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Deterministic result rules — matched against the reconciled call's real outcome, never guessed by an AI.
@@ -276,7 +358,7 @@ const CreateCampaign: React.FC = () => {
               </div>
             )}
 
-            {step === 5 && (
+            {step === 7 && (
               <div className="space-y-2 text-sm">
                 <p>
                   <strong>Name:</strong> {name}

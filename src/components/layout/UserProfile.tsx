@@ -14,7 +14,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Settings, User } from 'lucide-react';
 
-export const UserProfile: React.FC = () => {
+interface UserProfileProps {
+  /** Icon-only avatar button for the compact rail — no name/role text. */
+  compact?: boolean;
+}
+
+export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -30,6 +35,46 @@ export const UserProfile: React.FC = () => {
     .map(n => n[0])
     .join('')
     .toUpperCase();
+
+  if (compact) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Account menu — ${user.name}, ${user.role}`}
+            title={`${user.name} (${user.role})`}
+            className="w-9 h-9 rounded-full flex items-center justify-center mt-1 mb-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarFallback className="bg-cyan-600 text-white text-xs">{initials}</AvatarFallback>
+            </Avatar>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="right" className="w-56">
+          <DropdownMenuLabel>
+            {user.name}
+            <span className="block text-xs font-normal text-muted-foreground">{user.role}</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <div className="p-4 border-t border-gray-700">

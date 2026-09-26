@@ -1,136 +1,190 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useIndustry } from '@/contexts/IndustryContext';
 import { UserProfile } from './UserProfile';
-import { IndustryIndicator } from './IndustryIndicator';
-import { Logo } from '@/components/ui/logo';
-import { ChevronDown } from 'lucide-react';
 import { PILLARS, findPillarForPath, type Pillar } from './pillarNav';
+import {
+  LayoutGrid,
+  Phone,
+  Workflow,
+  Puzzle,
+  Bot,
+  BarChart3,
+  ShieldCheck,
+  Menu,
+  X,
+} from 'lucide-react';
 
-const EXPANDED_STORAGE_KEY = 'callcenter.sidebar.expandedPillars';
-
-function loadExpandedState(): Record<string, boolean> {
-  try {
-    const raw = window.localStorage.getItem(EXPANDED_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveExpandedState(state: Record<string, boolean>) {
-  try {
-    window.localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // best-effort only; sidebar still works without persisted state
-  }
-}
+/**
+ * Session 10.1 production application shell — compact icon rail (~52px)
+ * with a temporary overlay for the full seven-pillar menu. Replaces the
+ * Session 7.2 permanently-expanded sidebar: the rail is the ONLY
+ * permanent navigation chrome, the overlay never resizes/pushes the
+ * workspace, and closes on outside-click, Escape, or item selection.
+ */
+const PILLAR_ICON: Record<string, React.ElementType> = {
+  observe: LayoutGrid,
+  control: Phone,
+  operationalize: Workflow,
+  integrate: Puzzle,
+  improve: Bot,
+  measure: BarChart3,
+  govern: ShieldCheck,
+};
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
+  const { industryConfig } = useIndustry();
   const activePillar = findPillarForPath(location.pathname);
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => loadExpandedState());
+  const [navOpen, setNavOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Whatever pillar contains the current route is always expanded, regardless
-  // of persisted/collapsed state, so the active page is never hidden.
-  useEffect(() => {
-    if (activePillar && !expanded[activePillar.key]) {
-      setExpanded((prev) => ({ ...prev, [activePillar.key]: true }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePillar?.key]);
-
-  const togglePillar = (key: string) => {
-    setExpanded((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      saveExpandedState(next);
-      return next;
-    });
-  };
-
-  const visiblePillars = PILLARS.map((pillar) => ({
+  const visiblePillars: Pillar[] = PILLARS.map((pillar) => ({
     ...pillar,
     items: pillar.items.filter((item) => !item.permission || hasPermission(user, item.permission)),
   })).filter((pillar) => pillar.items.length > 0);
 
+  // Escape-to-close + focus restoration to the trigger button.
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setNavOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    // Move focus into the overlay for keyboard users.
+    overlayRef.current?.querySelector<HTMLElement>('a, button')?.focus();
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [navOpen]);
+
+  const closeNav = () => {
+    setNavOpen(false);
+    toggleRef.current?.focus();
+  };
+
   return (
-    <div className="flex h-screen w-16 md:w-64 flex-col bg-gray-800 text-white shrink-0">
-      <div className="px-2 md:px-6 py-4 border-b border-gray-700">
-        <div className="flex items-center justify-center md:justify-start space-x-2 mb-3">
-          <Logo size="xl" className="h-10 md:h-16" />
-          <div className="hidden md:block">
-            <h1 className="text-lg font-semibold">TARDIS</h1>
-            <p className="text-xs text-gray-300">VoiceForce&reg;</p>
-          </div>
-        </div>
-        <div className="hidden md:flex justify-center">
-          <IndustryIndicator />
-        </div>
-      </div>
+    <div className="relative flex h-screen shrink-0">
+      {/* Permanent icon rail — ~52px, the only persistent navigation chrome. */}
+      <div className="flex flex-col items-center w-[52px] shrink-0 bg-slate-900 py-2 gap-1 border-r border-slate-800">
+        <button
+          ref={toggleRef}
+          type="button"
+          aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
+          aria-expanded={navOpen}
+          aria-controls="app-nav-overlay"
+          onClick={() => setNavOpen((v) => !v)}
+          className="w-9 h-9 rounded flex items-center justify-center text-white hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 mb-1"
+        >
+          <Menu size={18} aria-hidden="true" />
+        </button>
 
-      <nav className="flex-1 space-y-1 px-1 md:px-3 py-4 overflow-y-auto" aria-label="Product navigation">
-        {visiblePillars.map((pillar) => {
-          const isPillarActive = activePillar?.key === pillar.key;
-          const isExpanded = expanded[pillar.key] ?? false;
+        <div
+          className="w-8 h-8 rounded bg-cyan-600 flex items-center justify-center text-white text-[10px] font-bold mb-2"
+          title={`TARDIS VoiceForce — ${industryConfig.name}`}
+        >
+          TAR
+        </div>
 
-          return (
-            <div key={pillar.key} className="mb-1">
+        <nav className="flex flex-col items-center gap-1 flex-1 overflow-y-auto" aria-label="Product pillars">
+          {visiblePillars.map((pillar) => {
+            const Icon = PILLAR_ICON[pillar.key] ?? LayoutGrid;
+            const isActive = activePillar?.key === pillar.key;
+            return (
               <button
+                key={pillar.key}
                 type="button"
-                onClick={() => togglePillar(pillar.key)}
-                aria-expanded={isExpanded}
-                aria-controls={`pillar-${pillar.key}`}
-                title={pillar.blurb}
+                title={pillar.label}
+                aria-label={pillar.label}
+                onClick={() => setNavOpen(true)}
                 className={cn(
-                  'flex w-full items-center justify-center md:justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded-md transition-colors',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
-                  isPillarActive ? 'text-blue-300' : 'text-gray-400 hover:text-gray-200'
+                  'w-9 h-9 rounded flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
+                  isActive ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                 )}
               >
-                <span className="hidden md:inline">{pillar.label}</span>
-                <span className="md:hidden text-[10px]">{pillar.label.slice(0, 3)}</span>
-                <ChevronDown
-                  className={cn('hidden md:block h-3.5 w-3.5 transition-transform', isExpanded && 'rotate-180')}
-                  aria-hidden="true"
-                />
+                <Icon size={16} aria-hidden="true" />
               </button>
+            );
+          })}
+        </nav>
 
-              <div
-                id={`pillar-${pillar.key}`}
-                className={cn('space-y-1 overflow-hidden transition-all', isExpanded ? 'mt-1' : 'max-h-0 md:max-h-0')}
-                hidden={!isExpanded}
+        <UserProfile compact />
+      </div>
+
+      {/* Temporary overlay — absolutely positioned, never pushes the workspace. */}
+      {navOpen && (
+        <>
+          <button
+            aria-label="Close navigation overlay"
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={closeNav}
+          />
+          <div
+            id="app-nav-overlay"
+            ref={overlayRef}
+            role="dialog"
+            aria-label="Product navigation"
+            className="absolute left-[52px] top-0 h-full w-64 bg-slate-900 border-r border-slate-800 shadow-2xl z-50 flex flex-col text-slate-100"
+          >
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 shrink-0">
+              <div>
+                <div className="text-sm font-bold leading-tight">TARDIS VoiceForce</div>
+                <div className="text-[11px] text-slate-400">{industryConfig.name}</div>
+              </div>
+              <button
+                type="button"
+                aria-label="Close navigation"
+                onClick={closeNav}
+                className="p-1 rounded hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
               >
-                {pillar.items.map((item) => {
-                  const isActive =
-                    location.pathname === item.href ||
-                    (item.matchPrefix ? location.pathname.startsWith(item.matchPrefix) : false);
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      title={item.name}
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto py-1" aria-label="Product navigation, expanded">
+              {visiblePillars.map((pillar) => {
+                const isPillarActive = activePillar?.key === pillar.key;
+                return (
+                  <div key={pillar.key} className="px-3 py-1.5">
+                    <div
                       className={cn(
-                        'flex items-center justify-center md:justify-start px-3 py-2 text-sm font-medium rounded-md transition-colors',
-                        isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                        'text-[11px] font-semibold uppercase tracking-wide mb-0.5',
+                        isPillarActive ? 'text-cyan-400' : 'text-slate-400'
                       )}
                     >
-                      <item.icon className="h-5 w-5 md:mr-3" aria-hidden="true" />
-                      <span className="hidden md:inline">{item.name}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </nav>
-
-      <UserProfile />
+                      {pillar.label}
+                    </div>
+                    {pillar.items.map((item) => {
+                      const isActive =
+                        location.pathname === item.href ||
+                        (item.matchPrefix ? location.pathname.startsWith(item.matchPrefix) : false);
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          onClick={closeNav}
+                          className={cn(
+                            'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
+                            isActive ? 'bg-slate-800 text-cyan-300 font-medium' : 'text-slate-300'
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          {item.name}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+        </>
+      )}
     </div>
   );
 };

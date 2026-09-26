@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { CampaignStatusBadge } from './CampaignStatusBadge';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { useCallData } from '@/hooks/calls/useCallData';
@@ -39,7 +38,7 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => 
         <div className="bg-white rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
           Could not load full interaction detail for {interactionId} right now.
           <div className="mt-3">
-            <Button size="sm" variant="outline" onClick={onClose}>
+            <Button size="sm" variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={onClose}>
               Close
             </Button>
           </div>
@@ -86,26 +85,26 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={onBack} className="flex items-center space-x-2">
-            <span>← Back to Campaigns</span>
+    <div className="min-h-full bg-slate-950 p-4 space-y-3 text-slate-200">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" size="sm" onClick={onBack}>
+            ← Campaigns
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">{campaign.name}</h1>
-            <p className="text-slate-600">{campaign.description}</p>
+            <h1 className="text-base font-semibold text-white">{campaign.name}</h1>
+            {campaign.description && <p className="text-[12px] text-slate-400">{campaign.description}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <CampaignStatusBadge status={campaign.status} />
+          <CampaignStatusBadge status={campaign.status} dark />
           {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
             <Button size="sm" onClick={() => runAction(actions.start)} disabled={actions.start.isPending}>
               Start
             </Button>
           )}
           {campaign.status === 'running' && (
-            <Button size="sm" variant="outline" onClick={() => runAction(actions.pause)} disabled={actions.pause.isPending}>
+            <Button size="sm" variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => runAction(actions.pause)} disabled={actions.pause.isPending}>
               Pause
             </Button>
           )}
@@ -122,138 +121,132 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Targets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{campaign.stats.targetCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Calls Triggered</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{campaign.stats.triggeredCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{rate === null ? '—' : `${rate.toFixed(1)}%`}</div>
-            <div className="text-xs text-muted-foreground mt-1">{unclassified} unclassified / pending</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Agent</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">{campaign.agentName ?? campaign.agentId}</div>
-            <div className="text-xs text-muted-foreground font-mono">{campaign.agentId}</div>
-            {campaign.agentContractSnapshot && (
-              <div className="text-xs text-muted-foreground mt-1">
-                Contract: {campaign.agentContractSnapshot.contractCompleteness === 'complete' ? 'Complete' : 'Partial / Legacy'}
-                {campaign.agentContractSnapshot.contractCompleteness !== 'complete' && (
-                  <span className="block">
-                    Expected input, outcome, and output field metadata are not currently exposed by Call Centre for
-                    this agent. This is a Call Centre capability state, not an application error — the campaign
-                    uses the existing legacy Trigger Call contract.
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="text-xs text-muted-foreground mt-1">Created {formatTimestamp(campaign.createdAt)}</div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-slate-800 rounded-md bg-slate-900/40 text-[13px]">
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-semibold tabular-nums text-white">{campaign.stats.targetCount}</span>
+          <span className="text-slate-400 text-[11px]">targets</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-semibold tabular-nums text-white">{campaign.stats.triggeredCount}</span>
+          <span className="text-slate-400 text-[11px]">calls triggered</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-semibold tabular-nums text-white">{rate === null ? '—' : `${rate.toFixed(1)}%`}</span>
+          <span className="text-slate-400 text-[11px]">success rate</span>
+        </div>
+        {unclassified > 0 && (
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-semibold tabular-nums text-amber-400">{unclassified}</span>
+            <span className="text-slate-400 text-[11px]">unclassified / pending</span>
+          </div>
+        )}
+        <div className="h-4 w-px bg-slate-800" aria-hidden="true" />
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-slate-300">{campaign.agentName ?? campaign.agentId}</span>
+          <span className="text-slate-400 text-[11px] font-mono">{campaign.agentId}</span>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-slate-400 text-[11px]">Created {formatTimestamp(campaign.createdAt)}</span>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Targets ({targets.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 font-medium text-slate-700">Name</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Phone</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Status</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Campaign Result</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Next Action</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Follow-up Due</th>
-                  <th className="text-left py-2 font-medium text-slate-700">Attempts</th>
-                  <th className="text-center py-2 font-medium text-slate-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {targets.map((target) => (
-                  <tr key={target.id} className="border-b border-slate-100">
-                    <td className="py-2 text-slate-700">{target.customerDisplayName ?? '—'}</td>
-                    <td className="py-2 text-slate-600">{target.contactRawValue}</td>
-                    <td className="py-2">
-                      <Badge variant="outline">{target.status.replace('_', ' ')}</Badge>
-                    </td>
-                    <td className="py-2 text-slate-600">
-                      {target.effectiveResultId ? (
-                        <span className={target.resultIsSuccess === true ? 'text-green-700' : target.resultIsSuccess === false ? 'text-red-700' : ''}>
-                          {reconciliationLabel(target)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">{reconciliationLabel(target)}</span>
+      {campaign.agentContractSnapshot && campaign.agentContractSnapshot.contractCompleteness !== 'complete' && (
+        <p className="text-[12px] text-slate-400 px-3">
+          Agent contract: partial / legacy — expected input, outcome and output metadata are not currently exposed
+          by Call Centre for this agent. This is a Call Centre capability state, not an application error; the
+          campaign uses the existing legacy Trigger Call contract.
+        </p>
+      )}
+
+      <div>
+        <h2 className="text-[13px] font-semibold text-slate-300 mb-1.5 px-0.5">Targets ({targets.length})</h2>
+        <div className="overflow-x-auto border border-slate-800 rounded-md bg-slate-900/40">
+          <table className="w-full text-[13px] text-slate-200">
+            <thead>
+              <tr className="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-800">
+                <th className="text-left py-2 px-3 font-medium">Name</th>
+                <th className="text-left py-2 px-3 font-medium">Phone</th>
+                <th className="text-left py-2 px-3 font-medium">Status</th>
+                <th className="text-left py-2 px-3 font-medium">Campaign Result</th>
+                <th className="text-left py-2 px-3 font-medium">Next Action</th>
+                <th className="text-left py-2 px-3 font-medium">Follow-up Due</th>
+                <th className="text-right py-2 px-3 font-medium">Attempts</th>
+                <th className="text-center py-2 px-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {targets.map((target) => (
+                <tr key={target.id} className="border-b border-slate-800/60 last:border-b-0">
+                  <td className="py-2 px-3 text-slate-200">{target.customerDisplayName ?? '—'}</td>
+                  <td className="py-2 px-3 text-slate-400">{target.contactRawValue}</td>
+                  <td className="py-2 px-3">
+                    <Badge variant="outline" className="border-slate-700 text-slate-300">
+                      {target.status.replace('_', ' ')}
+                    </Badge>
+                  </td>
+                  <td className="py-2 px-3">
+                    {target.effectiveResultId ? (
+                      <span
+                        className={
+                          target.resultIsSuccess === true
+                            ? 'text-green-400'
+                            : target.resultIsSuccess === false
+                              ? 'text-red-400'
+                              : 'text-slate-400'
+                        }
+                      >
+                        {reconciliationLabel(target)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 inline-flex items-center gap-1">
+                        {target.latestReconciliationStatus === 'unresolved' && <AlertTriangle size={11} className="text-amber-400" aria-hidden="true" />}
+                        {reconciliationLabel(target)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 px-3 text-slate-400">{target.resultNextAction ?? '—'}</td>
+                  <td className="py-2 px-3 text-slate-400">
+                    {target.status === 'follow_up_due' && target.nextActionAt ? formatTimestamp(target.nextActionAt) : '—'}
+                  </td>
+                  <td className="py-2 px-3 text-right tabular-nums text-slate-400">{target.attemptCount}</td>
+                  <td className="py-2 px-3 text-center">
+                    <div className="flex justify-center gap-1">
+                      {target.latestReconciledInteractionId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-[11px] h-7"
+                          onClick={() => setOpenInteractionId(target.latestReconciledInteractionId)}
+                        >
+                          Transcript / Recording
+                        </Button>
                       )}
-                    </td>
-                    <td className="py-2 text-slate-600">{target.resultNextAction ?? '-'}</td>
-                    <td className="py-2 text-slate-600">
-                      {target.status === 'follow_up_due' && target.nextActionAt
-                        ? formatTimestamp(target.nextActionAt)
-                        : '—'}
-                    </td>
-                    <td className="py-2 text-slate-600">{target.attemptCount}</td>
-                    <td className="py-2 text-center">
-                      <div className="flex justify-center gap-1">
-                        {target.latestReconciledInteractionId && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            onClick={() => setOpenInteractionId(target.latestReconciledInteractionId)}
-                          >
-                            Transcript / Recording
-                          </Button>
-                        )}
-                        {(target.status === 'failed' || target.status === 'follow_up_due') && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            disabled={actions.retry.isPending}
-                            onClick={() => actions.retry.mutateAsync(target.id).then(onRefetch)}
-                          >
-                            Retry
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {targets.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">
-                      No targets imported yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                      {(target.status === 'failed' || target.status === 'follow_up_due') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-[11px] h-7"
+                          disabled={actions.retry.isPending}
+                          onClick={() => actions.retry.mutateAsync(target.id).then(onRefetch)}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {targets.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    No targets imported yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {openInteractionId && <InteractionLookupDialog interactionId={openInteractionId} onClose={() => setOpenInteractionId(null)} />}
     </div>

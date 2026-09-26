@@ -128,3 +128,14 @@ export function findPillarForPath(pathname: string): Pillar | undefined {
     pillar.items.some((item) => pathname === item.href || (item.matchPrefix && pathname.startsWith(item.matchPrefix)))
   );
 }
+
+/** Same lookup, but also returns the matched nav item — used by the compact context bar. */
+export function findPillarAndItemForPath(pathname: string): { pillar: Pillar; item: NavItem } | undefined {
+  for (const pillar of PILLARS) {
+    const item = pillar.items.find(
+      (it) => pathname === it.href || (it.matchPrefix && pathname.startsWith(it.matchPrefix))
+    );
+    if (item) return { pillar, item };
+  }
+  return undefined;
+}

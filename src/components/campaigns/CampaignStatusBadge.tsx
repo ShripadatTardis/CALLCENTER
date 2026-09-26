@@ -18,7 +18,19 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   failed: { color: 'bg-red-100 text-red-800', label: 'Failed' },
 };
 
-export const CampaignStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
+/** Dark operational palette (Session 10.1) — same lifecycle states, no new business states. */
+const STATUS_CONFIG_DARK: Record<string, { color: string; label: string }> = {
+  draft: { color: 'bg-slate-800 text-slate-300', label: 'Draft' },
+  scheduled: { color: 'bg-cyan-950 text-cyan-300', label: 'Scheduled' },
+  running: { color: 'bg-green-950 text-green-400', label: 'Running' },
+  paused: { color: 'bg-amber-950 text-amber-400', label: 'Paused' },
+  completed: { color: 'bg-cyan-950 text-cyan-300', label: 'Completed' },
+  stopped: { color: 'bg-slate-800 text-slate-400', label: 'Stopped' },
+  failed: { color: 'bg-red-950 text-red-400', label: 'Failed' },
+};
+
+export const CampaignStatusBadge: React.FC<{ status: string; dark?: boolean }> = ({ status, dark = false }) => {
+  const table = dark ? STATUS_CONFIG_DARK : STATUS_CONFIG;
+  const config = table[status] ?? table.draft;
   return <Badge className={config.color}>{config.label}</Badge>;
 };

@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { Loader2, Plus } from 'lucide-react';
 import { useCampaigns } from '@/hooks/campaigns/useCampaigns';
 import { useCampaignDetail, useCampaignTargets } from '@/hooks/campaigns/useCampaignDetail';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
-import { CampaignOverviewStats } from '@/components/campaigns/CampaignOverviewStats';
-import { CampaignFilters } from '@/components/campaigns/CampaignFilters';
+import { CampaignStatStrip } from '@/components/campaigns/CampaignStatStrip';
+import { CampaignFiltersBar } from '@/components/campaigns/CampaignFiltersBar';
 import { CampaignGrid } from '@/components/campaigns/CampaignGrid';
 import { CampaignDetail } from '@/components/campaigns/CampaignDetail';
 import type { CampaignWithStats } from '@/types/campaign';
@@ -38,8 +36,8 @@ const OutboundCampaigns: React.FC = () => {
     if (detailQuery.isLoading || targetsQuery.isLoading) {
       return (
         <Layout>
-          <div className="p-6 flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="min-h-full bg-slate-950 p-4 flex items-center gap-2 text-slate-400 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
             Loading campaign…
           </div>
         </Layout>
@@ -49,7 +47,7 @@ const OutboundCampaigns: React.FC = () => {
     if (detailQuery.isError || !detailQuery.data) {
       return (
         <Layout>
-          <div className="p-6 space-y-4">
+          <div className="min-h-full bg-slate-950 p-4 space-y-4">
             <Button variant="outline" onClick={() => setSelectedCampaignId(null)}>
               ← Back to Campaigns
             </Button>
@@ -80,54 +78,44 @@ const OutboundCampaigns: React.FC = () => {
   }
 
   return (
-    <TooltipProvider>
-      <Layout>
-        <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <PageHeader
-              pillar="Operationalize"
-              title="Outbound Campaigns"
-              description="Manage AI-powered proactive voice campaigns."
-            />
-            <Button
-              className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-600"
-              onClick={() => navigate('/outbound-campaigns/create')}
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create Campaign</span>
-            </Button>
+    <Layout>
+      <div className="min-h-full bg-slate-950 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-base font-semibold text-white">Outbound Campaigns</h1>
+            {data?.scoped && (
+              <p className="text-[11px] text-slate-400 mt-0.5">Showing campaigns for your authorized categories only.</p>
+            )}
           </div>
-
-          {isError && (
-            <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={campaigns.length > 0} isFetching={isFetching} />
-          )}
-
-          {data?.scoped && (
-            <p className="text-xs text-muted-foreground">
-              Showing campaigns for your authorized categories only.
-            </p>
-          )}
-
-          <CampaignOverviewStats campaigns={campaigns} />
-
-          <CampaignFilters
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            selectedStatus={selectedStatus}
-            setSelectedStatus={setSelectedStatus}
-          />
-
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground p-6">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Loading campaigns…
-            </div>
-          ) : (
-            <CampaignGrid campaigns={filteredCampaigns} onViewCampaign={(c) => setSelectedCampaignId(c.id)} />
-          )}
+          <Button size="sm" onClick={() => navigate('/outbound-campaigns/create')}>
+            <Plus className="h-4 w-4 mr-1" />
+            New Campaign
+          </Button>
         </div>
-      </Layout>
-    </TooltipProvider>
+
+        {isError && (
+          <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={campaigns.length > 0} isFetching={isFetching} />
+        )}
+
+        <CampaignStatStrip campaigns={campaigns} />
+
+        <CampaignFiltersBar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+        />
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-slate-400 text-sm p-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading campaigns…
+          </div>
+        ) : (
+          <CampaignGrid campaigns={filteredCampaigns} onViewCampaign={(c) => setSelectedCampaignId(c.id)} />
+        )}
+      </div>
+    </Layout>
   );
 };
 

@@ -58,11 +58,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => 
             <span className="block text-xs font-normal text-muted-foreground">{user.role}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/settings')}>
             <User className="mr-2 h-4 w-4" />
             Profile
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/settings')}>
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </DropdownMenuItem>
@@ -98,11 +98,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => 
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/settings')}>
             <User className="mr-2 h-4 w-4" />
             Profile
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate('/settings')}>
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </DropdownMenuItem>

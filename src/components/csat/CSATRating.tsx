@@ -59,7 +59,7 @@ export const CSATRating: React.FC<CSATRatingProps> = ({
       very_good: 'text-blue-500',
       excellent: 'text-green-500'
     };
-    return colors[rating as keyof typeof colors] || 'text-gray-400';
+    return colors[rating as keyof typeof colors] || 'text-muted-foreground';
   };
 
   if (!displayScore) {
@@ -76,7 +76,7 @@ export const CSATRating: React.FC<CSATRatingProps> = ({
               sizeClasses[size],
               star <= displayScore
                 ? cn('fill-current', getRatingColor(displayRating))
-                : 'text-gray-300'
+                : 'text-muted-foreground'
             )}
           />
         ))}

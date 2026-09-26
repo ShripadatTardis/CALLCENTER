@@ -18,23 +18,23 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm ${
           isOutbound
             ? 'bg-blue-500 text-white'
-            : 'bg-gray-100 dark:bg-muted text-gray-900 dark:text-foreground'
+            : 'bg-muted dark:bg-muted text-foreground dark:text-foreground'
         }`}
       >
         <div className="break-words">
           <p className="text-sm">{message.message_body}</p>
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
-          <span className={`text-xs ${isOutbound ? 'text-blue-100' : 'text-gray-500 dark:text-muted-foreground'}`}>
+          <span className={`text-xs ${isOutbound ? 'text-blue-100' : 'text-muted-foreground dark:text-muted-foreground'}`}>
             {isOutbound ? message.to_number : message.from_number}
           </span>
-          <span className={`text-xs ${isOutbound ? 'text-blue-100' : 'text-gray-500 dark:text-muted-foreground'}`}>
+          <span className={`text-xs ${isOutbound ? 'text-blue-100' : 'text-muted-foreground dark:text-muted-foreground'}`}>
             {format(new Date(message.timestamp), 'HH:mm')}
           </span>
         </div>
         {message.status && (
           <div className="mt-1">
-            <span className={`text-xs ${isOutbound ? 'text-blue-200' : 'text-gray-400 dark:text-muted-foreground'}`}>
+            <span className={`text-xs ${isOutbound ? 'text-blue-200' : 'text-muted-foreground dark:text-muted-foreground'}`}>
               {message.status}
             </span>
           </div>

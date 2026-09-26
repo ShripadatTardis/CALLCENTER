@@ -217,7 +217,7 @@ const LiveView: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2">
                                     <Label className="text-sm font-medium">Caller Information</Label>
-                                    <div className="text-sm bg-slate-50 p-3 rounded-lg">
+                                    <div className="text-sm bg-muted p-3 rounded-lg">
                                       <p><strong>Name:</strong> {call.callerName || '—'}</p>
                                       <p><strong>Phone:</strong> {call.phoneNumber}</p>
                                       <p><strong>Intent:</strong> {call.intent || '—'}</p>
@@ -227,7 +227,7 @@ const LiveView: React.FC = () => {
                                   </div>
                                   <div className="space-y-2">
                                     <Label className="text-sm font-medium">Call Details</Label>
-                                    <div className="text-sm bg-slate-50 p-3 rounded-lg">
+                                    <div className="text-sm bg-muted p-3 rounded-lg">
                                       <p title={formatDurationExact(call.durationSeconds)}>
                                         <strong>Duration:</strong> {formatDurationLong(call.durationSeconds)}
                                       </p>
@@ -239,7 +239,7 @@ const LiveView: React.FC = () => {
                                 </div>
                                 <div className="space-y-2">
                                   <Label className="text-sm font-medium">Recent Transcript</Label>
-                                  <div className="bg-slate-50 p-3 rounded-lg text-sm max-h-40 overflow-y-auto space-y-1">
+                                  <div className="bg-muted p-3 rounded-lg text-sm max-h-40 overflow-y-auto space-y-1">
                                     {call.transcript && call.transcript.length > 0 ? (
                                       call.transcript.slice(-6).map((entry, i) => (
                                         <p key={i}>
@@ -253,7 +253,7 @@ const LiveView: React.FC = () => {
                                 </div>
                                 <div className="space-y-2">
                                   <Label className="text-sm font-medium">Call Analysis</Label>
-                                  <div className="bg-slate-50 p-3 rounded-lg text-sm">
+                                  <div className="bg-muted p-3 rounded-lg text-sm">
                                     <div className="grid grid-cols-2 gap-4">
                                       <div>
                                         <p><strong>Sentiment Trend:</strong> {call.analysis?.sentimentTrend ?? '—'}</p>

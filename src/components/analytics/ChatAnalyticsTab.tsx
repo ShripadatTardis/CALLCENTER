@@ -10,10 +10,10 @@ function Tile({ label, value }: { label: string; value: string }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">{label}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
       </CardContent>
     </Card>
   );
@@ -44,7 +44,7 @@ export const ChatAnalyticsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs text-muted-foreground bg-slate-50 border border-slate-200 rounded px-3 py-2 flex-1">
+        <p className="text-xs text-muted-foreground bg-muted border border-border rounded px-3 py-2 flex-1">
           Analyzed {metrics.sampleSize} of {metrics.totalMatchingFilter} session(s) matching the current filter — Chat
           has no aggregate-metrics or date-window API, so this is a fetched sample, not a true time-windowed total.
         </p>
@@ -88,7 +88,7 @@ export const ChatAnalyticsTab: React.FC = () => {
             <div className="space-y-1.5">
               {metrics.sessionsByAgent.map((row) => (
                 <div key={row.agent} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700">{row.agent}</span>
+                  <span className="text-foreground">{row.agent}</span>
                   <span className="text-muted-foreground">{row.count}</span>
                 </div>
               ))}

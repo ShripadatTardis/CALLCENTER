@@ -14,7 +14,7 @@ export const UserSelectionRadio: React.FC<UserSelectionRadioProps> = ({
   onUserSelection,
 }) => {
   return (
-    <div className="p-4 bg-slate-50 rounded-lg border">
+    <div className="p-4 bg-muted rounded-lg border">
       <h4 className="font-medium text-sm text-slate-900 mb-3 flex items-center">
         <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
         Quick Demo Access

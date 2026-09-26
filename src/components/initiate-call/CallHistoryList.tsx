@@ -13,9 +13,9 @@ interface CallHistoryListProps {
 
 export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, isLoading }) => {
   return (
-    <Card className="w-full bg-card shadow-lg border border-gray-200 min-h-[200px] max-h-[600px] flex flex-col">
+    <Card className="w-full bg-card shadow-lg border border-border min-h-[200px] max-h-[600px] flex flex-col">
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
           <History className="h-5 w-5 text-blue-600" />
           Recent Calls ({callHistory.length})
         </CardTitle>
@@ -23,22 +23,22 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, i
       <CardContent className="space-y-3 flex-1 flex flex-col overflow-hidden">
         {isLoading ? (
           <div className="text-center py-8 flex-1 flex flex-col items-center justify-center">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+            <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
           </div>
         ) : callHistory.length === 0 ? (
           <div className="text-center py-8 flex-1 flex flex-col justify-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Phone className="w-8 h-8 text-gray-400" />
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Phone className="w-8 h-8 text-muted-foreground" />
             </div>
-            <p className="text-gray-500 text-sm">No calls yet</p>
-            <p className="text-gray-400 text-xs mt-1">Calls you initiate will appear here</p>
+            <p className="text-muted-foreground text-sm">No calls yet</p>
+            <p className="text-muted-foreground text-xs mt-1">Calls you initiate will appear here</p>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto space-y-3 pr-2">
             {callHistory.map((call) => (
               <div
                 key={call.interactionId}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors"
+                className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border hover:bg-muted transition-colors"
               >
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                   <div className="flex-shrink-0">
@@ -48,14 +48,14 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, i
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-gray-900 truncate">
+                      <span className="font-medium text-foreground truncate">
                         {formatPhoneNumber(call.phoneNumber)}
                       </span>
                       <Badge variant="secondary" className="text-xs whitespace-nowrap">
                         {formatStatusLabel(call.status)}
                       </Badge>
                     </div>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       <div className="flex items-center space-x-1">
                         <User className="w-3 h-3" />
                         <span className="truncate">{call.agentDisplayName ?? call.agentId ?? 'Unknown agent'}</span>

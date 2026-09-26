@@ -14,9 +14,9 @@ const NotFound: React.FC = () => {
       <div className="flex items-center justify-center min-h-screen p-6">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-6xl font-bold text-gray-300 mb-4">404</CardTitle>
-            <h1 className="text-2xl font-bold text-gray-900">Page Not Found</h1>
-            <p className="text-gray-600 mt-2">
+            <CardTitle className="text-6xl font-bold text-muted-foreground mb-4">404</CardTitle>
+            <h1 className="text-2xl font-bold text-foreground">Page Not Found</h1>
+            <p className="text-muted-foreground mt-2">
               The page you're looking for doesn't exist or has been moved.
             </p>
           </CardHeader>

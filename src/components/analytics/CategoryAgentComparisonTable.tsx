@@ -28,10 +28,10 @@ export const CategoryAgentComparisonTable: React.FC<Props> = ({ classification, 
 
   return (
     <div className="border rounded-lg divide-y">
-      <div className="px-3 py-2 bg-slate-50 text-sm font-semibold">{classification.domain}</div>
+      <div className="px-3 py-2 bg-muted text-sm font-semibold">{classification.domain}</div>
       {categories.map((cat) => (
         <div key={cat.id} className="px-3 py-2">
-          <div className="text-sm font-medium text-gray-700 mb-1">{cat.name}</div>
+          <div className="text-sm font-medium text-foreground mb-1">{cat.name}</div>
           <div className="pl-3 space-y-1">
             {cat.agentIds
               .filter((id) => countByAgentId.has(id))
@@ -39,7 +39,7 @@ export const CategoryAgentComparisonTable: React.FC<Props> = ({ classification, 
                 <Link
                   key={agentId}
                   to={`/ai-agents/${agentId}`}
-                  className="flex items-center justify-between text-sm text-gray-600 hover:text-primary py-0.5"
+                  className="flex items-center justify-between text-sm text-muted-foreground hover:text-primary py-0.5"
                 >
                   <span className="flex items-center gap-1">
                     <ChevronRight className="h-3 w-3" />

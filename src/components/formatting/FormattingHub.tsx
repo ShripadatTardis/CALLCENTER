@@ -88,9 +88,9 @@ export const FormattingHub: React.FC = () => {
       case 'LOCAL':
         return 'bg-green-100 text-green-800 dark:bg-emerald-950/50 dark:text-emerald-300';
       case 'DISABLED':
-        return 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-foreground';
+        return 'bg-muted text-foreground dark:bg-muted dark:text-foreground';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-muted dark:text-foreground';
+        return 'bg-muted text-foreground dark:bg-muted dark:text-foreground';
     }
   };
 
@@ -179,7 +179,7 @@ export const FormattingHub: React.FC = () => {
                     </div>
                     <div className={`border rounded p-3 text-sm whitespace-pre-wrap ${
                       log.format_strategy === 'DISABLED'
-                        ? 'bg-gray-50 border-gray-200 dark:bg-muted dark:border-border'
+                        ? 'bg-muted border-border dark:bg-muted dark:border-border'
                         : 'bg-green-50 border-green-200 dark:bg-emerald-950/30 dark:border-emerald-900'
                     }`}>
                       {log.formatted_text}
@@ -200,7 +200,7 @@ export const FormattingHub: React.FC = () => {
                   {expandedLog === log.id && log.format_strategy !== 'DISABLED' && (
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Original Message:</div>
-                      <div className="bg-gray-50 border border-gray-200 dark:bg-muted dark:border-border rounded p-3 text-sm whitespace-pre-wrap">
+                      <div className="bg-muted border border-border dark:bg-muted dark:border-border rounded p-3 text-sm whitespace-pre-wrap">
                         {log.original_text}
                       </div>
                     </div>

@@ -52,7 +52,7 @@ export const NPSResponsesTab: React.FC<NPSResponsesTabProps> = ({
       <div className="space-y-2">
         {campaignResponses.slice(0, 5).map((response) => (
           response.feedback && (
-            <Card key={`feedback-${response.id}`} className="hover:bg-slate-50">
+            <Card key={`feedback-${response.id}`} className="hover:bg-muted">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
@@ -64,7 +64,7 @@ export const NPSResponsesTab: React.FC<NPSResponsesTabProps> = ({
                   </div>
                   <NPSBadge score={response.npsScore} variant="compact" />
                 </div>
-                <div className="mt-3 p-3 bg-slate-50 rounded text-sm">
+                <div className="mt-3 p-3 bg-muted rounded text-sm">
                   <span className="font-medium">Feedback: </span>
                   {response.feedback}
                 </div>

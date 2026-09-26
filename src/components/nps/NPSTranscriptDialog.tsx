@@ -134,7 +134,7 @@ Customer: Thank you, goodbye.
                     <span className="text-xs font-medium text-blue-600">AI</span>
                   </div>
                   <div className="flex-1">
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted rounded-lg p-3">
                       <p className="text-sm">
                         Hello {response.name}, thank you for taking time to participate in our Net Promoter Score survey. On a scale of 0 to 10, how likely are you to recommend our bank to a friend or colleague?
                       </p>
@@ -166,7 +166,7 @@ Customer: Thank you, goodbye.
                     <span className="text-xs font-medium text-blue-600">AI</span>
                   </div>
                   <div className="flex-1">
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted rounded-lg p-3">
                       <p className="text-sm">
                         Thank you for that rating. Could you please tell us what influenced your decision to give us that score?
                       </p>
@@ -198,7 +198,7 @@ Customer: Thank you, goodbye.
                     <span className="text-xs font-medium text-blue-600">AI</span>
                   </div>
                   <div className="flex-1">
-                    <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="bg-muted rounded-lg p-3">
                       <p className="text-sm">
                         Thank you for your valuable feedback. This helps us improve our services. Have a great day!
                       </p>

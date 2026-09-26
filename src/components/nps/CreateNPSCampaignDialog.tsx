@@ -152,7 +152,7 @@ export const CreateNPSCampaignDialog: React.FC<CreateNPSCampaignDialogProps> = (
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                       formData.channel === channel
                         ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-border hover:border-border'
                     }`}
                     onClick={() => setFormData({ ...formData, channel })}
                   >
@@ -180,7 +180,7 @@ export const CreateNPSCampaignDialog: React.FC<CreateNPSCampaignDialogProps> = (
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                       formData.scriptId === script.id
                         ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-border hover:border-border'
                     }`}
                     onClick={() => setFormData({ ...formData, scriptId: script.id })}
                   >
@@ -214,8 +214,8 @@ export const CreateNPSCampaignDialog: React.FC<CreateNPSCampaignDialogProps> = (
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                  <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <div className="text-lg font-medium mb-2">Upload CSV or Excel File</div>
                   <div className="text-sm text-muted-foreground mb-4">
                     Required columns: Name, Mobile Number, Account ID, Language

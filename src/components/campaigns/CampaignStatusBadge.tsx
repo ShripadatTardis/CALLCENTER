@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
  * required to adopt it this session.
  */
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
+  draft: { color: 'bg-muted text-foreground', label: 'Draft' },
   scheduled: { color: 'bg-blue-100 text-blue-800', label: 'Scheduled' },
   running: { color: 'bg-green-100 text-green-800', label: 'Running' },
   paused: { color: 'bg-yellow-100 text-yellow-800', label: 'Paused' },

@@ -90,7 +90,7 @@ export const NPSSettingsTab: React.FC<NPSSettingsTabProps> = ({ campaign }) => {
               </div>
               <div>
                 <span className="font-medium text-slate-600">Content:</span>
-                <div className="mt-1 p-3 bg-slate-50 rounded text-sm">
+                <div className="mt-1 p-3 bg-muted rounded text-sm">
                   {script.content}
                 </div>
               </div>

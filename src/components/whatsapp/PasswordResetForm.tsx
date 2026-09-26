@@ -49,7 +49,7 @@ export const PasswordResetForm: React.FC<PasswordResetFormProps> = ({
           value={phoneNumber}
           onChange={(e) => onPhoneChange(e.target.value)}
           placeholder="+1234567890"
-          className="bg-gray-50"
+          className="bg-muted"
           readOnly={isPhoneReadOnly}
         />
       </div>

@@ -32,14 +32,14 @@ export const CallConfigurationForm: React.FC<CallConfigurationFormProps> = ({
   return (
     <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg">
       <CardHeader className="text-center pb-4">
-        <CardTitle className="text-xl font-bold text-gray-800 flex items-center justify-center gap-2">
+        <CardTitle className="text-xl font-bold text-foreground flex items-center justify-center gap-2">
           <Phone className="h-5 w-5 text-blue-600" />
           Call Configuration
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="phoneNumber" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <Label htmlFor="phoneNumber" className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Phone className="h-4 w-4 text-blue-600" />
             Phone Number
           </Label>
@@ -63,7 +63,7 @@ export const CallConfigurationForm: React.FC<CallConfigurationFormProps> = ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="aiAgent" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <Label htmlFor="aiAgent" className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Bot className="h-4 w-4 text-blue-600" />
             AI Agent
           </Label>

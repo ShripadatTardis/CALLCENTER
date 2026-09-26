@@ -28,7 +28,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, variant }) => 
       case 'callback_scheduled':
         return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
       default:
-        return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
+        return 'bg-muted text-foreground hover:bg-muted';
     }
   };
 

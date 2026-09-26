@@ -35,7 +35,7 @@ export const NPSResponseTable: React.FC<NPSResponseTableProps> = ({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200">
+          <tr className="border-b border-border">
             <th className="text-left py-3 px-4 font-medium text-slate-700">Name</th>
             <th className="text-left py-3 px-4 font-medium text-slate-700">Mobile</th>
             <th className="text-left py-3 px-4 font-medium text-slate-700">NPS Score</th>
@@ -46,7 +46,7 @@ export const NPSResponseTable: React.FC<NPSResponseTableProps> = ({
         </thead>
         <tbody>
           {responses.slice(0, 10).map((response) => (
-            <tr key={response.id} className="border-b border-slate-100 hover:bg-slate-50">
+            <tr key={response.id} className="border-b border-border hover:bg-muted">
               <td className="py-3 px-4 text-slate-700">{response.name}</td>
               <td className="py-3 px-4 text-slate-600">{response.mobileNumber}</td>
               <td className="py-3 px-4">

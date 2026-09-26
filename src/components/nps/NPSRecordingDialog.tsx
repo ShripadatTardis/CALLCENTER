@@ -256,7 +256,7 @@ export const NPSRecordingDialog: React.FC<NPSRecordingDialogProps> = ({
                 {response.feedback && (
                   <div>
                     <span className="font-medium">Customer Feedback:</span>
-                    <div className="mt-1 p-2 bg-slate-50 rounded text-sm">
+                    <div className="mt-1 p-2 bg-muted rounded text-sm">
                       "{response.feedback}"
                     </div>
                   </div>

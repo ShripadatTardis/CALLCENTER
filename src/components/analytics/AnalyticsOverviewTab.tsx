@@ -10,10 +10,10 @@ function Tile({ label, value, source, origin }: { label: string; value: string; 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600">{label}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
         <MetricSourceCaption origin={origin} source={source} />
       </CardContent>
     </Card>

@@ -34,7 +34,7 @@ export const NPSOverviewTab: React.FC<NPSOverviewTabProps> = ({ campaign }) => {
       case 'completed': return 'bg-blue-100 text-blue-800';
       case 'scheduled': return 'bg-orange-100 text-orange-800';
       case 'paused': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-muted text-foreground';
     }
   };
 

@@ -146,7 +146,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
 
   if (isBound) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-muted rounded-lg border border-border text-sm">
         <Field label="Agent"><div className="h-8 flex items-center text-sm font-medium truncate" title={boundAgentName ?? undefined}>{boundAgentName ?? '—'}</div></Field>
         <Field label="Customer"><div className="h-8 flex items-center text-muted-foreground truncate" title={resolvedCustomerId ?? undefined}>{resolvedCustomerId ?? '—'}</div></Field>
         <Field label="Contact"><div className="h-8 flex items-center text-muted-foreground truncate" title={resolvedContactId ?? undefined}>{resolvedContactId ?? '—'}</div></Field>
@@ -158,7 +158,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm">
+      <div className="space-y-3 p-3 bg-muted rounded-lg border border-border text-sm">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">
             {advancedMode ? 'Advanced / Manual IDs (support & testing)' : 'Start a new chat'}
@@ -241,7 +241,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
                   {customerId && (
                     <button
                       type="button"
-                      className="w-full text-left text-xs text-muted-foreground px-2 py-1 hover:bg-slate-50 rounded"
+                      className="w-full text-left text-xs text-muted-foreground px-2 py-1 hover:bg-muted rounded"
                       onClick={() => {
                         setCustomerId(null);
                         setSelectedPhone(null);
@@ -260,7 +260,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
                       <button
                         key={c.id}
                         type="button"
-                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-slate-50 rounded"
+                        className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded"
                         onClick={() => {
                           setCustomerId(c.id);
                           setSelectedPhone(null);

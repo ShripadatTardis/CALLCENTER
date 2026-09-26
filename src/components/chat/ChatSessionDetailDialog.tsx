@@ -43,7 +43,7 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
           <p className="text-sm text-destructive">Could not load this chat session.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-card p-4 rounded-lg text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-muted dark:bg-card p-4 rounded-lg text-sm">
               <div><span className="text-muted-foreground dark:text-muted-foreground">Agent:</span> {data.session.agentName ?? data.session.agentId ?? '—'}</div>
               <div><span className="text-muted-foreground dark:text-muted-foreground">Customer:</span> {data.session.resolvedCustomerLabel ?? '—'}</div>
               {data.session.resolvedCustomerLabel && !data.session.customerId && (

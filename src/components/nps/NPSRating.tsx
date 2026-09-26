@@ -36,7 +36,7 @@ export const NPSRating: React.FC<NPSRatingProps> = ({
       passive: 'text-yellow-600 bg-yellow-100',  
       detractor: 'text-red-600 bg-red-100'
     };
-    return colors[category as keyof typeof colors] || 'text-gray-600 bg-gray-100';
+    return colors[category as keyof typeof colors] || 'text-muted-foreground bg-muted';
   };
 
   const sizeClasses = {

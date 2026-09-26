@@ -53,7 +53,7 @@ export const GroupedInteractionTree: React.FC<GroupedInteractionTreeProps> = ({
 
   return (
     <div className="border rounded-lg divide-y">
-      <div className="px-3 py-2 bg-slate-50 text-sm font-semibold flex items-center justify-between">
+      <div className="px-3 py-2 bg-muted text-sm font-semibold flex items-center justify-between">
         <span>{group.domain}</span>
         <span className="text-muted-foreground font-normal">
           {group.total} interaction{group.total === 1 ? '' : 's'}
@@ -67,7 +67,7 @@ export const GroupedInteractionTree: React.FC<GroupedInteractionTreeProps> = ({
           <div key={cat.categoryId}>
             <button
               type="button"
-              className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-slate-50"
+              className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted"
               onClick={() => toggleCategory(cat.categoryId)}
             >
               <span className="flex items-center gap-1.5 font-medium">
@@ -84,10 +84,10 @@ export const GroupedInteractionTree: React.FC<GroupedInteractionTreeProps> = ({
                   <div key={agent.agentId} className="pl-5">
                     <button
                       type="button"
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-slate-50"
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-sm hover:bg-muted"
                       onClick={() => toggleAgent(agent.agentId)}
                     >
-                      <span className="flex items-center gap-1.5 text-gray-700">
+                      <span className="flex items-center gap-1.5 text-foreground">
                         {agentOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                         {agent.agentName}
                       </span>
@@ -103,7 +103,7 @@ export const GroupedInteractionTree: React.FC<GroupedInteractionTreeProps> = ({
                               key={ch.channel}
                               type="button"
                               className={`w-full flex items-center justify-between px-3 py-1 text-xs rounded ${
-                                isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-slate-50'
+                                isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted'
                               }`}
                               onClick={() => onSelect(isSelected ? null : { agentId: agent.agentId, channel: ch.channel })}
                             >

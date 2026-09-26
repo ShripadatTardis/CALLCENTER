@@ -32,7 +32,7 @@ function getSpeakerColor(speaker: string) {
     case 'agent':
       return 'bg-purple-100 text-purple-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
   }
 }
 
@@ -45,7 +45,7 @@ function getSentimentColor(sentiment?: string) {
     case 'neutral':
       return 'text-yellow-600';
     default:
-      return 'text-gray-600';
+      return 'text-muted-foreground';
   }
 }
 
@@ -94,7 +94,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </DialogHeader>
 
         {/* Metadata */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-card p-4 rounded-lg text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-muted dark:bg-card p-4 rounded-lg text-sm">
           <div><span className="text-muted-foreground dark:text-muted-foreground">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
           <div><span className="text-muted-foreground dark:text-muted-foreground">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
           <div><span className="text-muted-foreground dark:text-muted-foreground">Direction:</span> {interaction.direction ?? '—'}</div>
@@ -137,7 +137,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </div>
 
         {/* Recording */}
-        <div className="bg-slate-50 dark:bg-card p-4 rounded-lg">
+        <div className="bg-muted dark:bg-card p-4 rounded-lg">
           {interaction.recording?.url ? (
             <audio controls className="w-full" src={interaction.recording.url}>
               Your browser does not support the audio element.
@@ -193,7 +193,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             <p className="text-sm text-muted-foreground">No transcript available for this interaction.</p>
           ) : (
             filteredTranscript.map((entry, index) => (
-              <div key={index} className="border-l-4 border-slate-200 pl-4 py-2">
+              <div key={index} className="border-l-4 border-border pl-4 py-2">
                 <div className="flex items-center space-x-2 mb-2">
                   <Badge className={getSpeakerColor(entry.speaker)}>{entry.speaker.toUpperCase()}</Badge>
                   <span className="text-sm text-muted-foreground">{entry.timestamp}</span>

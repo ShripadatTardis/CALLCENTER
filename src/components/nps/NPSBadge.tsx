@@ -34,7 +34,7 @@ export const NPSBadge: React.FC<NPSBadgeProps> = ({
       passive: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       promoter: 'bg-green-100 text-green-800 border-green-200'
     };
-    return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[category as keyof typeof colors] || 'bg-muted text-foreground';
   };
 
   const getCategoryLabel = (category: string) => {

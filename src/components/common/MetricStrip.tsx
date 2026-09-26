@@ -27,11 +27,11 @@ export const MetricStrip: React.FC<{ items: MetricStripItem[]; dark?: boolean; c
   return (
     <div
       className={`flex flex-wrap items-stretch gap-x-6 gap-y-2 rounded-md border px-4 py-2.5 text-sm ${
-        dark ? 'border-border bg-card' : 'border-slate-200 bg-card'
+        dark ? 'border-border bg-card' : 'border-border bg-card'
       } ${className}`}
     >
       {items.map((item, i) => (
-        <div key={item.label} className={`flex items-baseline gap-2 ${i > 0 ? 'pl-6 border-l' : ''} ${dark ? 'border-border' : 'border-slate-200'}`}>
+        <div key={item.label} className={`flex items-baseline gap-2 ${i > 0 ? 'pl-6 border-l' : ''} ${dark ? 'border-border' : 'border-border'}`}>
           <span className={`text-base font-semibold tabular-nums ${dark ? TONE_CLASS[item.tone ?? 'default'] : 'text-slate-900'}`}>
             {item.value}
           </span>

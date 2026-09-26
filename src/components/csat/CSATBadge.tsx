@@ -38,7 +38,7 @@ export const CSATBadge: React.FC<CSATBadgeProps> = ({
       very_good: 'bg-blue-100 text-blue-800 border-blue-200',
       excellent: 'bg-green-100 text-green-800 border-green-200'
     };
-    return colors[rating as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[rating as keyof typeof colors] || 'bg-muted text-foreground';
   };
 
   const getRatingLabel = (rating: string) => {

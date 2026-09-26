@@ -40,6 +40,14 @@ export interface IdentitySignal {
   externalCustomerId: string | null;
   /** Raw phone number, if the source interaction carries one. */
   phoneNumber: string | null;
+  /**
+   * A locally-recorded Customer 360 selection (Session 7.1 follow-up) —
+   * consulted only when no authoritative CIF resolves the interaction.
+   * An exact phone match still takes precedence over this when the two
+   * disagree, since a proven identity signal must never be overridden
+   * by a possibly-stale locally-remembered pointer.
+   */
+  preferredCustomerId?: string | null;
 }
 
 export interface ResolvedIdentity {
@@ -70,7 +78,7 @@ export async function resolveCustomerIdentity(
   now: string,
 ): Promise<ResolvedIdentity | null> {
   const normalized = signal.phoneNumber ? normalizePhoneNumber(signal.phoneNumber) : null;
-  if (!signal.externalCustomerId && !normalized) return null; // no identity signal at all — cannot materialize (unchanged from pre-5.2 behavior)
+  if (!signal.externalCustomerId && !normalized && !signal.preferredCustomerId) return null; // no identity signal at all — cannot materialize (unchanged from pre-5.2 behavior)
 
   const byIdentity = signal.externalCustomerId
     ? await repo.findCustomerByExternalIdentity(EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId)
@@ -106,6 +114,26 @@ export async function resolveCustomerIdentity(
     return { customerId: byIdentity.id, contactPointId, merged: false };
   }
 
+  // Case: no CIF match (or none supplied), but a locally-recorded
+  // Customer 360 selection exists (Session 7.1 follow-up) — trust it
+  // only when the phone signal, if any, doesn't already point to a
+  // DIFFERENT customer (an exact phone match wins over a stale
+  // preference; see identityResolver.ts's own precedence comment).
+  if (signal.preferredCustomerId && (!byPhoneContactPoint || byPhoneContactPoint.customerId === signal.preferredCustomerId)) {
+    const preferred = await repo.getCustomer(signal.preferredCustomerId);
+    if (preferred) {
+      let contactPointId = byPhoneContactPoint?.id ?? null;
+      if (normalized && !byPhoneContactPoint) {
+        const cp = await repo.addContactPointToCustomer(preferred.id, 'phone', signal.phoneNumber as string, normalized, now);
+        contactPointId = cp.id;
+      }
+      if (signal.externalCustomerId) {
+        await repo.attachExternalIdentity(preferred.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
+      }
+      return { customerId: preferred.id, contactPointId, merged: false };
+    }
+  }
+
   // Case: phone known, no external-identity match yet.
   if (byPhoneContactPoint) {
     if (signal.externalCustomerId) {
@@ -136,7 +164,14 @@ export async function resolveCustomerIdentity(
   }
 
   // CIF-only, no phone at all (e.g. a chat session keyed by contact_id, not phone_number).
-  const created = await repo.createCustomer(now);
-  await repo.attachExternalIdentity(created.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId as string, now);
-  return { customerId: created.id, contactPointId: null, merged: false };
+  if (signal.externalCustomerId) {
+    const created = await repo.createCustomer(now);
+    await repo.attachExternalIdentity(created.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
+    return { customerId: created.id, contactPointId: null, merged: false };
+  }
+
+  // Pathological edge case only: a preferredCustomerId was supplied but
+  // its customer no longer exists, and there's no CIF or phone signal
+  // either — nothing left to resolve against.
+  return null;
 }

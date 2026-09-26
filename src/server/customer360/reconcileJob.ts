@@ -81,7 +81,7 @@ export async function runReconciliation(
       // documented precedence.
       const resolved = await resolveCustomerIdentity(
         repo,
-        { externalCustomerId: row.externalCustomerId, phoneNumber: row.phoneNumber },
+        { externalCustomerId: row.externalCustomerId, phoneNumber: row.phoneNumber, preferredCustomerId: row.preferredCustomerId ?? null },
         new Date().toISOString(),
       );
       if (!resolved) continue; // no identity signal at all — cannot materialize (unchanged skip behavior)

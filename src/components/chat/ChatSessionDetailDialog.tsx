@@ -45,7 +45,10 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 p-4 rounded-lg text-sm">
               <div><span className="text-slate-500">Agent:</span> {data.session.agentName ?? data.session.agentId ?? '—'}</div>
-              <div><span className="text-slate-500">Customer:</span> {data.session.customerId ?? '—'}</div>
+              <div><span className="text-slate-500">Customer:</span> {data.session.resolvedCustomerLabel ?? '—'}</div>
+              {data.session.resolvedCustomerLabel && !data.session.customerId && (
+                <div><span className="text-slate-500">Backend Customer ID:</span> —</div>
+              )}
               <div><span className="text-slate-500">Contact / Phone:</span> {data.session.contactId ?? data.session.phoneNumber ?? '—'}</div>
               <div><span className="text-slate-500">Status:</span> {formatStatusLabel(data.session.status)}</div>
               <div><span className="text-slate-500">Started:</span> {formatTimestamp(data.session.startedAt)}</div>

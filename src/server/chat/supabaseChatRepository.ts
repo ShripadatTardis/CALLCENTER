@@ -143,6 +143,7 @@ export const supabaseChatRepository: ChatRepository = {
       p_is_bank_customer: identity.isBankCustomer ?? null,
       p_upstream_status: identity.upstreamStatus ?? null,
       p_history_doc_id: identity.historyDocId ?? null,
+      p_customer360_customer_id: identity.customer360CustomerId ?? null,
     });
     return mapSession(row);
   },
@@ -190,5 +191,28 @@ export const supabaseChatRepository: ChatRepository = {
   async listMessages(chatSessionId) {
     const rows = await rpc<MessageRow[]>('call_center_chat_list_messages', { p_session_id: chatSessionId });
     return (rows ?? []).map(mapMessage);
+  },
+
+  async getCustomerLinks(upstreamSessionIds) {
+    if (upstreamSessionIds.length === 0) return {};
+    const rows = await rpc<
+      Array<{
+        upstream_session_id: string;
+        customer_id: string;
+        display_name: string | null;
+        source_customer_ref: string | null;
+        primary_phone_masked: string | null;
+      }>
+    >('call_center_chat_customer_links', { p_upstream_session_ids: upstreamSessionIds });
+    const out: Record<string, { customerId: string; displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null }> = {};
+    for (const r of rows ?? []) {
+      out[r.upstream_session_id] = {
+        customerId: r.customer_id,
+        displayName: r.display_name,
+        sourceCustomerRef: r.source_customer_ref,
+        primaryPhoneMasked: r.primary_phone_masked,
+      };
+    }
+    return out;
   },
 };

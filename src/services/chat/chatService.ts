@@ -18,6 +18,14 @@ export interface SendChatMessageOptions {
   contactId?: string;
   callerName?: string;
   phoneNumber?: string;
+  /**
+   * The Customer 360 internal customer id the operator explicitly
+   * selected, if any — kept separate from `customerId` above (which is
+   * only ever a real backend CIF). Read by this app's own /api/chat
+   * route to persist the local Customer 360 linkage; NEVER forwarded to
+   * the backend Chat API itself.
+   */
+  customer360CustomerId?: string;
 }
 
 export async function sendChatMessage(
@@ -26,7 +34,11 @@ export async function sendChatMessage(
   sessionId: string | undefined,
   opts: SendChatMessageOptions = {},
 ): Promise<ChatSendResult & { raw: ChatResponseDto }> {
-  const body: ChatRequestDto = { message, session_id: sessionId };
+  // customer360_customer_id is a local-persistence-only field read by
+  // this app's own /api/chat route — it is never part of ChatRequestDto
+  // (the exact upstream backend contract) and is never forwarded to the
+  // backend Chat API.
+  const body: ChatRequestDto & { customer360_customer_id?: string } = { message, session_id: sessionId };
   // agent_id/customer_id/contact_id/caller_name/phone_number are only
   // meaningful on the first message of a session — agent_id binds then
   // and every identity field is resolved once and kept on the session
@@ -37,6 +49,7 @@ export async function sendChatMessage(
     if (opts.contactId) body.contact_id = opts.contactId;
     if (opts.callerName) body.caller_name = opts.callerName;
     if (opts.phoneNumber) body.phone_number = opts.phoneNumber;
+    if (opts.customer360CustomerId) body.customer360_customer_id = opts.customer360CustomerId;
   }
 
   const dto = await request<ChatResponseDto & { chatSessionId: string | null; persisted: boolean }>('/chat', {

@@ -45,6 +45,16 @@ export interface NewChatSessionIdentity {
   isBankCustomer?: boolean | null;
   upstreamStatus?: string | null;
   historyDocId?: string | null;
+  /**
+   * This app's own internal Customer 360 linkage, set only when the
+   * operator explicitly selected a Customer 360 customer in the Chat
+   * Console selector before starting the session. Never derived from
+   * the backend response, never sent to the backend API — distinct
+   * from backendCustomerId (the raw backend CIF) exactly as
+   * ChatSessionRecord.customerId already documents. Preserved
+   * (never nulled) by the create/touch RPC once set.
+   */
+  customer360CustomerId?: string | null;
 }
 
 export interface ChatMessageRecord {

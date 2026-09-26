@@ -10,6 +10,25 @@ import type {
   ChatSessionsListResponseDto,
 } from '../../src/types/api/chat.js';
 import type { ChatMessage, ChatSessionSummary } from '../../src/types/chat.js';
+import { getCustomerDisplayLabel } from '../../src/lib/customerDisplayLabel.js';
+
+type CustomerLink = { displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null };
+
+function resolveCustomerLabel(backendCustomerId: string | null, link: CustomerLink | undefined): string | null {
+  // Session 7.1 follow-up: an authoritative backend CIF is shown as-is
+  // (unchanged prior behavior); when absent, a locally-recorded
+  // Customer 360 selection (see api/chat/index.ts) is resolved via the
+  // same display-label hierarchy used everywhere else, so a phone-only
+  // selected customer shows "Customer ••••2844" instead of "—" — never
+  // fabricated when neither is known.
+  if (backendCustomerId) return backendCustomerId;
+  if (!link) return null;
+  return getCustomerDisplayLabel({
+    displayName: link.displayName,
+    sourceCustomerRef: link.sourceCustomerRef,
+    primaryPhoneMasked: link.primaryPhoneMasked,
+  });
+}
 
 /**
  * GET /api/chat/logs                 — paginated session list
@@ -33,9 +52,10 @@ import type { ChatMessage, ChatSessionSummary } from '../../src/types/chat.js';
  * longer key off the internal id at all.
  */
 
-function toSummaryFromLive(row: ChatSessionListRowDto): ChatSessionSummary {
+function toSummaryFromLive(row: ChatSessionListRowDto, link?: CustomerLink): ChatSessionSummary {
   return {
     sessionId: row.session_id,
+    resolvedCustomerLabel: resolveCustomerLabel(row.customer_id, link),
     agentId: row.agent_id ?? null,
     agentName: row.agent_name ?? null,
     customerId: row.customer_id,
@@ -58,9 +78,10 @@ function toSummaryFromLive(row: ChatSessionListRowDto): ChatSessionSummary {
   };
 }
 
-function toSummaryFromLocal(s: ChatSessionRecord): ChatSessionSummary {
+function toSummaryFromLocal(s: ChatSessionRecord, link?: CustomerLink): ChatSessionSummary {
   return {
     sessionId: s.upstreamSessionId,
+    resolvedCustomerLabel: resolveCustomerLabel(s.backendCustomerId, link),
     agentId: s.agentId,
     agentName: s.agentName,
     customerId: s.backendCustomerId,
@@ -155,8 +176,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
         res.status(404).json({ detail: 'Chat session not found' });
         return;
       }
+      const links = await supabaseChatRepository.getCustomerLinks([sessionRow.session_id]);
       res.status(200).json({
-        session: toSummaryFromLive(sessionRow),
+        session: toSummaryFromLive(sessionRow, links[sessionRow.session_id]),
         messages: messages.map((m) => ({
           id: `${sessionId}-${m.number}`,
           role: m.role === 'customer' ? 'user' : 'ai',
@@ -173,7 +195,11 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
         return;
       }
       const messages = await supabaseChatRepository.listMessages(local.id);
-      res.status(200).json({ session: toSummaryFromLocal(local), messages: messages.map(toMessageFromLocal) });
+      const links = await supabaseChatRepository.getCustomerLinks([local.upstreamSessionId]);
+      res.status(200).json({
+        session: toSummaryFromLocal(local, links[local.upstreamSessionId]),
+        messages: messages.map(toMessageFromLocal),
+      });
       return;
     }
   }
@@ -205,8 +231,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     const rowsAll = dto.data.sessions;
     const rows = authorizedAgentIds === null ? rowsAll : rowsAll.filter((r) => isAuthorized(r.agent_id));
     const scoped = authorizedAgentIds !== null;
+    const links = await supabaseChatRepository.getCustomerLinks(rows.map((r) => r.session_id));
     res.status(200).json({
-      data: rows.map(toSummaryFromLive),
+      data: rows.map((r) => toSummaryFromLive(r, links[r.session_id])),
       pagination: scoped
         ? { page: dto.data.pagination.page, pageSize: dto.data.pagination.page_size, totalCount: rows.length, totalPages: 1 }
         : {
@@ -224,8 +251,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     const rows = authorizedAgentIds === null ? rowsAll : rowsAll.filter((r) => isAuthorized(r.agentId));
     const scoped = authorizedAgentIds !== null;
     const totalCount = scoped ? rows.length : totalCountAll;
+    const links = await supabaseChatRepository.getCustomerLinks(rows.map((r) => r.upstreamSessionId));
     res.status(200).json({
-      data: rows.map(toSummaryFromLocal),
+      data: rows.map((r) => toSummaryFromLocal(r, links[r.upstreamSessionId])),
       pagination: { page, pageSize, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)) },
       source: 'local-fallback',
       ...(scoped ? { scoped: true } : {}),

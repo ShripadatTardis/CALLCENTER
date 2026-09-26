@@ -49,6 +49,14 @@ export interface ChatSessionSummary {
   updatedAt: string;
   /** 'live' when sourced from the real backend just now; 'local-fallback' when the live call failed and this row came from this app's own persisted copy instead (never fabricated — see plan §2). */
   source: 'live' | 'local-fallback';
+  /**
+   * The resolved Customer 360 display label (display_name -> CIF ->
+   * masked phone), when this session has either an authoritative
+   * backend CIF or a locally-recorded Customer 360 selection — null
+   * when neither is known. Distinct from `customerId` above (the raw
+   * backend CIF, which may legitimately be null even when this is set).
+   */
+  resolvedCustomerLabel: string | null;
 }
 
 export interface ChatSessionDetail {

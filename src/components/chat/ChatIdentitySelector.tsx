@@ -130,11 +130,15 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
     }
     onIdentityChange({
       agentId: agentId || undefined,
-      // Never the Customer 360 UUID — only a real backend CIF, or omitted.
+      // Never the Customer 360 UUID as backend customer_id — only a real backend CIF, or omitted.
       customerId: cif ?? undefined,
       contactId: undefined,
       callerName: undefined,
       phoneNumber: selectedPhone ?? undefined,
+      // Local-only linkage: retained even when there's no backend CIF,
+      // so the selected Customer 360 customer isn't lost (see
+      // chatService.ts / api/chat/index.ts). Never sent to the backend.
+      customer360CustomerId: customerId ?? undefined,
       displayLabel,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -37,4 +37,14 @@ export interface ChatRepository {
   }>;
 
   listMessages(chatSessionId: string): Promise<ChatMessageRecord[]>;
+
+  /**
+   * Batch, read-only lookup of each upstream session's linked Customer
+   * 360 customer (via chat_sessions.customer_id), for Chat Logs/Session
+   * Detail display resolution only — never used for authorization,
+   * which stays keyed on agent_id -> category -> role.
+   */
+  getCustomerLinks(upstreamSessionIds: string[]): Promise<
+    Record<string, { customerId: string; displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null }>
+  >;
 }

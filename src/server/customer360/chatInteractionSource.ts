@@ -1,5 +1,6 @@
 import type { InteractionSourceAdapter } from './interactionSourceAdapter.js';
 import type { SourceInteraction } from './types.js';
+import { supabaseChatRepository } from '../chat/supabaseChatRepository.js';
 
 /**
  * Session 5.1 addition — a second InteractionSourceAdapter implementation
@@ -91,13 +92,14 @@ async function fetchSessions(query: Record<string, string>): Promise<ChatSession
   throw lastError instanceof Error ? lastError : new Error('chat/sessions request failed after retries');
 }
 
-function mapRow(dto: ChatSessionRowDto): SourceInteraction | null {
-  if (!dto.phone_number && !dto.customer_id) return null; // no identity signal at all — cannot materialize a customer/contact
+function mapRow(dto: ChatSessionRowDto, preferredCustomerId: string | null = null): SourceInteraction | null {
+  if (!dto.phone_number && !dto.customer_id && !preferredCustomerId) return null; // no identity signal at all — cannot materialize a customer/contact
   return {
     interactionId: dto.session_id,
     channel: 'chat',
     phoneNumber: dto.phone_number,
     externalCustomerId: dto.customer_id,
+    preferredCustomerId,
     direction: null, // chat has no inbound/outbound concept
     agentId: dto.agent_id,
     agentDisplayName: dto.agent_name,
@@ -118,16 +120,22 @@ export const chatInteractionSource: InteractionSourceAdapter = {
   async searchByContactPoint(type, normalizedValue) {
     if (type !== 'phone') return [];
     const dto = await fetchSessions({ page_size: '100' });
-    return dto.data.sessions
-      .filter((s) => s.phone_number && s.phone_number.replace(/[^0-9]/g, '') === normalizedValue)
-      .map(mapRow)
+    const matched = dto.data.sessions.filter(
+      (s) => s.phone_number && s.phone_number.replace(/[^0-9]/g, '') === normalizedValue,
+    );
+    const links = await supabaseChatRepository.getCustomerLinks(matched.map((s) => s.session_id));
+    return matched
+      .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
       .filter((s): s is SourceInteraction => s !== null);
   },
 
   async listPage(page, pageSize) {
     const dto = await fetchSessions({ page: String(page), page_size: String(pageSize) });
+    const links = await supabaseChatRepository.getCustomerLinks(dto.data.sessions.map((s) => s.session_id));
     return {
-      rows: dto.data.sessions.map(mapRow).filter((s): s is SourceInteraction => s !== null),
+      rows: dto.data.sessions
+        .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
+        .filter((s): s is SourceInteraction => s !== null),
       totalPages: dto.data.pagination.total_pages,
     };
   },

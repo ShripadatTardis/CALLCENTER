@@ -51,7 +51,7 @@ const ChatLogs: React.FC = () => {
       if (authFacet === 'yes' && !s.authenticated) return false;
       if (authFacet === 'no' && s.authenticated) return false;
       if (!q) return true;
-      return [s.sessionId, s.customerId, s.contactId, s.callerName, s.phoneNumber, s.agentName, s.latestIntent]
+      return [s.sessionId, s.customerId, s.resolvedCustomerLabel, s.contactId, s.callerName, s.phoneNumber, s.agentName, s.latestIntent]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
@@ -200,7 +200,7 @@ const ChatLogs: React.FC = () => {
                       >
                         <TableCell className="font-mono text-xs">{s.sessionId.slice(0, 12)}…</TableCell>
                         <TableCell className="whitespace-nowrap">{s.agentName ?? s.agentId ?? '—'}</TableCell>
-                        <TableCell className="whitespace-nowrap">{s.customerId ?? '—'}</TableCell>
+                        <TableCell className="whitespace-nowrap">{s.resolvedCustomerLabel ?? '—'}</TableCell>
                         <TableCell className="whitespace-nowrap">{s.contactId ?? s.phoneNumber ?? '—'}</TableCell>
                         <TableCell>
                           <Badge variant={s.status === 'active' ? 'secondary' : 'outline'} className="whitespace-nowrap">

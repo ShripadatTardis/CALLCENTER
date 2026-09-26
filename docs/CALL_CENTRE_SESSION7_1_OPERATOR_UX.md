@@ -216,6 +216,82 @@ the materialization branch as before). No duplicate customer rows —
 this is a read-only search-path fix. Function count unchanged at 11 (no
 new route file). Commit: see below.
 
+## 13.2. Fixed after this session: Chat → Customer 360 selection retention
+
+Live verification found a second, related defect: selecting an existing
+Customer 360 customer with no authoritative backend CIF (e.g. a
+phone-only customer, "Customer ••••5475") in the Chat Console, then
+starting a chat, correctly avoided sending the Customer 360 internal UUID
+as backend `customer_id` (§10's rule held) — but the selection itself was
+then lost entirely: Chat Logs/Session Detail showed "Customer: —" even
+though `phone_number` was retained.
+
+Root cause: `call_center.chat_sessions.customer_id` already existed as
+exactly the right field (a nullable FK to `call_center.customers.id`,
+documented as "this app's own internal Customer 360 linkage... never set
+by a chat turn directly") — but `call_center_chat_create_session` had no
+parameter to actually set it, so nothing ever populated it.
+
+Fix — narrow, additive, reuses the existing resolver rather than a second
+identity path:
+
+1. Migration `chat_customer360_selection_retention`: added
+   `p_customer360_customer_id uuid` to `call_center_chat_create_session`
+   (its `on conflict` clause never overwrites an already-set value with
+   null — a later touch call can't erase an earlier selection), plus a
+   new read-only `call_center_chat_customer_links(text[])` RPC for
+   batch-resolving each session's linked customer's display fields.
+   Applies no authorization filtering itself, by design — customer
+   identity is not an authorization classifier for Chat.
+2. `ChatIdentitySelector.tsx` now threads the operator's selected
+   Customer 360 customer id through `onIdentityChange` as a new
+   `customer360CustomerId` field on `SendChatMessageOptions` — kept
+   entirely separate from `customerId` (which remains CIF-only, or
+   omitted). `chatService.ts` sends it to this app's own `/api/chat`
+   route as an extra `customer360_customer_id` body field that is
+   **not** part of `ChatRequestDto` and is never forwarded to the
+   backend Chat API — `api/chat/index.ts`'s `upstreamPayload` is built
+   field-by-field and never reads it.
+3. `api/chat/index.ts` passes it to `createOrTouchSession` as
+   `identity.customer360CustomerId`, persisted onto the new
+   `chat_sessions` row.
+4. `api/chat/logs.ts` now resolves a `resolvedCustomerLabel` on every
+   session (list and detail, live and local-fallback): the raw backend
+   CIF when present (unchanged prior behavior — e.g. "CIF003"), else the
+   locally-linked customer's `getCustomerDisplayLabel` result (e.g.
+   "Customer ••••5475"), else `null`. `ChatSessionSummary` gained this
+   field; `ChatLogs.tsx`'s Customer column and
+   `ChatSessionDetailDialog.tsx` now render it (the detail dialog shows
+   a secondary "Backend Customer ID: —" line only when the label came
+   from the local link and the backend field is genuinely absent).
+5. `identityResolver.ts`'s `IdentitySignal` gained an optional
+   `preferredCustomerId`, consulted in precedence exactly as specified —
+   after the CIF path, before falling back to phone-only matching or
+   creating a new customer — and only when it doesn't contradict an
+   exact phone match already pointing elsewhere (an exact match still
+   wins over a possibly-stale local pointer). This is the same one
+   resolver function every path already used; no second algorithm.
+   `chatInteractionSource.ts` now batch-looks-up each session's local
+   link (via the same new RPC) and passes it through as
+   `SourceInteraction.preferredCustomerId`; `reconcileJob.ts`'s one call
+   site forwards it into the signal unchanged.
+
+Verified live in production against the real Forex Transaction session
+for phone ending 5475 (customer `ab81fbcb-fba5-45f9-8a52-a71f2f0aaaf8`):
+selecting it and sending a first turn persisted `chat_sessions.customer_id`
+even though the backend returned `customer_id: null`; Chat Logs and
+Session Detail both showed "Customer ••••5475"; reconciliation attached
+the resulting `customer_interactions` row to that same customer (one
+session → one interaction); re-running reconciliation against the same
+interaction (checkpoint rewound for the test) rescanned it but inserted
+zero new rows — idempotent; CIF003 continued to resolve exactly as
+before (`resolvedCustomerLabel: "CIF003"`, correct customer id) — no
+regression; a scoped test role with no access to the Forex Transaction
+category got a 404 on the session despite its resolved customer label,
+confirming authorization stayed keyed on `agent_id → category → role`,
+never on customer identity (test role cleaned up after). Build/type/lint
+clean, function count unchanged at 11 (no new route file).
+
 ## 14. Backend limitations (unchanged, reconfirmed during this session)
 
 - `/call-data` has no agent/category/FCR/escalation/sentiment/authenticated/

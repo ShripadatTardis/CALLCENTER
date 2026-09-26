@@ -100,6 +100,15 @@ export interface SourceInteraction {
    * Session 4). Never fabricated; only ever set from a real backend field.
    */
   externalCustomerId: string | null;
+  /**
+   * A locally-recorded Customer 360 customer id the interaction should
+   * prefer when no authoritative external identity resolves it (Session
+   * 7.1 follow-up — e.g. an operator explicitly selected this customer
+   * in the Chat Console before starting a session that has no backend
+   * CIF). Below externalCustomerId and an exact phone match in
+   * precedence; see identityResolver.ts. Always null for Voice today.
+   */
+  preferredCustomerId?: string | null;
   direction: string | null;
   agentId: string | null;
   agentDisplayName: string | null;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnalyticsTimeWindowControl } from '@/components/analytics/AnalyticsTimeWindowControl';
 import { AnalyticsOverviewTab } from '@/components/analytics/AnalyticsOverviewTab';
@@ -38,10 +39,11 @@ const Analytics: React.FC = () => {
   return (
     <Layout>
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-sm text-gray-500">Historical and trend reporting, built on confirmed data sources only.</p>
-        </div>
+        <PageHeader
+          pillar="Measure"
+          title="Analytics"
+          description="Operational performance and historical trends, built on confirmed data sources only."
+        />
 
         <AnalyticsTimeWindowControl query={query} onChange={setQuery} />
 

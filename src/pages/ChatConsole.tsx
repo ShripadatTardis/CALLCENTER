@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MessageSquarePlus, MessageCircle } from 'lucide-react';
@@ -54,12 +55,11 @@ const ChatConsole: React.FC = () => {
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Chat</h1>
-            <p className="text-muted-foreground">
-              Start and continue a live AI text conversation — a separate channel from WhatsApp.
-            </p>
-          </div>
+          <PageHeader
+            pillar="Control"
+            title="Chat"
+            description="Start and continue a live AI text conversation — a separate channel from WhatsApp."
+          />
           <Button variant="outline" onClick={handleNewChat} disabled={messages.length === 0}>
             <MessageSquarePlus className="h-4 w-4 mr-1" />
             New Chat

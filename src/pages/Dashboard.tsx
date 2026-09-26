@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,9 +43,11 @@ const Dashboard: React.FC = () => {
   return (
     <Layout>
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        </div>
+        <PageHeader
+          pillar="VoiceForce"
+          title="Dashboard"
+          description="Immediate operational snapshot across Observe, Control, Operationalize, Improve and Measure — for historical trends, see Analytics."
+        />
 
         {(recent.isError || agents.isError || metrics.isError) && (
           <QueryErrorBanner

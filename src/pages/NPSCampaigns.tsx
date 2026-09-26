@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -187,10 +188,11 @@ const NPSCampaigns: React.FC = () => {
       <TooltipProvider>
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">NPS Campaigns</h1>
-              <p className="text-slate-600">Launch and monitor Net Promoter Score surveys using AI agents</p>
-            </div>
+            <PageHeader
+              pillar="Operationalize"
+              title="NPS Campaigns"
+              description="Launch and monitor Net Promoter Score surveys using AI agents."
+            />
             <CreateNPSCampaignDialog npsScripts={npsScripts}>
               <Button className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-600">
                 <Plus className="h-4 w-4" />

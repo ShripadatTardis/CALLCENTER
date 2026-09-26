@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -73,10 +74,7 @@ const ChatLogs: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Chat Logs</h1>
-          <p className="text-muted-foreground">Historical text-interaction sessions.</p>
-        </div>
+        <PageHeader pillar="Observe" title="Chat Logs" description="Historical text-interaction sessions." />
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1 flex-1 min-w-[200px]">

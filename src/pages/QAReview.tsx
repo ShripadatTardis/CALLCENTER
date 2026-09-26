@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -179,20 +180,23 @@ const QAReview: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Interaction Quality</h1>
-          <p className="text-muted-foreground max-w-3xl">
-            Read-only review of real Voice and Chat interactions — grouped as{' '}
-            <span className="font-medium text-foreground">Operational Signals</span> (outcome, FCR,
-            escalation), <span className="font-medium text-foreground">Conversation Signals</span>{' '}
-            (intent, confidence/accuracy, sentiment, authentication), and{' '}
-            <span className="font-medium text-foreground">Technical Signals</span> (duration, latency
-            where available). There is no composite quality score here — see AI Agents for the
-            agent-level Business Outcome / Conversational / Technical Performance breakdown. No manual
-            review, reviewer assignment, or approval workflow exists yet; see the roadmap notes in
-            docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md.
-          </p>
-        </div>
+        <PageHeader
+          pillar="Improve"
+          title="Interaction Quality"
+          description={
+            <span className="max-w-3xl block">
+              Read-only review of real Voice and Chat interactions — grouped as{' '}
+              <span className="font-medium text-foreground">Operational Signals</span> (outcome, FCR,
+              escalation), <span className="font-medium text-foreground">Conversation Signals</span>{' '}
+              (intent, confidence/accuracy, sentiment, authentication), and{' '}
+              <span className="font-medium text-foreground">Technical Signals</span> (duration, latency
+              where available). There is no composite quality score here — see AI Agents for the
+              agent-level Business Outcome / Conversational / Technical Performance breakdown. No manual
+              review, reviewer assignment, or approval workflow exists yet; see the roadmap notes in
+              docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md.
+            </span>
+          }
+        />
 
         {isError && (
           <QueryErrorBanner

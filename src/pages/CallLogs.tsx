@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { AdvancedFilters, CallLogFilters } from '@/components/call-logs/AdvancedFilters';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -125,12 +126,11 @@ const CallLogs: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Call Logs & Recordings</h1>
-          <p className="text-muted-foreground">
-            Complete audit trail of all AI interactions
-          </p>
-        </div>
+        <PageHeader
+          pillar="Observe"
+          title="Call Logs & Recordings"
+          description="Complete audit trail of AI voice interactions."
+        />
 
         {/* Summary Statistics — from the live call-data summary, not recomputed client-side */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

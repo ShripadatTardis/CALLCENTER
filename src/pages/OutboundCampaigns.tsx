@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Loader2, Plus } from 'lucide-react';
@@ -83,10 +84,11 @@ const OutboundCampaigns: React.FC = () => {
       <Layout>
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Outbound Campaigns</h1>
-              <p className="text-slate-600">Manage AI-powered proactive voice campaigns</p>
-            </div>
+            <PageHeader
+              pillar="Operationalize"
+              title="Outbound Campaigns"
+              description="Manage AI-powered proactive voice campaigns."
+            />
             <Button
               className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-purple-600"
               onClick={() => navigate('/outbound-campaigns/create')}

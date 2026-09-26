@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,12 +27,11 @@ const AIAgents: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">AI Agents</h1>
-          <p className="text-muted-foreground">
-            The live agent roster used across Voice, Chat, Customer 360 and Campaigns.
-          </p>
-        </div>
+        <PageHeader
+          pillar="Improve"
+          title="AI Agents"
+          description="The live agent roster used across Voice, Chat, Customer 360 and Campaigns."
+        />
 
         <Card>
           <CardHeader>

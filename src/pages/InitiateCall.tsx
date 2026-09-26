@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { CallConfigurationForm } from '@/components/initiate-call/CallConfigurationForm';
 import { CallHistoryList } from '@/components/initiate-call/CallHistoryList';
 import { PostTriggerStatusCard } from '@/components/initiate-call/PostTriggerStatusCard';
@@ -32,12 +33,11 @@ const InitiateCall: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Initiate Call</h1>
-          <p className="text-muted-foreground">
-            Start a new voice AI call with customized settings
-          </p>
-        </div>
+        <PageHeader
+          pillar="Control"
+          title="Initiate Call"
+          description="Start a new voice AI call with customized settings."
+        />
 
         {triggerError && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

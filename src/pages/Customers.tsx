@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -35,12 +36,11 @@ const Customers: React.FC = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Customers</h1>
-          <p className="text-muted-foreground">
-            Operational view of customer interaction history — not a CRM.
-          </p>
-        </div>
+        <PageHeader
+          pillar="Observe"
+          title="Customers"
+          description="Operational view of customer interaction history — not a CRM."
+        />
 
         <Card>
           <CardHeader>

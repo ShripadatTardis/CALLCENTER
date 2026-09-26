@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -78,10 +79,11 @@ const LiveView: React.FC = () => {
     <Layout>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Live View Dashboard</h1>
-            <p className="text-slate-600">Real-time monitoring of active AI-agent calls</p>
-          </div>
+          <PageHeader
+            pillar="Observe"
+            title="Live View"
+            description="Real-time monitoring of active AI-agent calls."
+          />
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-2 text-sm text-slate-500">
               <div className={`w-2 h-2 rounded-full ${live.isFetching ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />

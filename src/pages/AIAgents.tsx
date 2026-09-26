@@ -1,10 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2 } from 'lucide-react';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -26,65 +24,62 @@ const AIAgents: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <PageHeader
-          pillar="Improve"
-          title="AI Agents"
-          description="The live agent roster used across Voice, Chat, Customer 360 and Campaigns."
-        />
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <div className="text-xs text-slate-500 px-1">
+          Live agent roster — used across Voice, Chat, Customer 360 and Campaigns.
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Agent Roster</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : isError ? (
-              <p className="text-sm text-destructive">Could not load the agent roster.</p>
-            ) : agents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No agents available.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Persona</TableHead>
-                    <TableHead>Direction</TableHead>
-                    <TableHead>Language</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agents.map((agent) => (
-                    <TableRow key={agent.agentId}>
-                      <TableCell className="font-medium">
-                        {agent.displayName}
-                        {agent.isDefault && (
-                          <Badge variant="outline" className="ml-2">
-                            Default
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{agent.personaName || '—'}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{formatStatusLabel(agent.direction)}</Badge>
-                      </TableCell>
-                      <TableCell>{agent.language || '—'}</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/ai-agents/${agent.agentId}`)}>
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-red-400 px-1">Could not load the agent roster.</p>
+        ) : agents.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">No agents available.</p>
+        ) : (
+          <div className="rounded-md border border-slate-800 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-800 hover:bg-transparent">
+                  {['Name', 'Persona', 'Direction', 'Language', ''].map((h) => (
+                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
                   ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {agents.map((agent) => (
+                  <TableRow
+                    key={agent.agentId}
+                    className="cursor-pointer border-slate-800/60 hover:bg-slate-900/60 focus-within:bg-slate-900/60"
+                  >
+                    <TableCell className="font-medium text-slate-100">
+                      {agent.displayName}
+                      {agent.isDefault && (
+                        <Badge variant="outline" className="ml-2 text-xs border-slate-600 text-slate-300">Default</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-slate-300">{agent.personaName || '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">{formatStatusLabel(agent.direction)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-slate-300">{agent.language || '—'}</TableCell>
+                    <TableCell className="text-right pr-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-slate-800"
+                        onClick={() => navigate(`/ai-agents/${agent.agentId}`)}
+                      >
+                        View →
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     </Layout>
   );

@@ -37,12 +37,15 @@ export const AnalyticsTimeWindowControl: React.FC<Props> = ({ query, onChange })
     ? `${query.date_from ?? '…'} – ${query.date_to ?? '…'} (calendar days, Asia/Kolkata)`
     : `${WINDOWS.find((w) => w.value === (query.window ?? '24h'))?.label ?? 'Last 24h'} (rolling, ends now)`;
 
+  const outlineClass = 'border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white';
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {WINDOWS.map((w) => (
         <Button
           key={w.value}
           size="sm"
+          className={!isCustom && (query.window ?? '24h') === w.value ? 'h-7 text-xs' : `h-7 text-xs ${outlineClass}`}
           variant={!isCustom && (query.window ?? '24h') === w.value ? 'default' : 'outline'}
           onClick={() => onChange({ window: w.value, direction: query.direction })}
         >
@@ -52,23 +55,23 @@ export const AnalyticsTimeWindowControl: React.FC<Props> = ({ query, onChange })
 
       <Popover>
         <PopoverTrigger asChild>
-          <Button size="sm" variant={isCustom ? 'default' : 'outline'}>
+          <Button size="sm" className={isCustom ? 'h-7 text-xs' : `h-7 text-xs ${outlineClass}`} variant={isCustom ? 'default' : 'outline'}>
             <Calendar className="h-3.5 w-3.5 mr-1" />
             Custom Range
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 space-y-3">
+        <PopoverContent className="w-72 space-y-3 bg-slate-900 border-slate-700 text-slate-200">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">From (YYYY-MM-DD)</label>
-            <Input value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} placeholder="2026-09-01" />
+            <label className="text-xs text-slate-400">From (YYYY-MM-DD)</label>
+            <Input value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} placeholder="2026-09-01" className="h-8 text-xs border-slate-700 bg-slate-900 text-slate-200" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">To (YYYY-MM-DD)</label>
-            <Input value={customTo} onChange={(e) => setCustomTo(e.target.value)} placeholder="2026-09-25" />
+            <label className="text-xs text-slate-400">To (YYYY-MM-DD)</label>
+            <Input value={customTo} onChange={(e) => setCustomTo(e.target.value)} placeholder="2026-09-25" className="h-8 text-xs border-slate-700 bg-slate-900 text-slate-200" />
           </div>
           <Button
             size="sm"
-            className="w-full"
+            className="w-full h-8 text-xs"
             disabled={!customFrom || !customTo}
             onClick={() => onChange({ date_from: customFrom, date_to: customTo, direction: query.direction })}
           >
@@ -77,7 +80,7 @@ export const AnalyticsTimeWindowControl: React.FC<Props> = ({ query, onChange })
         </PopoverContent>
       </Popover>
 
-      <span className="text-xs text-muted-foreground ml-1">Active basis: {activeLabel}</span>
+      <span className="text-xs text-slate-500 ml-1">Active basis: {activeLabel}</span>
     </div>
   );
 };

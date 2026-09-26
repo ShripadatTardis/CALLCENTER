@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnalyticsTimeWindowControl } from '@/components/analytics/AnalyticsTimeWindowControl';
 import { AnalyticsOverviewTab } from '@/components/analytics/AnalyticsOverviewTab';
@@ -38,25 +37,19 @@ const Analytics: React.FC = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-        <PageHeader
-          pillar="Measure"
-          title="Analytics"
-          description="Operational performance and historical trends, built on confirmed data sources only."
-        />
-
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
         <AnalyticsTimeWindowControl query={query} onChange={setQuery} />
 
         <Tabs defaultValue="overview">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="voice">Voice</TabsTrigger>
-            <TabsTrigger value="chat">Chat</TabsTrigger>
-            <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-            <TabsTrigger value="customers">Customers</TabsTrigger>
+          <TabsList className="bg-slate-900 border border-slate-800 h-9">
+            <TabsTrigger value="overview" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Overview</TabsTrigger>
+            <TabsTrigger value="voice" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Voice</TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Chat</TabsTrigger>
+            <TabsTrigger value="campaigns" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Campaigns</TabsTrigger>
+            <TabsTrigger value="customers" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">Customers</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-4">
+          <TabsContent value="overview" className="mt-3">
             <AnalyticsOverviewTab query={query} />
           </TabsContent>
           <TabsContent value="voice" className="mt-4">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
+import { MetricStrip } from '@/components/common/MetricStrip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -77,19 +77,10 @@ const LiveView: React.FC = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <PageHeader
-            pillar="Observe"
-            title="Live View"
-            description="Real-time monitoring of active AI-agent calls."
-          />
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-2 text-sm text-slate-500">
-              <div className={`w-2 h-2 rounded-full ${live.isFetching ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
-              <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
-            </div>
-          </div>
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
+          <div className={`w-1.5 h-1.5 rounded-full ${live.isFetching ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+          <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
         </div>
 
         {live.isError && (
@@ -101,61 +92,14 @@ const LiveView: React.FC = () => {
           />
         )}
 
-        {/* Summary Statistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Calls</CardTitle>
-              <Phone className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {live.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : summary?.active_calls ?? 0}
-              </div>
-              <p className="text-xs text-muted-foreground">{connectingCount} connecting</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Escalated (live)</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {live.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : summary?.escalated_calls ?? 0}
-              </div>
-              <p className="text-xs text-muted-foreground">Of currently active calls</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Handle Time</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div
-                className="text-2xl font-bold text-purple-600"
-                title={formatDurationExact(summary?.avg_handle_time_seconds)}
-              >
-                {live.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatDurationLong(summary?.avg_handle_time_seconds)}
-              </div>
-              <p className="text-xs text-muted-foreground">Current active calls</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Escalations with Trigger</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{transferredCalls.length}</div>
-              <p className="text-xs text-muted-foreground">Active calls with an escalation trigger recorded</p>
-            </CardContent>
-          </Card>
-        </div>
+        <MetricStrip
+          items={[
+            { label: 'Active calls', value: live.isLoading ? '…' : summary?.active_calls ?? 0, hint: `${connectingCount} connecting` },
+            { label: 'Escalated (live)', value: live.isLoading ? '…' : summary?.escalated_calls ?? 0, tone: 'warning' },
+            { label: 'Avg handle time', value: live.isLoading ? '…' : formatDurationLong(summary?.avg_handle_time_seconds), hint: formatDurationExact(summary?.avg_handle_time_seconds) },
+            { label: 'Escalations w/ trigger', value: transferredCalls.length, tone: transferredCalls.length > 0 ? 'warning' : 'default' },
+          ]}
+        />
 
         <AgentActivityPanel
           agents={agentRoster}
@@ -164,130 +108,107 @@ const LiveView: React.FC = () => {
           title="AI Agent Roster"
         />
 
-        {/* Live Calls with Search and Filters */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center space-x-2">
-                <Phone className="h-5 w-5" />
-                <span>Live Calls ({filteredCalls.length})</span>
-              </CardTitle>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Search className="h-4 w-4 text-slate-500" />
-                  <Input
-                    placeholder="Search by name, number, or intent..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-64"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Filter className="h-4 w-4 text-slate-500" />
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="connecting">Connecting</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="escalated">Escalated</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={intentFilter} onValueChange={setIntentFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Intent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Intents</SelectItem>
-                      {uniqueIntents.map((intent) => (
-                        <SelectItem key={intent} value={intent}>{intent}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {live.isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : live.isError && calls.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                Live calls are unavailable right now — see the error above.
-              </p>
-            ) : calls.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No active calls right now.</p>
-            ) : filteredCalls.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                No active calls match the current search/filters.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Caller</TableHead>
-                      <TableHead>Intent</TableHead>
-                      <TableHead>Agent</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Sentiment</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCalls.slice(0, 20).map((call) => (
-                      <TableRow key={call.interactionId}>
-                        <TableCell className="max-w-[180px]">
-                          <div className="min-w-0">
-                            <div className="font-medium text-slate-900 truncate">{call.callerName || '—'}</div>
-                            <div className="text-sm text-slate-500 truncate">{formatPhoneNumber(call.phoneNumber)}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-64">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+            <Input
+              placeholder="Search by name, number, or intent…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-8 pl-7 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 w-32 text-xs border-slate-700 bg-slate-900 text-slate-300">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All status</SelectItem>
+              <SelectItem value="connecting">Connecting</SelectItem>
+              <SelectItem value="in-progress">In progress</SelectItem>
+              <SelectItem value="escalated">Escalated</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={intentFilter} onValueChange={setIntentFilter}>
+            <SelectTrigger className="h-8 w-40 text-xs border-slate-700 bg-slate-900 text-slate-300">
+              <SelectValue placeholder="Intent" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All intents</SelectItem>
+              {uniqueIntents.map((intent) => (
+                <SelectItem key={intent} value={intent}>{intent}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-slate-500 ml-1">{filteredCalls.length} shown</span>
+        </div>
+
+        {live.isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+          </div>
+        ) : live.isError && calls.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">Live calls are unavailable right now — see the error above.</p>
+        ) : calls.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">No active calls right now.</p>
+        ) : filteredCalls.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">No active calls match the current search/filters.</p>
+        ) : (
+          <div className="rounded-md border border-slate-800 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-800 hover:bg-transparent">
+                  {['Caller', 'Intent', 'Agent', 'Duration', 'Sentiment', 'Status', 'Actions'].map((h) => (
+                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCalls.slice(0, 20).map((call) => (
+                  <TableRow key={call.interactionId} className="border-slate-800/60 hover:bg-slate-900/60">
+                    <TableCell className="max-w-[180px]">
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-100 truncate">{call.callerName || '—'}</div>
+                        <div className="text-xs text-slate-500 truncate">{formatPhoneNumber(call.phoneNumber)}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="whitespace-nowrap text-xs border-slate-600 text-slate-300">{call.intent || '—'}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[140px]">
+                      <span className="text-sm text-slate-300 truncate block">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-slate-300 whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
+                        {formatDurationLong(call.durationSeconds)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <span className={`font-medium whitespace-nowrap text-xs ${getSentimentColor(call.sentimentScore)}`}>
+                          {formatFractionAsPercent(call.sentimentScore)}
+                        </span>
+                        {call.sentimentScore !== undefined && (
+                          <div className="w-10 bg-slate-800 rounded-full h-1.5">
+                            <div
+                              className="bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 h-1.5 rounded-full"
+                              style={{ width: `${call.sentimentScore * 100}%` }}
+                            />
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="whitespace-nowrap">{call.intent || '—'}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[140px]">
-                          <span className="text-sm text-slate-700 truncate block">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className="font-mono text-slate-700 whitespace-nowrap"
-                            title={formatDurationExact(call.durationSeconds)}
-                          >
-                            {formatDurationLong(call.durationSeconds)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <span className={`font-medium whitespace-nowrap ${getSentimentColor(call.sentimentScore)}`}>
-                              {formatFractionAsPercent(call.sentimentScore)}
-                            </span>
-                            {call.sentimentScore !== undefined && (
-                              <div className="w-12 bg-slate-200 rounded-full h-2">
-                                <div
-                                  className="bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-2 rounded-full"
-                                  style={{ width: `${call.sentimentScore * 100}%` }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={call.outcome === 'escalated' ? 'escalated' : (call.stage ?? call.status)} />
-                        </TableCell>
-                        <TableCell>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setSelectedCall(call)}>
-                                <Monitor className="h-4 w-4 mr-1" />
-                                Monitor
-                              </Button>
-                            </DialogTrigger>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={call.outcome === 'escalated' ? 'escalated' : (call.stage ?? call.status)} />
+                    </TableCell>
+                    <TableCell>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-7 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={() => setSelectedCall(call)}>
+                            <Monitor className="h-3.5 w-3.5 mr-1" />
+                            Monitor
+                          </Button>
+                        </DialogTrigger>
                             <DialogContent className="max-w-2xl">
                               <DialogHeader>
                                 <DialogTitle>Call Monitoring - {call.callerName || call.phoneNumber}</DialogTitle>
@@ -353,39 +274,30 @@ const LiveView: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
         {/* Escalation Alerts — only rendered when real data has an escalation trigger; no fake fallback */}
         {transferredCalls.length > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
-            <CardHeader>
-              <CardTitle className="text-orange-800 flex items-center space-x-2">
-                <UserPlus className="h-5 w-5" />
-                <span>Active Escalations ({transferredCalls.length})</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {transferredCalls.map((call) => (
-                  <div key={call.interactionId} className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200 gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium text-orange-900 truncate">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
-                      <div className="text-sm text-orange-700 truncate">Trigger: {call.escalation?.trigger}</div>
-                      <div
-                        className="text-xs text-orange-600"
-                        title={formatDurationExact(call.durationSeconds)}
-                      >
-                        Duration: {formatDurationLong(call.durationSeconds)}
-                      </div>
-                    </div>
+          <div className="rounded-md border border-amber-800 bg-amber-950/30 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+              <UserPlus className="h-4 w-4" />
+              Active Escalations ({transferredCalls.length})
+            </div>
+            <div className="space-y-1">
+              {transferredCalls.map((call) => (
+                <div key={call.interactionId} className="flex items-center justify-between py-1.5 border-b border-amber-900/40 last:border-0 text-xs">
+                  <div className="min-w-0">
+                    <span className="font-medium text-amber-200">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
+                    <span className="text-amber-400/80 ml-2">Trigger: {call.escalation?.trigger}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <span className="text-amber-400/70 whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
+                    {formatDurationLong(call.durationSeconds)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </Layout>

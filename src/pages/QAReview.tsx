@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,6 +24,7 @@ import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
+import { FilterPopover } from '@/components/common/FilterPopover';
 
 type QARow = {
   key: string;
@@ -177,26 +176,30 @@ const QAReview: React.FC = () => {
     }
   };
 
+  const activeFilterCount =
+    (channelFilter !== ALL ? 1 : 0) + (agentFilter !== ALL ? 1 : 0) + (outcomeFilter !== ALL ? 1 : 0) +
+    (escalationFilter !== ALL ? 1 : 0) + (fcrFilter !== ALL ? 1 : 0) + (sentimentFilter !== ALL ? 1 : 0) +
+    (campaignOnly ? 1 : 0);
+
+  const clearAdvanced = () => {
+    setChannelFilter(ALL);
+    setAgentFilter(ALL);
+    setOutcomeFilter(ALL);
+    setEscalationFilter(ALL);
+    setFcrFilter(ALL);
+    setSentimentFilter(ALL);
+    setCampaignOnly(false);
+  };
+
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <PageHeader
-          pillar="Improve"
-          title="Interaction Quality"
-          description={
-            <span className="max-w-3xl block">
-              Read-only review of real Voice and Chat interactions — grouped as{' '}
-              <span className="font-medium text-foreground">Operational Signals</span> (outcome, FCR,
-              escalation), <span className="font-medium text-foreground">Conversation Signals</span>{' '}
-              (intent, confidence/accuracy, sentiment, authentication), and{' '}
-              <span className="font-medium text-foreground">Technical Signals</span> (duration, latency
-              where available). There is no composite quality score here — see AI Agents for the
-              agent-level Business Outcome / Conversational / Technical Performance breakdown. No manual
-              review, reviewer assignment, or approval workflow exists yet; see the roadmap notes in
-              docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md.
-            </span>
-          }
-        />
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <p className="text-xs text-slate-500 max-w-3xl">
+          Read-only review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
+          Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
+          (duration, latency where available). No composite quality score — see AI Agents for the agent-level
+          breakdown. No manual review/approval workflow exists yet.
+        </p>
 
         {isError && (
           <QueryErrorBanner
@@ -210,108 +213,117 @@ const QAReview: React.FC = () => {
           />
         )}
 
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">By Domain / Category / Agent</h2>
-          <div className="flex gap-1">
-            <Button variant={view === 'grouped' ? 'default' : 'outline'} size="sm" onClick={() => setView('grouped')}>
-              <Network className="h-4 w-4 mr-1" />
-              Grouped View
-            </Button>
-            <Button
-              variant={view === 'table' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                setView('table');
-                setSelectedGroup(null);
-              }}
-            >
-              <LayoutList className="h-4 w-4 mr-1" />
-              Table View
-            </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-52">
+            <Input
+              placeholder="Search intent…"
+              value={intentSearch}
+              onChange={(e) => setIntentSearch(e.target.value)}
+              className="h-8 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+            />
           </div>
+          <Select value={channelFilter} onValueChange={setChannelFilter}>
+            <SelectTrigger className="h-8 w-32 text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue placeholder="Channel" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All channels</SelectItem>
+              <SelectItem value="voice">Voice</SelectItem>
+              <SelectItem value="chat">Chat</SelectItem>
+            </SelectContent>
+          </Select>
+          <FilterPopover activeCount={activeFilterCount} onClear={clearAdvanced}>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium mb-1.5 block text-slate-400">Agent</label>
+                <Select value={agentFilter} onValueChange={setAgentFilter}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Agent" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All agents</SelectItem>
+                    {agentOptions.map((a) => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1.5 block text-slate-400">Outcome</label>
+                <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Outcome" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All outcomes</SelectItem>
+                    {outcomeOptions.map((o) => (
+                      <SelectItem key={o} value={o}>{formatStatusLabel(o)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium mb-1.5 block text-slate-400">Escalation</label>
+                  <Select value={escalationFilter} onValueChange={setEscalationFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Escalation" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Any</SelectItem>
+                      <SelectItem value="yes">Escalated</SelectItem>
+                      <SelectItem value="no">Not escalated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1.5 block text-slate-400">FCR</label>
+                  <Select value={fcrFilter} onValueChange={setFcrFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="FCR" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Any</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {sentimentOptions.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium mb-1.5 block text-slate-400">Sentiment</label>
+                  <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sentiment" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>All sentiment</SelectItem>
+                      {sentimentOptions.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <label className="flex items-center gap-2 text-xs text-slate-300">
+                <Checkbox checked={campaignOnly} onCheckedChange={(v) => setCampaignOnly(Boolean(v))} />
+                Campaign interactions only
+              </label>
+            </div>
+          </FilterPopover>
+          <div className="flex-1" />
+          <Button
+            variant={view === 'grouped' ? 'default' : 'outline'}
+            size="sm"
+            className={view === 'grouped' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            onClick={() => setView('grouped')}
+          >
+            <Network className="h-3.5 w-3.5 mr-1.5" />
+            Grouped
+          </Button>
+          <Button
+            variant={view === 'table' ? 'default' : 'outline'}
+            size="sm"
+            className={view === 'table' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            onClick={() => { setView('table'); setSelectedGroup(null); }}
+          >
+            <LayoutList className="h-3.5 w-3.5 mr-1.5" />
+            Table
+          </Button>
         </div>
 
         {view === 'grouped' && !isLoading && rows.length > 0 && (
           <GroupedInteractionTree group={grouped} selected={selectedGroup} onSelect={setSelectedGroup} countsAreExhaustive={false} />
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-3 items-center">
-            <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="Channel" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All channels</SelectItem>
-                <SelectItem value="voice">Voice</SelectItem>
-                <SelectItem value="chat">Chat</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger className="w-48"><SelectValue placeholder="Agent" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All agents</SelectItem>
-                {agentOptions.map((a) => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Outcome" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>All outcomes</SelectItem>
-                {outcomeOptions.map((o) => (
-                  <SelectItem key={o} value={o}>{formatStatusLabel(o)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={escalationFilter} onValueChange={setEscalationFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="Escalation" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Escalation: any</SelectItem>
-                <SelectItem value="yes">Escalated</SelectItem>
-                <SelectItem value="no">Not escalated</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={fcrFilter} onValueChange={setFcrFilter}>
-              <SelectTrigger className="w-32"><SelectValue placeholder="FCR" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>FCR: any</SelectItem>
-                <SelectItem value="yes">FCR: Yes</SelectItem>
-                <SelectItem value="no">FCR: No</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {sentimentOptions.length > 0 && (
-              <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
-                <SelectTrigger className="w-36"><SelectValue placeholder="Sentiment" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All sentiment</SelectItem>
-                  {sentimentOptions.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            <Input
-              placeholder="Search intent…"
-              value={intentSearch}
-              onChange={(e) => setIntentSearch(e.target.value)}
-              className="w-44"
-            />
-
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={campaignOnly} onCheckedChange={(v) => setCampaignOnly(Boolean(v))} />
-              Campaign interactions only
-            </label>
-          </CardContent>
-        </Card>
 
         <ActiveFilterChips
           chips={[
@@ -338,91 +350,85 @@ const QAReview: React.FC = () => {
           }}
         />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ListChecks className="h-4 w-4" />
-              Interactions ({filteredRows.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                No interactions match the current filters.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Channel</TableHead>
-                      <TableHead>Agent</TableHead>
-                      <TableHead>Outcome</TableHead>
-                      <TableHead>FCR</TableHead>
-                      <TableHead>Escalation</TableHead>
-                      <TableHead>Intent</TableHead>
-                      <TableHead>Accuracy / Confidence</TableHead>
-                      <TableHead>Sentiment</TableHead>
-                      <TableHead>Authenticated</TableHead>
-                      <TableHead>Duration / Latency</TableHead>
-                      <TableHead>Campaign</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRows.map((row) => (
-                      <TableRow
-                        key={row.key}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => handleRowClick(row)}
-                      >
-                        <TableCell className="whitespace-nowrap text-xs">{formatTimestamp(row.startTime)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                            {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
-                            {row.channel}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">{row.agentName}</TableCell>
-                        <TableCell>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
-                        <TableCell>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
-                        <TableCell>
-                          {row.escalationTrigger ? (
-                            <Badge variant="destructive" className="text-xs">{row.escalationTrigger}</Badge>
-                          ) : row.channel === 'voice' ? 'No' : '—'}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">{row.intent ?? '—'}</TableCell>
-                        <TableCell>
-                          {row.channel === 'voice'
-                            ? formatPercent(row.intentAccuracyPct, 0)
-                            : row.chatConfidenceFraction != null
-                              ? formatFractionAsPercent(row.chatConfidenceFraction)
-                              : '—'}
-                        </TableCell>
-                        <TableCell>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
-                        <TableCell>
-                          {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {row.channel === 'voice'
-                            ? formatDurationLong(row.durationSeconds)
-                            : row.latencyMs != null
-                              ? `${row.latencyMs}ms`
-                              : '—'}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">{row.campaignName ?? '—'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+          <ListChecks className="h-3.5 w-3.5" />
+          Interactions — {filteredRows.length} shown
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">No interactions match the current filters.</p>
+        ) : (
+          <div className="rounded-md border border-slate-800 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-800 hover:bg-transparent">
+                  {['Time', 'Channel', 'Agent', 'Outcome', 'FCR', 'Escalation', 'Intent', 'Accuracy/Confidence', 'Sentiment', 'Auth', 'Duration/Latency', 'Campaign'].map((h) => (
+                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRows.map((row) => (
+                  <TableRow
+                    key={row.key}
+                    className="cursor-pointer border-slate-800/60 hover:bg-slate-900/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleRowClick(row)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleRowClick(row);
+                      }
+                    }}
+                  >
+                    <TableCell className="whitespace-nowrap text-xs text-slate-400">{formatTimestamp(row.startTime)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs border-slate-600 text-slate-300">
+                        {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
+                        {row.channel}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-200">{row.agentName}</TableCell>
+                    <TableCell className="text-slate-300">{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                    <TableCell className="text-slate-300">{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                    <TableCell>
+                      {row.escalationTrigger ? (
+                        <Badge variant="destructive" className="text-xs">{row.escalationTrigger}</Badge>
+                      ) : (
+                        <span className="text-slate-500">{row.channel === 'voice' ? 'No' : '—'}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-300">{row.intent ?? '—'}</TableCell>
+                    <TableCell className="text-slate-300">
+                      {row.channel === 'voice'
+                        ? formatPercent(row.intentAccuracyPct, 0)
+                        : row.chatConfidenceFraction != null
+                          ? formatFractionAsPercent(row.chatConfidenceFraction)
+                          : '—'}
+                    </TableCell>
+                    <TableCell className="text-slate-300">{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                    <TableCell className="text-slate-300">
+                      {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-300">
+                      {row.channel === 'voice'
+                        ? formatDurationLong(row.durationSeconds)
+                        : row.latencyMs != null
+                          ? `${row.latencyMs}ms`
+                          : '—'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-400">{row.campaignName ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       <InteractionDetailDialog

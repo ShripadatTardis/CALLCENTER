@@ -1,11 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, MessageCircle, ChevronLeft, ChevronRight, LayoutList, Network } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, LayoutList, Network, Search } from 'lucide-react';
 import { useChatLogs } from '@/hooks/chat/useChatLogs';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
@@ -16,7 +14,6 @@ import { GroupedInteractionTree, type SelectedGroup } from '@/components/classif
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search } from 'lucide-react';
 
 /**
  * Session 5.1 amendment: sourced from GET /api/v1/chat/sessions (the
@@ -73,44 +70,52 @@ const ChatLogs: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <PageHeader pillar="Observe" title="Chat Logs" description="Historical text-interaction sessions." />
-
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1 flex-1 min-w-[200px]">
-            <label className="text-xs text-muted-foreground">Search (current page)</label>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                className="h-8 pl-7 text-sm"
-                placeholder="Customer, CIF, session, agent, intent…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-64">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+            <Input
+              className="h-8 pl-7 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+              placeholder="Customer, CIF, session, agent, intent… (page)"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Status</label>
-            <Select value={statusFacet} onValueChange={(v) => { setStatusFacet(v as StatusFacet); setPage(1); }}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Authenticated (page)</label>
-            <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as YesNoFacet)}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={statusFacet} onValueChange={(v) => { setStatusFacet(v as StatusFacet); setPage(1); }}>
+            <SelectTrigger className="h-8 w-32 text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Status: any</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as YesNoFacet)}>
+            <SelectTrigger className="h-8 w-40 text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Auth (page): any</SelectItem>
+              <SelectItem value="yes">Auth: yes</SelectItem>
+              <SelectItem value="no">Auth: no</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex-1" />
+          <Button
+            variant={view === 'grouped' ? 'default' : 'outline'}
+            size="sm"
+            className={view === 'grouped' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            onClick={() => setView('grouped')}
+          >
+            <Network className="h-3.5 w-3.5 mr-1.5" />
+            Grouped
+          </Button>
+          <Button
+            variant={view === 'table' ? 'default' : 'outline'}
+            size="sm"
+            className={view === 'table' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            onClick={() => setView('table')}
+          >
+            <LayoutList className="h-3.5 w-3.5 mr-1.5" />
+            Table
+          </Button>
         </div>
 
         <ActiveFilterChips
@@ -123,127 +128,108 @@ const ChatLogs: React.FC = () => {
           onClearAll={() => { setSearch(''); setStatusFacet('any'); setAuthFacet('any'); setSelectedGroup(null); }}
         />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              Chat History {pagination ? `(${sessions.length} of ${pagination.totalCount})` : ''}
-            </CardTitle>
-            <div className="flex gap-1">
-              <Button variant={view === 'grouped' ? 'default' : 'outline'} size="sm" onClick={() => setView('grouped')}>
-                <Network className="h-4 w-4 mr-1" />
-                Grouped View
+        {view === 'grouped' && !isLoading && allSessions.length > 0 && (
+          <GroupedInteractionTree
+            group={grouped}
+            selected={selectedGroup}
+            onSelect={setSelectedGroup}
+            countsAreExhaustive={false}
+          />
+        )}
+
+        {isError && (
+          <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={sessions.length > 0} isFetching={isFetching} />
+        )}
+        {isFallback && (
+          <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+            Showing this app's local operational copy — the live chat history service didn't respond. Data may be incomplete or slightly out of date.
+          </div>
+        )}
+
+        <div className="text-xs text-slate-500 px-1">
+          Chat history — {pagination ? `${sessions.length} of ${pagination.totalCount}` : sessions.length} shown
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+          </div>
+        ) : isError && sessions.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">Chat logs are unavailable right now — see the error above.</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">No chat sessions yet.</p>
+        ) : (
+          <div className="rounded-md border border-slate-800 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-800 hover:bg-transparent">
+                  {['Session', 'Agent', 'Customer', 'Contact / Phone', 'Status', 'Msgs', 'Intent', 'Auth', 'Source', 'Confidence', 'Latency', 'Started', 'Updated'].map((h) => (
+                    <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sessions.map((s) => (
+                  <TableRow
+                    key={s.sessionId}
+                    className="cursor-pointer border-slate-800/60 hover:bg-slate-900/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedSessionId(s.sessionId)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedSessionId(s.sessionId);
+                      }
+                    }}
+                  >
+                    <TableCell className="font-mono text-xs text-slate-400">{s.sessionId.slice(0, 12)}…</TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-200">{s.agentName ?? s.agentId ?? '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-300">{s.resolvedCustomerLabel ?? '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-300">{s.contactId ?? s.phoneNumber ?? '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={s.status === 'active' ? 'secondary' : 'outline'} className="whitespace-nowrap text-xs">
+                        {formatStatusLabel(s.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-slate-300">{s.messageCount}</TableCell>
+                    <TableCell className="text-slate-300">{s.latestIntent ?? '—'}</TableCell>
+                    <TableCell className="text-slate-300">{s.authenticated ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>
+                      {s.latestDataSource ? <Badge variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-slate-300">{s.latestDataSource}</Badge> : '—'}
+                    </TableCell>
+                    <TableCell className="text-slate-300">{s.latestConfidence !== null ? formatFractionAsPercent(s.latestConfidence) : '—'}</TableCell>
+                    <TableCell className="text-slate-300">{s.latestLatencyMs !== null ? `${s.latestLatencyMs}ms` : '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-400 text-xs">{formatTimestamp(s.startedAt)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-slate-400 text-xs">{formatTimestamp(s.updatedAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs text-slate-500">
+              Page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="h-7 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
-              <Button variant={view === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setView('table')}>
-                <LayoutList className="h-4 w-4 mr-1" />
-                Table View
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {view === 'grouped' && !isLoading && allSessions.length > 0 && (
-              <GroupedInteractionTree
-                group={grouped}
-                selected={selectedGroup}
-                onSelect={setSelectedGroup}
-                countsAreExhaustive={false}
-              />
-            )}
-            {isError && (
-              <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={sessions.length > 0} isFetching={isFetching} />
-            )}
-            {isFallback && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Showing this app's local operational copy — the live chat history service didn't respond.
-                Data may be incomplete or slightly out of date.
-              </div>
-            )}
-
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : isError && sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                Chat logs are unavailable right now — see the error above.
-              </p>
-            ) : sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No chat sessions yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Session ID</TableHead>
-                      <TableHead>Agent</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Contact / Phone</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Messages</TableHead>
-                      <TableHead>Intent</TableHead>
-                      <TableHead>Authenticated</TableHead>
-                      <TableHead>Data Source</TableHead>
-                      <TableHead>Confidence</TableHead>
-                      <TableHead>Latency</TableHead>
-                      <TableHead>Started At</TableHead>
-                      <TableHead>Updated At</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sessions.map((s) => (
-                      <TableRow
-                        key={s.sessionId}
-                        className="cursor-pointer hover:bg-gray-50"
-                        onClick={() => setSelectedSessionId(s.sessionId)}
-                      >
-                        <TableCell className="font-mono text-xs">{s.sessionId.slice(0, 12)}…</TableCell>
-                        <TableCell className="whitespace-nowrap">{s.agentName ?? s.agentId ?? '—'}</TableCell>
-                        <TableCell className="whitespace-nowrap">{s.resolvedCustomerLabel ?? '—'}</TableCell>
-                        <TableCell className="whitespace-nowrap">{s.contactId ?? s.phoneNumber ?? '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === 'active' ? 'secondary' : 'outline'} className="whitespace-nowrap">
-                            {formatStatusLabel(s.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{s.messageCount}</TableCell>
-                        <TableCell>{s.latestIntent ?? '—'}</TableCell>
-                        <TableCell>{s.authenticated ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>
-                          {s.latestDataSource ? <Badge variant="outline" className="text-xs whitespace-nowrap">{s.latestDataSource}</Badge> : '—'}
-                        </TableCell>
-                        <TableCell>{s.latestConfidence !== null ? formatFractionAsPercent(s.latestConfidence) : '—'}</TableCell>
-                        <TableCell>{s.latestLatencyMs !== null ? `${s.latestLatencyMs}ms` : '—'}</TableCell>
-                        <TableCell className="whitespace-nowrap">{formatTimestamp(s.startedAt)}</TableCell>
-                        <TableCell className="whitespace-nowrap">{formatTimestamp(s.updatedAt)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            {pagination && pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-muted-foreground">
-                  Page {pagination.page} of {pagination.totalPages} ({pagination.totalCount} total)
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= pagination.totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
         <ChatSessionDetailDialog
           isOpen={Boolean(selectedSessionId)}

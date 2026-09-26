@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Phone, RefreshCw } from 'lucide-react';
+import { MetricStrip } from '@/components/common/MetricStrip';
+import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { useCustomerDetail } from '@/hooks/customers/useCustomerDetail';
 import { useCustomerInteractions } from '@/hooks/customers/useCustomerInteractions';
 import { useRefreshCustomer } from '@/hooks/customers/useRefreshCustomer';
@@ -154,13 +154,11 @@ const CustomerDetail: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/customers')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-        </div>
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-slate-400 hover:text-white hover:bg-slate-900" onClick={() => navigate('/customers')}>
+          <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+          Back to Customers
+        </Button>
 
         {isError && (
           <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={Boolean(data)} isFetching={isFetching} />
@@ -168,12 +166,10 @@ const CustomerDetail: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
           </div>
         ) : !data ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            Customer not found, or not visible under your current access.
-          </p>
+          <p className="text-sm text-slate-500 px-1">Customer not found, or not visible under your current access.</p>
         ) : (() => {
           const displayLabel = getCustomerDisplayLabel({
             displayName: data.customer.displayName,
@@ -183,127 +179,123 @@ const CustomerDetail: React.FC = () => {
           return (
           <>
             {data.refresh.failed && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
                 Could not check for new interactions right now ({data.refresh.error}). Showing the last data we had.
               </div>
             )}
 
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">{displayLabel}</h1>
+                <h1 className="text-lg font-semibold text-slate-50">{displayLabel}</h1>
                 {data.customer.sourceCustomerRef && data.customer.sourceCustomerRef !== displayLabel && (
-                  <p className="text-muted-foreground">Ref: {data.customer.sourceCustomerRef}</p>
+                  <p className="text-xs text-slate-500">Ref: {data.customer.sourceCustomerRef}</p>
                 )}
               </div>
-              <Button variant="outline" size="sm" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
-                <RefreshCw className={`h-4 w-4 mr-1 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">First / Last Seen</CardTitle></CardHeader>
-                <CardContent className="text-sm">
-                  <div>{formatTimestamp(data.customer.firstSeen)}</div>
-                  <div className="text-muted-foreground">to {formatTimestamp(data.customer.lastSeen)}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Visible Interactions</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{aggregate?.totalInteractions ?? 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {aggregate?.inboundCount ?? 0} inbound · {aggregate?.outboundCount ?? 0} outbound
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Latest Intent / Outcome</CardTitle></CardHeader>
-                <CardContent className="text-sm">
-                  <div>{aggregate?.latestIntent ?? '—'}</div>
-                  <div className="text-muted-foreground">{aggregate?.latestOutcome ? formatStatusLabel(aggregate.latestOutcome) : '—'}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Escalations</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{aggregate?.escalationCount ?? 0}</div>
-                  <p className="text-xs text-muted-foreground">Among visible interactions</p>
-                </CardContent>
-              </Card>
-            </div>
+            <MetricStrip
+              items={[
+                { label: 'First seen', value: formatTimestamp(data.customer.firstSeen) },
+                { label: 'Last seen', value: formatTimestamp(data.customer.lastSeen) },
+                { label: 'Visible interactions', value: aggregate?.totalInteractions ?? 0, hint: `${aggregate?.inboundCount ?? 0} inbound · ${aggregate?.outboundCount ?? 0} outbound` },
+                { label: 'Latest intent', value: aggregate?.latestIntent ?? '—' },
+                { label: 'Latest outcome', value: aggregate?.latestOutcome ? formatStatusLabel(aggregate.latestOutcome) : '—' },
+                { label: 'Escalations', value: aggregate?.escalationCount ?? 0, tone: (aggregate?.escalationCount ?? 0) > 0 ? 'warning' : 'default' },
+              ]}
+            />
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Interaction Timeline</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Grouped by this customer's authorized Category/Agent/Channel (Session 6.2 classification).
-                  {!groupingIsExhaustive && ` Counts below cover the first ${allInteractions.length} of ${interactionsTotalCount} interactions.`}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {interactionsQuery.isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : allInteractions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">
-                    No visible interactions for this customer.
-                  </p>
-                ) : (
-                  <>
-                    <GroupedInteractionTree
-                      group={grouped}
-                      selected={selectedGroup}
-                      onSelect={setSelectedGroup}
-                      countsAreExhaustive={groupingIsExhaustive}
-                    />
-                    {interactions.length === 0 && (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        No interactions in the selected group.
-                      </p>
-                    )}
-                  </>
-                )}
-                {allInteractions.length > 0 && interactions.length > 0 && (
-                  interactions.map((row) => (
-                    <button
-                      key={row.id}
-                      onClick={() => setSelectedInteraction({ id: row.interactionId, channel: row.channel })}
-                      className="w-full text-left flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="font-medium text-gray-900">{formatTimestamp(row.startedAt)}</span>
-                          <Badge variant="outline" className="text-xs whitespace-nowrap">{row.channel}</Badge>
-                          {row.direction && <Badge variant="secondary" className="text-xs whitespace-nowrap">{row.direction}</Badge>}
-                        </div>
-                        <div className="text-sm text-gray-600 truncate">
-                          {row.agentDisplayName ?? row.agentId ?? 'Unknown agent'} · {row.intent ?? '—'} ·{' '}
-                          <span title={formatDurationExact(row.durationSeconds ?? undefined)}>
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500 px-1">
+                Interaction timeline — grouped by authorized Category/Agent/Channel.
+                {!groupingIsExhaustive && ` Counts cover the first ${allInteractions.length} of ${interactionsTotalCount} interactions.`}
+              </p>
+              {interactionsQuery.isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                </div>
+              ) : allInteractions.length === 0 ? (
+                <p className="text-sm text-slate-500 px-1 py-4">No visible interactions for this customer.</p>
+              ) : (
+                <>
+                  <GroupedInteractionTree
+                    group={grouped}
+                    selected={selectedGroup}
+                    onSelect={setSelectedGroup}
+                    countsAreExhaustive={groupingIsExhaustive}
+                  />
+                  {interactions.length === 0 && (
+                    <p className="text-sm text-slate-500 px-1 py-4">No interactions in the selected group.</p>
+                  )}
+                </>
+              )}
+              {allInteractions.length > 0 && interactions.length > 0 && (
+                <div className="rounded-md border border-slate-800 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+                        <th className="px-3 py-2 font-medium">Time</th>
+                        <th className="px-3 py-2 font-medium">Channel</th>
+                        <th className="px-3 py-2 font-medium">Agent</th>
+                        <th className="px-3 py-2 font-medium">Intent</th>
+                        <th className="px-3 py-2 font-medium">Duration</th>
+                        <th className="px-3 py-2 font-medium">Outcome</th>
+                        <th className="px-3 py-2 font-medium">Sentiment</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {interactions.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="cursor-pointer border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedInteraction({ id: row.interactionId, channel: row.channel })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedInteraction({ id: row.interactionId, channel: row.channel });
+                            }
+                          }}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-slate-300">{formatTimestamp(row.startedAt)}</td>
+                          <td className="px-3 py-2">
+                            <Badge variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-slate-300">{row.channel}</Badge>
+                            {row.direction && <Badge variant="secondary" className="text-xs whitespace-nowrap ml-1">{row.direction}</Badge>}
+                          </td>
+                          <td className="px-3 py-2 text-slate-200 whitespace-nowrap">{row.agentDisplayName ?? row.agentId ?? 'Unknown agent'}</td>
+                          <td className="px-3 py-2 text-slate-300">{row.intent ?? '—'}</td>
+                          <td className="px-3 py-2 text-slate-300 whitespace-nowrap" title={formatDurationExact(row.durationSeconds ?? undefined)}>
                             {formatDurationLong(row.durationSeconds ?? undefined)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-4 shrink-0">
-                        {row.outcome && (
-                          <Badge variant={row.outcome === 'escalated' ? 'destructive' : 'default'} className="whitespace-nowrap">
-                            {formatStatusLabel(row.outcome)}
-                          </Badge>
-                        )}
-                        {row.sentimentScore !== null && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatFractionAsPercent(row.sentimentScore)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                          </td>
+                          <td className="px-3 py-2">
+                            {row.outcome ? (
+                              <Badge variant={row.outcome === 'escalated' ? 'destructive' : 'default'} className="whitespace-nowrap text-xs">
+                                {formatStatusLabel(row.outcome)}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-600">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-slate-400 whitespace-nowrap">
+                            {row.sentimentScore !== null ? formatFractionAsPercent(row.sentimentScore) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </>
           );
         })()}

@@ -1,0 +1,846 @@
+
+SESSION 10.2 — VOICEFORCE FULL PRODUCT UX TRANSFORMATION
+
+You are working in the existing Call Centre / VoiceForce repository.
+
+This is a FULL-PRODUCT UX TRANSFORMATION session.
+
+Session 10.1 established the production UX foundation:
+- 52px compact icon rail
+- temporary overlay navigation
+- compact context bar
+- Direction A-style dense operational tables
+- refined Direction C dark navy visual language
+- Direction C master/detail Create Campaign workflow
+- accessibility/readability improvements
+- production deployment
+
+However, Session 10.1 intentionally transformed only the shell and selected campaign surfaces.
+
+The rest of VoiceForce still contains substantial portions of the old UI inside the new shell:
+- oversized cards
+- large filter sections
+- excessive whitespace
+- tall page headers
+- controls occupying too much viewport
+- vertically stacked information that could be presented much more efficiently
+- large bordered containers around sparse content
+- detail pages that still look like the previous application
+- inconsistent density and hierarchy between modules
+
+The user has now explicitly requested a thorough redesign of EVERY VoiceForce page.
+
+This is NOT a superficial theme migration.
+
+============================================================
+1. PRIMARY PRODUCT PRINCIPLE
+============================================================
+
+WORKSPACE FIRST.
+
+The information or task the operator came to work with must dominate the viewport.
+
+Navigation, filters, headings, controls, chrome and secondary information should consume as little persistent screen area as practical.
+
+Target:
+
+- approximately 90%+ of useful viewport available to working content where practical
+- persistent application chrome approximately <=10%
+- navigation remains compact and temporary/overlay where appropriate
+- avoid large permanent control panels
+- avoid decorative whitespace
+- avoid giant cards merely because the old UI used cards
+
+IMPORTANT:
+
+DO NOT interpret "preserve functionality" as "preserve the current layout."
+
+Existing page structure, card structure, component structure and information placement are NOT design constraints.
+
+You MAY substantially reorganize the presentation of a page if doing so improves usability.
+
+Preserve:
+- real functionality
+- real data
+- permissions
+- API semantics
+- domain semantics
+- business rules
+
+Do NOT preserve bad layouts simply to minimize the diff.
+
+============================================================
+2. APPROVED VISUAL DIRECTION
+============================================================
+
+The user reviewed three prototypes in Session 10.0.
+
+Approved hybrid direction:
+
+NAVIGATION
+- Session 10.1 compact 52px icon rail
+- temporary overlay navigation
+- overlay must NOT push workspace
+- Escape closes
+- outside-click closes
+- focus restoration
+- permission filtering remains authoritative
+
+OPERATIONAL DATA
+- Direction A was judged easiest to read
+- use compact, high-information-density tables/lists
+- do NOT replace operational information with large card grids
+
+COLOR / VISUAL LANGUAGE
+- Direction C dark navy visual language was preferred
+- retain/refine this palette where appropriate
+- readability takes priority over aesthetic darkness
+- sufficient contrast is mandatory
+
+WORKFLOWS
+- Direction C master/detail workflow was preferred for Create Campaign
+- Direction A's simple pill wizard was too basic
+- Direction B's accordion workflow was unnecessarily complicated
+
+Do not force every page into exactly the same layout.
+
+Create a coherent product system while selecting the correct interaction model for each task.
+
+============================================================
+3. ABSOLUTE FILTER DESIGN RULE
+============================================================
+
+FILTERS ARE CONTROLS, NOT CONTENT.
+
+Current Call Logs and similar screens allow filters and surrounding controls to consume a large portion of the upper viewport.
+
+This must change.
+
+For filter-heavy operational pages, use a reusable compact filtering model.
+
+Preferred pattern:
+
+[ Search................................ ] [important selector] [Filters 3] [View] [Export]
+
+Clicking Filters opens a TEMPORARY FLOATING FILTER SURFACE.
+
+The filter surface:
+- overlays the workspace
+- does NOT permanently push/reflow the primary data area
+- closes with Escape
+- closes appropriately on outside click
+- has accessible focus behavior
+- may be a floating popover/panel on desktop
+- may become a temporary drawer/bottom sheet on smaller screens
+
+Typical desktop width:
+approximately 320–380px where appropriate.
+
+When filters are active and the panel is closed:
+- show compact removable filter chips where useful
+- show active-filter count on the Filters button
+- ensure the operator can immediately tell that filtering is active
+
+Example conceptual toolbar:
+
+Search interactions...   [Status ▾]   [Filters 3]   [Grouped/Table]   [Export]
+
+Active:
+[EMI Reminder ×] [Escalated ×] [Last 7 days ×]
+
+Do NOT blindly put every filter in the floating panel.
+
+One or two extremely common/page-critical controls may remain directly visible.
+
+Secondary/advanced filtering belongs in the temporary panel.
+
+VERY IMPORTANT:
+Preserve actual filtering semantics.
+
+If an existing filter only filters the currently loaded page:
+- it must continue to say that honestly
+- do NOT make it look like global/server filtering
+
+Do not invent backend filtering.
+
+Build reusable primitives rather than independent filter implementations for every page.
+
+Possible conceptual components:
+- CompactFilterBar
+- FilterPopover / FilterPanel
+- ActiveFilterChips
+- CompactSearch
+- ViewToggle
+
+Names are illustrative, not mandatory.
+
+============================================================
+4. VIEWPORT DENSITY TARGET
+============================================================
+
+On a normal desktop / 1080p-class viewport:
+
+After the compact application context/header, primary working data should begin as high on the page as reasonably possible.
+
+For operational screens, aim for roughly 50–90px of control/header overhead between the context bar and primary data where practical.
+
+Do NOT create:
+
+[Huge title]
+[Large subtitle]
+[Four giant KPI cards]
+[Huge filter card]
+[Separate filter controls]
+[Then finally the data]
+
+Instead consider:
+
+compact title/context + metric strip + compact toolbar + primary workspace.
+
+Metrics should use compact strips / inline summaries where suitable rather than large cards.
+
+============================================================
+5. ROUTE COVERAGE — AUDIT THE ENTIRE PRODUCT
+============================================================
+
+Do NOT assume this route list is exhaustive.
+
+FIRST inspect the actual router/navigation and enumerate EVERY reachable production route, nested route and meaningful detail screen.
+
+Then systematically review the whole product.
+
+At minimum cover all seven pillars:
+
+OBSERVE
+- Dashboard
+- Live View
+- Call Logs
+- Chat Logs
+- Customers
+- customer/detail states if present
+
+CONTROL
+- Initiate Call
+- Chat
+- all meaningful interaction states
+
+OPERATIONALIZE
+- Outbound Campaigns
+- Campaign Detail
+- Create Campaign
+- NPS Campaigns
+- NPS detail/create states if present
+
+INTEGRATE
+- WhatsApp Hub
+- Formatting Hub
+- AI Orchestrator
+- related detail/configuration states
+
+IMPROVE
+- AI Agents
+- AI Agent Detail
+- Interaction Quality
+- drill-down/detail states
+
+MEASURE
+- Analytics
+- related drill-down/export/filter states
+
+GOVERN
+- User Management
+- Settings
+- meaningful nested/configuration states
+
+Also inspect:
+- dialogs
+- sheets
+- modals
+- expanded rows
+- drilldowns
+- empty states
+- loading states
+- error states
+- permission-denied/not-found states where relevant
+- secondary workflows reachable from these pages
+
+A route counts as unfinished if its main page is modern but its important detail/drill-down still looks like old VoiceForce.
+
+============================================================
+6. PAGE-SPECIFIC DESIGN INTENT
+============================================================
+
+These are intentions, not rigid mockups.
+
+CALL LOGS
+
+The current page has excessive vertical overhead from:
+- large KPI cards
+- large Filters container
+- separate filter controls
+
+Transform toward:
+- compact metrics strip
+- compact search/action/filter toolbar
+- floating advanced filters
+- active-filter chips
+- dense Call History workspace
+- grouped/table view preserved if both are real/useful
+- existing export semantics preserved honestly
+
+The call history should be the dominant surface.
+
+CHAT LOGS
+
+Apply the same operational filtering philosophy:
+- compact search
+- compact filter trigger
+- temporary advanced filters
+- active filter visibility
+- dense session/history workspace
+- grouped/table behavior preserved if real
+
+CUSTOMERS
+
+Current large stacked customer cards waste substantial space.
+
+Explore a more operational presentation such as:
+- dense customer list/table
+- optional master/detail behavior where appropriate
+- compact customer identity/status information
+- interaction count / last activity / relevant real status presented efficiently
+
+Do NOT turn VoiceForce into a CRM.
+
+Preserve the established product meaning:
+Customer 360 here is an operational interaction/customer view, not a fabricated CRM.
+
+CHAT
+
+Current conversation area is very large while setup/context controls are inefficiently positioned.
+
+Redesign as a genuine conversation workspace:
+- compact session setup controls
+- maximum usable conversation area
+- clear customer/agent/context visibility
+- contextual information can use a secondary panel if useful
+- composer remains prominent and practical
+- avoid huge empty bordered rectangles purely for decoration
+
+Do NOT send real messages while testing.
+
+AI AGENTS
+
+Roster:
+- compact operational list/table
+- useful attributes visible without giant containers
+- preserve real roster data only
+
+Agent Detail:
+Current page still uses several large cards and significant whitespace.
+
+Redesign as an operational agent profile:
+- compact identity header
+- compact activity/metric strip
+- dense sections/tabs/master-detail as appropriate for:
+  - identity
+  - activity
+  - business outcomes
+  - conversational quality
+  - technical performance
+  - any other real existing data
+
+Do not invent Agent Contract metadata not supplied by Call Centre.
+
+DASHBOARD / LIVE VIEW
+
+Optimize for monitoring:
+- information density
+- status hierarchy
+- scanability
+- compact metrics
+- primary operational information above the fold
+- avoid decorative cards where a compact metric/status strip works better
+
+INITIATE CALL
+
+Make task completion direct and compact.
+
+Do NOT place a real call during verification.
+
+NPS CAMPAIGNS
+
+Remember existing architecture findings:
+NPS remains mock unless the repository has genuinely changed since the previous audit.
+
+Do not make mock data look real.
+
+Do not create a second campaign engine.
+
+If still mock, redesign honestly while preserving clear status.
+
+WHATSAPP HUB / FORMATTING HUB / AI ORCHESTRATOR
+
+Redesign presentation thoroughly but do not alter their integration architecture as part of a visual exercise.
+
+INTERACTION QUALITY / ANALYTICS
+
+Charts/tables/metrics should maximize useful analytical space.
+
+Filtering follows the compact/floating model.
+
+Do not create decorative dashboards that reduce information density.
+
+USER MANAGEMENT / SETTINGS
+
+Use compact enterprise administration patterns:
+- tables/lists
+- tabs where appropriate
+- drawers/modals for editing where this improves workspace utilization
+- clear destructive/action hierarchy
+
+============================================================
+7. SHARED DESIGN SYSTEM
+============================================================
+
+Do not solve every screen independently.
+
+As repeated patterns emerge, create/refine shared presentation primitives.
+
+Examples:
+
+- compact page/context header
+- metric strip
+- compact toolbar
+- floating filter surface
+- active filter chips
+- dense data table/list
+- status badge
+- master/detail workspace
+- detail section
+- empty state
+- compact form section
+- action menu
+- temporary contextual panel
+
+Avoid excessive abstraction.
+
+Only create shared primitives where there is genuine repetition.
+
+The result should feel like ONE product.
+
+============================================================
+8. RESPONSIVE BEHAVIOR
+============================================================
+
+Desktop is important, but do not make the transformation desktop-only.
+
+At smaller widths:
+- preserve usable workspace
+- navigation remains temporary
+- filter popovers may become drawers/bottom sheets
+- tables may horizontally scroll where that is preferable to destroying information hierarchy
+- master/detail may stack
+- primary actions remain reachable
+- no accidental permanent side panels consuming the screen
+
+Do not fabricate a completely separate mobile product.
+
+============================================================
+9. APPLE HIG / ACCESSIBILITY
+============================================================
+
+Use the available Apple HIG skill as design guidance where useful.
+
+Do NOT blindly make VoiceForce look like an Apple consumer app.
+
+This is an enterprise operational application.
+
+Use HIG principles for:
+- hierarchy
+- clarity
+- focus
+- interaction feedback
+- control consistency
+- keyboard behavior
+- accessibility
+- temporary surfaces
+- appropriate target sizing
+- reduced visual clutter
+
+Perform an accessibility/design review of the transformed surfaces.
+
+Check at minimum:
+- text contrast
+- focus visibility
+- keyboard navigation
+- Escape behavior
+- focus restoration for temporary surfaces
+- aria-expanded / labels where relevant
+- logical tab order
+- status not communicated solely through color
+
+============================================================
+10. FUNCTIONAL / ARCHITECTURAL GUARDRAILS
+============================================================
+
+ABSOLUTE:
+
+Call Centre owns all AI/LLM capability.
+
+VoiceForce must NOT introduce:
+- LLM calls
+- transcript interpretation
+- outcome inference
+- summarization
+- intent inference
+- sentiment inference
+- structured extraction
+- semantic analysis
+
+If Call Centre does not provide an AI-derived value through Partner API, do not fabricate it.
+
+No agent_version.
+
+agent_id remains the immutable Call Agent identity.
+
+Do not alter Partner API assumptions merely for UI work.
+
+Do not change campaign correlation.
+
+Do not invent structured outcomes.
+
+Do not fabricate Agent Contract fields.
+
+Do not introduce fuzzy matching.
+
+Do not create another campaign engine.
+
+Preserve current authorization exactly.
+
+Do not weaken category/role authorization.
+
+Preserve the separate stronger admin-token gate for runBatch/reconcile.
+
+Maintain the Vercel function count constraint.
+Current baseline is 11.
+Do not create unnecessary new API routes/functions.
+
+Prefer frontend/shared-component work.
+
+If you discover a genuine backend/domain defect:
+DOCUMENT IT.
+Do not silently expand this session into unrelated backend work.
+
+============================================================
+11. OUTBOUND CAMPAIGNS
+============================================================
+
+Session 10.1 Outbound Campaigns is the current QUALITY REFERENCE.
+
+Do not gratuitously redesign it again.
+
+You MAY:
+- align shared primitives
+- fix inconsistencies revealed by the product-wide system
+- improve filters/detail density where clearly needed
+
+But preserve the approved model:
+- compact operational lists/tables
+- dark readable visual language
+- Direction C master/detail Create Campaign workflow
+- seven campaign stages
+- no Scheduling stage
+- "Outcome Policy" UI terminology
+
+Campaign stages remain:
+
+1 Basic Info
+2 Call Agent
+3 Agent Contract
+4 Audience
+5 Input Mapping
+6 Outcome Policy
+7 Review & Launch
+
+Do not reintroduce:
+- Direction A pill wizard
+- Direction B accordion wizard
+- Scheduling stage
+
+============================================================
+12. OUTCOME POLICY / AGENT CONTRACT HONESTY
+============================================================
+
+Existing seeded campaign result rules were previously audited.
+
+They are generic conservative defaults based on real call-data fields.
+
+They are NOT authoritative Call-Agent-specific outcomes.
+
+Continue to present them honestly.
+
+Until Partner API exposes expected outcomes:
+- do not imply generic rules are the selected Call Agent's contract
+- do not invent expected outcomes
+
+Current agents may still have:
+contractSource = legacy
+contractCompleteness = partial
+empty expectedInputFields
+empty expectedOutcomes
+empty outputFields
+
+That is legitimate and must remain visible/honest.
+
+============================================================
+13. TESTING SAFETY — ABSOLUTE
+============================================================
+
+NO LIVE OUTBOUND CALL MAY BE PLACED FOR TESTING.
+
+NO REAL CHAT MESSAGE MAY BE SENT FOR TESTING.
+
+NO REAL WHATSAPP MESSAGE MAY BE SENT FOR TESTING.
+
+NO REAL EXTERNAL SIDE EFFECT MAY BE TRIGGERED MERELY TO VERIFY UX.
+
+This is absolute unless the user explicitly approves that specific action later.
+
+You may navigate to states immediately before submission and then cancel.
+
+Do not invoke runBatch in a way that triggers calls.
+
+Do not launch a campaign.
+
+Do not click Initiate Call final submission.
+
+Do not send a chat.
+
+Use existing production data read-only where safe.
+
+============================================================
+14. VISUAL INSPECTION
+============================================================
+
+Do not consider compilation sufficient.
+
+Use the available connected browser capability to visually inspect the application.
+
+Playwright MCP previously had local browser installation problems.
+Figma MCP was unavailable.
+Claude-in-Chrome was connected and successfully used during Sessions 10.0/10.1.
+
+Use whatever browser inspection capability is ACTUALLY available in this session.
+
+Do not spend the session repeatedly trying to repair unavailable Figma/Playwright integrations.
+
+For every major transformed route:
+- inspect visually
+- check common viewport
+- inspect temporary navigation
+- inspect floating filters where applicable
+- inspect representative detail state
+- inspect empty/loading state where reasonably reachable without side effects
+
+Fix obvious density/layout regressions before completion.
+
+============================================================
+15. IMPLEMENTATION METHOD
+============================================================
+
+PHASE 1 — INVENTORY
+
+Before modifying production code:
+
+1. Enumerate all production routes from the actual router.
+2. Map each route to pillar.
+3. Identify nested/detail states.
+4. Identify existing filter-heavy pages.
+5. Identify pages still using legacy layout patterns.
+6. Identify reusable UI primitives already available.
+7. Identify Session 10.1 components that should become shared patterns.
+8. Record the inventory in the session report.
+
+Do not assume the prompt's route list is complete.
+
+PHASE 2 — DESIGN SYSTEM FOUNDATION
+
+Establish/refine shared primitives required for:
+- compact headers
+- metrics
+- toolbars
+- filters
+- chips
+- dense tables/lists
+- master/detail
+- status
+- compact forms
+- temporary panels
+
+Do not rewrite stable domain/business components unnecessarily.
+
+PHASE 3 — TRANSFORM PILLAR BY PILLAR
+
+Recommended order:
+
+Observe
+Control
+Operationalize
+Integrate
+Improve
+Measure
+Govern
+
+After each pillar:
+- visually inspect
+- fix obvious inconsistencies
+- ensure no functional regression
+
+PHASE 4 — CROSS-PRODUCT CONSISTENCY PASS
+
+Review the product as a whole.
+
+Look for:
+- old giant cards surviving
+- inconsistent spacing
+- inconsistent headings
+- duplicated filter patterns
+- oversized controls
+- inconsistent table density
+- light legacy surfaces accidentally left inside the new visual language
+- excessive empty space
+- detail screens not transformed
+- secondary screens missed
+- inconsistent responsive behavior
+
+PHASE 5 — ACCESSIBILITY / HIG PASS
+
+Run the appropriate design/accessibility review.
+
+Fix material findings.
+
+PHASE 6 — BUILD / VERIFY / DEPLOY
+
+Run:
+- TypeScript
+- build
+- lint and compare against known baseline rather than claiming old lint failures as new
+- function count check
+- route smoke tests
+- safe visual production verification
+
+Deploy only after the above passes.
+
+============================================================
+16. STOP CONDITIONS
+============================================================
+
+STOP and report rather than guessing if:
+
+- a redesign would require changing business semantics you cannot determine
+- a page depends on apparently fabricated/mock data and making it look production-real would be misleading
+- authorization behavior is unclear and a UI change might expose unauthorized data
+- a backend/API change becomes necessary to preserve functionality
+- Partner API behavior would need to be guessed
+- a test would require placing a real call/message
+- a destructive production action would be required for verification
+
+A stop condition may apply to one page without preventing safe transformation of the rest of the product.
+
+============================================================
+17. DEFINITION OF DONE
+============================================================
+
+This session is NOT done merely because:
+- colors changed
+- cards became dark
+- the sidebar changed
+- CSS tokens changed
+- components compile
+
+It is done only when:
+
+1. Every reachable production page has been inventoried.
+2. Every significant production page has been intentionally reviewed.
+3. Legacy page layouts have been structurally transformed where appropriate.
+4. Filter-heavy screens use compact/floating filtering rather than large persistent filter sections.
+5. Primary working data dominates operational screens.
+6. Major detail/drill-down screens use the same modern product language.
+7. Shared interaction patterns are consistent.
+8. Existing real functionality remains intact.
+9. Authorization remains intact.
+10. No fabricated data or AI interpretation has been introduced.
+11. No live call/message was triggered.
+12. TypeScript/build pass.
+13. Function count remains within the existing constraint.
+14. Major routes have been visually inspected.
+15. Production has been safely re-verified after deployment.
+
+FINAL VISUAL ACCEPTANCE TEST:
+
+"No production route should still look like the old VoiceForce application placed inside the new sidebar."
+
+If any important route does, the transformation is incomplete.
+
+============================================================
+18. SESSION REPORT
+============================================================
+
+Create:
+
+docs/SESSION_10_2_VOICEFORCE_FULL_PRODUCT_UX_TRANSFORMATION.md
+
+Include:
+
+1. Executive summary
+2. Full route inventory
+3. Before-state findings by pillar
+4. Shared UX primitives created/changed
+5. Pages transformed
+6. Filter architecture
+7. Detail/drill-down transformations
+8. Responsive behavior
+9. Accessibility/HIG findings and fixes
+10. Functional regression verification
+11. Authorization verification
+12. Build/lint/function-count results
+13. Visual inspection coverage
+14. Production deployment verification
+15. Known remaining UX debt
+16. Any intentionally untouched functionality and why
+17. Explicit confirmation:
+    - no live call placed
+    - no real chat/WhatsApp message sent
+    - no LLM added
+    - no agent_version added
+    - no correlation behavior changed
+    - no fabricated Partner API fields/outcomes added
+
+Also state clearly whether EVERY inventoried production route was:
+- TRANSFORMED
+- REVIEWED / ALREADY COMPLIANT
+- DEFERRED WITH REASON
+
+There must be no silently omitted routes.
+
+============================================================
+19. FINAL INSTRUCTION
+============================================================
+
+Be willing to redesign.
+
+Do not simply restyle the existing JSX.
+
+The purpose of Session 10.2 is to make VoiceForce feel like a modern, high-density operational product across the ENTIRE application.
+
+The user is specifically dissatisfied that Session 10.1's effect is visible mainly in the shell and campaign pages while detailed screens retain the old layout.
+
+Solve that problem comprehensively.
+
+Workspace first.
+Controls compact.
+Filters temporary.
+Data dominant.
+Functionality preserved.
+Information honest.

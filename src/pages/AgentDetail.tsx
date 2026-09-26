@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { MetricStrip } from '@/components/common/MetricStrip';
 import { ArrowLeft, Bot, Loader2, Phone, MessageSquare } from 'lucide-react';
 import { useAgentDetail } from '@/hooks/agents/useAgentDetail';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
@@ -55,8 +55,8 @@ const AgentDetail: React.FC = () => {
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto p-6 flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="bg-slate-950 min-h-full flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
         </div>
       </Layout>
     );
@@ -65,12 +65,12 @@ const AgentDetail: React.FC = () => {
   if (!agent) {
     return (
       <Layout>
-        <div className="container mx-auto p-6 space-y-4">
-          <Button variant="ghost" onClick={() => navigate('/ai-agents')}>
+        <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-900" onClick={() => navigate('/ai-agents')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to AI Agents
           </Button>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-slate-500 px-1">
             No agent found for id "{agentId}" in the live roster (GET /api/v1/agents).
           </p>
         </div>
@@ -78,235 +78,121 @@ const AgentDetail: React.FC = () => {
     );
   }
 
+  const SectionCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+    <div className="rounded-md border border-slate-800 bg-slate-900/60 p-3 space-y-2">
+      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{title}</div>
+      {children}
+    </div>
+  );
+
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/ai-agents')} className="mb-2 -ml-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to AI Agents
-          </Button>
-          <div className="flex items-center gap-3">
-            <Bot className="h-7 w-7" />
-            <div>
-              <h1 className="text-3xl font-bold">{agent.displayName}</h1>
-              <p className="text-muted-foreground">{agent.personaName}</p>
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-slate-400 hover:text-white hover:bg-slate-900" onClick={() => navigate('/ai-agents')}>
+          <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+          Back to AI Agents
+        </Button>
+
+        {/* Compact identity header */}
+        <div className="flex items-center gap-3">
+          <Bot className="h-6 w-6 text-cyan-400 shrink-0" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-slate-50 truncate">{agent.displayName}</h1>
+              {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-slate-300">Default</Badge>}
             </div>
-            {agent.isDefault && <Badge variant="outline">Default</Badge>}
+            <p className="text-xs text-slate-500">
+              {agent.personaName || FALLBACK} · {formatStatusLabel(agent.direction)} · {agent.language || FALLBACK} ·{' '}
+              <span className="font-mono">{agent.agentId}</span>
+            </p>
           </div>
         </div>
 
-        {/* Identity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Identity</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <div className="text-muted-foreground">Agent ID</div>
-              <div className="font-mono text-xs mt-1">{agent.agentId}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Direction</div>
-              <div className="mt-1">{formatStatusLabel(agent.direction)}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Language</div>
-              <div className="mt-1">{agent.language || FALLBACK}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Persona</div>
-              <div className="mt-1">{agent.personaName || FALLBACK}</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-2 gap-4 text-sm">
-            <div className="border rounded-lg p-4">
-              <div className="text-muted-foreground flex items-center gap-1">
-                <Phone className="h-3.5 w-3.5" /> Calls handled
-              </div>
-              <div className="text-2xl font-semibold mt-1">{callMetrics.callsHandled}</div>
-              <div className="text-xs text-muted-foreground mt-1">Most recent 100 call-data rows for this agent</div>
-            </div>
-            <div className="border rounded-lg p-4">
-              <div className="text-muted-foreground flex items-center gap-1">
-                <MessageSquare className="h-3.5 w-3.5" /> Chats handled
-              </div>
-              <div className="text-2xl font-semibold mt-1">{chatMetrics.chatsHandled}</div>
-              <div className="text-xs text-muted-foreground mt-1">Most recent 100 chat sessions for this agent</div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Compact activity/metric strip */}
+        <MetricStrip
+          items={[
+            { label: 'Calls handled', value: callMetrics.callsHandled, hint: 'Most recent 100 call-data rows' },
+            { label: 'Chats handled', value: chatMetrics.chatsHandled, hint: 'Most recent 100 chat sessions' },
+          ]}
+        />
 
         {/* Quality — three visibly separate categories, never blended into one score */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Business Outcomes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Resolved</span>
-                <span>{callMetrics.resolvedCount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Escalated</span>
-                <span>{callMetrics.escalatedCount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">FCR rate</span>
-                <span>{callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)}</span>
-              </div>
-              {agent.direction === 'outbound' && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Campaign success rate</span>
-                  <span>
-                    {campaignOutcomes.successRate === null
-                      ? FALLBACK
-                      : formatFractionAsPercent(campaignOutcomes.successRate)}
-                  </span>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground pt-1">
-                Voice: call-data outcome/fcr, aggregated. Chat has no documented business-outcome field today —
-                intentionally not shown here.
-              </p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 text-sm">
+          <SectionCard title="Business Outcomes">
+            <div className="flex justify-between"><span className="text-slate-500">Resolved</span><span className="text-slate-200">{callMetrics.resolvedCount}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Escalated</span><span className="text-slate-200">{callMetrics.escalatedCount}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">FCR rate</span><span className="text-slate-200">{callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)}</span></div>
+            {agent.direction === 'outbound' && (
+              <div className="flex justify-between"><span className="text-slate-500">Campaign success rate</span><span className="text-slate-200">{campaignOutcomes.successRate === null ? FALLBACK : formatFractionAsPercent(campaignOutcomes.successRate)}</span></div>
+            )}
+            <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-800">
+              Voice: call-data outcome/fcr, aggregated. Chat has no documented business-outcome field today — intentionally not shown.
+            </p>
+          </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Conversational Quality</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Avg intent accuracy (voice)</span>
-                <span>
-                  {callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Avg intent confidence (chat)</span>
-                <span>
-                  {chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Avg sentiment score (voice)</span>
-                <span>{callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Authenticated (voice / chat)</span>
-                <span>
-                  {callMetrics.authenticatedCount} / {chatMetrics.authenticatedCount}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          <SectionCard title="Conversational Quality">
+            <div className="flex justify-between"><span className="text-slate-500">Intent accuracy (voice)</span><span className="text-slate-200">{callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Intent confidence (chat)</span><span className="text-slate-200">{chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Sentiment (voice)</span><span className="text-slate-200">{callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Authenticated (voice/chat)</span><span className="text-slate-200">{callMetrics.authenticatedCount} / {chatMetrics.authenticatedCount}</span></div>
+          </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Technical Performance</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Avg handle time (voice)</span>
-                <span>{formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Avg turn latency (chat)</span>
-                <span>{chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`}</span>
-              </div>
-              <p className="text-xs text-muted-foreground pt-1">
-                Per-agent voice turn latency has no confirmed API source today (GET /api/v1/analytics/metrics is
-                global/direction-scoped only) — intentionally not shown.
-              </p>
-            </CardContent>
-          </Card>
+          <SectionCard title="Technical Performance">
+            <div className="flex justify-between"><span className="text-slate-500">Avg handle time (voice)</span><span className="text-slate-200">{formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Avg turn latency (chat)</span><span className="text-slate-200">{chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`}</span></div>
+            <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-800">
+              Per-agent voice turn latency has no confirmed API source today (analytics/metrics is global/direction-scoped only) — intentionally not shown.
+            </p>
+          </SectionCard>
         </div>
 
         {/* Campaign outcomes — outbound agents only */}
         {agent.direction === 'outbound' && agentCampaigns.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Campaign Outcomes</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <div className="text-muted-foreground">Campaigns</div>
-                <div className="text-xl font-semibold mt-1">{campaignOutcomes.campaignCount}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Targets</div>
-                <div className="text-xl font-semibold mt-1">{campaignOutcomes.targetCount}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Classified</div>
-                <div className="text-xl font-semibold mt-1">{campaignOutcomes.classifiedCount}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Success rate</div>
-                <div className="text-xl font-semibold mt-1">
-                  {campaignOutcomes.successRate === null ? FALLBACK : formatFractionAsPercent(campaignOutcomes.successRate)}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground col-span-full">
-                Target-level success rate via each target's effective_result_id — same definition Campaigns itself
-                uses (Session 5). Targets with no classified result are excluded from both sides of the ratio, not
-                counted as failures.
-              </p>
-            </CardContent>
-          </Card>
+          <MetricStrip
+            items={[
+              { label: 'Campaigns', value: campaignOutcomes.campaignCount },
+              { label: 'Targets', value: campaignOutcomes.targetCount },
+              { label: 'Classified', value: campaignOutcomes.classifiedCount },
+              { label: 'Success rate', value: campaignOutcomes.successRate === null ? FALLBACK : formatFractionAsPercent(campaignOutcomes.successRate) },
+            ]}
+          />
         )}
 
         {/* Recent interactions — drill-down into existing detail mechanisms only */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Interactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentInteractions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No recent interactions for this agent.</p>
-            ) : (
+        <div className="space-y-2">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">Recent Interactions</div>
+          {recentInteractions.length === 0 ? (
+            <p className="text-sm text-slate-500 px-1">No recent interactions for this agent.</p>
+          ) : (
+            <div className="rounded-md border border-slate-800 overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Channel</TableHead>
-                    <TableHead>When</TableHead>
-                    <TableHead>Outcome / Status</TableHead>
-                    <TableHead></TableHead>
+                  <TableRow className="border-slate-800 hover:bg-transparent">
+                    {['Channel', 'When', 'Outcome / Status', ''].map((h) => (
+                      <TableHead key={h} className="text-slate-500 text-xs">{h}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {recentInteractions.map((row) =>
                     row.kind === 'call' ? (
-                      <TableRow key={`call-${row.call.interactionId}`}>
-                        <TableCell>
-                          <Badge variant="outline">Voice</Badge>
-                        </TableCell>
-                        <TableCell>{formatTimestamp(row.call.startTime)}</TableCell>
-                        <TableCell>{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm" onClick={() => setSelectedInteraction(row.call)}>
+                      <TableRow key={`call-${row.call.interactionId}`} className="border-slate-800/60 hover:bg-slate-900/60">
+                        <TableCell><Badge variant="outline" className="text-xs border-slate-600 text-slate-300">Voice</Badge></TableCell>
+                        <TableCell className="text-slate-300 text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
+                        <TableCell className="text-slate-300">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-slate-800" onClick={() => setSelectedInteraction(row.call)}>
                             View
                           </Button>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      <TableRow key={`chat-${row.chat.sessionId}`}>
-                        <TableCell>
-                          <Badge variant="outline">Chat</Badge>
-                        </TableCell>
-                        <TableCell>{formatTimestamp(row.chat.updatedAt)}</TableCell>
-                        <TableCell>{formatStatusLabel(row.chat.status)}</TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
+                      <TableRow key={`chat-${row.chat.sessionId}`} className="border-slate-800/60 hover:bg-slate-900/60">
+                        <TableCell><Badge variant="outline" className="text-xs border-slate-600 text-slate-300">Chat</Badge></TableCell>
+                        <TableCell className="text-slate-300 text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
+                        <TableCell className="text-slate-300">{formatStatusLabel(row.chat.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-slate-800" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
                             View
                           </Button>
                         </TableCell>
@@ -315,9 +201,9 @@ const AgentDetail: React.FC = () => {
                   )}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
 
         <InteractionDetailDialog
           isOpen={Boolean(selectedInteraction)}

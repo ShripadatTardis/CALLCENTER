@@ -1,13 +1,11 @@
 
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { AdvancedFilters, CallLogFilters } from '@/components/call-logs/AdvancedFilters';
+import { AdvancedFilters, CallLogFilters, CallLogsSearch } from '@/components/call-logs/AdvancedFilters';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, FileText, TrendingUp, Clock, Target, Users, Loader2, LayoutList, Network } from 'lucide-react';
+import { Play, FileText, Loader2, LayoutList, Network, Download } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { Interaction } from '@/types/interaction';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
@@ -16,6 +14,8 @@ import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
+import { FilterPopover } from '@/components/common/FilterPopover';
+import { MetricStrip } from '@/components/common/MetricStrip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
@@ -68,6 +68,9 @@ const CallLogs: React.FC = () => {
   const summary = data?.summary;
   const clientFacetsActive = fcrFacet !== 'any' || authFacet !== 'any' || Boolean(campaignFacet);
   const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '') || clientFacetsActive;
+  const advancedActiveCount =
+    (filters.date_from ? 1 : 0) + (filters.date_to ? 1 : 0) + (filters.outcome ? 1 : 0) +
+    (filters.direction ? 1 : 0) + (filters.min_duration !== undefined || filters.max_duration !== undefined ? 1 : 0);
 
   const grouped = useMemo(
     () =>
@@ -117,112 +120,79 @@ const CallLogs: React.FC = () => {
     setShowDetail(true);
   };
 
+  // Exports only the currently fetched/filtered page, not the complete
+  // call history — the honest label lives on the Export button below.
   const handleExport = () => {
-    // Exports only the currently fetched/filtered result set — see the
-    // limitation note rendered in AdvancedFilters above the controls.
     downloadCsv(toCsv(interactions), `call-logs-${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <PageHeader
-          pillar="Observe"
-          title="Call Logs & Recordings"
-          description="Complete audit trail of AI voice interactions."
-        />
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-3">
+        {summary && (
+          <MetricStrip
+            items={[
+              { label: 'FCR', value: formatPercent(summary.fcr_rate), hint: `${summary.resolved_count} of ${summary.total_calls} resolved` },
+              { label: 'Avg handle time', value: formatDurationLong(summary.avg_aht_seconds), hint: formatDurationExact(summary.avg_aht_seconds) },
+              { label: 'Intent accuracy', value: formatPercent(summary.avg_intent_accuracy) },
+              { label: 'Escalation rate', value: formatPercent(summary.escalation_rate), hint: `${summary.escalated_count} escalated`, tone: summary.escalation_rate && summary.escalation_rate > 20 ? 'warning' : 'default' },
+            ]}
+          />
+        )}
 
-        {/* Summary Statistics — from the live call-data summary, not recomputed client-side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">First Call Resolution</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatPercent(summary?.fcr_rate)}</div>
-              <p className="text-xs text-muted-foreground">
-                {summary ? `${summary.resolved_count} of ${summary.total_calls} calls resolved` : ''}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Handle Time</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div
-                className="text-2xl font-bold"
-                title={formatDurationExact(summary?.avg_aht_seconds)}
-              >
-                {formatDurationLong(summary?.avg_aht_seconds)}
-              </div>
-              <p className="text-xs text-muted-foreground">Across all calls</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Intent Accuracy</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatPercent(summary?.avg_intent_accuracy)}</div>
-              <p className="text-xs text-muted-foreground">AI understanding rate</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Escalation Rate</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatPercent(summary?.escalation_rate)}</div>
-              <p className="text-xs text-muted-foreground">
-                {summary ? `${summary.escalated_count} calls escalated` : ''}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <AdvancedFilters filters={filters} onFiltersChange={setFilters} onExport={handleExport} />
-
-        {/* Client-side voice facets — no server query param exists for these (§13), so they narrow only the current page. */}
-        <div className="flex flex-wrap items-end gap-3 -mt-2">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">FCR (current page)</label>
-            <Select value={fcrFacet} onValueChange={(v) => setFcrFacet(v as ClientFacet)}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
+        {/* Compact toolbar — search, page-local facets, temporary filter panel, view toggle, export. Filters are controls, not content. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-64">
+            <CallLogsSearch value={filters.search ?? ''} onChange={(v) => setFilters((f) => ({ ...f, search: v || undefined }))} />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Authenticated (current page)</label>
-            <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as ClientFacet)}>
-              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Campaign contains (current page)</label>
-            <Input
-              className="h-8 w-48 text-xs"
-              value={campaignFacet}
-              onChange={(e) => setCampaignFacet(e.target.value)}
-              placeholder="Campaign name…"
-            />
-          </div>
+          <Select value={fcrFacet} onValueChange={(v) => setFcrFacet(v as ClientFacet)}>
+            <SelectTrigger className="h-8 w-[124px] text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue placeholder="FCR (page)" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">FCR: any</SelectItem>
+              <SelectItem value="yes">FCR: yes</SelectItem>
+              <SelectItem value="no">FCR: no</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as ClientFacet)}>
+            <SelectTrigger className="h-8 w-[150px] text-xs border-slate-700 bg-slate-900 text-slate-300"><SelectValue placeholder="Authenticated (page)" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Auth: any</SelectItem>
+              <SelectItem value="yes">Auth: yes</SelectItem>
+              <SelectItem value="no">Auth: no</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            className="h-8 w-40 text-xs border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500"
+            value={campaignFacet}
+            onChange={(e) => setCampaignFacet(e.target.value)}
+            placeholder="Campaign (page)…"
+          />
+          <FilterPopover activeCount={advancedActiveCount} onClear={() => setFilters((f) => ({ search: f.search }))}>
+            <AdvancedFilters filters={filters} onFiltersChange={setFilters} />
+          </FilterPopover>
+          <div className="flex-1" />
+          <Button
+            variant={view === 'grouped' ? 'default' : 'outline'}
+            size="sm"
+            className={view === 'grouped' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            onClick={() => setView('grouped')}
+          >
+            <Network className="h-3.5 w-3.5 mr-1.5" />
+            Grouped
+          </Button>
+          <Button
+            variant={view === 'table' ? 'default' : 'outline'}
+            size="sm"
+            className={view === 'table' ? 'h-8' : 'h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}
+            onClick={() => setView('table')}
+          >
+            <LayoutList className="h-3.5 w-3.5 mr-1.5" />
+            Table
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white" onClick={handleExport} title="Exports the currently loaded/filtered page only">
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Export
+          </Button>
         </div>
 
         <ActiveFilterChips chips={activeChips} onClearAll={clearAll} />
@@ -236,153 +206,107 @@ const CallLogs: React.FC = () => {
           />
         )}
 
-        {/* Call Logs Cards */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">
-              Call History ({interactions.length}
-              {view === 'grouped' && selectedGroup ? ` of ${allInteractions.length}` : ''})
-            </h2>
-            <div className="flex gap-1">
-              <Button
-                variant={view === 'grouped' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setView('grouped')}
-              >
-                <Network className="h-4 w-4 mr-1" />
-                Grouped View
-              </Button>
-              <Button variant={view === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setView('table')}>
-                <LayoutList className="h-4 w-4 mr-1" />
-                Table View
-              </Button>
-            </div>
-          </div>
+        {view === 'grouped' && !isLoading && allInteractions.length > 0 && (
+          <GroupedInteractionTree
+            group={grouped}
+            selected={selectedGroup}
+            onSelect={setSelectedGroup}
+            countsAreExhaustive={false}
+          />
+        )}
 
-          {view === 'grouped' && !isLoading && allInteractions.length > 0 && (
-            <GroupedInteractionTree
-              group={grouped}
-              selected={selectedGroup}
-              onSelect={setSelectedGroup}
-              countsAreExhaustive={false}
-            />
-          )}
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : isError && interactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Call logs are unavailable right now — see the error above.
-            </p>
-          ) : interactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {hasActiveFilters
-                ? 'No calls match the current filters. Try widening or clearing them.'
-                : 'No completed calls yet.'}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {interactions.map((call) => (
-                <Card key={call.interactionId} className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-semibold text-lg">
-                          {call.callerName || call.phoneNumber} - {call.intent || 'General'}
-                        </h3>
-                        <Badge
-                          variant={
-                            call.outcome === 'resolved'
-                              ? 'default'
-                              : call.outcome === 'escalated'
-                                ? 'destructive'
-                                : 'secondary'
-                          }
-                        >
-                          {call.outcome ?? call.status}
-                        </Badge>
-                      </div>
-
-                      <div className="text-sm text-muted-foreground mb-2 break-all">
-                        <span className="font-mono text-xs">{call.interactionId}</span>
-                        {' • '}
-                        {formatPhoneNumber(call.phoneNumber)}
-                        {' • '}
-                        <span title={formatDurationExact(call.durationSeconds)}>
-                          {formatDurationLong(call.durationSeconds)}
-                        </span>
-                      </div>
-
-                      <p className="text-sm mb-3 text-gray-700">
-                        {call.summary || 'No summary available'}
-                      </p>
-
-                      {call.tags && call.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {call.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col items-end space-y-2 ml-4">
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!call.recording?.url}
-                          onClick={() => handleViewDetail(call)}
-                          title={call.recording?.url ? 'Play call recording' : 'No recording available for this call'}
-                          aria-label={call.recording?.url ? 'Play call recording' : 'No recording available'}
-                        >
-                          <Play className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetail(call)}
-                          title="View call details and transcript"
-                          aria-label="View call details and transcript"
-                        >
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <div className="text-right text-xs text-muted-foreground">
-                        <div className="flex items-center space-x-1 mb-1">
-                          <span>FCR:</span>
-                          <span className={call.fcr ? 'text-green-600' : 'text-red-600'}>
-                            {call.fcr ? 'Yes' : 'No'}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <span>Intent:</span>
-                          <span className="font-medium">{formatPercent(call.intentAccuracy, 0)}</span>
-                          {call.intentAccuracy !== undefined && (
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                call.intentAccuracy >= 90
-                                  ? 'bg-green-500'
-                                  : call.intentAccuracy >= 80
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
-                              }`}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+        <div className="text-xs text-slate-500 px-1">
+          Call history — {interactions.length}
+          {view === 'grouped' && selectedGroup ? ` of ${allInteractions.length}` : ''} shown
         </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+          </div>
+        ) : isError && interactions.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">Call logs are unavailable right now — see the error above.</p>
+        ) : interactions.length === 0 ? (
+          <p className="text-sm text-slate-500 px-1">
+            {hasActiveFilters ? 'No calls match the current filters. Try widening or clearing them.' : 'No completed calls yet.'}
+          </p>
+        ) : (
+          <div className="rounded-md border border-slate-800 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+                  <th className="px-3 py-2 font-medium">Caller / Intent</th>
+                  <th className="px-3 py-2 font-medium">Phone</th>
+                  <th className="px-3 py-2 font-medium">Duration</th>
+                  <th className="px-3 py-2 font-medium">Outcome</th>
+                  <th className="px-3 py-2 font-medium">FCR</th>
+                  <th className="px-3 py-2 font-medium">Intent accuracy</th>
+                  <th className="px-3 py-2 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {interactions.map((call) => (
+                  <tr key={call.interactionId} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-900/60">
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-slate-100">{call.callerName || call.phoneNumber}</div>
+                      <div className="text-xs text-slate-500">{call.intent || 'General'} · <span className="font-mono">{call.interactionId.slice(0, 8)}</span></div>
+                    </td>
+                    <td className="px-3 py-2 text-slate-300 whitespace-nowrap">{formatPhoneNumber(call.phoneNumber)}</td>
+                    <td className="px-3 py-2 text-slate-300 whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
+                      {formatDurationLong(call.durationSeconds)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge
+                        variant={call.outcome === 'resolved' ? 'default' : call.outcome === 'escalated' ? 'destructive' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {call.outcome ?? call.status}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={call.fcr ? 'text-emerald-400' : 'text-red-400'}>{call.fcr ? 'Yes' : 'No'}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-slate-300">
+                        {formatPercent(call.intentAccuracy, 0)}
+                        {call.intentAccuracy !== undefined && (
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              call.intentAccuracy >= 90 ? 'bg-emerald-500' : call.intentAccuracy >= 80 ? 'bg-amber-500' : 'bg-red-500'
+                            }`}
+                          />
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-30"
+                        disabled={!call.recording?.url}
+                        onClick={() => handleViewDetail(call)}
+                        title={call.recording?.url ? 'Play call recording' : 'No recording available for this call'}
+                        aria-label={call.recording?.url ? 'Play call recording' : 'No recording available'}
+                      >
+                        <Play className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white"
+                        onClick={() => handleViewDetail(call)}
+                        title="View call details and transcript"
+                        aria-label="View call details and transcript"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <InteractionDetailDialog
           isOpen={showDetail}

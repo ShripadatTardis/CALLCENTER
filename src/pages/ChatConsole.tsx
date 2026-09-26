@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MessageSquarePlus, MessageCircle } from 'lucide-react';
@@ -53,37 +52,39 @@ const ChatConsole: React.FC = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <PageHeader
-            pillar="Control"
-            title="Chat"
-            description="Start and continue a live AI text conversation — a separate channel from WhatsApp."
-          />
-          <Button variant="outline" onClick={handleNewChat} disabled={messages.length === 0}>
-            <MessageSquarePlus className="h-4 w-4 mr-1" />
+      <div className="bg-slate-950 min-h-full text-slate-200 p-4 space-y-2 flex flex-col" style={{ height: 'calc(100vh - 44px)' }}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <ChatIdentitySelector
+              isBound={hasActiveSession}
+              boundAgentName={boundAgentName ?? boundAgentId}
+              sessionId={sessionId}
+              resolvedCustomerId={customerId}
+              resolvedContactId={contactId}
+              onIdentityChange={({ displayLabel: _displayLabel, ...next }) => setIdentity(next)}
+              resetKey={resetKey}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white"
+            onClick={handleNewChat}
+            disabled={messages.length === 0}
+          >
+            <MessageSquarePlus className="h-3.5 w-3.5 mr-1.5" />
             New Chat
           </Button>
         </div>
 
-        <ChatIdentitySelector
-          isBound={hasActiveSession}
-          boundAgentName={boundAgentName ?? boundAgentId}
-          sessionId={sessionId}
-          resolvedCustomerId={customerId}
-          resolvedContactId={contactId}
-          onIdentityChange={({ displayLabel: _displayLabel, ...next }) => setIdentity(next)}
-          resetKey={resetKey}
-        />
-
-        <Card className="flex flex-col h-[65vh]">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageCircle className="h-4 w-4" />
-              Conversation {hasActiveSession && <span className="text-xs text-muted-foreground font-normal">(active session)</span>}
+        <Card className="flex-1 min-h-0 flex flex-col bg-slate-900 border-slate-800">
+          <CardHeader className="py-2 border-b border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+              <MessageCircle className="h-3.5 w-3.5" />
+              Conversation {hasActiveSession && <span className="text-xs text-slate-500 font-normal">(active session)</span>}
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col min-h-0">
+          <CardContent className="flex-1 flex flex-col min-h-0 pt-3">
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center text-gray-500">

@@ -7,11 +7,6 @@ import { queryClient } from "@/lib/queryClient";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
-// Session 10.0 — isolated design-lab prototypes, not part of production IA/nav.
-import { DesignLabIndex } from "./design-lab/DesignLabIndex";
-import { DirectionA } from "./design-lab/DirectionA";
-import { DirectionB } from "./design-lab/DirectionB";
-import { DirectionC } from "./design-lab/DirectionC";
 import Dashboard from "./pages/Dashboard";
 import InitiateCall from "./pages/InitiateCall";
 import CallLogs from "./pages/CallLogs";
@@ -72,11 +67,6 @@ const App = () => (
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/user-management" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          {/* Session 10.0 design lab — isolated, unauthenticated, static demo data only. */}
-          <Route path="/design-lab" element={<DesignLabIndex />} />
-          <Route path="/design-lab/a" element={<DirectionA />} />
-          <Route path="/design-lab/b" element={<DirectionB />} />
-          <Route path="/design-lab/c" element={<DirectionC />} />
           <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>

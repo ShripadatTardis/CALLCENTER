@@ -85,14 +85,7 @@ export const Sidebar: React.FC = () => {
           <Menu size={18} aria-hidden="true" />
         </button>
 
-        <div
-          className="w-8 h-8 rounded bg-cyan-600 flex items-center justify-center text-white text-[10px] font-bold mb-2"
-          title={`TARDIS VoiceForce — ${industryConfig.name}`}
-        >
-          TAR
-        </div>
-
-        <nav className="flex flex-col items-center gap-1 flex-1 overflow-y-auto" aria-label="Product pillars">
+        <nav className="flex flex-col items-center gap-1 flex-1 overflow-y-auto mt-1" aria-label="Product pillars">
           {visiblePillars.map((pillar) => {
             const Icon = PILLAR_ICON[pillar.key] ?? LayoutGrid;
             const isActive = activePillar?.key === pillar.key;

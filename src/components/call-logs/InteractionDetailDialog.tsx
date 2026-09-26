@@ -94,38 +94,38 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </DialogHeader>
 
         {/* Metadata */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 p-4 rounded-lg text-sm">
-          <div><span className="text-slate-500">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
-          <div><span className="text-slate-500">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
-          <div><span className="text-slate-500">Direction:</span> {interaction.direction ?? '—'}</div>
-          <div><span className="text-slate-500">Status:</span> {formatStatusLabel(interaction.status)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-slate-50 dark:bg-slate-900 p-4 rounded-lg text-sm">
+          <div><span className="text-slate-500 dark:text-slate-400">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Direction:</span> {interaction.direction ?? '—'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Status:</span> {formatStatusLabel(interaction.status)}</div>
           <div title={formatDurationExact(interaction.durationSeconds)}>
-            <span className="text-slate-500">Duration:</span> {formatDurationLong(interaction.durationSeconds)}
+            <span className="text-slate-500 dark:text-slate-400">Duration:</span> {formatDurationLong(interaction.durationSeconds)}
           </div>
-          <div><span className="text-slate-500">Outcome:</span> {interaction.outcome ?? '—'}</div>
-          <div><span className="text-slate-500">FCR:</span> {interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No'}</div>
-          <div><span className="text-slate-500">Intent:</span> {interaction.intent ?? '—'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Outcome:</span> {interaction.outcome ?? '—'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">FCR:</span> {interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Intent:</span> {interaction.intent ?? '—'}</div>
           <div>
-            <span className="text-slate-500">Intent accuracy:</span> {formatPercent(interaction.intentAccuracy, 0)}
+            <span className="text-slate-500 dark:text-slate-400">Intent accuracy:</span> {formatPercent(interaction.intentAccuracy, 0)}
           </div>
-          <div><span className="text-slate-500">Sentiment:</span> {interaction.sentiment ?? '—'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Sentiment:</span> {interaction.sentiment ?? '—'}</div>
           <div>
-            <span className="text-slate-500">Sentiment score:</span>{' '}
+            <span className="text-slate-500 dark:text-slate-400">Sentiment score:</span>{' '}
             {formatFractionAsPercent(interaction.sentimentScore)}
           </div>
-          <div><span className="text-slate-500">Campaign:</span> {interaction.campaignName ?? '—'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Campaign:</span> {interaction.campaignName ?? '—'}</div>
           <div>
-            <span className="text-slate-500">Authenticated:</span>{' '}
+            <span className="text-slate-500 dark:text-slate-400">Authenticated:</span>{' '}
             {interaction.wasAuthenticated === null || interaction.wasAuthenticated === undefined
               ? 'N/A'
               : interaction.wasAuthenticated
                 ? 'Yes'
                 : 'No'}
           </div>
-          <div><span className="text-slate-500">Escalation:</span> {interaction.escalation?.trigger ?? 'None'}</div>
-          <div><span className="text-slate-500">Started:</span> {formatTimestamp(interaction.startTime)}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Escalation:</span> {interaction.escalation?.trigger ?? 'None'}</div>
+          <div><span className="text-slate-500 dark:text-slate-400">Started:</span> {formatTimestamp(interaction.startTime)}</div>
           <div className="col-span-2 md:col-span-4">
-            <span className="text-slate-500">Summary:</span> {interaction.summary || 'No summary available'}
+            <span className="text-slate-500 dark:text-slate-400">Summary:</span> {interaction.summary || 'No summary available'}
           </div>
           {interaction.tags && interaction.tags.length > 0 && (
             <div className="col-span-2 md:col-span-4 flex flex-wrap gap-1">
@@ -137,7 +137,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </div>
 
         {/* Recording */}
-        <div className="bg-slate-50 p-4 rounded-lg">
+        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg">
           {interaction.recording?.url ? (
             <audio controls className="w-full" src={interaction.recording.url}>
               Your browser does not support the audio element.
@@ -204,7 +204,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
                     <span className="text-xs text-slate-400">{formatFractionAsPercent(entry.confidence)} confidence</span>
                   )}
                 </div>
-                <p className="text-slate-800 leading-relaxed">
+                <p className="text-slate-800 dark:text-slate-200 leading-relaxed">
                   {searchTerm
                     ? entry.text
                         .split(new RegExp(`(${searchTerm})`, 'gi'))

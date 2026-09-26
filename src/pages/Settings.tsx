@@ -6,12 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Save, Bell, Shield, Database, SlidersHorizontal } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Save, Bell, Shield, Database, SlidersHorizontal, Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme, type AppearancePreference } from '@/contexts/ThemeContext';
 
 const Settings: React.FC = () => {
   const [notifications, setNotifications] = useState(true);
   const [autoEscalation, setAutoEscalation] = useState(false);
   const [dataRetention, setDataRetention] = useState('90');
+  const { preference, setPreference } = useTheme();
 
   const handleSave = () => {
     console.log('Settings saved');
@@ -41,7 +44,53 @@ const Settings: React.FC = () => {
             <TabsTrigger value="ai" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">
               <Database className="h-3.5 w-3.5 mr-1.5" />AI Configuration
             </TabsTrigger>
+            <TabsTrigger value="appearance" className="text-xs data-[state=active]:bg-slate-800 data-[state=active]:text-white">
+              <Sun className="h-3.5 w-3.5 mr-1.5" />Appearance
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="appearance" className="mt-3">
+            <div className="rounded-md border border-slate-800 bg-slate-900/60 p-4 space-y-3 max-w-md">
+              <div>
+                <Label className="text-xs text-slate-300">Appearance</Label>
+                <p className="text-xs text-slate-500">Choose how VoiceForce looks on this device.</p>
+              </div>
+              <ToggleGroup
+                type="single"
+                value={preference}
+                onValueChange={(value) => value && setPreference(value as AppearancePreference)}
+                className="justify-start gap-2"
+                aria-label="Appearance preference"
+              >
+                <ToggleGroupItem
+                  value="light"
+                  aria-label="Light"
+                  className="h-8 px-3 text-xs gap-1.5 border border-slate-700 bg-slate-900 text-slate-300 data-[state=on]:bg-cyan-600 data-[state=on]:text-white data-[state=on]:border-cyan-600"
+                >
+                  <Sun className="h-3.5 w-3.5" />Light
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="dark"
+                  aria-label="Dark"
+                  className="h-8 px-3 text-xs gap-1.5 border border-slate-700 bg-slate-900 text-slate-300 data-[state=on]:bg-cyan-600 data-[state=on]:text-white data-[state=on]:border-cyan-600"
+                >
+                  <Moon className="h-3.5 w-3.5" />Dark
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="system"
+                  aria-label="System"
+                  className="h-8 px-3 text-xs gap-1.5 border border-slate-700 bg-slate-900 text-slate-300 data-[state=on]:bg-cyan-600 data-[state=on]:text-white data-[state=on]:border-cyan-600"
+                >
+                  <Monitor className="h-3.5 w-3.5" />System
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <p className="text-[11px] text-slate-500">
+                {preference === 'system'
+                  ? 'Use your device appearance — VoiceForce switches automatically if your device changes.'
+                  : `VoiceForce always displays in ${preference} mode on this device.`}
+              </p>
+            </div>
+          </TabsContent>
 
           <TabsContent value="general" className="mt-3">
             <div className="rounded-md border border-slate-800 bg-slate-900/60 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">

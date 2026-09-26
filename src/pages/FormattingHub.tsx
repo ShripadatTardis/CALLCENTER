@@ -6,8 +6,10 @@ import { FormattingHub as FormattingHubComponent } from '@/components/formatting
 const FormattingHub: React.FC = () => {
   return (
     <Layout>
-      <FormattingHubComponent />
-    </Layout> 
+      <div className="bg-slate-950 min-h-full text-slate-200">
+        <FormattingHubComponent />
+      </div>
+    </Layout>
   );
 };
 

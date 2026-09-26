@@ -100,7 +100,7 @@ export const WhatsAppChat: React.FC = () => {
         <CardContent className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading messages...</p>
+            <p className="text-gray-600 dark:text-slate-400">Loading messages...</p>
           </div>
         </CardContent>
       </Card>
@@ -115,7 +115,7 @@ export const WhatsAppChat: React.FC = () => {
       <CardContent className="flex-1 flex flex-col p-0">
         <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[400px]">
           {messages.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-gray-500 dark:text-slate-400 py-8">
               <p>No messages yet. Send your first message!</p>
             </div>
           ) : (

@@ -16,13 +16,13 @@ export const WhatsAppSidebar: React.FC = () => {
         <CardContent>
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium text-gray-700">Sandbox Number:</p>
-              <p className="text-lg font-mono bg-gray-100 p-2 rounded">+1 415 523 8886</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-slate-300">Sandbox Number:</p>
+              <p className="text-lg font-mono bg-gray-100 dark:bg-slate-800 dark:text-slate-100 p-2 rounded">+1 415 523 8886</p>
             </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
+            <div className="bg-blue-50 dark:bg-blue-950/40 p-3 rounded-lg">
               <div className="flex items-start gap-2">
-                <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="text-sm text-blue-800">
+                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div className="text-sm text-blue-800 dark:text-blue-300">
                   <p className="font-medium mb-1">Setup Instructions:</p>
                   <ol className="list-decimal list-inside space-y-1 text-xs">
                     <li>Send "join <code>nor-ate</code>" to the sandbox number</li>
@@ -46,7 +46,7 @@ export const WhatsAppSidebar: React.FC = () => {
         <CardContent>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-700">Connected to Sandbox</span>
+            <span className="text-sm text-gray-700 dark:text-slate-300">Connected to Sandbox</span>
           </div>
         </CardContent>
       </Card>

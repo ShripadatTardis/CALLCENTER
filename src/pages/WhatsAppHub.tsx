@@ -6,7 +6,7 @@ import { WhatsAppDashboard } from '@/components/whatsapp/WhatsAppDashboard';
 const WhatsAppHub: React.FC = () => {
   return (
     <Layout>
-      <div className="p-3 h-full">
+      <div className="bg-slate-950 min-h-full p-3">
         <WhatsAppDashboard />
       </div>
     </Layout>

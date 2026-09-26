@@ -19,7 +19,7 @@ function renderInline(nodes: InlineNode[], keyPrefix: string): React.ReactNode {
         return <React.Fragment key={key}>{node.value}</React.Fragment>;
       case 'code':
         return (
-          <code key={key} className="px-1 py-0.5 rounded bg-slate-100 text-slate-800 text-sm font-mono break-words">
+          <code key={key} className="px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-sm font-mono break-words">
             {node.value}
           </code>
         );

@@ -5,6 +5,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('voiceforce.appearance');
+          var resolved = pref === 'light' || pref === 'dark' ? pref
+            : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+          var root = document.documentElement;
+          if (resolved === 'dark') root.classList.add('dark');
+          root.style.colorScheme = resolved;
+        } catch (e) {}
+      })();
+    </script>
     <title>TARDIS AI - Conversational AI Call Center Platform</title>
     <meta name="description" content="Advanced AI-powered call center management platform with real-time monitoring, analytics, and performance optimization">
     <meta name="author" content="TARDIS AI" />

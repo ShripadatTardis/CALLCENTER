@@ -84,13 +84,13 @@ export const FormattingHub: React.FC = () => {
   const getStrategyBadgeColor = (strategy: 'LOCAL' | 'AI' | 'DISABLED') => {
     switch (strategy) {
       case 'AI':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300';
       case 'LOCAL':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-emerald-950/50 dark:text-emerald-300';
       case 'DISABLED':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-300';
     }
   };
 
@@ -139,7 +139,7 @@ export const FormattingHub: React.FC = () => {
                     ? "No logs match your search criteria." 
                     : "Formatting may be disabled, or no WhatsApp conversations have occurred yet."}
                 </p>
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg text-sm text-blue-800">
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/40 rounded-lg text-sm text-blue-800 dark:text-blue-300">
                   <strong>Note:</strong> When formatting is disabled via the FORMATTING_ENABLED environment variable, 
                   messages are not logged to preserve system resources and maintain privacy.
                 </div>
@@ -178,9 +178,9 @@ export const FormattingHub: React.FC = () => {
                       {log.format_strategy === 'DISABLED' ? 'Original Message (Formatting Disabled):' : 'Formatted Message:'}
                     </div>
                     <div className={`border rounded p-3 text-sm whitespace-pre-wrap ${
-                      log.format_strategy === 'DISABLED' 
-                        ? 'bg-gray-50 border-gray-200' 
-                        : 'bg-green-50 border-green-200'
+                      log.format_strategy === 'DISABLED'
+                        ? 'bg-gray-50 border-gray-200 dark:bg-slate-800 dark:border-slate-700'
+                        : 'bg-green-50 border-green-200 dark:bg-emerald-950/30 dark:border-emerald-900'
                     }`}>
                       {log.formatted_text}
                     </div>
@@ -200,7 +200,7 @@ export const FormattingHub: React.FC = () => {
                   {expandedLog === log.id && log.format_strategy !== 'DISABLED' && (
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Original Message:</div>
-                      <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm whitespace-pre-wrap">
+                      <div className="bg-gray-50 border border-gray-200 dark:bg-slate-800 dark:border-slate-700 rounded p-3 text-sm whitespace-pre-wrap">
                         {log.original_text}
                       </div>
                     </div>

@@ -31,7 +31,13 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   const access = await resolveAccessForRequest(req);
 
   let materializationWarning: string | null = null;
-  const normalizedPhone = search ? normalizePhoneNumber(search) : null;
+  // Phone-search dispatch requires the raw query to be phone-shaped (only
+  // digits and phone punctuation) — a CIF/name search like "CIF003" also
+  // contains digits, and normalizePhoneNumber would otherwise silently
+  // reduce it to "003" and misroute it into the phone-materialization
+  // branch, never reaching listCustomers' name/CIF search at all.
+  const looksLikePhone = Boolean(search && /^[0-9+\-\s()]+$/.test(search.trim()));
+  const normalizedPhone = looksLikePhone ? normalizePhoneNumber(search) : null;
 
   if (normalizedPhone) {
     // Phone search is the progressive materialization entry point — it

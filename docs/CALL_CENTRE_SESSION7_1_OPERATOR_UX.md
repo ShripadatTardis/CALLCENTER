@@ -182,6 +182,40 @@ defer rather than forcing it"), this is deferred rather than rushed.
 - No new backend calls were introduced on every keystroke anywhere —
   client-side facets filter already-fetched data in memory.
 
+## 13.1. Fixed after this session: CIF search gap
+
+Live verification after this session's initial ship found that searching
+"CIF003" in the Customer 360 list and the Chat Console customer picker
+returned zero results, even though the customer existed and was
+authorized. Two independent causes, both fixed:
+
+1. `call_center_list_customers`'s search predicate only matched
+   `display_name` — never `source_customer_ref` (CIF) or phone. Extended
+   (migration `20261001000000_customer360_list_customers_search_cif_phone`)
+   to also match `source_customer_ref` (`ilike`) and phone contact points
+   (digits-only substring match against `customer_contact_points.normalized_value`).
+   Authorization/visibility filtering (`p_all`/`p_agent_ids` → `v_visible`)
+   was untouched — only the search predicate was widened, in both the count
+   and rows branches identically. `source_customer_ref` remains a
+   display/search field only, never an identity join key.
+2. `api/customers/index.ts` dispatches any search string through
+   `normalizePhoneNumber` first; since that strips all non-digit
+   characters, "CIF003" silently became `"003"` and the request was
+   misrouted into the phone-materialization branch (which resolves to at
+   most one customer via a contact-point lookup) — it never reached
+   `listCustomers` at all, regardless of the RPC fix above. Fixed by only
+   attempting phone-search dispatch when the raw query is phone-shaped
+   (`/^[0-9+\-\s()]+$/` — digits and phone punctuation only, no letters);
+   a CIF/name query now falls through to `listCustomers` correctly.
+
+Verified live in production: "CIF003" now resolves via both the Customer
+360 list search and the Chat Console picker; a role not mapped to CIF003's
+category gets zero results (no authorization leak); phone search is
+unaffected (a full phone number for the same customer still resolves via
+the materialization branch as before). No duplicate customer rows —
+this is a read-only search-path fix. Function count unchanged at 11 (no
+new route file). Commit: see below.
+
 ## 14. Backend limitations (unchanged, reconfirmed during this session)
 
 - `/call-data` has no agent/category/FCR/escalation/sentiment/authenticated/

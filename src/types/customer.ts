@@ -91,3 +91,46 @@ export interface CustomerInteractionsResponse {
   data: CustomerInteractionRow[];
   pagination: { page: number; pageSize: number; totalCount: number };
 }
+
+/**
+ * Session 11.5B — Customer Campaign Participation/History (§C.3 of the
+ * implementation prompt). Mirrors src/server/campaigns/types.ts's
+ * `CustomerCampaignTargetRow` field-for-field; the API
+ * (`GET /api/customers/{id}?action=campaigns`, built in Session 11.5A)
+ * serializes that server type directly with no separate DTO mapper,
+ * same as the rest of this domain (see the header comment above).
+ * `effectiveResultId`/`campaignResultLabel`/`resultIsSuccess` reflect
+ * the target's CURRENT effective result only — the latest successfully
+ * reconciled attempt, per Session 11.5A's confirmed policy. No
+ * best-result-wins/ranking concept exists anywhere in this shape.
+ */
+export interface CustomerCampaignRow {
+  id: string;
+  campaignId: string;
+  customerId: string;
+  contactPointId: string;
+  status: string;
+  attemptCount: number;
+  lastActionAt: string | null;
+  nextActionAt: string | null;
+  effectiveResultId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  contactRawValue: string;
+  customerDisplayName: string | null;
+  campaignResultCode: string | null;
+  campaignResultLabel: string | null;
+  resultIsSuccess: boolean | null;
+  resultNextAction: string | null;
+  latestExecutionStatus: string | null;
+  latestReconciliationStatus: string | null;
+  latestReconciledInteractionId: string | null;
+  campaignName: string;
+  /** Immutable Call Agent id the campaign is configured against — never agent_version. */
+  campaignAgentId: string;
+  campaignAgentName: string | null;
+}
+
+export interface CustomerCampaignsResponse {
+  data: CustomerCampaignRow[];
+}

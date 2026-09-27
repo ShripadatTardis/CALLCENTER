@@ -12,7 +12,7 @@
  * internal routes — never an arbitrary URL string.
  */
 
-export type DetailOrigin = 'dashboard' | 'ai-agents' | 'live-view';
+export type DetailOrigin = 'dashboard' | 'ai-agents' | 'live-view' | 'customers';
 
 interface OriginDestination {
   path: string;
@@ -23,6 +23,7 @@ const ORIGIN_DESTINATIONS: Record<DetailOrigin, OriginDestination> = {
   dashboard: { path: '/dashboard', label: 'Dashboard' },
   'ai-agents': { path: '/ai-agents', label: 'AI Agents' },
   'live-view': { path: '/live-view', label: 'Live View' },
+  customers: { path: '/customers', label: 'Customers' },
 };
 
 /** Canonical safe fallback for detail pages reached with no (or an

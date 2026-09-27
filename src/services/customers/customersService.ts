@@ -1,5 +1,6 @@
 import { request } from '@/services/transport/httpClient';
 import type {
+  CustomerCampaignsResponse,
   CustomerDetailResponse,
   CustomerInteractionsResponse,
   CustomerListResponse,
@@ -47,6 +48,15 @@ export async function fetchCustomerInteractions(
   return request<CustomerInteractionsResponse>(`/customers/${encodeURIComponent(customerId)}`, {
     method: 'GET',
     query: { action: 'interactions', page: opts.page, pageSize: opts.pageSize },
+    headers: roleHeaders(role),
+  });
+}
+
+/** Session 11.5A's customer-scoped Campaign Participation/History endpoint. */
+export async function fetchCustomerCampaigns(role: string, customerId: string): Promise<CustomerCampaignsResponse> {
+  return request<CustomerCampaignsResponse>(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'GET',
+    query: { action: 'campaigns' },
     headers: roleHeaders(role),
   });
 }

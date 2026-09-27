@@ -173,14 +173,14 @@ const Dashboard: React.FC = () => {
                     key={call.interactionId}
                     type="button"
                     onClick={() => setSelectedInteraction(call)}
-                    className="w-full flex items-center justify-between gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                    className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                   >
-                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                    <div className="min-w-0 flex items-baseline gap-1.5 sm:flex-1">
                       <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
                       <span className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</span>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <div className="flex flex-wrap justify-end gap-1 max-w-[220px]">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+                      <div className="flex flex-wrap gap-1">
                         {(category === 'escalated' || category === 'escalated-stale') && (
                           <Badge variant="destructive" className="whitespace-nowrap text-xs">Escalated</Badge>
                         )}
@@ -194,7 +194,7 @@ const Dashboard: React.FC = () => {
                         )}
                       </div>
                       <div
-                        className="text-xs text-muted-foreground tabular-nums whitespace-nowrap w-16 text-right"
+                        className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-16 text-right"
                         title={formatDurationExact(call.durationSeconds)}
                       >
                         {category === 'escalated'
@@ -236,20 +236,20 @@ const Dashboard: React.FC = () => {
                       key={call.interactionId}
                       type="button"
                       onClick={() => setSelectedInteraction(call)}
-                      className="w-full flex items-center justify-between gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                      className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                     >
-                      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                      <div className="min-w-0 flex items-baseline gap-1.5 sm:flex-1">
                         <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
                         <span className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</span>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
                         <Badge
                           variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'destructive' : 'default'}
                           className="whitespace-nowrap text-xs"
                         >
                           {formatStatusLabel(call.outcome ?? call.status)}
                         </Badge>
-                        <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap w-12 text-right" title={formatDurationExact(call.durationSeconds)}>
+                        <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-12 text-right" title={formatDurationExact(call.durationSeconds)}>
                           {formatDurationLong(call.durationSeconds)}
                         </div>
                       </div>

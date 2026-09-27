@@ -167,44 +167,62 @@ const Dashboard: React.FC = () => {
             ) : attentionItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-1">No escalated or stale active records.</p>
             ) : (
-              <div className="divide-y divide-border/60">
-                {attentionItems.map(({ interaction: call, category }) => (
-                  <button
-                    key={call.interactionId}
-                    type="button"
-                    onClick={() => setSelectedInteraction(call)}
-                    className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
-                  >
-                    <div className="min-w-0 flex items-baseline gap-1.5 sm:flex-1">
-                      <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
-                      <span className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</span>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
-                      <div className="flex flex-wrap gap-1">
-                        {(category === 'escalated' || category === 'escalated-stale') && (
-                          <Badge variant="destructive" className="whitespace-nowrap text-xs">Escalated</Badge>
-                        )}
-                        {(category === 'stale' || category === 'escalated-stale') && (
-                          <Badge
-                            variant="outline"
-                            className="whitespace-nowrap text-xs border-amber-600/50 text-amber-700 dark:border-amber-500/40 dark:text-amber-400"
-                          >
-                            Stale active
-                          </Badge>
-                        )}
-                      </div>
-                      <div
-                        className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-16 text-right"
-                        title={formatDurationExact(call.durationSeconds)}
+              <>
+                {/* Session 11.1 XYZ: subtle desktop-only column cues — Dashboard is a
+                    cross-agent overview, so Agent is a first-class scanning dimension
+                    (see docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md "Cross-Agent
+                    Context"). Kept intentionally light: no header band/border, just a
+                    muted uppercase label row. */}
+                <div className="hidden sm:flex items-center gap-2 px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                  <span className="flex-1">Customer / Context</span>
+                  <span className="w-28 flex-shrink-0">Agent</span>
+                  <span className="flex-shrink-0">Status</span>
+                  <span className="w-16 flex-shrink-0 text-right">Duration</span>
+                </div>
+                <div className="divide-y divide-border/60">
+                  {attentionItems.map(({ interaction: call, category }) => {
+                    const agentLabel = call.agentDisplayName ?? call.agentId ?? 'Unknown agent';
+                    return (
+                      <button
+                        key={call.interactionId}
+                        type="button"
+                        onClick={() => setSelectedInteraction(call)}
+                        className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                       >
-                        {category === 'escalated'
-                          ? formatDurationLong(call.durationSeconds)
-                          : formatStaleDurationHuman(call.durationSeconds)}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5 sm:flex-1">
+                          <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {call.intent || '—'} ·{' '}
+                            <span className="sm:hidden">{agentLabel}</span>
+                            <span className="hidden sm:inline">{formatPhoneNumber(call.phoneNumber)}</span>
+                          </span>
+                        </div>
+                        <div className="hidden sm:block sm:w-28 flex-shrink-0 text-xs text-muted-foreground truncate" title={agentLabel}>
+                          {agentLabel}
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+                          <div className="flex flex-wrap gap-1">
+                            {(category === 'escalated' || category === 'escalated-stale') && (
+                              <Badge variant="escalated" className="whitespace-nowrap text-xs">Escalated</Badge>
+                            )}
+                            {(category === 'stale' || category === 'escalated-stale') && (
+                              <Badge variant="warning" className="whitespace-nowrap text-xs">Stale active</Badge>
+                            )}
+                          </div>
+                          <div
+                            className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-16 text-right"
+                            title={formatDurationExact(call.durationSeconds)}
+                          >
+                            {category === 'escalated'
+                              ? formatDurationLong(call.durationSeconds)
+                              : formatStaleDurationHuman(call.durationSeconds)}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -230,32 +248,50 @@ const Dashboard: React.FC = () => {
               ) : recentCalls.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-1">No recent calls.</p>
               ) : (
-                <div className="divide-y divide-border/60">
-                  {recentCalls.map((call) => (
-                    <button
-                      key={call.interactionId}
-                      type="button"
-                      onClick={() => setSelectedInteraction(call)}
-                      className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
-                    >
-                      <div className="min-w-0 flex items-baseline gap-1.5 sm:flex-1">
-                        <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
-                        <span className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</span>
-                      </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
-                        <Badge
-                          variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'destructive' : 'default'}
-                          className="whitespace-nowrap text-xs"
+                <>
+                  <div className="hidden sm:flex items-center gap-2 px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                    <span className="flex-1">Customer / Context</span>
+                    <span className="w-24 flex-shrink-0">Agent</span>
+                    <span className="flex-shrink-0">Outcome</span>
+                    <span className="w-12 flex-shrink-0 text-right">Duration</span>
+                  </div>
+                  <div className="divide-y divide-border/60">
+                    {recentCalls.map((call) => {
+                      const agentLabel = call.agentDisplayName ?? call.agentId ?? 'Unknown agent';
+                      return (
+                        <button
+                          key={call.interactionId}
+                          type="button"
+                          onClick={() => setSelectedInteraction(call)}
+                          className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                         >
-                          {formatStatusLabel(call.outcome ?? call.status)}
-                        </Badge>
-                        <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-12 text-right" title={formatDurationExact(call.durationSeconds)}>
-                          {formatDurationLong(call.durationSeconds)}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                          <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5 sm:flex-1">
+                            <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {call.intent || '—'} ·{' '}
+                              <span className="sm:hidden">{agentLabel}</span>
+                              <span className="hidden sm:inline">{formatPhoneNumber(call.phoneNumber)}</span>
+                            </span>
+                          </div>
+                          <div className="hidden sm:block sm:w-24 flex-shrink-0 text-xs text-muted-foreground truncate" title={agentLabel}>
+                            {agentLabel}
+                          </div>
+                          <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+                            <Badge
+                              variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'escalated' : call.outcome === 'resolved' ? 'positive' : 'default'}
+                              className="whitespace-nowrap text-xs"
+                            >
+                              {formatStatusLabel(call.outcome ?? call.status)}
+                            </Badge>
+                            <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-12 text-right" title={formatDurationExact(call.durationSeconds)}>
+                              {formatDurationLong(call.durationSeconds)}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -270,7 +306,7 @@ const Dashboard: React.FC = () => {
               agents={agentRoster}
               activeInteractions={activeInteractions}
               isLoading={agents.isLoading || recent.isLoading}
-              onAgentClick={(agentId) => navigate(`/ai-agents/${agentId}`)}
+              onAgentClick={(agentId) => navigate(`/ai-agents/${agentId}`, { state: { origin: 'dashboard' } })}
               title="Agent Load"
               variant="compact"
             />

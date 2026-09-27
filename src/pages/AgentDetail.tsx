@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useAgentDetail } from '@/hooks/agents/useAgentDetail';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
 import type { Interaction } from '@/types/interaction';
+import { resolveDetailOrigin, type DetailNavigationState } from '@/lib/detailOrigin';
 import {
   formatDurationLong,
   formatFractionAsPercent,
@@ -31,6 +32,8 @@ const FALLBACK = '—';
 const AgentDetail: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = resolveDetailOrigin((location.state as DetailNavigationState | null)?.origin);
   const {
     agent,
     callInteractions,
@@ -66,9 +69,9 @@ const AgentDetail: React.FC = () => {
     return (
       <Layout>
         <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/ai-agents')}>
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to AI Agents
+            Back to {returnTo.label}
           </Button>
           <p className="text-sm text-muted-foreground px-1">
             No agent found for id "{agentId}" in the live roster (GET /api/v1/agents).
@@ -88,9 +91,9 @@ const AgentDetail: React.FC = () => {
   return (
     <Layout>
       <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/ai-agents')}>
+        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-          Back to AI Agents
+          Back to {returnTo.label}
         </Button>
 
         {/* Compact identity header */}

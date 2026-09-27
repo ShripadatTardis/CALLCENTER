@@ -15,6 +15,21 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        /**
+         * Session 11.1 XYZ — corporate semantic status language (see
+         * docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md). Restrained
+         * tinted-outline treatment for ordinary business exceptions/states,
+         * reserving `destructive` (solid saturated red) for genuine
+         * technical failure/error/destructive-action semantics only.
+         * Opt-in — existing `destructive`/`default`/`secondary`/`outline`
+         * usage elsewhere in the product is completely unaffected.
+         */
+        escalated:
+          "border-red-600/40 bg-red-500/10 text-red-700 hover:bg-red-500/15 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15",
+        warning:
+          "border-amber-600/50 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/15",
+        positive:
+          "border-emerald-600/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/15",
       },
     },
     defaultVariants: {

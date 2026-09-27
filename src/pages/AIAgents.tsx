@@ -69,7 +69,7 @@ const AIAgents: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-muted"
-                        onClick={() => navigate(`/ai-agents/${agent.agentId}`)}
+                        onClick={() => navigate(`/ai-agents/${agent.agentId}`, { state: { origin: 'ai-agents' } })}
                       >
                         View →
                       </Button>

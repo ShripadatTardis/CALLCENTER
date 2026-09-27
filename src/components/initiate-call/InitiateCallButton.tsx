@@ -15,21 +15,20 @@ export const InitiateCallButton: React.FC<InitiateCallButtonProps> = ({
   isDisabled
 }) => {
   return (
-    <div className="mt-6 flex justify-center">
+    <div className="pt-1">
       <Button
         onClick={onInitiateCall}
         disabled={isDisabled}
-        size="lg"
-        className="px-8 py-4 text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+        className="w-full h-9"
       >
         {isLoading ? (
           <>
-            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             Initiating Call...
           </>
         ) : (
           <>
-            <Phone className="w-5 h-5 mr-2" />
+            <Phone className="w-4 h-4 mr-2" />
             Initiate Call
           </>
         )}

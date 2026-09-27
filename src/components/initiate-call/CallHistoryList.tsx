@@ -13,10 +13,10 @@ interface CallHistoryListProps {
 
 export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, isLoading }) => {
   return (
-    <Card className="w-full bg-card shadow-lg border border-border min-h-[200px] max-h-[600px] flex flex-col">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-          <History className="h-5 w-5 text-blue-600" />
+    <Card className="w-full bg-card border-border min-h-[200px] max-h-[600px] flex flex-col">
+      <CardHeader className="py-3">
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <History className="h-4 w-4 text-muted-foreground" />
           Recent Calls ({callHistory.length})
         </CardTitle>
       </CardHeader>
@@ -38,12 +38,12 @@ export const CallHistoryList: React.FC<CallHistoryListProps> = ({ callHistory, i
             {callHistory.map((call) => (
               <div
                 key={call.interactionId}
-                className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border hover:bg-muted transition-colors"
+                className="flex items-center justify-between p-2.5 bg-muted/50 rounded-md border border-border hover:bg-muted transition-colors"
               >
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Phone className="w-4 h-4 text-blue-600" />
+                    <div className="w-7 h-7 bg-primary/10 rounded-full flex items-center justify-center">
+                      <Phone className="w-3.5 h-3.5 text-primary" />
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">

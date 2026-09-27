@@ -14,7 +14,6 @@ export const FlowLibrary: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<FlowStatus | 'all'>('all');
   const [channelFilter, setChannelFilter] = useState<FlowChannel | 'all'>('all');
 
   const canEdit = hasPermission(user, 'orchestrator_edit');
@@ -54,69 +53,48 @@ export const FlowLibrary: React.FC = () => {
   // Flows are now imported from shared data file
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Workflow className="h-8 w-8 text-primary" />
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Workflow className="h-4 w-4 text-primary shrink-0" />
+          <h1 className="text-sm font-semibold text-foreground truncate">
             AI Conversation Orchestrator
           </h1>
-          <p className="text-muted-foreground mt-1">
-            View Conversation Flow
-          </p>
         </div>
         {canEdit && false && (
-          <Button onClick={handleCreateFlow} size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
+          <Button onClick={handleCreateFlow} size="sm" className="gap-1.5 shrink-0">
+            <Plus className="h-3.5 w-3.5" />
             Create Flow
           </Button>
         )}
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search flows by name, tags, or nodes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="hidden">
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="live">Live</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as any)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Channels</SelectItem>
-                <SelectItem value="voice">Voice</SelectItem>
-                <SelectItem value="text">Text</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1 relative min-w-0">
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search flows by name, tags, or nodes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 pl-8"
+          />
+        </div>
+        <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as any)}>
+          <SelectTrigger className="h-9 w-full sm:w-40 shrink-0">
+            <SelectValue placeholder="Channel" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Channels</SelectItem>
+            <SelectItem value="voice">Voice</SelectItem>
+            <SelectItem value="text">Text</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Flow Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {sampleFlows.map((flow) => (
           <Card 
             key={flow.id} 

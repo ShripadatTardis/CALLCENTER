@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,63 +29,55 @@ export const CallConfigurationForm: React.FC<CallConfigurationFormProps> = ({
   const { data: agentsData, isLoading: isAgentsLoading } = useAgents();
   const agents = agentsData?.agents ?? [];
   return (
-    <Card className="w-full max-w-md mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg">
-      <CardHeader className="text-center pb-4">
-        <CardTitle className="text-xl font-bold text-foreground flex items-center justify-center gap-2">
-          <Phone className="h-5 w-5 text-blue-600" />
-          Call Configuration
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="phoneNumber" className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Phone className="h-4 w-4 text-blue-600" />
-            Phone Number
-          </Label>
-          <Input
-            id="phoneNumber"
-            type="tel"
-            placeholder="+1234567890"
-            value={config.phoneNumber}
-            onChange={(e) => onPhoneNumberChange(e.target.value)}
-            className={`text-base h-10 ${
-              config.phoneNumber && !validatePhoneNumber(config.phoneNumber) 
-                ? 'border-red-500 focus:border-red-500' 
-                : 'border-blue-300 focus:border-blue-500'
-            }`}
-          />
-          {config.phoneNumber && !validatePhoneNumber(config.phoneNumber) && (
-            <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-              Please enter a valid phone number (e.g., +1234567890)
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="aiAgent" className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Bot className="h-4 w-4 text-blue-600" />
-            AI Agent
-          </Label>
-          <Select value={config.selectedAgent} onValueChange={onAgentChange}>
-            <SelectTrigger className="h-10 text-base border-blue-300 focus:border-blue-500">
-              <SelectValue placeholder={isAgentsLoading ? 'Loading agents…' : 'Select an AI Agent'} />
-            </SelectTrigger>
-            <SelectContent>
-              {agents.map((agent) => (
-                <SelectItem key={agent.agentId} value={agent.agentId} className="text-base py-2">
-                  {agent.displayName} ({agent.direction})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <InitiateCallButton
-          onInitiateCall={onInitiateCall}
-          isLoading={isLoading}
-          isDisabled={isDisabled}
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="phoneNumber" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          <Phone className="h-3.5 w-3.5" />
+          Phone Number
+        </Label>
+        <Input
+          id="phoneNumber"
+          type="tel"
+          placeholder="+1234567890"
+          value={config.phoneNumber}
+          onChange={(e) => onPhoneNumberChange(e.target.value)}
+          className={`h-9 ${
+            config.phoneNumber && !validatePhoneNumber(config.phoneNumber)
+              ? 'border-destructive focus-visible:ring-destructive'
+              : ''
+          }`}
         />
-      </CardContent>
-    </Card>
+        {config.phoneNumber && !validatePhoneNumber(config.phoneNumber) && (
+          <p className="text-xs text-destructive">
+            Please enter a valid phone number (e.g., +1234567890)
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="aiAgent" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          <Bot className="h-3.5 w-3.5" />
+          AI Agent
+        </Label>
+        <Select value={config.selectedAgent} onValueChange={onAgentChange}>
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder={isAgentsLoading ? 'Loading agents…' : 'Select an AI Agent'} />
+          </SelectTrigger>
+          <SelectContent>
+            {agents.map((agent) => (
+              <SelectItem key={agent.agentId} value={agent.agentId}>
+                {agent.displayName} ({agent.direction})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <InitiateCallButton
+        onInitiateCall={onInitiateCall}
+        isLoading={isLoading}
+        isDisabled={isDisabled}
+      />
+    </div>
   );
 };

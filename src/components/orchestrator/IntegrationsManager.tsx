@@ -54,16 +54,16 @@ export const IntegrationsManager: React.FC = () => {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Integrations</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-sm font-semibold text-foreground">Integrations</h1>
+          <p className="text-xs text-muted-foreground">
             Manage data sources, APIs, and external services
           </p>
         </div>
-        <Button size="lg">
-          <Plus className="h-5 w-5 mr-2" />
+        <Button size="sm" className="shrink-0">
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
           Add Integration
         </Button>
       </div>

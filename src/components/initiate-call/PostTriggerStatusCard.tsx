@@ -35,10 +35,10 @@ export const PostTriggerStatusCard: React.FC<PostTriggerStatusCardProps> = ({
   const displayStatus = liveStatus ?? call.initialStatus;
 
   return (
-    <Card className="border-green-200 bg-green-50">
+    <Card className="border-green-200 bg-green-50 dark:border-emerald-900 dark:bg-emerald-950/30">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2 text-green-900">
+          <CardTitle className="text-base flex items-center gap-2 text-green-900 dark:text-emerald-300">
             <CheckCircle2 className="h-5 w-5" />
             Call Initiated
           </CardTitle>
@@ -72,7 +72,7 @@ export const PostTriggerStatusCard: React.FC<PostTriggerStatusCardProps> = ({
           </Button>
         </div>
         {isPollCapped && (
-          <p className="text-xs text-amber-700">
+          <p className="text-xs text-amber-700 dark:text-amber-400">
             This call is still active. Live updates have paused after 60s to avoid excessive
             polling — use Refresh to check the latest status.
           </p>

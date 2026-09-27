@@ -140,3 +140,46 @@ Wrap a list of these in `<div className="divide-y divide-border/60">…</div>` i
 ## 21. Standing rule
 
 Subsequent screen-review/implementation sessions **must** reuse this standard unless there is a documented functional reason to deviate (§17). Do not independently redesign row height, padding, primary/secondary typography, status badges, hover, focus, separators, truncation, or basic action placement on every screen.
+
+## 22. Cross-agent context (Session 11.1 XYZ)
+
+On a generic operational surface containing interactions from **multiple** Call Agents, Agent is a first-class record dimension — not optional metadata. Every interaction row on such a surface should expose the responsible Call Agent (human-readable `agentDisplayName`, falling back to `agentId`, then a truthful `"Unknown agent"` — never invented, never suppressed) **unless the surrounding screen/context already establishes a single agent**.
+
+- **Data source**: use the interaction's own `agentDisplayName`/`agentId` fields (already present on the normalized `Interaction` type) directly — this is the exact same fallback convention already used by `CallHistoryList.tsx`/`CustomerDetail.tsx`. Do not re-derive agent identity from a roster join unless the interaction itself lacks the field. `agent_id` remains the immutable identity; `agent_name`/`agentDisplayName` is presentation only. Never introduce `agent_version`.
+- **Where this applies later**: Live View, Call Logs, Chat Logs where agent attribution exists, and any other cross-agent interaction grid.
+- **Where Agent may be omitted**: Agent Detail's own "Recent Interactions" table — the page itself already establishes the single agent, so repeating it on every row is redundant.
+- **Desktop**: Agent gets its own compact column (fixed/near-fixed width, truncated), placed between the primary identity/context column and the status/duration columns. Subtle uppercase column-header labels (`text-xs uppercase tracking-wide text-muted-foreground`) are preferred where they improve scanability — keep them light, never a heavy header band.
+- **Mobile** (below `sm`): do not add a 4th line. Merge Agent into the existing secondary line alongside intent (`{intent} · {agentLabel}`), and it's acceptable to drop a lower-priority field (e.g. raw phone number, which remains one click away via the detail dialog) from that same mobile-only line to make room — never drop Agent itself. Agent must remain visibly present and readable at every required viewport, never hidden purely to make a row fit.
+- **Never group by agent** on a cross-agent overview merely to add this context — grouping fragments the overview and increases page height; Agent stays a row/column dimension, not a grouping axis.
+
+## 23. Corporate semantic status language (Session 11.1 XYZ)
+
+**Color intensity should match operational severity.** Strong saturated red is not the default treatment for every business exception — reserve it for genuine technical failure, a destructive action, a genuinely critical state, or an irreversible/high-risk action. A business exception (e.g. "Escalated") is not automatically a system failure.
+
+Status families, using restrained tinted-outline treatments (translucent background + matching border + accessible foreground text, verified contrast-consistent between Light/Dark), never a solid saturated fill:
+
+- **Business exception / escalated** — `Badge variant="escalated"`: `bg-red-500/10`, `border-red-600/40` (`dark:border-red-500/40`), `text-red-700`/`dark:text-red-400`.
+- **Warning / stale** — `Badge variant="warning"`: `bg-amber-500/10`, `border-amber-600/50` (`dark:border-amber-500/40`), `text-amber-700`/`dark:text-amber-400`. (This is the original amber pattern from §6, now formalized as a named variant.)
+- **Positive / completed** — `Badge variant="positive"`: `bg-emerald-500/10`, `border-emerald-600/40` (`dark:border-emerald-500/40`), `text-emerald-700`/`dark:text-emerald-400`.
+- **Neutral** — the existing `secondary`/`outline` Badge variants (e.g. an in-progress/active technical state).
+- **Informational/live** — document only, not yet implemented anywhere: should use the product's existing restrained cyan/blue accent family when it's introduced on a screen that needs it (e.g. a genuine "Live"/"Active" indicator), not a new color.
+- **Critical/error/destructive** — the existing `destructive` Badge variant (solid saturated red) remains fully correct and unchanged for actual technical failure, a destructive action's confirmation, or a genuinely critical system state. This is the one case where strong red stays appropriate.
+
+**Implementation**: these are opt-in additions to the shared `Badge` component's `variant` prop (`escalated`/`warning`/`positive`, alongside the pre-existing `default`/`secondary`/`destructive`/`outline`) — never a change to any existing variant's definition, and never a hardcoded new color introduced outside the shared component. A screen adopts the new language by switching which named variant it passes; screens that haven't been reviewed yet keep using whatever variant they already use, completely unaffected. Do not mass-repaint unreviewed screens merely because this vocabulary now exists — each screen adopts it through its own Session 11 review/implementation.
+
+Status remains **never color-only** — every badge keeps its text label. Verify contrast in both Light and Dark before shipping a new usage of these variants.
+
+## 24. Detail Navigation Standard (Session 11.1 XYZ)
+
+A detail page's "Back" control must return to the workspace that actually opened it — never a hardcoded fixed destination mislabeled as "Back."
+
+1. **A Back control returns to the originating workspace.** The visible label must always match the resolved destination exactly (e.g. "← Back to Dashboard", never a bare "Back" pointing somewhere unrelated to where the user came from).
+2. **Origin is passed explicitly by application navigation** — via React Router `navigate(path, { state: { origin } })` — never inferred from browser history (`navigate(-1)`/history-back is explicitly disallowed: browser history can contain an external site, a login step, an unrelated screen, or a stale chain unrelated to the user's actual in-app journey).
+3. **Origin is restricted to a small, typed, trusted set of known internal routes** (see `src/lib/detailOrigin.ts`'s `DetailOrigin` type and `resolveDetailOrigin()`) — never an arbitrary URL string trusted from navigation state.
+4. **Direct-entry detail pages have a canonical fallback.** A detail page reached with no (or an unrecognized) origin — direct URL entry, a bookmark, or a hard refresh in an environment where in-memory state doesn't survive it — falls back to one documented, always-safe destination (for Agent Detail: AI Agents). No error, no missing control, no broken state.
+5. **Detail pages remain directly addressable/bookmarkable** regardless of origin state — the page must render correctly and usably even with zero navigation-state context.
+6. **Do not build a state-restoration framework** merely to make an origin workspace look exactly as the user left it — a normal route return is sufficient unless a specific screen's own transient state genuinely requires more (document that decision on that screen, don't build it preemptively).
+
+**Current implementation**: `src/lib/detailOrigin.ts` defines `DetailOrigin = 'dashboard' | 'ai-agents' | 'live-view'` mapped to real routes/labels. `AgentDetail.tsx` resolves `location.state?.origin` via `resolveDetailOrigin()` and renders/navigates accordingly; `Dashboard.tsx`'s Agent Load and `AIAgents.tsx`'s list both pass their real origin explicitly. `'live-view'` is defined now for forward reuse even though Live View doesn't yet link to Agent Detail — adding that link later requires no change to this mechanism, only passing `{ state: { origin: 'live-view' } }` at the call site.
+
+**Future reuse**: this exact mechanism (not a redesigned one) should back later detail navigation from Live View, Call Logs, Chat Logs, and Campaigns where applicable — extend `DetailOrigin`/`ORIGIN_DESTINATIONS` in `src/lib/detailOrigin.ts` with new entries as those screens need them, rather than building a parallel mechanism. Not refactored now.

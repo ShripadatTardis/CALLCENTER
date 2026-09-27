@@ -50,6 +50,21 @@ export function formatDurationLong(seconds?: number): string {
   return `${mins}m ${secs}s`;
 }
 
+/**
+ * Human-readable "16d 18h" form of a stale duration, for contexts that
+ * specifically call out a record as stale (e.g. Dashboard's Needs
+ * Attention section) rather than the general-purpose "Xh+ (stale)"
+ * used elsewhere. Presentation-only — derived from the same seconds
+ * value as formatDurationLong; does not change the stale threshold.
+ */
+export function formatStaleDurationHuman(seconds?: number): string {
+  if (seconds === undefined || Number.isNaN(seconds)) return FALLBACK;
+  const totalHours = Math.floor(seconds / 3600);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  return days > 0 ? `${days}d ${hours}h` : `${totalHours}h`;
+}
+
 /** Full precision, for tooltips/title attributes — never hides the real value. */
 export function formatDurationExact(seconds?: number): string {
   if (seconds === undefined || Number.isNaN(seconds)) return FALLBACK;

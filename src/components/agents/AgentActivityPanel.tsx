@@ -11,6 +11,10 @@ interface AgentActivityPanelProps {
   activeInteractions: Interaction[];
   isLoading?: boolean;
   title?: string;
+  /** Optional — when provided, each agent card becomes a keyboard/mouse-activatable
+   * link (e.g. Dashboard navigating to Agent Detail). Omitted callers (Live View)
+   * keep the existing non-interactive card exactly as before. */
+  onAgentClick?: (agentId: string) => void;
 }
 
 /**
@@ -36,6 +40,7 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   activeInteractions,
   isLoading,
   title = 'AI Agent Roster',
+  onAgentClick,
 }) => {
   const activeCounts = countActiveCallsByAgent(activeInteractions);
 
@@ -55,8 +60,28 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
           {agents.map((agent) => {
             const activeCount = activeCounts.get(agent.agentId) ?? 0;
+            const clickable = Boolean(onAgentClick);
             return (
-              <div key={agent.agentId} className="min-w-0 border border-border rounded-md p-2.5 space-y-1.5 bg-background/40">
+              <div
+                key={agent.agentId}
+                className={`min-w-0 border border-border rounded-md p-2.5 space-y-1.5 bg-background/40 ${
+                  clickable ? 'cursor-pointer hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400' : ''
+                }`}
+                {...(clickable
+                  ? {
+                      role: 'button',
+                      tabIndex: 0,
+                      onClick: () => onAgentClick?.(agent.agentId),
+                      onKeyDown: (e: React.KeyboardEvent) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onAgentClick?.(agent.agentId);
+                        }
+                      },
+                      'aria-label': `View ${agent.displayName} detail`,
+                    }
+                  : {})}
+              >
                 <h3 className="font-medium text-sm text-foreground break-words leading-snug">{agent.displayName}</h3>
                 <Badge
                   variant={activeCount > 0 ? 'default' : 'outline'}

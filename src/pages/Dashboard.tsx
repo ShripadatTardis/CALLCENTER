@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,12 +12,16 @@ import { AgentActivityPanel } from '@/components/agents/AgentActivityPanel';
 import { countActiveCallsByAgent } from '@/components/agents/agentActivity';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { MetricStrip } from '@/components/common/MetricStrip';
+import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import type { Interaction } from '@/types/interaction';
 import {
   formatDurationExact,
   formatDurationLong,
   formatPercent,
   formatPhoneNumber,
+  formatStaleDurationHuman,
   formatStatusLabel,
+  isStaleDuration,
 } from '@/lib/format';
 
 /**
@@ -27,18 +31,82 @@ import {
  * capability reconciliation) rather than left hardcoded/random. The
  * "AI Agents" tile is a safely-derived count (agents with >=1 active
  * call / total roster size), not a fabricated Engaged/Idle status.
+ *
+ * Session 11.1: Needs Attention + Recent Calls are both hard-capped
+ * client-side (5 each). This is deliberate defense against a confirmed
+ * upstream defect — the Partner API does not reliably honor
+ * `page_size`, so the `useCallData({ page_size: 5 })` call below cannot
+ * be trusted alone to bound how many rows this page ever has to render
+ * (see docs/SCREEN_REVIEW_01_DASHBOARD.md §5 and
+ * docs/SESSION_11_1_DASHBOARD_IMPLEMENTATION.md). Do not remove the
+ * `.slice(0, 5)` calls below on the assumption the backend now behaves.
  */
+
+type AttentionCategory = 'escalated-stale' | 'escalated' | 'stale';
+
+interface AttentionEntry {
+  interaction: Interaction;
+  category: AttentionCategory;
+}
+
+const ATTENTION_CATEGORY_RANK: Record<AttentionCategory, number> = {
+  'escalated-stale': 0,
+  escalated: 1,
+  stale: 2,
+};
+
+function classifyAttention(interactions: Interaction[]): AttentionEntry[] {
+  return interactions
+    .filter((i) => i.outcome === 'escalated' || (i.status === 'active' && isStaleDuration(i.durationSeconds)))
+    .map((i) => {
+      const escalated = i.outcome === 'escalated';
+      const stale = i.status === 'active' && isStaleDuration(i.durationSeconds);
+      const category: AttentionCategory = escalated && stale ? 'escalated-stale' : escalated ? 'escalated' : 'stale';
+      return { interaction: i, category };
+    })
+    .sort((a, b) => {
+      const rankDiff = ATTENTION_CATEGORY_RANK[a.category] - ATTENTION_CATEGORY_RANK[b.category];
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.interaction.startTime).getTime() - new Date(a.interaction.startTime).getTime();
+    });
+}
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const metrics = useAnalyticsMetrics();
   const recent = useCallData({ page_size: 5 });
   const agents = useAgents();
+  const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
 
-  const interactions = recent.data?.interactions ?? [];
+  const interactions = useMemo(() => recent.data?.interactions ?? [], [recent.data]);
   const activeInteractions = interactions.filter((i) => i.status === 'active');
   const activeCalls = recent.data?.summary.active_calls ?? 0;
   const agentRoster = agents.data?.agents ?? [];
   const activeAgentCount = countActiveCallsByAgent(activeInteractions).size;
+
+  // Needs Attention: deterministic, real-data-only — escalated and/or
+  // stale-active rows already present in `interactions`. No LLM, no
+  // inference, no severity score. Hard-capped to 5 regardless of how
+  // many qualify (§ bounded-workspace requirement).
+  const allAttention = useMemo(() => classifyAttention(interactions), [interactions]);
+  const attentionItems = useMemo(() => allAttention.slice(0, 5), [allAttention]);
+  const attentionIds = useMemo(
+    () => new Set(attentionItems.map((a) => a.interaction.interactionId)),
+    [attentionItems]
+  );
+
+  // Recent Calls: genuinely recent activity only — excludes anything
+  // already surfaced in Needs Attention, and excludes stale-active rows
+  // outright so they can never dominate this list even beyond the
+  // Attention cap. Hard-capped to 5 client-side, independent of
+  // whatever the backend actually returned.
+  const recentCalls = useMemo(() => {
+    return interactions
+      .filter((i) => !attentionIds.has(i.interactionId))
+      .filter((i) => !(i.status === 'active' && isStaleDuration(i.durationSeconds)))
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+      .slice(0, 5);
+  }, [interactions, attentionIds]);
 
   return (
     <Layout>
@@ -60,39 +128,115 @@ const Dashboard: React.FC = () => {
           items={[
             { label: 'Active calls', value: recent.isLoading ? '…' : activeCalls, hint: 'Currently in progress' },
             { label: 'Active agents', value: agents.isLoading || recent.isLoading ? '…' : `${activeAgentCount}/${agentRoster.length}`, hint: 'On a call / total roster' },
-            { label: 'FCR rate', value: metrics.isLoading ? '…' : formatPercent(metrics.data?.fcrRate) },
+            { label: 'FCR rate (all time)', value: metrics.isLoading ? '…' : formatPercent(metrics.data?.fcrRate) },
             {
-              label: 'Escalation rate',
+              label: 'Escalation rate (all time)',
               value: metrics.isLoading ? '…' : formatPercent(metrics.data?.escalationRate),
               hint: metrics.data ? `${metrics.data.escalatedCount} calls escalated` : undefined,
               tone: metrics.data?.escalationRate && metrics.data.escalationRate > 20 ? 'warning' : 'default',
             },
             {
-              label: 'Avg handle time',
+              label: 'Avg handle time (all time)',
               value: metrics.isLoading ? '…' : formatDurationLong(metrics.data?.avgAhtSeconds),
               hint: formatDurationExact(metrics.data?.avgAhtSeconds),
             },
           ]}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Card className="bg-card border-border">
+          <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm font-semibold text-foreground">
+              Needs Attention{allAttention.length > 0 ? ` (${allAttention.length})` : ''}
+            </CardTitle>
+            {allAttention.length > 5 && (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs text-cyan-400"
+                onClick={() => navigate('/call-logs')}
+              >
+                View all &rarr; Call Logs
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {recent.isLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : attentionItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No escalated or stale active records.</p>
+            ) : (
+              <div className="space-y-0.5">
+                {attentionItems.map(({ interaction: call, category }) => (
+                  <button
+                    key={call.interactionId}
+                    type="button"
+                    onClick={() => setSelectedInteraction(call)}
+                    className="w-full flex items-center justify-between py-2 border-b border-border/60 last:border-0 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
+                      <div className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</div>
+                    </div>
+                    <div className="text-right ml-3 flex-shrink-0 flex flex-col items-end gap-1">
+                      <div className="flex gap-1">
+                        {(category === 'escalated' || category === 'escalated-stale') && (
+                          <Badge variant="destructive" className="whitespace-nowrap text-xs">Escalated</Badge>
+                        )}
+                        {(category === 'stale' || category === 'escalated-stale') && (
+                          <Badge
+                            variant="outline"
+                            className="whitespace-nowrap text-xs border-amber-600/50 text-amber-700 dark:border-amber-500/40 dark:text-amber-400"
+                          >
+                            Stale active record
+                          </Badge>
+                        )}
+                      </div>
+                      <div
+                        className="text-xs text-muted-foreground"
+                        title={formatDurationExact(call.durationSeconds)}
+                      >
+                        {category === 'escalated'
+                          ? formatDurationLong(call.durationSeconds)
+                          : `${formatStaleDurationHuman(call.durationSeconds)} active`}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3">
           <Card className="bg-card border-border">
-            <CardHeader className="py-3">
+            <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-semibold text-foreground">Recent Calls</CardTitle>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs text-cyan-400"
+                onClick={() => navigate('/call-logs')}
+              >
+                View all &rarr; Call Logs
+              </Button>
             </CardHeader>
             <CardContent>
               {recent.isLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-              ) : interactions.length === 0 ? (
+              ) : recentCalls.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No calls yet.</p>
               ) : (
                 <div className="space-y-0.5">
-                  {interactions.map((call) => (
-                    <div
+                  {recentCalls.map((call) => (
+                    <button
                       key={call.interactionId}
-                      className="flex items-center justify-between py-2 border-b border-border/60 last:border-0"
+                      type="button"
+                      onClick={() => setSelectedInteraction(call)}
+                      className="w-full flex items-center justify-between py-2 border-b border-border/60 last:border-0 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
@@ -109,19 +253,31 @@ const Dashboard: React.FC = () => {
                           {formatDurationLong(call.durationSeconds)}
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <AgentActivityPanel
-            agents={agentRoster}
-            activeInteractions={activeInteractions}
-            isLoading={agents.isLoading || recent.isLoading}
-          />
+          {/* max-h + overflow-y-auto bounds the roster's Dashboard footprint even if
+              the real roster grows well past today's 3 agents — see data-growth
+              reasoning in docs/SESSION_11_1_DASHBOARD_IMPLEMENTATION.md. */}
+          <div className="max-h-[420px] overflow-y-auto">
+            <AgentActivityPanel
+              agents={agentRoster}
+              activeInteractions={activeInteractions}
+              isLoading={agents.isLoading || recent.isLoading}
+              onAgentClick={(agentId) => navigate(`/ai-agents/${agentId}`)}
+            />
+          </div>
         </div>
+
+        <InteractionDetailDialog
+          isOpen={Boolean(selectedInteraction)}
+          onClose={() => setSelectedInteraction(null)}
+          interaction={selectedInteraction}
+        />
 
         <div className="flex gap-2">
           <Button

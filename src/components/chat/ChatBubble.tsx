@@ -40,7 +40,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, failed, notPers
             {formatTimestamp(message.timestamp)}
           </span>
           {notPersisted && (
-            <span className="text-xs text-amber-600 font-medium">Not saved</span>
+            <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">Not saved</span>
           )}
         </div>
 

@@ -322,7 +322,7 @@ No new files. No migrations. No `api/*` changes.
 Local commit only, not pushed, not deployed:
 
 ```
-5b7cf3e Session 11.7: AI Agents G1/C1/S1/L1 reskin, 5-section Agent Detail, AHT stale-duration fix
+a65f359 Session 11.7: AI Agents G1/C1/S1/L1 reskin, 5-section Agent Detail, AHT stale-duration fix
 ```
 
-(exact-file `git add`, not `git add -A` — only the 5 files listed above staged)
+(exact-file `git add`, not `git add -A` — only the 5 source files + this report staged; HIG gate reviewed and passed before commit)

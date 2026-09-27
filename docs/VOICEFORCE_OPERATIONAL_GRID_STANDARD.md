@@ -15,8 +15,10 @@ Session 11.2A normalized the rules below into short reusable codes. **Future scr
 | **N1** | Origin-aware detail navigation | "Back" behavior on detail screens | §24 (original definition, referenced as N1 from here on) |
 | **L1** | Bounded operational workspace | Whole-screen scroll behavior — page must not grow with backend record count | §29 |
 | **C1** | Adaptive columns | Column width allocation in a grid/table | §25 (original definition, referenced as C1 from here on) |
+| **F1** | Operational filter toolbar | Filter UX on operational record screens (Call Logs, Chat Logs) | §30 |
+| **GR1** | Operational grouping | Grouped views of operational records | §31 |
 
-Nothing below is a new rule invented for this table — G1/G2/P1/L1 are newly *named* here (§26–§29) to make G1 in particular precise enough to enforce (the existing §3 density target was written for `G2`-shaped summary rows and undershot how tall a real multi-column table row like Live View's was actually landing at); S1/N1/C1 already existed as named, numbered sections (§23/§24/§25) and are simply indexed here under their short codes for citation convenience.
+Nothing below is a new rule invented for this table — G1/G2/P1/L1 are newly *named* here (§26–§29) to make G1 in particular precise enough to enforce (the existing §3 density target was written for `G2`-shaped summary rows and undershot how tall a real multi-column table row like Live View's was actually landing at); S1/N1/C1 already existed as named, numbered sections (§23/§24/§25) and are simply indexed here under their short codes for citation convenience. F1/GR1 (§30/§31) are new standards, not renamings of existing rules — established by Session 11.2B ahead of Call Logs/Chat Logs implementation, not yet applied to any screen.
 
 ## 1. Purpose
 
@@ -264,3 +266,32 @@ Compact operational agent summary: **Agent Name + one prominent operational coun
 **Verification method**: live-measure `main.clientHeight` vs `main.scrollHeight` (or the page's actual outer scroll container) at the four required viewports (1536×1024, 1366×768, 768×1024, 390×844) — equal values (0px delta) is the target; a small, *data-independent* delta (e.g. from a genuinely necessary two-line mobile recomposition) is an acceptable, documented exception, never an unexplained one. A delta that grows with record count is an L1 failure.
 
 **Reference implementations**: Dashboard (Session 11.1A: 1366×768 → 724/724) and Live View (Session 11.2/11.2A: 1366×768 → 724/724) both currently measure zero page-level scroll at all four required viewports, in both themes.
+
+## 30. F1 — Operational filter toolbar (Session 11.2B)
+
+Applies to operational record screens with a real filter surface — Call Logs and Chat Logs, not yet implemented against this standard.
+
+- **Records dominate the viewport.** Filters are controls, not content — the filter surface must never compete with the record grid (G1) for primary vertical space.
+- **One shallow, persistent toolbar.** Search stays directly accessible in that toolbar at all times — never buried behind an extra click.
+- **Secondary filters open in a temporary floating popover/panel**, not permanently rendered inline. The floating filter UI overlays the workspace; it must not push or reflow the record grid when opened.
+- **Show active-filter count** and compact removable chips where useful, so the operator can see what's currently filtering without opening the panel.
+- **Keep only genuinely critical selectors permanently visible** in the shallow toolbar itself — everything else lives in the floating panel.
+- **Do not introduce a permanent second left-side filter rail.** VoiceForce already has one global navigation rail (the 52px compact rail); a screen-local filter rail duplicates that pattern and consumes width the record grid needs.
+- **Mobile**: a temporary sheet/drawer is the appropriate floating-filter treatment at narrow widths, consistent with N1's "temporary overlay, not a second permanent panel" spirit.
+- **Preserve all existing filter semantics** — F1 governs presentation only; it never changes what a filter actually matches or how results are queried.
+
+Not yet implemented on any screen — this section exists so Call Logs/Chat Logs' own future implementation sessions can cite "Filters → F1" without re-deriving these rules.
+
+## 31. GR1 — Operational grouping (Session 11.2B)
+
+Applies where operational records can be grouped by a dimension (e.g. by Agent) — Call Logs and Chat Logs, not yet implemented against this standard.
+
+- **Grouping is a view of the records, not a large permanent preamble above them.** A grouped view must not push the actual record grid (G1) far down the page behind a tall hierarchy header.
+- **Group selection belongs in the compact operational toolbar** — e.g. a "Group by: Agent" control sitting alongside search/filters (F1), not a separate large control area.
+- **Grouped/Table mode may remain as a togglable view** where functionally useful (an operator choosing flat-table vs. grouped-by-agent, for example).
+- **Group structure renders compactly inside the primary records workspace** — group headers within the scrollable record region itself, not as a fixed block competing with it for space.
+- **Do not render a large always-visible hierarchy above the records grid.** If group navigation needs its own space, it collapses/expands within the workspace rather than reserving permanent height.
+- **Must comply with L1** — grouping must not consume unbounded page height; the grouped view is still one bounded, internally-scrolling workspace, not a page that grows with the number of groups or records.
+- **Do not change grouping semantics merely for presentation** — GR1 governs how a grouped view looks and where it lives on the page, never what "grouped by X" actually means or computes.
+
+Not yet implemented on any screen — this section exists so Call Logs/Chat Logs' own future implementation sessions can cite "Grouping → GR1" without re-deriving these rules.

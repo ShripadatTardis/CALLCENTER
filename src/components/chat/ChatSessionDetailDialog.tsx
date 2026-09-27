@@ -58,13 +58,21 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
               <div><span className="text-muted-foreground dark:text-muted-foreground">Latest intent:</span> {data.session.latestIntent ?? '—'}</div>
               <div>
                 <span className="text-muted-foreground dark:text-muted-foreground">Latest confidence:</span>{' '}
-                {data.session.latestConfidence !== null ? formatFractionAsPercent(data.session.latestConfidence) : '—'}
+                {data.session.latestConfidence != null ? formatFractionAsPercent(data.session.latestConfidence) : '—'}
               </div>
               <div>
-                <span className="text-muted-foreground dark:text-muted-foreground">Data source:</span>{' '}
+                <span className="text-muted-foreground dark:text-muted-foreground">Latest data source:</span>{' '}
                 {data.session.latestDataSource ? <Badge variant="outline" className="text-xs">{data.session.latestDataSource}</Badge> : '—'}
               </div>
-              <div><span className="text-muted-foreground dark:text-muted-foreground">Latency:</span> {data.session.latestLatencyMs !== null ? `${data.session.latestLatencyMs}ms` : '—'}</div>
+              {/* Session 11.4 fix: was `!== null`, which is true for
+                  `undefined` too — when the Partner API omits latency_ms
+                  entirely the field is `undefined` at runtime (despite the
+                  `number | null` type), so this rendered the literal
+                  string "undefinedms". `!= null` catches both. Also
+                  relabeled "Latency" -> "Latest latency": this is the most
+                  recent AI turn's latency only, not a session total/average
+                  (Session 11.4 field-provenance finding #10). */}
+              <div><span className="text-muted-foreground dark:text-muted-foreground">Latest latency:</span> {data.session.latestLatencyMs != null ? `${data.session.latestLatencyMs}ms` : '—'}</div>
             </div>
             {data.session.source === 'local-fallback' && (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">

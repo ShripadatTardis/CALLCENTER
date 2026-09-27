@@ -2,13 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchChatLogs } from '@/services/chat/chatService';
 
-export function useChatLogs(page = 1, status?: string) {
+export function useChatLogs(page = 1, status?: string, agentId?: string) {
   const { user } = useAuth();
   const role = user?.role ?? 'unauthenticated';
 
   return useQuery({
-    queryKey: ['chat', 'logs', page, role, status],
-    queryFn: () => fetchChatLogs(role, { page, pageSize: 25, status }),
+    queryKey: ['chat', 'logs', page, role, status, agentId],
+    queryFn: () => fetchChatLogs(role, { page, pageSize: 25, status, agentId }),
     enabled: Boolean(user),
   });
 }

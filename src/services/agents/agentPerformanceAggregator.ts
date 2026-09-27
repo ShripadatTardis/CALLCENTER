@@ -1,6 +1,7 @@
 import type { Interaction } from '@/types/interaction';
 import type { ChatSessionSummary } from '@/types/chat';
 import type { CampaignWithStats } from '@/types/campaign';
+import { isStaleDuration } from '@/lib/format';
 
 /**
  * Pure, client-side aggregation of already-fetched data, grouped by
@@ -24,6 +25,8 @@ export interface AgentCallMetrics {
   /** null when no call in the sample has an fcr value at all. */
   fcrRate: number | null;
   avgAhtSeconds: number | null;
+  /** Calls excluded from avgAhtSeconds because durationSeconds looked stale (see isStaleDuration). */
+  staleAhtExcludedCount: number;
   avgIntentAccuracy: number | null;
   avgSentimentScore: number | null;
   authenticatedCount: number;
@@ -75,12 +78,17 @@ export function groupChatSessionsByAgent(sessions: ChatSessionSummary[]): Map<st
 
 export function computeAgentCallMetrics(interactions: Interaction[]): AgentCallMetrics {
   const fcrKnown = interactions.filter((i) => i.fcr !== undefined && i.fcr !== null);
+  const knownDurations = interactions.map((i) => i.durationSeconds).filter((v): v is number => v != null);
+  // Same isStaleDuration() guard single-call formatters already use (src/lib/format.ts) —
+  // without it, one dirty demo row can drag the agent-level average up by hours.
+  const nonStaleDurations = knownDurations.filter((v) => !isStaleDuration(v));
   return {
     callsHandled: interactions.length,
     resolvedCount: interactions.filter((i) => i.outcome === 'resolved').length,
     escalatedCount: interactions.filter((i) => i.outcome === 'escalated' || Boolean(i.escalation?.trigger)).length,
     fcrRate: fcrKnown.length === 0 ? null : fcrKnown.filter((i) => i.fcr).length / fcrKnown.length,
-    avgAhtSeconds: average(interactions.map((i) => i.durationSeconds).filter((v): v is number => v != null)),
+    avgAhtSeconds: average(nonStaleDurations),
+    staleAhtExcludedCount: knownDurations.length - nonStaleDurations.length,
     avgIntentAccuracy: average(interactions.map((i) => i.intentAccuracy).filter((v): v is number => v != null)),
     avgSentimentScore: average(interactions.map((i) => i.sentimentScore).filter((v): v is number => v != null)),
     authenticatedCount: interactions.filter((i) => i.wasAuthenticated === true).length,
@@ -94,6 +102,26 @@ export function computeAgentChatMetrics(sessions: ChatSessionSummary[]): AgentCh
     avgLatencyMs: average(sessions.map((s) => s.latestLatencyMs).filter((v): v is number => v != null)),
     authenticatedCount: sessions.filter((s) => s.authenticated).length,
   };
+}
+
+/**
+ * Session 11.7 — campaign count per exact agentId, for the AI Agents
+ * list's Usage column and reused by useAgentDetail's Campaign Usage
+ * section (one function, two consumers, per docs/SCREEN_REVIEW_06_AI_AGENTS.md
+ * §7/§12). No new repository method / SQL / schema change: this groups
+ * the SAME bounded useCampaigns({pageSize:100}) fetch every other
+ * campaign-aware screen (e.g. useAgentDetail) already uses — consistent
+ * with the app's existing "bounded sample, not an authoritative
+ * unbounded count" convention (Calls/Chats handled use the same 100-row
+ * ceiling). If the campaign roster ever exceeds 100, this undercounts;
+ * flagged, not silently hidden — see the UI's "first 100" caveat.
+ */
+export function countCampaignsByAgent(campaigns: CampaignWithStats[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const campaign of campaigns) {
+    counts.set(campaign.agentId, (counts.get(campaign.agentId) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export function computeAgentCampaignOutcomeSummary(campaigns: CampaignWithStats[]): AgentCampaignOutcomeSummary {

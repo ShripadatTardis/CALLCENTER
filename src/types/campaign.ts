@@ -22,10 +22,10 @@ export type ReconciliationStatus = 'pending' | 'reconciled' | 'unresolved' | 'er
 export type NextActionType = 'retry' | 'follow_up' | 'close' | 'escalate' | 'move_campaign';
 
 /**
- * Session 9.1 — VoiceForce Outbound Campaign Domain Build. Mirrors
- * src/server/campaigns/types.ts's Agent Contract model (no shared
- * import across the client/server boundary, same convention as every
- * other domain in this project — see src/types/customer.ts).
+ * Session 9.1 — VoiceForce Outbound Campaign Domain Build. Session 11.7:
+ * this is now the single authoritative definition of the Agent Contract
+ * shape (src/server/campaigns/types.ts re-exports it) — previously two
+ * independently hand-maintained copies existed.
  */
 export type AgentContractSource = 'partner_api' | 'legacy';
 export type AgentContractCompleteness = 'complete' | 'partial';

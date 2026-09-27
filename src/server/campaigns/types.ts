@@ -36,57 +36,22 @@ export type NextActionType = 'retry' | 'follow_up' | 'close' | 'escalate' | 'mov
  * only. VoiceForce (this app) selects a Call Agent and snapshots its
  * contract; it never defines the agent, its prompt, or its expected
  * outcomes.
- */
-export type AgentContractSource = 'partner_api' | 'legacy';
-export type AgentContractCompleteness = 'complete' | 'partial';
-
-export interface AgentInputField {
-  fieldCode: string;
-  displayName: string;
-  dataType?: string;
-  required: boolean;
-  description?: string;
-  allowedValues?: string[];
-}
-
-export interface AgentOutcomeDefinition {
-  outcomeCode: string;
-  displayName: string;
-  description?: string;
-  active?: boolean;
-}
-
-export interface AgentOutputField {
-  fieldCode: string;
-  displayName: string;
-  dataType?: string;
-  description?: string;
-}
-
-/**
- * Immutable snapshot of the selected Call Agent's contract, captured at
- * campaign creation time so a later `/agents` response can never
- * silently rewrite what a campaign was configured against.
  *
- * Today's live `/agents` endpoint (src/types/api/agents.ts) is a roster
- * only — agent_id/display_name/persona_name/direction/language/
- * is_default — with no expected-input/outcome/output metadata. Every
- * contract built from it is therefore honestly `contractSource: 'legacy'`
- * and `contractCompleteness: 'partial'`, with all three field arrays
- * empty. Nothing here is invented to fill that gap.
+ * Session 11.7: these six types used to be independently redefined here
+ * AND in src/types/campaign.ts (two hand-maintained copies of the same
+ * shape). src/types/campaign.ts is now the single authoritative
+ * definition (docs/SESSION_11_7_AI_AGENTS_IMPLEMENTATION.md) — this file
+ * just re-exports it, so every existing import of these names from
+ * './types.js' keeps working unchanged.
  */
-export interface CallAgentContract {
-  agentId: string;
-  agentName: string;
-  status?: string;
-  direction?: string;
-  description?: string;
-  expectedInputFields: AgentInputField[];
-  expectedOutcomes: AgentOutcomeDefinition[];
-  outputFields: AgentOutputField[];
-  contractSource: AgentContractSource;
-  contractCompleteness: AgentContractCompleteness;
-}
+export type {
+  AgentContractSource,
+  AgentContractCompleteness,
+  AgentInputField,
+  AgentOutcomeDefinition,
+  AgentOutputField,
+  CallAgentContract,
+} from '../../types/campaign.js';
 
 /** The three source classes this build supports (plan Phase 4) — no generic CRM connector. */
 export type InputMappingSourceType = 'customer360' | 'csv' | 'campaign_field';

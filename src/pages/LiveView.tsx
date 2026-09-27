@@ -191,9 +191,11 @@ const LiveView: React.FC = () => {
         ) : (
             <Table>
               <TableHeader>
+                {/* G1 dense operational grid (docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md
+                    §G1): ~32-36px header, not the shadcn default h-12/px-4. */}
                 <TableRow className="border-border hover:bg-transparent">
                   {['Caller', 'Intent', 'Agent', 'Duration', 'Sentiment', 'Status', 'Actions'].map((h) => (
-                    <TableHead key={h} className={`text-muted-foreground text-xs ${h === 'Duration' ? 'text-right' : ''}`}>{h}</TableHead>
+                    <TableHead key={h} className={`h-9 px-3 text-muted-foreground text-xs ${h === 'Duration' ? 'text-right' : ''}`}>{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -205,29 +207,36 @@ const LiveView: React.FC = () => {
                     statusValue === 'escalated' ? 'escalated' : statusValue === 'resolved' ? 'positive' : 'secondary';
                   return (
                   <TableRow key={call.interactionId} className="border-border/60 hover:bg-card">
-                    <TableCell className="max-w-[180px]">
-                      <div className="min-w-0">
-                        <div className="font-medium text-foreground truncate">{call.callerName || '—'}</div>
-                        <div className="text-xs text-muted-foreground truncate">{formatPhoneNumber(call.phoneNumber)}</div>
-                      </div>
+                    {/* G1: single-line identity cell (Session 11.2A) — the
+                        prior two-line name/phone stack was the main reason
+                        this table still read as stacked cards rather than a
+                        dense grid row. Name and phone now share one line;
+                        phone remains available in full via View Details. */}
+                    <TableCell className="py-1.5 px-3 max-w-[220px]">
+                      <span
+                        className="text-sm text-foreground truncate block"
+                        title={`${call.callerName || '—'} · ${formatPhoneNumber(call.phoneNumber)}`}
+                      >
+                        {call.callerName || '—'} <span className="text-muted-foreground">· {formatPhoneNumber(call.phoneNumber)}</span>
+                      </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5 px-3">
                       <Badge variant="outline" className="whitespace-nowrap text-xs border-slate-600 text-foreground">{call.intent || '—'}</Badge>
                     </TableCell>
-                    {/* Session 11.1 XYZ-A adaptive sizing (see docs/VOICEFORCE_
-                        OPERATIONAL_GRID_STANDARD.md): a bounded-but-generous
-                        min/max, not the old fixed max-w-[140px] that truncated
-                        normal agent names ("Inbound Banking Assistant") even
-                        with unused row width elsewhere. */}
-                    <TableCell className="min-w-[7rem] max-w-[14rem]">
+                    {/* Session 11.1 XYZ-A / C1 adaptive sizing (see docs/
+                        VOICEFORCE_OPERATIONAL_GRID_STANDARD.md): a bounded-
+                        but-generous min/max, not the old fixed max-w-[140px]
+                        that truncated normal agent names ("Inbound Banking
+                        Assistant") even with unused row width elsewhere. */}
+                    <TableCell className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
                       <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="py-1.5 px-3 text-right">
                       <span className="font-mono tabular-nums text-foreground whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
                         {formatDurationLong(call.durationSeconds)}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5 px-3">
                       <div className="flex items-center space-x-2">
                         <span className={`font-medium whitespace-nowrap text-xs ${getSentimentColor(call.sentimentScore)}`}>
                           {formatFractionAsPercent(call.sentimentScore)}
@@ -242,7 +251,7 @@ const LiveView: React.FC = () => {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5 px-3">
                       {/* Session 11.1 XYZ corporate semantic status language:
                           same field/label as before (outcome==='escalated'
                           takes precedence over stage/status — unchanged),
@@ -253,7 +262,7 @@ const LiveView: React.FC = () => {
                         {formatStatusLabel(statusValue)}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1.5 px-3">
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm" className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setSelectedCall(call)}>

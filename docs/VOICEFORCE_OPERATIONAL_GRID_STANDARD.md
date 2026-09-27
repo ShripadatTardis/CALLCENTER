@@ -2,6 +2,22 @@
 
 Established by Session 11.1A, first implemented on Dashboard. This is a **product standard**, not implementation notes — future sessions should read this and reuse the grammar below rather than re-deriving row density/typography/badge/hover/focus rules screen by screen.
 
+## Named standards (quick reference)
+
+Session 11.2A normalized the rules below into short reusable codes. **Future screen prompts may cite these directly** (e.g. "Call details → G1", "Agent Load → P1") without redefining them — each code below is fully specified in its linked section, nothing further to restate.
+
+| Code | Name | Applies to | Defined in |
+|---|---|---|---|
+| **G1** | Dense operational grid | Full tabular record sets — Live View interactions, Call Logs, Chat Logs, other complete datasets | §26 |
+| **G2** | Compact summary rows | Bounded summary lists — Dashboard Needs Attention, Recent Calls | §27, and §3/§14 (original definition) |
+| **P1** | Agent Load | Compact per-agent operational load summary | §28, and §15 (original definition) |
+| **S1** | Corporate semantic status | Status badge visual language | §23 (original definition, referenced as S1 from here on) |
+| **N1** | Origin-aware detail navigation | "Back" behavior on detail screens | §24 (original definition, referenced as N1 from here on) |
+| **L1** | Bounded operational workspace | Whole-screen scroll behavior — page must not grow with backend record count | §29 |
+| **C1** | Adaptive columns | Column width allocation in a grid/table | §25 (original definition, referenced as C1 from here on) |
+
+Nothing below is a new rule invented for this table — G1/G2/P1/L1 are newly *named* here (§26–§29) to make G1 in particular precise enough to enforce (the existing §3 density target was written for `G2`-shaped summary rows and undershot how tall a real multi-column table row like Live View's was actually landing at); S1/N1/C1 already existed as named, numbered sections (§23/§24/§25) and are simply indexed here under their short codes for citation convenience.
+
 ## 1. Purpose
 
 VoiceForce is a dense enterprise operations console, not a consumer dashboard. Repeated operational data (calls, agents, campaign targets, chat sessions) needs one consistent visual grammar so every screen reads as the same product. This document is that grammar.
@@ -209,3 +225,42 @@ grid-template-columns: minmax(0,1fr) minmax(7rem,14rem) minmax(6rem,10rem) minma
 applied identically (via a Tailwind arbitrary-value class) to the header row's label spans and to every data row's `<button>`. A row's mobile-only sub-wrapper (the badges+duration pair, stacked on one line below `sm`) uses `sm:contents` at the grid breakpoint so its two children become direct grid items in the Status/Duration tracks — this keeps the mobile markup untouched while letting the same elements participate correctly in the desktop grid, without introducing an extra nested grid container. Grid children with `truncate` also need `min-w-0` (grid items default to `min-width: auto`, which prevents shrinking below content size and defeats the ellipsis) — the Agent cell's wrapper includes this.
 
 **Applies to**: any operational grid built as one-grid-per-row rather than one-grid-for-the-whole-list (which is the pattern this project uses for row-as-`<button>` clickable records). Future Live View, Call Logs, and Chat Logs should inherit this exact rule — same allocation principle, same "fixed-max-per-track, not `max-content`" reasoning — rather than independently choosing arbitrary column widths per screen. This supersedes §22's earlier "fixed/near-fixed width" phrasing for the Agent column.
+
+## 26. G1 — Dense operational grid (Session 11.2A)
+
+For **full tabular record sets** — Live View's Current Interactions table, Call Logs, Chat Logs, and any other complete (not capped-summary) dataset rendered as a real `<table>`. This is a stricter, table-specific refinement of §3's general row-density target, because a genuine multi-column data table (7+ columns, badges, numeric alignment) needs an explicit target or it silently lands taller than a simple 2-field summary row.
+
+**Desktop characteristics**:
+- Genuine tabular presentation — an HTML `<table>` (or equivalent grid), not a stack of per-record cards.
+- **Data row height: ~38–42px.** **Header height: ~32–36px.** Targets, not pixel-perfect requirements, but a row landing at 60px+ (the shadcn `Table` primitive's untouched defaults — `TableHead` is `h-12`/48px, `TableCell` is `p-4`/16px-all-sides) is a G1 violation, not an acceptable variance.
+- **Single-line cells by default.** A record's identity cell (e.g. Caller name + phone) is one line, not two stacked lines — merge related fields with a separator (`·`) rather than stacking them. Two-line cells are not the desktop default; reserve them for a documented case where the content genuinely can't compress (rare on a G1 grid — if you find you need one, that's usually a sign the field belongs in the detail view instead).
+- Minimal vertical padding (`py-1.5`–`py-2` on `TableCell`, `h-9` on `TableHead` — override the shadcn primitives' defaults explicitly, since `cn()`/`twMerge` resolves the conflict correctly).
+- Subtle row separators (inherited `border-b`/`border-border` per row — no per-row card border/shadow/rounded-corner treatment).
+- No per-record card appearance — a G1 row must visually read as **one row of a data grid**, never an individual horizontal card with its own visual boundary.
+- No large empty vertical space inside a row — content that doesn't need two lines shouldn't get two lines' worth of padding "for breathing room."
+- Compact status treatment — reuse S1 (§23) badges, never a status element that forces the row taller than its text content requires.
+- Compact row actions — a "View Details"-style action stays a small (`h-7`-class) button, never a large/prominent CTA that dictates row height.
+- Strong column alignment — numeric/duration columns right-aligned and `tabular-nums` (see C1, §25); header and every row share equivalent column treatment.
+- High information density **without reducing readability** — this is still enterprise text at `text-sm`/`text-xs`, not a font-size reduction exercise.
+
+**Verification method**: measure `getBoundingClientRect().height` on an actual `<thead> tr` and a `<tbody> tr` in the live rendered page (via the project's Playwright+Edge harness) — do not estimate from source alone, since Tailwind class stacking/line-height/border interactions routinely produce a few px of drift from a hand calculation.
+
+**Reference implementation**: `src/pages/LiveView.tsx`'s Current Interactions table (Session 11.2A) — measured live at 41px data rows / 36px header at all four required viewports, both themes.
+
+## 27. G2 — Compact summary rows (Session 11.2A naming; rule itself is §3/§14 unchanged)
+
+For **bounded summary lists** — Dashboard's Needs Attention and Recent Calls (capped at 5 records, click-through to full detail elsewhere). This is exactly the original §3 row-density target (~40–44px normal, ~36–40px dense) and the "compact row list" half of §14 — nothing new, just named for citation. A G2 row may combine related secondary information within the row (identity + context on one line, as already described in §4's typography model) because it's a *summary* of a bounded list, not a full data table — it does not need G1's stricter single-line-cell discipline applied to every field, though it should still default to one line per §4/§9.
+
+**Do not use G2's slightly looser target to justify a G1 screen (a real multi-column table) drifting taller** — if a screen is a full tabular dataset, it's G1, not G2, regardless of how the rule is phrased.
+
+## 28. P1 — Agent Load (Session 11.2A naming; rule itself is §15 unchanged)
+
+Compact operational agent summary: **Agent Name + one prominent operational count/load value**, right-aligned, one line per agent. This is exactly §15's "entity/load-row usage" rule, named for citation. Reuse the established `AgentActivityPanel` `variant="compact"` component directly (Dashboard and Live View both already do) — do not build a second implementation. Do not add Direction/Language/Persona to a P1 summary unless that specific screen has a genuine, documented operational reason to need them in the summary itself (full metadata always remains one click away on Agent Detail).
+
+## 29. L1 — Bounded operational workspace (Session 11.2A naming; rule is the Session 11.1/11.2 bounded-workspace requirement, now named)
+
+**Backend record count must never determine whole-page height.** An operational screen (Dashboard, Live View, and — when their own implementation sessions apply this standard — Call Logs/Chat Logs) stays viewport-bounded: the primary dataset (the G1 table or the G2 summary lists) becomes the one principal scrolling region, while every other section on the page (header/indicator, metrics, Agent Load, filter toolbar) is fixed/compact height. 10, 50, or 500 records must only grow that one region's own internal scroll — never `main`'s `scrollHeight` beyond its `clientHeight`.
+
+**Verification method**: live-measure `main.clientHeight` vs `main.scrollHeight` (or the page's actual outer scroll container) at the four required viewports (1536×1024, 1366×768, 768×1024, 390×844) — equal values (0px delta) is the target; a small, *data-independent* delta (e.g. from a genuinely necessary two-line mobile recomposition) is an acceptable, documented exception, never an unexplained one. A delta that grows with record count is an L1 failure.
+
+**Reference implementations**: Dashboard (Session 11.1A: 1366×768 → 724/724) and Live View (Session 11.2/11.2A: 1366×768 → 724/724) both currently measure zero page-level scroll at all four required viewports, in both themes.

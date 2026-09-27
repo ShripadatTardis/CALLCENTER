@@ -144,7 +144,7 @@ const AgentDetail: React.FC = () => {
           <Bot className="h-6 w-6 text-cyan-400 shrink-0" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-slate-50 truncate">{agent.displayName}</h1>
+              <h1 className="text-lg font-semibold text-foreground truncate">{agent.displayName}</h1>
               {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
             </div>
             <p className="text-xs text-muted-foreground font-mono">{agent.agentId}</p>

@@ -73,10 +73,12 @@ const AIAgents: React.FC = () => {
               <TableBody>
                 {agents.map((agent) => {
                   const campaignCount = campaignCounts.get(agent.agentId) ?? 0;
+                  const openDetail = () => navigate(`/ai-agents/${agent.agentId}`, { state: { origin: 'ai-agents' } });
                   return (
                     <TableRow
                       key={agent.agentId}
                       className="cursor-pointer border-border/60 hover:bg-card focus-within:bg-card"
+                      onClick={openDetail}
                     >
                       {/* C1: identity column is the flexible one — no fixed
                           max-width truncating names like "Inbound Banking
@@ -109,7 +111,10 @@ const AIAgents: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-muted"
-                          onClick={() => navigate(`/ai-agents/${agent.agentId}`, { state: { origin: 'ai-agents' } })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDetail();
+                          }}
                         >
                           View →
                         </Button>

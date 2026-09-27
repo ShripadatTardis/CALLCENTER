@@ -41,12 +41,17 @@ const Analytics: React.FC = () => {
         <AnalyticsTimeWindowControl query={query} onChange={setQuery} />
 
         <Tabs defaultValue="overview">
-          <TabsList className="bg-card border border-border h-9">
-            <TabsTrigger value="overview" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Overview</TabsTrigger>
-            <TabsTrigger value="voice" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Voice</TabsTrigger>
-            <TabsTrigger value="chat" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Chat</TabsTrigger>
-            <TabsTrigger value="campaigns" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Campaigns</TabsTrigger>
-            <TabsTrigger value="customers" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">Customers</TabsTrigger>
+          {/* overflow-x-auto: at ~390px the 5 triggers exceed viewport width;
+              without this the strip was silently clipped (Customers tab
+              unreachable, no page-level scroll since the clip happened
+              inside this flex row, not the document) — found during Session
+              10.5B's responsive survey. */}
+          <TabsList className="bg-card border border-border h-9 flex-nowrap overflow-x-auto max-w-full justify-start">
+            <TabsTrigger value="overview" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="voice" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Voice</TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Chat</TabsTrigger>
+            <TabsTrigger value="campaigns" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Campaigns</TabsTrigger>
+            <TabsTrigger value="customers" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Customers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-3">

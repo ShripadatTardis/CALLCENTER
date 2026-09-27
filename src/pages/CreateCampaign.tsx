@@ -149,10 +149,41 @@ const CreateCampaign: React.FC = () => {
           </Button>
         </div>
 
-        <div className="flex gap-4 p-4">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4 p-3 md:p-4">
+          {/* Mobile-only compact stage stepper — a horizontally-scrollable
+              pill strip, never the full vertical nav squeezed beside the
+              form (that clipped the form/actions off-screen at ~390px). */}
+          <nav
+            aria-label="Campaign creation stages"
+            className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1"
+          >
+            {STAGES.map((label, i) => {
+              const state = stageState(i);
+              const locked = i > maxReachable && i !== step;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => !locked && setStep(i)}
+                  aria-current={i === step ? 'step' : undefined}
+                  title={label}
+                  className={`shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-[11px] border focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed ${
+                    i === step ? 'bg-cyan-600 border-cyan-600 text-foreground' : state === 'completed' ? 'border-cyan-700 text-cyan-300' : 'border-border text-muted-foreground'
+                  }`}
+                >
+                  {state === 'completed' && i !== step ? <Check size={12} /> : i + 1}
+                </button>
+              );
+            })}
+            <span className="shrink-0 text-[12px] text-muted-foreground ml-1">{STAGES[step]}</span>
+          </nav>
+
           {/* Workflow stage navigator — contextual workflow chrome, not
-              permanent app chrome; ~192px. */}
-          <nav aria-label="Campaign creation stages" className="w-[192px] shrink-0 space-y-0.5">
+              permanent app chrome; ~192px. Desktop/tablet only (md+); on
+              mobile the compact stepper above replaces it so the current
+              stage gets the full viewport width. */}
+          <nav aria-label="Campaign creation stages" className="hidden md:block w-[192px] shrink-0 space-y-0.5">
             {STAGES.map((label, i) => {
               const state = stageState(i);
               const locked = i > maxReachable && i !== step;
@@ -177,7 +208,7 @@ const CreateCampaign: React.FC = () => {
           </nav>
 
           {/* Current-stage workspace — one bounded surface, not nested cards. */}
-          <div className="flex-1 min-w-0 border border-border rounded-md bg-card/40 p-4">
+          <div className="flex-1 min-w-0 w-full border border-border rounded-md bg-card/40 p-3 md:p-4">
             <h2 className="text-[13px] font-semibold text-foreground mb-3">{STAGES[step]}</h2>
 
             {step === 0 && (

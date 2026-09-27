@@ -32,20 +32,25 @@ const Settings: React.FC = () => {
         </div>
 
         <Tabs defaultValue="general">
-          <TabsList className="bg-card border border-border h-9">
-            <TabsTrigger value="general" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">
+          {/* overflow-x-auto: at ~390px the 5 triggers (with icons/labels)
+              exceeded viewport width and clipped Appearance off-screen with
+              no way to reach it — found during Session 10.5B's responsive
+              survey; Appearance reachability at mobile width is an explicit
+              requirement. */}
+          <TabsList className="bg-card border border-border h-9 flex-nowrap overflow-x-auto max-w-full justify-start">
+            <TabsTrigger value="general" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">
               <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />General
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">
+            <TabsTrigger value="notifications" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">
               <Bell className="h-3.5 w-3.5 mr-1.5" />Notifications
             </TabsTrigger>
-            <TabsTrigger value="security" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">
+            <TabsTrigger value="security" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">
               <Shield className="h-3.5 w-3.5 mr-1.5" />Security
             </TabsTrigger>
-            <TabsTrigger value="ai" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">
+            <TabsTrigger value="ai" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">
               <Database className="h-3.5 w-3.5 mr-1.5" />AI Configuration
             </TabsTrigger>
-            <TabsTrigger value="appearance" className="text-xs data-[state=active]:bg-muted data-[state=active]:text-foreground">
+            <TabsTrigger value="appearance" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">
               <Sun className="h-3.5 w-3.5 mr-1.5" />Appearance
             </TabsTrigger>
           </TabsList>

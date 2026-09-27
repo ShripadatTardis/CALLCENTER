@@ -110,24 +110,27 @@ export const FlowEditor: React.FC<FlowEditorProps> = ({ flowId }) => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Toolbar */}
+      {/* Toolbar — flex-wrap so all controls stay reachable at narrow
+          widths instead of running off-screen (found during Session
+          10.5B's responsive survey: this row has no wrap/scroll handling
+          and is wider than a 390px viewport as a single line). */}
       <div className="border-b border-border bg-card px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-y-2">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={handleBack}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <div className="h-8 w-px bg-border" />
+            <div className="h-8 w-px bg-border hidden sm:block" />
             <Input
               value={flowName}
               onChange={(e) => setFlowName(e.target.value)}
-              className="w-64 font-semibold"
+              className="w-40 sm:w-64 font-semibold"
               placeholder="Flow name"
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 mr-4">
               <Button variant="ghost" size="sm" onClick={() => setZoom(Math.max(50, zoom - 10))}>
                 <ZoomOut className="h-4 w-4" />
@@ -165,17 +168,28 @@ export const FlowEditor: React.FC<FlowEditorProps> = ({ flowId }) => {
         </div>
       </div>
 
-      {/* Main Editor */}
+      {/* Main Editor. RESPONSIVE VIEWING / LIMITED EDITING at narrow
+          widths (Session 10.5B classification, presentation-only fix,
+          engine untouched): the palette and inspector are fixed-width
+          (256px + 320px = 576px) panels that cannot fit alongside a usable
+          canvas below the `lg` breakpoint, so they are hidden there —
+          the canvas gets the full viewport and remains visible/pannable,
+          but dragging new nodes from the palette or editing a selected
+          node's properties requires a tablet/desktop-width viewport. This
+          is an honest limitation, not a fake mobile-editing experience;
+          closing it fully (e.g. temporary drawers for both panels) is
+          deferred as documented follow-up, not attempted here given this
+          is the highest-regression-risk surface in the app. */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Node Palette */}
-        <div className="w-64 border-r border-border bg-card overflow-y-auto">
+        <div className="hidden lg:block w-64 border-r border-border bg-card overflow-y-auto">
           <NodePalette />
         </div>
 
         {/* Center - Canvas */}
-        <div className="flex-1 relative bg-background">
-          <Canvas 
-            zoom={zoom} 
+        <div className="flex-1 relative bg-background min-w-0">
+          <Canvas
+            zoom={zoom}
             onNodeSelect={setSelectedNodeId}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
@@ -184,8 +198,8 @@ export const FlowEditor: React.FC<FlowEditorProps> = ({ flowId }) => {
         </div>
 
         {/* Right Panel - Inspector */}
-        <div className="w-80 border-l border-border bg-card overflow-y-auto">
-          <NodeInspector 
+        <div className="hidden lg:block w-80 border-l border-border bg-card overflow-y-auto">
+          <NodeInspector
             selectedNodeId={selectedNodeId}
             nodes={nodes}
             onUpdateNode={handleUpdateNode}

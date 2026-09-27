@@ -146,7 +146,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
 
   if (isBound) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-muted rounded-lg border border-border text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-muted rounded-lg border border-border text-sm">
         <Field label="Agent"><div className="h-8 flex items-center text-sm font-medium truncate" title={boundAgentName ?? undefined}>{boundAgentName ?? '—'}</div></Field>
         <Field label="Customer"><div className="h-8 flex items-center text-muted-foreground truncate" title={resolvedCustomerId ?? undefined}>{resolvedCustomerId ?? '—'}</div></Field>
         <Field label="Contact"><div className="h-8 flex items-center text-muted-foreground truncate" title={resolvedContactId ?? undefined}>{resolvedContactId ?? '—'}</div></Field>
@@ -170,7 +170,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
         </div>
 
         {advancedMode ? (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
             <Field label="Agent">
               <AgentPicker agentId={agentId} onChange={setAgentId} />
             </Field>
@@ -189,7 +189,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
             <Field label="Session ID"><div className="h-8 flex items-center font-mono text-xs truncate">{sessionId ?? 'Not started'}</div></Field>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <Field label="Category">
               <Select
                 value={categoryId}

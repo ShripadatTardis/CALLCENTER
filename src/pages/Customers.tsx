@@ -86,7 +86,7 @@ const Customers: React.FC = () => {
         )}
 
         {data?.materializationWarning && (
-          <div className="flex items-center gap-2 rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-300 flex-shrink-0">
+          <div className="flex items-center gap-2 rounded-md border border-amber-600/50 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 flex-shrink-0">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             Could not check for new interactions for this phone number right now: {data.materializationWarning}
           </div>
@@ -94,8 +94,9 @@ const Customers: React.FC = () => {
 
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           {isLoading ? (
-            <div className="flex justify-center py-12">
+            <div className="flex justify-center py-12" role="status" aria-live="polite">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="sr-only">Loading customers…</span>
             </div>
           ) : isError && customers.length === 0 ? (
             <p className="text-sm text-muted-foreground px-3 py-4">Customers are unavailable right now — see the error above.</p>

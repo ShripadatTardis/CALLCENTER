@@ -308,6 +308,53 @@ neither of which is in this session's scope.
 
 ---
 
+## Post-commit HIG follow-up
+
+A HIG review dispatched against the staged diff (after the first
+commit below had already landed) surfaced medium/low findings, all
+`evidence: static-code` (no live-rendered pass — same blocked-`vercel
+dev` limitation documented above prevented one): `HIG-VERDICT:
+advisory-pass level=static scope=screen rows=6/6 blind=2 (critical=0
+high=0 medium=3 low=2 advisory=1)`. high=0 throughout, so this never
+blocked the gate — the three medium findings were fixed as a small
+follow-up commit rather than left for a future session, since they were
+cheap and localized to the files this session already owns:
+
+- **Amber warning-banner light-mode contrast** (`Customers.tsx`'s
+  materialization warning, `CustomerDetail.tsx`'s refresh-failed
+  banner) — both still used the unconditional dark-tuned
+  `border-amber-800 bg-amber-950/40 text-amber-300` literals carried
+  over unchanged from the pre-11.5B files. `LiveView.tsx` had already
+  identified and fixed this exact anti-pattern for its own Escalation
+  Alerts panel; both banners now use the same paired treatment:
+  `border-amber-600/50 bg-amber-500/10 dark:border-amber-500/40
+  dark:bg-amber-500/10 text-amber-700 dark:text-amber-400`.
+- **Missing loading-state announcements** (WCAG 4.1.3) — the four bare
+  `<Loader2 className="animate-spin" />` blocks this session introduced
+  or left unchanged in `Customers.tsx`/`CustomerDetail.tsx` had no
+  `role="status"`/`aria-live` region and no accompanying text (unlike
+  `InteractionLookupDialog`'s own loading state, which already pairs
+  the spinner with visible "Loading interaction…" text). Added
+  `role="status" aria-live="polite"` + an `sr-only` label to each.
+- **Arbitrary type size** — `SectionCard`'s `text-[11px]` subtitle
+  (below Tailwind's `text-xs`/12px floor) changed to `text-xs`.
+
+**Not fixed, deliberately, and documented rather than silently
+skipped**: (1) the finding that interactive `<tr role="button"
+tabIndex={0}>` rows strip native table row/cell semantics from the
+accessibility tree (WCAG 4.1.2) — this is a pre-existing pattern used
+identically across Call Logs, Chat Logs, and the original
+Customers.tsx/CustomerDetail.tsx before this session touched them, not
+something this session introduced; fixing it properly means an
+app-wide table-interactivity pattern change, out of this session's
+scope, the same call Session 11.7 made for its own lower-severity
+carried-forward findings. (2) `focus-visible:outline-cyan-500` as a raw
+color literal rather than a semantic token — also a pre-existing,
+codebase-wide convention (`Dashboard.tsx`, `Sidebar.tsx`, etc.), not
+introduced here, and the review itself judged it low-risk/cosmetic. (3)
+The `prefers-reduced-motion` advisory on spinner animations — an
+optional best-practice note, not a blocking finding, left as-is.
+
 ## Local commit
 
 `git add` (exact files only, no `git add -A`):

@@ -45,7 +45,7 @@ const SectionCard: React.FC<{ title: string; subtitle?: string; children: React.
   <div className="rounded-md border border-border bg-card p-3 space-y-2">
     <div>
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
-      {subtitle && <div className="text-[11px] text-muted-foreground">{subtitle}</div>}
+      {subtitle && <div className="text-xs text-muted-foreground">{subtitle}</div>}
     </div>
     {children}
   </div>
@@ -239,8 +239,9 @@ const CustomerDetail: React.FC = () => {
         )}
 
         {isLoading ? (
-          <div className="flex justify-center py-12">
+          <div className="flex justify-center py-12" role="status" aria-live="polite">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="sr-only">Loading customer…</span>
           </div>
         ) : !data ? (
           <p className="text-sm text-muted-foreground px-1">Customer not found, or not visible under your current access.</p>
@@ -253,7 +254,7 @@ const CustomerDetail: React.FC = () => {
           return (
           <>
             {data.refresh.failed && (
-              <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+              <div className="rounded-md border border-amber-600/50 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                 Could not check for new interactions right now ({data.refresh.error}). Showing the last data we had.
               </div>
             )}
@@ -348,8 +349,9 @@ const CustomerDetail: React.FC = () => {
                 </p>
               )}
               {interactionsQuery.isLoading ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-8" role="status" aria-live="polite">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <span className="sr-only">Loading interaction history…</span>
                 </div>
               ) : allInteractions.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-1 py-4">No visible interactions for this customer.</p>
@@ -433,8 +435,9 @@ const CustomerDetail: React.FC = () => {
             <div className="space-y-2">
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Campaign Participation</div>
               {campaignsQuery.isLoading ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-8" role="status" aria-live="polite">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <span className="sr-only">Loading campaign participation…</span>
                 </div>
               ) : campaignsQuery.isError ? (
                 <p className="text-sm text-muted-foreground px-1 py-2">Campaign history is unavailable right now.</p>

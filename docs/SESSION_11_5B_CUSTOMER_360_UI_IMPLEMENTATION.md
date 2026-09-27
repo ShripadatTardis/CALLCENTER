@@ -317,4 +317,4 @@ neither of which is in this session's scope.
 `src/hooks/customers/useCustomerCampaigns.ts`, `src/lib/detailOrigin.ts`,
 `docs/SESSION_11_5B_CUSTOMER_360_UI_IMPLEMENTATION.md`.
 
-Commit hash: see below (recorded after committing).
+Commit hash: `f1f4495`.

@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, AlertTriangle, BarChart3, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAnalyticsMetrics } from '@/hooks/analytics/useAnalyticsMetrics';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -110,7 +110,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-3 space-y-2">
         {(recent.isError || agents.isError || metrics.isError) && (
           <QueryErrorBanner
             error={recent.error ?? agents.error ?? metrics.error}
@@ -144,7 +144,7 @@ const Dashboard: React.FC = () => {
         />
 
         <Card className="bg-card border-border">
-          <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+          <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-semibold text-foreground">
               Needs Attention{allAttention.length > 0 ? ` (${allAttention.length})` : ''}
             </CardTitle>
@@ -159,28 +159,28 @@ const Dashboard: React.FC = () => {
               </Button>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-2">
             {recent.isLoading ? (
-              <div className="flex justify-center py-6">
+              <div className="flex justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : attentionItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No escalated or stale active records.</p>
+              <p className="text-sm text-muted-foreground py-1">No escalated or stale active records.</p>
             ) : (
-              <div className="space-y-0.5">
+              <div className="divide-y divide-border/60">
                 {attentionItems.map(({ interaction: call, category }) => (
                   <button
                     key={call.interactionId}
                     type="button"
                     onClick={() => setSelectedInteraction(call)}
-                    className="w-full flex items-center justify-between py-2 border-b border-border/60 last:border-0 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                    className="w-full flex items-center justify-between gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
-                      <div className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</div>
+                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                      <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
+                      <span className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</span>
                     </div>
-                    <div className="text-right ml-3 flex-shrink-0 flex flex-col items-end gap-1">
-                      <div className="flex gap-1">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex flex-wrap justify-end gap-1 max-w-[220px]">
                         {(category === 'escalated' || category === 'escalated-stale') && (
                           <Badge variant="destructive" className="whitespace-nowrap text-xs">Escalated</Badge>
                         )}
@@ -189,17 +189,17 @@ const Dashboard: React.FC = () => {
                             variant="outline"
                             className="whitespace-nowrap text-xs border-amber-600/50 text-amber-700 dark:border-amber-500/40 dark:text-amber-400"
                           >
-                            Stale active record
+                            Stale active
                           </Badge>
                         )}
                       </div>
                       <div
-                        className="text-xs text-muted-foreground"
+                        className="text-xs text-muted-foreground tabular-nums whitespace-nowrap w-16 text-right"
                         title={formatDurationExact(call.durationSeconds)}
                       >
                         {category === 'escalated'
                           ? formatDurationLong(call.durationSeconds)
-                          : `${formatStaleDurationHuman(call.durationSeconds)} active`}
+                          : formatStaleDurationHuman(call.durationSeconds)}
                       </div>
                     </div>
                   </button>
@@ -211,7 +211,7 @@ const Dashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3">
           <Card className="bg-card border-border">
-            <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-semibold text-foreground">Recent Calls</CardTitle>
               <Button
                 variant="link"
@@ -222,34 +222,34 @@ const Dashboard: React.FC = () => {
                 View all &rarr; Call Logs
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 pb-2">
               {recent.isLoading ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : recentCalls.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No calls yet.</p>
+                <p className="text-sm text-muted-foreground py-1">No recent calls.</p>
               ) : (
-                <div className="space-y-0.5">
+                <div className="divide-y divide-border/60">
                   {recentCalls.map((call) => (
                     <button
                       key={call.interactionId}
                       type="button"
                       onClick={() => setSelectedInteraction(call)}
-                      className="w-full flex items-center justify-between py-2 border-b border-border/60 last:border-0 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                      className="w-full flex items-center justify-between gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</div>
-                        <div className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</div>
+                      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                        <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
+                        <span className="text-xs text-muted-foreground truncate">{call.intent || '—'} · {formatPhoneNumber(call.phoneNumber)}</span>
                       </div>
-                      <div className="text-right ml-3 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Badge
                           variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'destructive' : 'default'}
                           className="whitespace-nowrap text-xs"
                         >
                           {formatStatusLabel(call.outcome ?? call.status)}
                         </Badge>
-                        <div className="text-xs text-muted-foreground mt-1" title={formatDurationExact(call.durationSeconds)}>
+                        <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap w-12 text-right" title={formatDurationExact(call.durationSeconds)}>
                           {formatDurationLong(call.durationSeconds)}
                         </div>
                       </div>
@@ -262,13 +262,17 @@ const Dashboard: React.FC = () => {
 
           {/* max-h + overflow-y-auto bounds the roster's Dashboard footprint even if
               the real roster grows well past today's 3 agents — see data-growth
-              reasoning in docs/SESSION_11_1_DASHBOARD_IMPLEMENTATION.md. */}
-          <div className="max-h-[420px] overflow-y-auto">
+              reasoning in docs/SESSION_11_1_DASHBOARD_IMPLEMENTATION.md. Lowered from
+              420px (11.1) to 220px in 11.1A since the compact 'Agent Load' row
+              treatment is far shorter per-agent than the original catalogue cards. */}
+          <div className="max-h-[220px] overflow-y-auto">
             <AgentActivityPanel
               agents={agentRoster}
               activeInteractions={activeInteractions}
               isLoading={agents.isLoading || recent.isLoading}
               onAgentClick={(agentId) => navigate(`/ai-agents/${agentId}`)}
+              title="Agent Load"
+              variant="compact"
             />
           </div>
         </div>
@@ -278,36 +282,6 @@ const Dashboard: React.FC = () => {
           onClose={() => setSelectedInteraction(null)}
           interaction={selectedInteraction}
         />
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => navigate('/live-view')}
-          >
-            <TrendingUp className="h-3.5 w-3.5 mr-1.5 text-cyan-400" />
-            Live Interactions
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => navigate('/qa-review')}
-          >
-            <AlertTriangle className="h-3.5 w-3.5 mr-1.5 text-amber-400" />
-            Review Escalations
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => navigate('/analytics')}
-          >
-            <BarChart3 className="h-3.5 w-3.5 mr-1.5 text-violet-400" />
-            Analytics
-          </Button>
-        </div>
       </div>
     </Layout>
   );

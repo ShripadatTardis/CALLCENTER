@@ -15,6 +15,16 @@ interface AgentActivityPanelProps {
    * link (e.g. Dashboard navigating to Agent Detail). Omitted callers (Live View)
    * keep the existing non-interactive card exactly as before. */
   onAgentClick?: (agentId: string) => void;
+  /**
+   * Session 11.1A (VoiceForce Operational Grid & Density Standard): 'cards'
+   * (default) is the original catalogue-card grid, used unchanged by Live
+   * View. 'compact' is the dense "Agent Load" row treatment used by
+   * Dashboard — name + active-call count only, one row per agent, no
+   * direction/language/persona (full metadata remains available via
+   * Agent Detail). Existing callers that don't pass `variant` are
+   * completely unaffected.
+   */
+  variant?: 'cards' | 'compact';
 }
 
 /**
@@ -41,8 +51,57 @@ export const AgentActivityPanel: React.FC<AgentActivityPanelProps> = ({
   isLoading,
   title = 'AI Agent Roster',
   onAgentClick,
+  variant = 'cards',
 }) => {
   const activeCounts = countActiveCallsByAgent(activeInteractions);
+
+  if (variant === 'compact') {
+    return (
+      <div className="rounded-md border border-border bg-card p-2.5 space-y-1">
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+          <Bot className="h-3.5 w-3.5" />
+          {title}
+        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : agents.length === 0 ? (
+          <p className="text-sm text-muted-foreground px-1">No agents available.</p>
+        ) : (
+          <div className="divide-y divide-border/60">
+            {agents.map((agent) => {
+              const activeCount = activeCounts.get(agent.agentId) ?? 0;
+              const clickable = Boolean(onAgentClick);
+              const Row = clickable ? 'button' : 'div';
+              return (
+                <Row
+                  key={agent.agentId}
+                  {...(clickable ? { type: 'button' as const } : {})}
+                  className={`w-full flex items-center justify-between gap-2 py-1.5 px-1 text-left rounded-sm ${
+                    clickable ? 'cursor-pointer hover:bg-muted/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400' : ''
+                  }`}
+                  {...(clickable
+                    ? {
+                        onClick: () => onAgentClick?.(agent.agentId),
+                        'aria-label': `View ${agent.displayName} detail — ${activeCount} active call${activeCount === 1 ? '' : 's'}`,
+                      }
+                    : {})}
+                >
+                  <span className="text-sm text-foreground truncate">{agent.displayName}</span>
+                  <span
+                    className={`text-sm tabular-nums flex-shrink-0 ${activeCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
+                  >
+                    {activeCount}
+                  </span>
+                </Row>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-border bg-card p-3 space-y-2">

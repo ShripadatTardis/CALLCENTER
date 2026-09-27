@@ -323,6 +323,37 @@ Local commit only, not pushed, not deployed:
 
 ```
 a65f359 Session 11.7: AI Agents G1/C1/S1/L1 reskin, 5-section Agent Detail, AHT stale-duration fix
+f4d16f9 docs: correct commit hash reference in Session 11.7 report
+35e42fb fix: real HIG findings on Session 11.7 AI Agents screens
 ```
 
-(exact-file `git add`, not `git add -A` — only the 5 source files + this report staged; HIG gate reviewed and passed before commit)
+(exact-file `git add` throughout, not `git add -A`)
+
+### HIG review — one real finding fixed, others deferred
+
+A `design-reviewer` HIG pass over the staged files (invoked by this
+repo's pre-commit `hig-gate` hook) surfaced genuine findings — not
+merely a gate formality:
+
+- **High (fixed)**: `AgentDetail.tsx`'s `h1` agent-name heading used
+  hardcoded `text-slate-50` instead of the semantic `text-foreground`
+  token used everywhere else on the page — this predates Session 11.7
+  (present in the original file) but was carried forward since the
+  whole file was rewritten. In light mode it computes to ~1:1 contrast
+  against the light theme's background — effectively invisible. Fixed
+  in commit `35e42fb`.
+- **Medium (fixed)**: `AIAgents.tsx` table rows carried
+  `cursor-pointer`/hover affordance with no `onClick` — only the small
+  "View" button actually navigated, so clicking anywhere else on a row
+  did nothing despite looking clickable. Rows now navigate on click
+  (the button stops propagation to avoid a redundant double-trigger).
+  Also predates this session (same pattern in the original file).
+  Fixed in commit `35e42fb`.
+- **Remaining medium/low/advisory** (tooltip-only "bounded sample"
+  caveat, loading/error states not `aria-live`-announced, raw
+  `text-cyan-400`/`text-red-400`/`border-slate-600` Tailwind literals,
+  an empty Recent-Interactions header cell): all pre-existing patterns
+  shared across many other screens in this app (Live View, Call Logs,
+  Chat Logs, Dashboard all use the same conventions), not introduced by
+  this session. Left for a dedicated, app-wide accessibility pass
+  rather than fixed piecemeal on just these two screens.

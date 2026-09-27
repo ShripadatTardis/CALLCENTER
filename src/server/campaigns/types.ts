@@ -284,6 +284,13 @@ export interface CampaignFollowup {
 export interface NewTargetRow {
   name: string | null;
   phone: string;
+  /**
+   * Authoritative external identity (CIF), when the CSV supplies one
+   * (Session 11.5A §11/§C) — resolved through the SAME
+   * identityResolver.ts precedence Voice/Chat already use (CIF -> phone
+   * -> create), never a separate phone-only SQL-side match.
+   */
+  customerReference: string | null;
   sourceAttributes: Record<string, unknown>;
 }
 
@@ -291,4 +298,17 @@ export interface ImportTargetsResult {
   customersCreated: number;
   customersMatched: number;
   rowsSkipped: number;
+}
+
+/**
+ * One customer's campaign-participation row (Session 11.5A workstream
+ * B) — CampaignTargetRow plus the campaign identity fields a
+ * customer-scoped view needs that a campaign-scoped view (where the
+ * campaign is already known from context) doesn't carry.
+ */
+export interface CustomerCampaignTargetRow extends CampaignTargetRow {
+  campaignName: string;
+  /** Immutable Call Agent id the campaign is configured against — never agent_version. */
+  campaignAgentId: string;
+  campaignAgentName: string | null;
 }

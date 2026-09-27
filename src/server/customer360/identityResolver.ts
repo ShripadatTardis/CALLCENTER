@@ -55,6 +55,15 @@ export interface ResolvedIdentity {
   contactPointId: string | null;
   /** True when this resolution triggered a customer merge (Session 5.2 behavior 3) — useful for reporting/verification, not required by callers. */
   merged: boolean;
+  /**
+   * True only when this call created a brand-new customer row (Session
+   * 11.5A) — false for every match/merge/preferred-id branch. Additive
+   * and optional for existing callers (voice/chat ingestion never read
+   * it); introduced so campaign CSV import (the first non-interaction
+   * caller of this resolver) can report accurate
+   * customersCreated/customersMatched counts without re-deriving them.
+   */
+  created: boolean;
 }
 
 /**
@@ -91,7 +100,7 @@ export async function resolveCustomerIdentity(
     const phoneCustomer = await repo.getCustomer(byPhoneContactPoint.customerId);
     if (!phoneCustomer) {
       // Shouldn't happen (contact point without its customer), but fail safe: fall through to identity-only resolution rather than merging against a ghost.
-      return { customerId: byIdentity.id, contactPointId: byPhoneContactPoint.id, merged: false };
+      return { customerId: byIdentity.id, contactPointId: byPhoneContactPoint.id, merged: false, created: false };
     }
     const { survivor, loser } = pickSurvivor(byIdentity, phoneCustomer);
     await repo.mergeCustomers(
@@ -101,7 +110,7 @@ export async function resolveCustomerIdentity(
       `external-identity-merge:${EXTERNAL_IDENTITY_SOURCE}:${EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID}:${signal.externalCustomerId}`,
     );
     await repo.recomputeCustomerAggregate(survivor.id, now);
-    return { customerId: survivor.id, contactPointId: byPhoneContactPoint.id, merged: true };
+    return { customerId: survivor.id, contactPointId: byPhoneContactPoint.id, merged: true, created: false };
   }
 
   // Case: CIF known, either phone not linked to anyone or no phone signal at all.
@@ -111,7 +120,7 @@ export async function resolveCustomerIdentity(
       const cp = await repo.addContactPointToCustomer(byIdentity.id, 'phone', signal.phoneNumber as string, normalized, now);
       contactPointId = cp.id;
     }
-    return { customerId: byIdentity.id, contactPointId, merged: false };
+    return { customerId: byIdentity.id, contactPointId, merged: false, created: false };
   }
 
   // Case: no CIF match (or none supplied), but a locally-recorded
@@ -130,7 +139,7 @@ export async function resolveCustomerIdentity(
       if (signal.externalCustomerId) {
         await repo.attachExternalIdentity(preferred.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
       }
-      return { customerId: preferred.id, contactPointId, merged: false };
+      return { customerId: preferred.id, contactPointId, merged: false, created: false };
     }
   }
 
@@ -145,12 +154,12 @@ export async function resolveCustomerIdentity(
         now,
       );
     }
-    return { customerId: byPhoneContactPoint.customerId, contactPointId: byPhoneContactPoint.id, merged: false };
+    return { customerId: byPhoneContactPoint.customerId, contactPointId: byPhoneContactPoint.id, merged: false, created: false };
   }
 
   // Case: neither resolves — brand new customer.
   if (normalized) {
-    const created = await repo.createCustomerWithContactPoint({
+    const newCustomer = await repo.createCustomerWithContactPoint({
       type: 'phone',
       rawValue: signal.phoneNumber as string,
       normalizedValue: normalized,
@@ -158,16 +167,16 @@ export async function resolveCustomerIdentity(
       now,
     });
     if (signal.externalCustomerId) {
-      await repo.attachExternalIdentity(created.customer.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
+      await repo.attachExternalIdentity(newCustomer.customer.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
     }
-    return { customerId: created.customer.id, contactPointId: created.contactPoint.id, merged: false };
+    return { customerId: newCustomer.customer.id, contactPointId: newCustomer.contactPoint.id, merged: false, created: true };
   }
 
   // CIF-only, no phone at all (e.g. a chat session keyed by contact_id, not phone_number).
   if (signal.externalCustomerId) {
-    const created = await repo.createCustomer(now);
-    await repo.attachExternalIdentity(created.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
-    return { customerId: created.id, contactPointId: null, merged: false };
+    const newCustomer = await repo.createCustomer(now);
+    await repo.attachExternalIdentity(newCustomer.id, EXTERNAL_IDENTITY_SOURCE, EXTERNAL_IDENTITY_TYPE_CUSTOMER_ID, signal.externalCustomerId, now);
+    return { customerId: newCustomer.id, contactPointId: null, merged: false, created: true };
   }
 
   // Pathological edge case only: a preferredCustomerId was supplied but

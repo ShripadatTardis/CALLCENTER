@@ -28,7 +28,16 @@ export function parseTargetsCsv(file: File): Promise<{ rows: ImportTargetRow[]; 
               if (!KNOWN_COLUMNS.has(key) && value) sourceAttributes[key] = value;
             }
             if (row.customer_reference) sourceAttributes.customerReference = row.customer_reference;
-            return { name: row.name || null, phone: row.phone.trim(), sourceAttributes };
+            return {
+              name: row.name || null,
+              phone: row.phone.trim(),
+              // Session 11.5A: promoted to a first-class field so the
+              // server resolves it through identityResolver.ts's CIF
+              // precedence — also kept in sourceAttributes above for
+              // backward-compatible display/audit.
+              customerReference: row.customer_reference?.trim() || null,
+              sourceAttributes,
+            };
           });
         resolve({ rows, errors });
       },

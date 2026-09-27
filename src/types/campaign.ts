@@ -197,6 +197,8 @@ export interface CreateCampaignInput {
 export interface ImportTargetRow {
   name: string | null;
   phone: string;
+  /** CIF/external identity, when the CSV's customer_reference column supplies one (Session 11.5A). */
+  customerReference: string | null;
   sourceAttributes: Record<string, unknown>;
 }
 

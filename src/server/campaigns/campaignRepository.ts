@@ -8,6 +8,7 @@ import type {
   CampaignWithStats,
   CallAgentContract,
   CampaignAgentInputMapping,
+  CustomerCampaignTargetRow,
   DerivedCampaignResult,
   ImportTargetsResult,
   NewCampaignAgentInputMappingInput,
@@ -50,6 +51,20 @@ export interface CampaignRepository {
   importTargets(campaignId: string, rows: NewTargetRow[], now: string): Promise<ImportTargetsResult>;
 
   listTargets(campaignId: string, page: number, pageSize: number): Promise<{ rows: CampaignTargetRow[]; totalCount: number }>;
+
+  /**
+   * All campaign-participation rows for ONE customer, across every
+   * campaign (Session 11.5A workstream B) — for Customer Detail's
+   * future Campaign Participation section. Unpaginated: a customer's
+   * own campaign history is expected to stay small (the compact,
+   * customer-scoped slice docs/SCREEN_REVIEW_05_CUSTOMER_360.md §12
+   * describes, not a second campaign log). Callers MUST apply the same
+   * authorizedAgentIds discipline used for interactions before
+   * returning these rows to a client — this method itself applies no
+   * authorization filtering, exactly like listAllInteractions on
+   * CustomerRepository.
+   */
+  listCustomerTargets(customerId: string): Promise<CustomerCampaignTargetRow[]>;
 
   selectRunnableTargets(batchSize: number): Promise<RunnableTarget[]>;
 

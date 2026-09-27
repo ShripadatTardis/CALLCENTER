@@ -13,10 +13,13 @@ import type {
   CampaignTargetRow,
   CampaignTargetStatus,
   CampaignWithStats,
+  CustomerCampaignTargetRow,
   InputMappingSourceType,
   ReconciliationStatus,
   RunnableTarget,
 } from './types.js';
+import { supabaseCustomerRepository } from '../customer360/supabaseCustomerRepository.js';
+import { resolveCustomerIdentity } from '../customer360/identityResolver.js';
 
 /**
  * The current deployment's adapter for CampaignRepository (plan §21/§22).
@@ -209,6 +212,21 @@ function mapTargetRow(row: TargetRow): CampaignTargetRow {
   };
 }
 
+interface CustomerTargetRow extends TargetRow {
+  campaign_name: string;
+  campaign_agent_id: string;
+  campaign_agent_name: string | null;
+}
+
+function mapCustomerTargetRow(row: CustomerTargetRow): CustomerCampaignTargetRow {
+  return {
+    ...mapTargetRow(row),
+    campaignName: row.campaign_name,
+    campaignAgentId: row.campaign_agent_id,
+    campaignAgentName: row.campaign_agent_name,
+  };
+}
+
 interface RunnableTargetRow {
   id: string;
   campaign_id: string;
@@ -390,12 +408,54 @@ export const supabaseCampaignRepository: CampaignRepository = {
     return mapCampaign(row);
   },
 
+  /**
+   * Session 11.5A correction (docs/SCREEN_REVIEW_05_CUSTOMER_360.md §11,
+   * docs/SESSION_11_5A_CUSTOMER_360_FOUNDATION.md §C): every row now
+   * resolves through the SAME identityResolver.ts precedence Voice/Chat
+   * already use (CIF -> phone -> create) instead of the old
+   * call_center_campaign_import_targets bulk RPC's phone-only SQL-side
+   * match. That RPC is left in the schema, unused by this path.
+   */
   async importTargets(campaignId, rows, now) {
-    return rpc('call_center_campaign_import_targets', {
-      p_campaign_id: campaignId,
-      p_rows: rows.map((r) => ({ name: r.name, phone: r.phone, sourceAttributes: r.sourceAttributes })),
-      p_now: now,
-    });
+    let customersCreated = 0;
+    let customersMatched = 0;
+    let rowsSkipped = 0;
+
+    for (const row of rows) {
+      if (!row.phone || !row.phone.trim()) {
+        rowsSkipped++;
+        continue;
+      }
+
+      const resolved = await resolveCustomerIdentity(
+        supabaseCustomerRepository,
+        { externalCustomerId: row.customerReference || null, phoneNumber: row.phone, preferredCustomerId: null },
+        now,
+      );
+
+      // campaign_targets.contact_point_id is a not-null FK — a row that
+      // resolves to a customer with no phone contact point (only
+      // reachable if phone normalization fails on garbage input, since
+      // every CSV row here always carries a phone) cannot become a
+      // target. Honest skip, never a fabricated/blank contact point.
+      if (!resolved || !resolved.contactPointId) {
+        rowsSkipped++;
+        continue;
+      }
+
+      await rpc('call_center_campaign_insert_resolved_target', {
+        p_campaign_id: campaignId,
+        p_customer_id: resolved.customerId,
+        p_contact_point_id: resolved.contactPointId,
+        p_source_attributes: row.sourceAttributes,
+        p_now: now,
+      });
+
+      if (resolved.created) customersCreated++;
+      else customersMatched++;
+    }
+
+    return { customersCreated, customersMatched, rowsSkipped };
   },
 
   async listTargets(campaignId, page, pageSize) {
@@ -405,6 +465,13 @@ export const supabaseCampaignRepository: CampaignRepository = {
       p_page_size: pageSize,
     });
     return { rows: (result.rows ?? []).map(mapTargetRow), totalCount: result.totalCount ?? 0 };
+  },
+
+  async listCustomerTargets(customerId) {
+    const rows = await rpc<CustomerTargetRow[]>('call_center_campaign_list_customer_targets', {
+      p_customer_id: customerId,
+    });
+    return (rows ?? []).map(mapCustomerTargetRow);
   },
 
   async selectRunnableTargets(batchSize) {

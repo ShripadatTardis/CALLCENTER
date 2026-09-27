@@ -148,7 +148,7 @@ On a generic operational surface containing interactions from **multiple** Call 
 - **Data source**: use the interaction's own `agentDisplayName`/`agentId` fields (already present on the normalized `Interaction` type) directly — this is the exact same fallback convention already used by `CallHistoryList.tsx`/`CustomerDetail.tsx`. Do not re-derive agent identity from a roster join unless the interaction itself lacks the field. `agent_id` remains the immutable identity; `agent_name`/`agentDisplayName` is presentation only. Never introduce `agent_version`.
 - **Where this applies later**: Live View, Call Logs, Chat Logs where agent attribution exists, and any other cross-agent interaction grid.
 - **Where Agent may be omitted**: Agent Detail's own "Recent Interactions" table — the page itself already establishes the single agent, so repeating it on every row is redundant.
-- **Desktop**: Agent gets its own compact column (fixed/near-fixed width, truncated), placed between the primary identity/context column and the status/duration columns. Subtle uppercase column-header labels (`text-xs uppercase tracking-wide text-muted-foreground`) are preferred where they improve scanability — keep them light, never a heavy header band.
+- **Desktop**: Agent gets its own compact column, placed between the primary identity/context column and the status/duration columns, using **adaptive column sizing** (see §25) rather than an arbitrary fixed width — truncation is a fallback for genuinely constrained space, not the default. Subtle uppercase column-header labels (`text-xs uppercase tracking-wide text-muted-foreground`) are preferred where they improve scanability — keep them light, never a heavy header band.
 - **Mobile** (below `sm`): do not add a 4th line. Merge Agent into the existing secondary line alongside intent (`{intent} · {agentLabel}`), and it's acceptable to drop a lower-priority field (e.g. raw phone number, which remains one click away via the detail dialog) from that same mobile-only line to make room — never drop Agent itself. Agent must remain visibly present and readable at every required viewport, never hidden purely to make a row fit.
 - **Never group by agent** on a cross-agent overview merely to add this context — grouping fragments the overview and increases page height; Agent stays a row/column dimension, not a grouping axis.
 
@@ -183,3 +183,29 @@ A detail page's "Back" control must return to the workspace that actually opened
 **Current implementation**: `src/lib/detailOrigin.ts` defines `DetailOrigin = 'dashboard' | 'ai-agents' | 'live-view'` mapped to real routes/labels. `AgentDetail.tsx` resolves `location.state?.origin` via `resolveDetailOrigin()` and renders/navigates accordingly; `Dashboard.tsx`'s Agent Load and `AIAgents.tsx`'s list both pass their real origin explicitly. `'live-view'` is defined now for forward reuse even though Live View doesn't yet link to Agent Detail — adding that link later requires no change to this mechanism, only passing `{ state: { origin: 'live-view' } }` at the call site.
 
 **Future reuse**: this exact mechanism (not a redesigned one) should back later detail navigation from Live View, Call Logs, Chat Logs, and Campaigns where applicable — extend `DetailOrigin`/`ORIGIN_DESTINATIONS` in `src/lib/detailOrigin.ts` with new entries as those screens need them, rather than building a parallel mechanism. Not refactored now.
+
+## 25. Adaptive column sizing (Session 11.1 XYZ-A)
+
+Operational grids must allocate columns according to **content priority and available container width** — not arbitrary fixed widths chosen without inspecting real content. A descriptive column (e.g. Agent) must not truncate merely because it was given a small hardcoded width while other space on the same row sits unused.
+
+**General allocation rule**:
+
+- **Identity/context column** (e.g. Customer/Context) — flexible, receives residual available width. This is the one `1fr`-equivalent track in the row; everything else is sized first, and this column absorbs whatever's left.
+- **Descriptive dimensions** (e.g. Agent) — content-aware, bounded by a sensible min/max, not a single fixed value. Shows the full value when space allows; truncates (with `title` for the full value on hover) only when the container is genuinely constrained.
+- **Short categorical/status columns** (e.g. Status, Outcome) — intrinsic/content-sized where practical, also bounded so header and rows stay aligned (see below).
+- **Numeric/duration columns** — compact, right-aligned, `tabular-nums`.
+- **Truncate only after available width has been efficiently allocated** — never as the first-line behavior for a column that could reasonably just show the full value.
+- **Header and every data row must share the exact same column definition** so alignment stays exact.
+
+**Why a literal `max-content` track is *not* used for Agent**: each operational row (e.g. each Dashboard `<button>` row) is its own independent CSS Grid formatting context — there is no single shared grid spanning the header and every row. If a column's *max* were driven by that row's own content (`max-content`), two rows with agent names of different lengths would resolve different column widths, and the Agent column would visibly drift out of alignment from row to row (and from the header). The fix used here instead: every track except the identity/context column is `minmax(min, max)` with a **fixed, non-content-derived `max`** — chosen by measuring real content (e.g. the longest current agent name, "Inbound Banking Assistant"), not copied from an example. Because the `max` is a literal value shared by every row's grid *and* the header's grid, all of them resolve to the same column widths independently, and the row stays genuinely adaptive within that range: at ample width every track sizes to its `max` (showing the full value); if the container narrows below what all tracks need at `max`, non-flexible tracks shrink toward their `min` before the identity/context `1fr` column gives up any more space, which is exactly when truncation should kick in.
+
+**Reference implementation** (`src/pages/Dashboard.tsx`, Needs Attention / Recent Calls):
+
+```
+grid-template-columns: minmax(0,1fr) minmax(7rem,14rem) minmax(6rem,10rem) minmax(3.5rem,4.5rem);
+/*                      Customer/Context  Agent             Status            Duration          */
+```
+
+applied identically (via a Tailwind arbitrary-value class) to the header row's label spans and to every data row's `<button>`. A row's mobile-only sub-wrapper (the badges+duration pair, stacked on one line below `sm`) uses `sm:contents` at the grid breakpoint so its two children become direct grid items in the Status/Duration tracks — this keeps the mobile markup untouched while letting the same elements participate correctly in the desktop grid, without introducing an extra nested grid container. Grid children with `truncate` also need `min-w-0` (grid items default to `min-width: auto`, which prevents shrinking below content size and defeats the ellipsis) — the Agent cell's wrapper includes this.
+
+**Applies to**: any operational grid built as one-grid-per-row rather than one-grid-for-the-whole-list (which is the pattern this project uses for row-as-`<button>` clickable records). Future Live View, Call Logs, and Chat Logs should inherit this exact rule — same allocation principle, same "fixed-max-per-track, not `max-content`" reasoning — rather than independently choosing arbitrary column widths per screen. This supersedes §22's earlier "fixed/near-fixed width" phrasing for the Agent column.

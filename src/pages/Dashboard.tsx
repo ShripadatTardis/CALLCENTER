@@ -173,11 +173,24 @@ const Dashboard: React.FC = () => {
                     (see docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md "Cross-Agent
                     Context"). Kept intentionally light: no header band/border, just a
                     muted uppercase label row. */}
-                <div className="hidden sm:flex items-center gap-2 px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
-                  <span className="flex-1">Customer / Context</span>
-                  <span className="w-28 flex-shrink-0">Agent</span>
-                  <span className="flex-shrink-0">Status</span>
-                  <span className="w-16 flex-shrink-0 text-right">Duration</span>
+                {/* Session 11.1 XYZ-A: adaptive column sizing (see
+                    docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md "Adaptive
+                    Column Sizing"). Customer/Context is the sole 1fr track and
+                    absorbs residual width; Agent/Status/Duration use
+                    minmax(min,max) tracks with a fixed (non-content-derived)
+                    max so every row's grid — each <button> is its own
+                    independent grid formatting context — resolves the same
+                    column widths and stays aligned with the header, rather
+                    than each row's Agent column sizing itself to that row's
+                    own agent-name length. The max values were chosen by
+                    measuring real agent names (longest current: "Inbound
+                    Banking Assistant"), not copied from the prompt's example
+                    template. */}
+                <div className="hidden sm:grid sm:[grid-template-columns:minmax(0,1fr)_minmax(7rem,14rem)_minmax(6rem,10rem)_minmax(3.5rem,4.5rem)] sm:gap-2 items-center px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                  <span>Customer / Context</span>
+                  <span>Agent</span>
+                  <span>Status</span>
+                  <span className="text-right">Duration</span>
                 </div>
                 <div className="divide-y divide-border/60">
                   {attentionItems.map(({ interaction: call, category }) => {
@@ -187,9 +200,9 @@ const Dashboard: React.FC = () => {
                         key={call.interactionId}
                         type="button"
                         onClick={() => setSelectedInteraction(call)}
-                        className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                        className="w-full flex flex-col gap-1 sm:grid sm:[grid-template-columns:minmax(0,1fr)_minmax(7rem,14rem)_minmax(6rem,10rem)_minmax(3.5rem,4.5rem)] sm:items-center sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                       >
-                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5 sm:flex-1">
+                        <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
                           <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
                           <span className="text-xs text-muted-foreground truncate">
                             {call.intent || '—'} ·{' '}
@@ -197,11 +210,11 @@ const Dashboard: React.FC = () => {
                             <span className="hidden sm:inline">{formatPhoneNumber(call.phoneNumber)}</span>
                           </span>
                         </div>
-                        <div className="hidden sm:block sm:w-28 flex-shrink-0 text-xs text-muted-foreground truncate" title={agentLabel}>
+                        <div className="hidden sm:block min-w-0 text-xs text-muted-foreground truncate" title={agentLabel}>
                           {agentLabel}
                         </div>
-                        <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
-                          <div className="flex flex-wrap gap-1">
+                        <div className="flex items-center justify-between gap-2 sm:contents">
+                          <div className="flex flex-wrap gap-1 min-w-0">
                             {(category === 'escalated' || category === 'escalated-stale') && (
                               <Badge variant="escalated" className="whitespace-nowrap text-xs">Escalated</Badge>
                             )}
@@ -210,7 +223,7 @@ const Dashboard: React.FC = () => {
                             )}
                           </div>
                           <div
-                            className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-16 text-right"
+                            className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:text-right"
                             title={formatDurationExact(call.durationSeconds)}
                           >
                             {category === 'escalated'
@@ -249,11 +262,14 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-muted-foreground py-1">No recent calls.</p>
               ) : (
                 <>
-                  <div className="hidden sm:flex items-center gap-2 px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
-                    <span className="flex-1">Customer / Context</span>
-                    <span className="w-24 flex-shrink-0">Agent</span>
-                    <span className="flex-shrink-0">Outcome</span>
-                    <span className="w-12 flex-shrink-0 text-right">Duration</span>
+                  {/* Session 11.1 XYZ-A: same adaptive-grid approach as Needs
+                      Attention above, with a narrower Status/Duration cap
+                      since Recent Calls only ever renders one outcome badge. */}
+                  <div className="hidden sm:grid sm:[grid-template-columns:minmax(0,1fr)_minmax(7rem,14rem)_minmax(5rem,7rem)_minmax(3rem,4rem)] sm:gap-2 items-center px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                    <span>Customer / Context</span>
+                    <span>Agent</span>
+                    <span>Outcome</span>
+                    <span className="text-right">Duration</span>
                   </div>
                   <div className="divide-y divide-border/60">
                     {recentCalls.map((call) => {
@@ -263,9 +279,9 @@ const Dashboard: React.FC = () => {
                           key={call.interactionId}
                           type="button"
                           onClick={() => setSelectedInteraction(call)}
-                          className="w-full flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
+                          className="w-full flex flex-col gap-1 sm:grid sm:[grid-template-columns:minmax(0,1fr)_minmax(7rem,14rem)_minmax(5rem,7rem)_minmax(3rem,4rem)] sm:items-center sm:gap-2 py-1.5 text-left hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 rounded-sm px-1 -mx-1"
                         >
-                          <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5 sm:flex-1">
+                          <div className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-1.5">
                             <span className="font-medium text-foreground truncate text-sm">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
                             <span className="text-xs text-muted-foreground truncate">
                               {call.intent || '—'} ·{' '}
@@ -273,17 +289,17 @@ const Dashboard: React.FC = () => {
                               <span className="hidden sm:inline">{formatPhoneNumber(call.phoneNumber)}</span>
                             </span>
                           </div>
-                          <div className="hidden sm:block sm:w-24 flex-shrink-0 text-xs text-muted-foreground truncate" title={agentLabel}>
+                          <div className="hidden sm:block min-w-0 text-xs text-muted-foreground truncate" title={agentLabel}>
                             {agentLabel}
                           </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
+                          <div className="flex items-center justify-between gap-2 sm:contents">
                             <Badge
                               variant={call.status === 'active' ? 'secondary' : call.outcome === 'escalated' ? 'escalated' : call.outcome === 'resolved' ? 'positive' : 'default'}
                               className="whitespace-nowrap text-xs"
                             >
                               {formatStatusLabel(call.outcome ?? call.status)}
                             </Badge>
-                            <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:w-12 text-right" title={formatDurationExact(call.durationSeconds)}>
+                            <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap sm:text-right" title={formatDurationExact(call.durationSeconds)}>
                               {formatDurationLong(call.durationSeconds)}
                             </div>
                           </div>

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { MetricStrip } from '@/components/common/MetricStrip';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -10,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { Users, Phone, Clock, AlertTriangle, Search, Filter, Monitor, UserPlus, Loader2 } from 'lucide-react';
+import { Search, FileText, UserPlus, Loader2 } from 'lucide-react';
 import { useLiveCallData } from '@/hooks/calls/useLiveCallData';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { AgentActivityPanel } from '@/components/agents/AgentActivityPanel';
@@ -20,6 +19,7 @@ import {
   formatDurationLong,
   formatFractionAsPercent,
   formatPhoneNumber,
+  formatStatusLabel,
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
 
@@ -32,8 +32,18 @@ import type { Interaction } from '@/types/interaction';
  * Johnson" fallback in the transfer-alerts panel are all removed —
  * none had backend support (per the Session 3 product decision, no
  * transfer/listen-in action is implemented without one).
+ *
+ * Session 11.2 (docs/SCREEN_REVIEW_02_LIVE_VIEW.md /
+ * docs/SESSION_11_2_LIVE_VIEW_IMPLEMENTATION.md): focused refinement,
+ * reusing the VoiceForce Operational Grid Standard established on
+ * Dashboard (11.1/11.1A/11.1 XYZ/11.1 XYZ-A) rather than redesigning
+ * this screen. Metric semantics/calculations are UNCHANGED — the three
+ * disagreeing escalation signals (row Status badge vs. "Escalated
+ * (live)" vs. "Escalations w/ trigger") are a real, documented, still-
+ * OPEN Partner API clarification (see the doc), not resolved here.
  */
 const LiveView: React.FC = () => {
+  const navigate = useNavigate();
   const live = useLiveCallData();
   const agents = useAgents();
 
@@ -77,38 +87,60 @@ const LiveView: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+      {/* Session 11.2: bounded operational console. The page root fills
+          the full height Layout's <main> makes available and is itself a
+          flex column with min-h-0 — everything above the interaction
+          table is fixed/compact (flex-shrink-0), and the table region
+          alone is flex-1 + overflow-auto, so it is the one part of the
+          screen that scrolls when call volume grows. 10, 50 or 500 rows
+          must never make the *page* taller — only the table's own
+          internal scroll region. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground flex-shrink-0">
           <div className={`w-1.5 h-1.5 rounded-full ${live.isFetching ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
           <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
         </div>
 
         {live.isError && (
-          <QueryErrorBanner
-            error={live.error}
-            onRetry={() => void live.refetch()}
-            hasStaleData={calls.length > 0}
-            isFetching={live.isFetching}
-          />
+          <div className="flex-shrink-0">
+            <QueryErrorBanner
+              error={live.error}
+              onRetry={() => void live.refetch()}
+              hasStaleData={calls.length > 0}
+              isFetching={live.isFetching}
+            />
+          </div>
         )}
 
-        <MetricStrip
-          items={[
-            { label: 'Active calls', value: live.isLoading ? '…' : summary?.active_calls ?? 0, hint: `${connectingCount} connecting` },
-            { label: 'Escalated (live)', value: live.isLoading ? '…' : summary?.escalated_calls ?? 0, tone: 'warning' },
-            { label: 'Avg handle time', value: live.isLoading ? '…' : formatDurationLong(summary?.avg_handle_time_seconds), hint: formatDurationExact(summary?.avg_handle_time_seconds) },
-            { label: 'Escalations w/ trigger', value: transferredCalls.length, tone: transferredCalls.length > 0 ? 'warning' : 'default' },
-          ]}
-        />
+        <div className="flex-shrink-0">
+          <MetricStrip
+            items={[
+              { label: 'Active calls', value: live.isLoading ? '…' : summary?.active_calls ?? 0, hint: `${connectingCount} connecting` },
+              { label: 'Escalated (live)', value: live.isLoading ? '…' : summary?.escalated_calls ?? 0, tone: 'warning' },
+              { label: 'Avg handle time (active)', value: live.isLoading ? '…' : formatDurationLong(summary?.avg_handle_time_seconds), hint: formatDurationExact(summary?.avg_handle_time_seconds) },
+              { label: 'Escalations w/ trigger', value: transferredCalls.length, tone: transferredCalls.length > 0 ? 'warning' : 'default' },
+            ]}
+          />
+        </div>
 
-        <AgentActivityPanel
-          agents={agentRoster}
-          activeInteractions={calls}
-          isLoading={agents.isLoading}
-          title="AI Agent Roster"
-        />
+        {/* Session 11.1A/11.2: compact "Agent Load" treatment (Dashboard's
+            established pattern), not the old full agent-card roster —
+            this screen's roster is uniquely live-scoped (same poll as the
+            table), so it stays, but no longer dominates the fold. Bounded
+            with max-h + overflow-y-auto so a much larger roster can never
+            grow this fixed-height region. */}
+        <div className="flex-shrink-0 max-h-[150px] overflow-y-auto">
+          <AgentActivityPanel
+            agents={agentRoster}
+            activeInteractions={calls}
+            isLoading={agents.isLoading}
+            title="Agent Load"
+            variant="compact"
+            onAgentClick={(agentId) => navigate(`/ai-agents/${agentId}`, { state: { origin: 'live-view' } })}
+          />
+        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           <div className="relative w-64">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -143,28 +175,35 @@ const LiveView: React.FC = () => {
           <span className="text-xs text-muted-foreground ml-1">{filteredCalls.length} shown</span>
         </div>
 
+        {/* The interaction table is the sole flex-grow, internally-
+            scrolling region on this page — see the header comment. */}
+        <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
         {live.isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : live.isError && calls.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-1">Live calls are unavailable right now — see the error above.</p>
+          <p className="text-sm text-muted-foreground px-3 py-4">Live calls are unavailable right now — see the error above.</p>
         ) : calls.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-1">No active calls right now.</p>
+          <p className="text-sm text-muted-foreground px-3 py-4">No active calls right now.</p>
         ) : filteredCalls.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-1">No active calls match the current search/filters.</p>
+          <p className="text-sm text-muted-foreground px-3 py-4">No active calls match the current search/filters.</p>
         ) : (
-          <div className="rounded-md border border-border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   {['Caller', 'Intent', 'Agent', 'Duration', 'Sentiment', 'Status', 'Actions'].map((h) => (
-                    <TableHead key={h} className="text-muted-foreground text-xs">{h}</TableHead>
+                    <TableHead key={h} className={`text-muted-foreground text-xs ${h === 'Duration' ? 'text-right' : ''}`}>{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCalls.slice(0, 20).map((call) => (
+                {filteredCalls.slice(0, 20).map((call) => {
+                  const agentLabel = call.agentDisplayName ?? call.agentId ?? 'Unknown agent';
+                  const statusValue = call.outcome === 'escalated' ? 'escalated' : (call.stage ?? call.status);
+                  const statusVariant =
+                    statusValue === 'escalated' ? 'escalated' : statusValue === 'resolved' ? 'positive' : 'secondary';
+                  return (
                   <TableRow key={call.interactionId} className="border-border/60 hover:bg-card">
                     <TableCell className="max-w-[180px]">
                       <div className="min-w-0">
@@ -175,11 +214,16 @@ const LiveView: React.FC = () => {
                     <TableCell>
                       <Badge variant="outline" className="whitespace-nowrap text-xs border-slate-600 text-foreground">{call.intent || '—'}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-[140px]">
-                      <span className="text-sm text-foreground truncate block">{call.agentDisplayName ?? call.agentId ?? '—'}</span>
+                    {/* Session 11.1 XYZ-A adaptive sizing (see docs/VOICEFORCE_
+                        OPERATIONAL_GRID_STANDARD.md): a bounded-but-generous
+                        min/max, not the old fixed max-w-[140px] that truncated
+                        normal agent names ("Inbound Banking Assistant") even
+                        with unused row width elsewhere. */}
+                    <TableCell className="min-w-[7rem] max-w-[14rem]">
+                      <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
                     </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-foreground whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
+                    <TableCell className="text-right">
+                      <span className="font-mono tabular-nums text-foreground whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
                         {formatDurationLong(call.durationSeconds)}
                       </span>
                     </TableCell>
@@ -199,19 +243,27 @@ const LiveView: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={call.outcome === 'escalated' ? 'escalated' : (call.stage ?? call.status)} />
+                      {/* Session 11.1 XYZ corporate semantic status language:
+                          same field/label as before (outcome==='escalated'
+                          takes precedence over stage/status — unchanged),
+                          only the visual treatment is restrained instead of
+                          a saturated destructive-red pill for every business
+                          exception. */}
+                      <Badge variant={statusVariant} className="whitespace-nowrap text-xs">
+                        {formatStatusLabel(statusValue)}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button variant="outline" size="sm" className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setSelectedCall(call)}>
-                            <Monitor className="h-3.5 w-3.5 mr-1" />
-                            Monitor
+                            <FileText className="h-3.5 w-3.5 mr-1" />
+                            View Details
                           </Button>
                         </DialogTrigger>
                             <DialogContent className="max-w-2xl">
                               <DialogHeader>
-                                <DialogTitle>Call Monitoring - {call.callerName || call.phoneNumber}</DialogTitle>
+                                <DialogTitle>Interaction Details - {call.callerName || call.phoneNumber}</DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
@@ -271,27 +323,36 @@ const LiveView: React.FC = () => {
                           </Dialog>
                         </TableCell>
                       </TableRow>
-                    ))}
+                  );
+                })}
                   </TableBody>
                 </Table>
-          </div>
         )}
+        </div>
 
-        {/* Escalation Alerts — only rendered when real data has an escalation trigger; no fake fallback */}
+        {/* Escalation Alerts — only rendered when real data has an escalation
+            trigger; no fake fallback. Session 11.2: bounded to the first 5
+            (same pattern as Dashboard's Needs Attention) — this panel used
+            to render every matching row with no cap at all, which is
+            exactly the unbounded-page defect this session's main acceptance
+            requirement rules out; the full count still shows in the header.
+            Recolored onto the theme-aware corporate `warning` tokens
+            (matching the Badge variant) instead of hardcoded amber-950/
+            amber-300 literals, which read poorly in Light mode. */}
         {transferredCalls.length > 0 && (
-          <div className="rounded-md border border-amber-800 bg-amber-950/30 p-3 space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+          <div className="flex-shrink-0 rounded-md border border-amber-600/50 bg-amber-500/10 dark:border-amber-500/40 dark:bg-amber-500/10 p-3 space-y-2 max-h-[180px] overflow-y-auto">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <UserPlus className="h-4 w-4" />
-              Active Escalations ({transferredCalls.length})
+              Active Escalations ({transferredCalls.length}{transferredCalls.length > 5 ? ', showing 5' : ''})
             </div>
             <div className="space-y-1">
-              {transferredCalls.map((call) => (
-                <div key={call.interactionId} className="flex items-center justify-between py-1.5 border-b border-amber-900/40 last:border-0 text-xs">
+              {transferredCalls.slice(0, 5).map((call) => (
+                <div key={call.interactionId} className="flex items-center justify-between py-1.5 border-b border-amber-600/20 dark:border-amber-500/20 last:border-0 text-xs">
                   <div className="min-w-0">
-                    <span className="font-medium text-amber-200">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
-                    <span className="text-amber-400/80 ml-2">Trigger: {call.escalation?.trigger}</span>
+                    <span className="font-medium text-amber-800 dark:text-amber-300">{call.callerName || formatPhoneNumber(call.phoneNumber)}</span>
+                    <span className="text-amber-700/80 dark:text-amber-400/80 ml-2">Trigger: {call.escalation?.trigger}</span>
                   </div>
-                  <span className="text-amber-400/70 whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
+                  <span className="text-amber-700/70 dark:text-amber-400/70 whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
                     {formatDurationLong(call.durationSeconds)}
                   </span>
                 </div>

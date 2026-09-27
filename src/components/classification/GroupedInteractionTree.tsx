@@ -13,6 +13,13 @@ interface GroupedInteractionTreeProps {
   onSelect: (selection: SelectedGroup | null) => void;
   /** False when `group`'s counts are only over a fetched page, not a true global total (plan §17). */
   countsAreExhaustive: boolean;
+  /**
+   * Session 11.3 (GR1) — opt-in, defaults to false so Chat Logs/Customer
+   * Detail/Interaction Quality are completely unaffected. When true, every
+   * category starts collapsed instead of all-expanded, so the tree opens
+   * as a compact single header row rather than a large permanent preamble.
+   */
+  collapsedByDefault?: boolean;
 }
 
 /**
@@ -28,8 +35,11 @@ export const GroupedInteractionTree: React.FC<GroupedInteractionTreeProps> = ({
   selected,
   onSelect,
   countsAreExhaustive,
+  collapsedByDefault = false,
 }) => {
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(group.categories.map((c) => c.categoryId)));
+  const [openCategories, setOpenCategories] = useState<Set<string>>(
+    collapsedByDefault ? new Set<string>() : new Set(group.categories.map((c) => c.categoryId)),
+  );
   const [openAgents, setOpenAgents] = useState<Set<string>>(new Set());
 
   const toggleCategory = (id: string) =>

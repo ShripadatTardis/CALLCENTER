@@ -147,6 +147,31 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
           )}
         </div>
 
+        {/* Session 11.3 — Call-Centre-supplied analysis (Interaction.analysis,
+            mapped 1:1 from CallDataEntryDto.analysis in callsMapper.ts). This
+            was already fetched on every call-data row but never rendered
+            anywhere; surfaced here as-is, never recomputed or inferred
+            locally — VoiceForce does not run its own sentiment/analysis. */}
+        {interaction.analysis && (
+          <div className="bg-muted dark:bg-card p-4 rounded-lg">
+            <div className="text-sm font-medium mb-2">Call Centre analysis</div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <div><span className="text-muted-foreground">Sentiment trend:</span> {interaction.analysis.sentimentTrend ?? '—'}</div>
+              <div><span className="text-muted-foreground">Resolution status:</span> {interaction.analysis.resolutionStatus ?? '—'}</div>
+              <div>
+                <span className="text-muted-foreground">Confidence score:</span>{' '}
+                {interaction.analysis.confidenceScore !== undefined ? `${interaction.analysis.confidenceScore}%` : '—'}
+              </div>
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Key topics:</span>{' '}
+                {interaction.analysis.keyTopics && interaction.analysis.keyTopics.length > 0
+                  ? interaction.analysis.keyTopics.join(', ')
+                  : '—'}
+              </div>
+            </div>
+          </div>
+        )}
+
         {isActive && liveTranscript.isPollingCapped && (
           <p className="text-xs text-amber-600">
             This call is still active. Live updates have paused after 60s to avoid excessive

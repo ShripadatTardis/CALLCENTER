@@ -114,9 +114,24 @@ Screenshots: `.tooling/screenshots/session-11-3a-call-logs/`.
   regression, no new issues in this session's files.
 - Vercel function count: **11**, unchanged (no `api/*` files touched).
 
+## HIG review
+
+Ran via the repo's HIG commit gate (`design-reviewer` subagent) against the 2 staged UI files:
+**0 high-severity findings** (gate passes at `high=0`). 2 medium + 1 low + 1 advisory findings, all
+accessibility-related. The one directly introduced by this session's new code (the "Call Agent"
+`<label>` not programmatically associated with its Radix `Select` trigger) was fixed immediately —
+added `id="call-agent-label"` on the label and `aria-labelledby="call-agent-label"` on the
+`SelectTrigger`. The remaining findings (unverified hint-text contrast, the pre-existing
+Campaign-field label-association gap, and the "Filters"/"Filters" microcopy redundancy) are
+non-blocking and outside this session's scope.
+
 ## Deployment
 
-- Deployed via `npx vercel --prod --yes`, twice: first for the core refinement, then again after
-  adding the `FilterPopover` `title` prop to satisfy §3's "FILTERS" panel rename.
+- Commit: `b546171` — "Session 11.3A: Call Logs filter/agent refinement".
+- Deployed via `npx vercel --prod --yes`, three times over the course of the session: the core
+  refinement, then after adding the `FilterPopover` `title` prop to satisfy §3's "FILTERS" panel
+  rename, then after the HIG accessibility fix above.
 - Production URL: **https://callcenter-three-livid.vercel.app/call-logs** — live, verified against
-  this deployment (all measurements above taken post-deploy).
+  the final deployment (all measurements above taken against the pre-accessibility-fix deploy;
+  build/tsc were re-verified clean after the final fix and function count/lint are unaffected by a
+  label/aria-only change).

@@ -293,5 +293,6 @@ Applies where operational records can be grouped by a dimension (e.g. by Agent) 
 - **Do not render a large always-visible hierarchy above the records grid.** If group navigation needs its own space, it collapses/expands within the workspace rather than reserving permanent height.
 - **Must comply with L1** — grouping must not consume unbounded page height; the grouped view is still one bounded, internally-scrolling workspace, not a page that grows with the number of groups or records.
 - **Do not change grouping semantics merely for presentation** — GR1 governs how a grouped view looks and where it lives on the page, never what "grouped by X" actually means or computes.
+- **Grouping is optional.** When the user's real task is simply narrowing records by a dimension such as Agent, use that dimension as an F1 filter rather than forcing hierarchical GR1 navigation. GR1 remains the right pattern when the hierarchy itself (e.g. Domain → Category → Agent) is part of what the operator needs to see, not merely a means of selecting one leaf value.
 
-Not yet implemented on any screen — this section exists so Call Logs/Chat Logs' own future implementation sessions can cite "Grouping → GR1" without re-deriving these rules.
+First implemented for Call Logs in Session 11.3, then removed from Call Logs in Session 11.3A in favor of a plain Call Agent filter (F1) per the rule above — the underlying Session 6.2 classification model and `GroupedInteractionTree` component are unchanged and remain available to other screens.

@@ -5,14 +5,12 @@ import { AdvancedFilters, CallLogFilters, CallLogsSearch } from '@/components/ca
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Loader2, LayoutList, Network, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { Interaction } from '@/types/interaction';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { formatDurationExact, formatDurationLong, formatPercent, formatPhoneNumber, formatTimestamp } from '@/lib/format';
-import { useClassification } from '@/hooks/classification/useClassification';
-import { groupInteractions } from '@/lib/interactionGrouping';
-import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
+import { useAgents } from '@/hooks/agents/useAgents';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
 import { MetricStrip } from '@/components/common/MetricStrip';
@@ -50,8 +48,13 @@ const CallLogs: React.FC = () => {
   const [page, setPage] = useState(1);
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [showDetail, setShowDetail] = useState(false);
-  const [view, setView] = useState<'grouped' | 'table'>('grouped');
-  const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
+  // Session 11.3A — Call Agent is a normal page-local F1 filter, not a
+  // GR1 grouping-tree navigation step. The underlying Session 6.2
+  // Domain->Category->Agent classification model is untouched; this is
+  // just a direct agentId equality filter over the already-fetched page,
+  // since /call-data has no agent_id query param (CallDataQueryDto below
+  // has no such field) — page-local, honestly labeled "(page)" below.
+  const [agentFilter, setAgentFilter] = useState<string>('all');
   // Client-side facets — the backend call-data query has no fcr/escalation/
   // authenticated/campaign filter params (Trigger_Call_API/Call_data_API
   // docs), so these narrow only the currently-fetched page and are labeled
@@ -76,34 +79,24 @@ const CallLogs: React.FC = () => {
     page,
     ...filters,
   });
-  const classification = useClassification();
+  const { data: agentsData } = useAgents();
+  const agentRoster = agentsData?.agents ?? [];
 
   const allInteractions = useMemo(() => data?.interactions ?? [], [data]);
   const summary = data?.summary;
   const pagination = data?.pagination;
-  const clientFacetsActive = fcrFacet !== 'any' || authFacet !== 'any' || Boolean(campaignFacet);
+  const clientFacetsActive = fcrFacet !== 'any' || authFacet !== 'any' || Boolean(campaignFacet) || agentFilter !== 'all';
   const hasActiveFilters = Object.values(filters).some((v) => v !== undefined && v !== '') || clientFacetsActive;
   const advancedActiveCount =
     (filters.date_from ? 1 : 0) + (filters.date_to ? 1 : 0) + (filters.outcome ? 1 : 0) +
     (filters.direction ? 1 : 0) + (filters.min_duration !== undefined || filters.max_duration !== undefined ? 1 : 0) +
+    (agentFilter !== 'all' ? 1 : 0) +
     (fcrFacet !== 'any' ? 1 : 0) + (authFacet !== 'any' ? 1 : 0) + (campaignFacet ? 1 : 0);
 
-  const grouped = useMemo(
-    () =>
-      groupInteractions(
-        allInteractions.map((i) => ({ agentId: i.agentId ?? null, channel: 'voice' as const })),
-        classification.data,
-        classification.agentsById,
-      ),
-    [allInteractions, classification.data, classification.agentsById],
-  );
+  const agentFiltered =
+    agentFilter !== 'all' ? allInteractions.filter((i) => (i.agentId ?? null) === agentFilter) : allInteractions;
 
-  const groupFiltered =
-    view === 'grouped' && selectedGroup
-      ? allInteractions.filter((i) => (i.agentId ?? null) === selectedGroup.agentId)
-      : allInteractions;
-
-  const interactions = groupFiltered.filter((i) => {
+  const interactions = agentFiltered.filter((i) => {
     if (fcrFacet === 'yes' && i.fcr !== true) return false;
     if (fcrFacet === 'no' && i.fcr !== false) return false;
     if (authFacet === 'yes' && i.wasAuthenticated !== true) return false;
@@ -118,7 +111,7 @@ const CallLogs: React.FC = () => {
     ...(filters.date_to ? [{ key: 'date_to', label: `To ${filters.date_to}`, onRemove: () => updateServerFilters({ ...filters, date_to: undefined }) }] : []),
     ...(filters.outcome ? [{ key: 'outcome', label: `Outcome: ${filters.outcome}`, onRemove: () => updateServerFilters({ ...filters, outcome: undefined }) }] : []),
     ...(filters.direction ? [{ key: 'direction', label: `Direction: ${filters.direction}`, onRemove: () => updateServerFilters({ ...filters, direction: undefined }) }] : []),
-    ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
+    ...(agentFilter !== 'all' ? [{ key: 'agent', label: `Agent: ${agentRoster.find((a) => a.agentId === agentFilter)?.displayName ?? agentFilter} (page)`, onRemove: () => setAgentFilter('all') }] : []),
     ...(fcrFacet !== 'any' ? [{ key: 'fcr', label: `FCR: ${fcrFacet} (page)`, onRemove: () => setFcrFacet('any') }] : []),
     ...(authFacet !== 'any' ? [{ key: 'auth', label: `Authenticated: ${authFacet} (page)`, onRemove: () => setAuthFacet('any') }] : []),
     ...(campaignFacet ? [{ key: 'campaign', label: `Campaign: ${campaignFacet} (page)`, onRemove: () => setCampaignFacet('') }] : []),
@@ -126,7 +119,7 @@ const CallLogs: React.FC = () => {
   const clearAll = () => {
     setFilters({});
     setPage(1);
-    setSelectedGroup(null);
+    setAgentFilter('all');
     setFcrFacet('any');
     setAuthFacet('any');
     setCampaignFacet('');
@@ -179,14 +172,36 @@ const CallLogs: React.FC = () => {
             <CallLogsSearch value={filters.search ?? ''} onChange={(v) => updateServerFilters({ ...filters, search: v || undefined })} />
           </div>
           <FilterPopover
+            title="Filters"
             activeCount={advancedActiveCount}
             onClear={() => {
               updateServerFilters({ search: filters.search });
+              setAgentFilter('all');
               setFcrFacet('any');
               setAuthFacet('any');
               setCampaignFacet('');
             }}
           >
+            {/* Session 11.3A — Call Agent replaces the GR1 grouping tree as
+                the way to narrow calls by agent. Uses the real /agents
+                roster and the interaction's immutable agentId; agent_id is
+                the identity, displayName is presentation only. No
+                agent_id query param exists on /call-data
+                (CallDataQueryDto), so this is honestly page-local — same
+                "(page)" chip convention as the other client-side facets. */}
+            <div className="pb-3 border-b border-border">
+              <label id="call-agent-label" className="text-xs font-medium mb-1.5 block text-muted-foreground">Call Agent</label>
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger aria-labelledby="call-agent-label" className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All agents</SelectItem>
+                  {agentRoster.map((a) => (
+                    <SelectItem key={a.agentId} value={a.agentId}>{a.displayName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-[11px] text-muted-foreground mt-1">Filters the currently loaded page only</div>
+            </div>
             <AdvancedFilters filters={filters} onFiltersChange={updateServerFilters} />
             <div className="border-t border-border pt-3 space-y-3">
               <div className="text-xs font-medium text-muted-foreground">Page-local facets (this page only)</div>
@@ -226,24 +241,6 @@ const CallLogs: React.FC = () => {
             </div>
           </FilterPopover>
           <div className="flex-1" />
-          <Button
-            variant={view === 'grouped' ? 'default' : 'outline'}
-            size="sm"
-            className={view === 'grouped' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
-            onClick={() => setView('grouped')}
-          >
-            <Network className="h-3.5 w-3.5 mr-1.5" />
-            Grouped
-          </Button>
-          <Button
-            variant={view === 'table' ? 'default' : 'outline'}
-            size="sm"
-            className={view === 'table' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
-            onClick={() => setView('table')}
-          >
-            <LayoutList className="h-3.5 w-3.5 mr-1.5" />
-            Table
-          </Button>
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" className="h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={handleExport}>
               <Download className="h-3.5 w-3.5 mr-1.5" />
@@ -268,26 +265,14 @@ const CallLogs: React.FC = () => {
           </div>
         )}
 
-        {/* GR1 — grouping is a compact view of the records, not a large
-            permanent preamble: starts fully collapsed (collapsedByDefault)
-            and is height-bounded/internally-scrollable so it can never grow
-            the page (L1). The Session 6.2 Domain->Category->Agent->Channel
-            classification model itself is unchanged. */}
-        {view === 'grouped' && !isLoading && allInteractions.length > 0 && (
-          <div className="flex-shrink-0 max-h-[180px] overflow-y-auto">
-            <GroupedInteractionTree
-              group={grouped}
-              selected={selectedGroup}
-              onSelect={setSelectedGroup}
-              countsAreExhaustive={false}
-              collapsedByDefault
-            />
-          </div>
-        )}
-
+        {/* Session 11.3A — the GR1 grouping-tree preamble was removed for
+            Call Logs specifically (GroupedInteractionTree/groupInteractions
+            and the underlying Session 6.2 classification model are
+            untouched and unaffected for any other screen that still uses
+            them). Records now begin immediately below the toolbar. */}
         <div className="text-xs text-muted-foreground px-1 flex-shrink-0">
           Call history — {interactions.length}
-          {view === 'grouped' && selectedGroup ? ` of ${allInteractions.length}` : ''} shown
+          {agentFilter !== 'all' ? ` of ${allInteractions.length}` : ''} shown
         </div>
 
         {/* The record table is the sole flex-grow, internally-scrolling

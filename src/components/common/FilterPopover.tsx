@@ -17,7 +17,8 @@ export const FilterPopover: React.FC<{
   children: React.ReactNode;
   dark?: boolean;
   align?: 'start' | 'end';
-}> = ({ activeCount, onClear, children, dark = true, align = 'start' }) => {
+  title?: string;
+}> = ({ activeCount, onClear, children, dark = true, align = 'start', title = 'Advanced filters' }) => {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -40,7 +41,7 @@ export const FilterPopover: React.FC<{
         className={`w-[340px] max-h-[70vh] overflow-y-auto p-4 space-y-4 ${dark ? 'bg-card border-border text-foreground' : ''}`}
       >
         <div className="flex items-center justify-between">
-          <span className={`text-sm font-semibold ${dark ? 'text-foreground' : ''}`}>Advanced filters</span>
+          <span className={`text-sm font-semibold ${dark ? 'text-foreground' : ''}`}>{title}</span>
           {onClear && activeCount > 0 && (
             <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onClear}>
               <X className="h-3 w-3 mr-1" />

@@ -16,6 +16,7 @@ import {
   PenTool,
   Workflow,
   ShieldCheck,
+  Percent,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -100,6 +101,7 @@ export const PILLARS: Pillar[] = [
     blurb: 'Operational and economic performance',
     items: [
       { name: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'view_analytics' },
+      { name: 'Ratios', href: '/ratios', icon: Percent, permission: 'view_analytics', matchPrefix: '/ratios' },
     ],
   },
   {

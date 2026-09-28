@@ -25,6 +25,8 @@ import FormattingHub from "./pages/FormattingHub";
 import AIAgents from "./pages/AIAgents";
 import AgentDetail from "./pages/AgentDetail";
 import Analytics from "./pages/Analytics";
+import Ratios from "./pages/Ratios";
+import RatioExplorer from "./pages/RatioExplorer";
 import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
 import Settings from "./pages/Settings";
@@ -66,6 +68,8 @@ const App = () => (
           <Route path="/orchestrator/flow/:flowId" element={<ProtectedRoute><OrchestratorFlow /></ProtectedRoute>} />
           <Route path="/orchestrator/integrations" element={<ProtectedRoute><OrchestratorIntegrations /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/ratios" element={<ProtectedRoute><Ratios /></ProtectedRoute>} />
+          <Route path="/ratios/:ratioId" element={<ProtectedRoute><RatioExplorer /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/user-management" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

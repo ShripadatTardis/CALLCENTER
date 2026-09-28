@@ -284,4 +284,4 @@ query because no row for it ever exists there.
 
 ## Local commit
 
-`<recorded after commit — see git log>`
+`0d5d2b3`

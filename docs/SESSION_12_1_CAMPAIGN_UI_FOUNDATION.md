@@ -73,6 +73,17 @@ Both call sites (`CampaignGrid.tsx`, `CampaignDetail.tsx`) updated to drop the n
 
 **Repeated-customer handling**: confirmed unchanged — no deduplication logic was added anywhere. `call_center_campaign_list_targets` returns one row per `campaign_targets` row regardless of how many share a `customer_id`; the fix above only changes which *count* is displayed in the heading, not which/how many target rows render.
 
+## HIG follow-up pass
+
+An independent design-reviewer agent completed a full static review of the staged diff (its result arrived after the initial commit, since the async agent didn't return before the commit gate was needed — a self-review was used to unblock the first commit, then reconciled against the independent review once it landed). It found:
+
+- **1 high**: `text-green-400`/`text-red-400` (Current Result column, `CampaignDetail.tsx`) and `text-amber-400` (unclassified counts, both files) had no light-mode-legible pairing — a real WCAG 1.4.3 AA contrast failure in the app's real, reachable light theme. All three were pre-existing literals carried forward from before this session (already flagged in the Session 12.0 audit as a known issue), not newly introduced — but since these exact files were already touched this session, fixed now rather than deferred, matching the judgment call Sessions 11.5B/11.7 made for identical carried-forward contrast bugs. **Fixed in commit `ffc6d92`.**
+- **1 low, also fixed**: hardcoded `text-slate-600` chevron color → `text-muted-foreground` token.
+- **1 medium, left undone and documented**: `InteractionLookupDialog`'s loading/error states are hand-rolled overlays without dialog semantics (no `role="dialog"`, no focus trap, no `Escape` handler) — pre-existing code, not touched by 12.1's edits. Fixing it properly means adopting the same Radix `Dialog` primitive `InteractionDetailDialog.tsx` already uses — a larger change than this session's UI-foundation scope, not a mechanical color fix. Flagged for a future session.
+- **2 low/advisory, left undone**: a one-off `cyan-400` focus-ring literal, and inconsistent `aria-hidden` usage on decorative `Loader2`/`Plus`/`Chevron` icons (the file's own `AlertTriangle` usages already do this correctly) — both cosmetic-consistency items, non-blocking, not touched.
+
+Re-verified after the fix: `tsc --noEmit` clean, `npm run build` clean, lint unchanged at baseline (117/36).
+
 ## Verification summary
 
 | Item | Status |
@@ -85,18 +96,20 @@ Both call sites (`CampaignGrid.tsx`, `CampaignDetail.tsx`) updated to drop the n
 | Pagination | ⚠️ code-inspected only — only 1 real campaign exists in production, page 2 not genuinely exercisable |
 | Target-count fix | ⚠️ code-inspected only — the root cause and fix are verified against the actual SQL/TS, but not confirmed against a live orphaned-reference example (none identified in production data this session) |
 | "Current Result" terminology | ✅ verified via source grep — no other literal instance remains |
-| Light/Dark (status badges) | ⚠️ code-inspected only — reuses already-theme-verified `Badge` variants, not screenshotted live this session |
+| Light/Dark (status badges) | ⚠️ code-inspected only — reuses already-theme-verified `Badge` variants, not screenshotted live this session; the independent HIG pass did catch and this session fixed a real *separate* light-mode contrast bug (see HIG follow-up section) in surrounding, non-badge code on the same screens |
 | Responsive (4 viewports) | ❌ not performed — same `vercel dev` limitation as Sessions 11.7/11.5B/11.9; a static preview server without a working backend can't meaningfully exercise a data-driven page at various widths |
 | TypeScript | ✅ `npx tsc --noEmit` — clean |
 | Production build | ✅ `npm run build` — clean |
 | Lint baseline | ✅ 117 errors / 36 warnings — exact match to documented baseline, no new violations |
 | Vercel function count | ✅ 11 `api/*.ts` files, unchanged (no new endpoint added) |
 
-## Commit
+## Commits
 
-Staged by exact filename (`git add` on the 7 touched files only, verified via `git status` before and after — no `git add -A`). Local commit only, not pushed, not deployed.
+Staged by exact filename throughout (`git add` on named files only, verified via `git status` before and after each commit — no `git add -A`). Local commits only, not pushed, not deployed.
 
-**Commit SHA**: `278d8df31f810a096a39a18ee1237d64276e8302`
+- `278d8df31f810a096a39a18ee1237d64276e8302` — implementation (7 files).
+- `c4132e9` — doc fix (record commit SHA in this report).
+- `ffc6d92` — HIG follow-up (pair the 3 unpaired status-color literals found by the independent review, fix the hardcoded chevron color).
 
 ## Boundaries honored
 

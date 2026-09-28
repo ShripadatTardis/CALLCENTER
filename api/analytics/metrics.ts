@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, methodNotAllowed, proxyRequest, readReqQuery, withErrorBoundary } from '../_voicebot.js';
+import { readIntQuery } from '../_customer360.js';
 import { getRatioSummary, getRatioTrend, getRatioBreakdown, getRatioDrivers, getRatioInteractions } from '../../src/server/analytics/ratioService.js';
 import type { RatioFilterState } from '../../src/types/ratio.js';
 
@@ -73,7 +74,7 @@ async function handleRatiosResource(req: VercelRequest, res: VercelResponse, que
       return;
     }
     case 'trend': {
-      const result = await getRatioTrend(ratioId);
+      const result = await getRatioTrend(ratioId, filters);
       res.status(200).json(result);
       return;
     }
@@ -83,17 +84,19 @@ async function handleRatiosResource(req: VercelRequest, res: VercelResponse, que
         res.status(400).json({ detail: 'by (breakdown dimension) is required for view=breakdown' });
         return;
       }
-      const result = await getRatioBreakdown(ratioId, by);
+      const result = await getRatioBreakdown(ratioId, by, filters);
       res.status(200).json(result);
       return;
     }
     case 'drivers': {
-      const result = await getRatioDrivers(ratioId);
+      const result = await getRatioDrivers(ratioId, filters);
       res.status(200).json(result);
       return;
     }
     case 'interactions': {
-      const result = await getRatioInteractions(ratioId);
+      const page = readIntQuery(req, 'page', 1);
+      const pageSize = readIntQuery(req, 'pageSize', 25);
+      const result = await getRatioInteractions(ratioId, filters, page, pageSize);
       res.status(200).json(result);
       return;
     }

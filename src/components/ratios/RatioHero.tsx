@@ -62,6 +62,12 @@ export const RatioHero: React.FC<{
         <RatioUnavailableState reason={summary.unavailableReason ?? 'Not yet instrumented.'} />
       )}
 
+      {summary?.populationCapped && (
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          Based on the first {summary.population?.toLocaleString()} of {summary.trueTotalRecords?.toLocaleString()} matching records — not the complete population for this window.
+        </p>
+      )}
+
       {/* Spec §5 "Explainability" — formula/definition stay visible regardless of availability; numerator/denominator/N/freshness only appear once a real value exists. */}
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-muted-foreground pt-1 border-t border-border/60">
         <span>Formula: {definition.formulaText}</span>

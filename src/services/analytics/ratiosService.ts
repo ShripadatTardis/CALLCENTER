@@ -62,9 +62,14 @@ export async function fetchRatioDrivers(ratioId: string, filters: RatioFilterSta
   });
 }
 
-export async function fetchRatioInteractions(ratioId: string, filters: RatioFilterState): Promise<RatioInteractionsResponseDto> {
+export async function fetchRatioInteractions(
+  ratioId: string,
+  filters: RatioFilterState,
+  page: number,
+  pageSize: number,
+): Promise<RatioInteractionsResponseDto> {
   return request<RatioInteractionsResponseDto>('/analytics/metrics', {
     method: 'GET',
-    query: { resource: 'ratios', ratioId, view: 'interactions', ...filtersQuery(filters) },
+    query: { resource: 'ratios', ratioId, view: 'interactions', page, pageSize, ...filtersQuery(filters) },
   });
 }

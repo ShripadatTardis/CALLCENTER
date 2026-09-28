@@ -21,8 +21,8 @@ export type RatioUnit = 'percent' | 'seconds' | 'count' | 'score' | 'currency';
 
 export type RatioVisualization = 'trend_line' | 'distribution' | 'funnel' | 'composition';
 
-/** Spec §14 — the drillable dimensions a ratio MAY support. The registry decides which of these apply per ratio; the frontend never invents one. */
-export type RatioDimension = 'time' | 'intent' | 'agent' | 'campaign' | 'domain' | 'outcome' | 'segment' | 'escalation_reason' | 'tool';
+/** Spec §14 — the drillable dimensions a ratio MAY support. The registry decides which of these apply per ratio; the frontend never invents one. R2 added 'direction' (a real, confirmed field on every call-data row). */
+export type RatioDimension = 'time' | 'intent' | 'agent' | 'campaign' | 'domain' | 'outcome' | 'segment' | 'escalation_reason' | 'tool' | 'direction';
 
 export type RatioEvidenceKind = 'transcript' | 'recording' | 'metadata' | 'ai_trace' | 'qa';
 
@@ -67,6 +67,17 @@ export interface RatioSummaryDto {
   /** Present only when availability is not 'direct'/'derived' with a real value — a short, honest, human-readable reason (e.g. "Backend telemetry required"). */
   unavailableReason: string | null;
   filtersEcho: RatioFilterState;
+  /**
+   * R2 — true when the aggregation is based on fewer records than
+   * actually exist for the query (the underlying complete-population
+   * fetch hit its page cap before reaching the backend's own
+   * `total_records`). When true, `population` is the number of records
+   * actually aggregated, NOT the true total — always disclosed, never
+   * silently presented as complete.
+   */
+  populationCapped: boolean;
+  /** The backend's own reported total matching record count, when known — may exceed `population` if `populationCapped` is true. */
+  trueTotalRecords: number | null;
 }
 
 export interface RatioTrendPointDto {
@@ -82,6 +93,8 @@ export interface RatioTrendResponseDto {
   availability: RatioAvailability;
   unavailableReason: string | null;
   points: RatioTrendPointDto[];
+  populationCapped: boolean;
+  trueTotalRecords: number | null;
 }
 
 export interface RatioBreakdownRowDto {
@@ -101,6 +114,8 @@ export interface RatioBreakdownResponseDto {
   availability: RatioAvailability;
   unavailableReason: string | null;
   rows: RatioBreakdownRowDto[];
+  populationCapped: boolean;
+  trueTotalRecords: number | null;
 }
 
 export interface RatioDriverRowDto {
@@ -138,7 +153,12 @@ export interface RatioInteractionsResponseDto {
   availability: RatioAvailability;
   unavailableReason: string | null;
   rows: RatioInteractionRefDto[];
+  /** Count of matching records actually found within the (possibly capped) fetched population — see populationCapped. */
   totalCount: number;
+  page: number;
+  pageSize: number;
+  populationCapped: boolean;
+  trueTotalRecords: number | null;
 }
 
 /**
@@ -188,4 +208,16 @@ export interface FrontendRatioDefinition {
    * only affects catalogue badge display, never a rendered value.
    */
   declaredAvailability: RatioAvailability;
+  /**
+   * R2 — a static snapshot of which breakdown dimensions the backend
+   * registry supports for this ratio, used ONLY to populate the
+   * BreakdownSelector control without importing server code client-side.
+   * The API independently validates the dimension server-side on every
+   * request regardless of what this list offers — a mismatch here would
+   * surface as a clean validation-error response, never a silent wrong
+   * result.
+   */
+  declaredDrillDimensions: RatioDimension[];
+  /** Same idea as declaredDrillDimensions, for whether a Driver view exists at all. */
+  declaredDriverDimension: RatioDimension | null;
 }

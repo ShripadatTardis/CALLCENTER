@@ -10,5 +10,6 @@ export const ratiosKeys = {
   trend: (ratioId: string, filters: RatioFilterState) => [...ratiosKeys.all, 'trend', ratioId, filters] as const,
   breakdown: (ratioId: string, by: string, filters: RatioFilterState) => [...ratiosKeys.all, 'breakdown', ratioId, by, filters] as const,
   drivers: (ratioId: string, filters: RatioFilterState) => [...ratiosKeys.all, 'drivers', ratioId, filters] as const,
-  interactions: (ratioId: string, filters: RatioFilterState) => [...ratiosKeys.all, 'interactions', ratioId, filters] as const,
+  interactions: (ratioId: string, filters: RatioFilterState, page: number, pageSize: number) =>
+    [...ratiosKeys.all, 'interactions', ratioId, filters, page, pageSize] as const,
 };

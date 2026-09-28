@@ -4,6 +4,7 @@ import type { RatioDimension } from '@/types/ratio';
 const DIMENSION_LABELS: Record<RatioDimension, string> = {
   time: 'Time', intent: 'Intent', agent: 'Agent', campaign: 'Campaign', domain: 'Domain',
   outcome: 'Outcome', segment: 'Segment', escalation_reason: 'Escalation reason', tool: 'Tool',
+  direction: 'Direction',
 };
 
 /** Spec §4.4 — dimensions come from the registry (passed in), never hard-coded per screen. */

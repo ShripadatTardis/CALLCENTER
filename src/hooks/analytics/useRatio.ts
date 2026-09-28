@@ -43,10 +43,10 @@ export function useRatioDrivers(ratioId: string | undefined, filters: RatioFilte
   });
 }
 
-export function useRatioInteractions(ratioId: string | undefined, filters: RatioFilterState, enabled: boolean) {
+export function useRatioInteractions(ratioId: string | undefined, filters: RatioFilterState, page: number, pageSize: number, enabled: boolean) {
   return useQuery({
-    queryKey: ratiosKeys.interactions(ratioId ?? '', filters),
-    queryFn: () => fetchRatioInteractions(ratioId as string, filters),
+    queryKey: ratiosKeys.interactions(ratioId ?? '', filters, page, pageSize),
+    queryFn: () => fetchRatioInteractions(ratioId as string, filters, page, pageSize),
     enabled: Boolean(ratioId) && enabled,
   });
 }

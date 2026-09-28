@@ -287,6 +287,64 @@ async function handleScheduleFollowup(req: VercelRequest, res: VercelResponse, a
   res.status(200).json(followup);
 }
 
+/**
+ * Session 11.9A — Integrated Initiate Chat's "Campaign Customer" mode.
+ * Reuses the SAME campaign_executions row shape/attempt-count bump the
+ * Voice batch path already gets from createExecution — only the
+ * channel differs. Mirrors handleRetryTarget's exact
+ * getTargetContext + isAgentAuthorized guard (Session 9.2 precedent),
+ * since a target id alone carries no client-trusted campaign/agent
+ * context.
+ */
+async function handleCreateChatExecution(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const targetId = (req.body as { targetId?: string } | undefined)?.targetId;
+  if (!targetId) {
+    res.status(400).json({ detail: 'targetId is required' });
+    return;
+  }
+  const context = await repo.getTargetContext(targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
+    return;
+  }
+  const execution = await repo.createExecution(targetId, new Date().toISOString(), null, 'chat');
+  res.status(201).json(execution);
+}
+
+interface MarkChatExecutionBody {
+  targetId: string;
+  executionId: string;
+  chatSessionId?: string;
+  errorDetail?: string;
+}
+
+/**
+ * Chat's analogue of the internal markExecutionTriggered/markExecutionFailed
+ * calls campaignRunner.ts makes for Voice — exposed here because Chat's
+ * send happens client-initiated via /api/chat, not from a server batch
+ * job, so ChatConsole must report the outcome back explicitly once it
+ * knows it. Re-verifies targetId->campaign->agentId authorization again
+ * rather than trusting the executionId alone.
+ */
+async function handleMarkChatExecutionSent(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const body = req.body as MarkChatExecutionBody | undefined;
+  if (!body?.targetId || !body?.executionId) {
+    res.status(400).json({ detail: 'targetId and executionId are required' });
+    return;
+  }
+  const context = await repo.getTargetContext(body.targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
+    return;
+  }
+  if (body.chatSessionId) {
+    await repo.markExecutionChatSent(body.executionId, body.chatSessionId, new Date().toISOString());
+  } else {
+    await repo.markExecutionFailed(body.executionId, body.errorDetail ?? 'Chat send failed');
+  }
+  res.status(200).json({ ok: true });
+}
+
 async function handleRunBatch(req: VercelRequest, res: VercelResponse): Promise<void> {
   const batchSize = readIntQuery(req, 'batchSize', 5);
   const result = await runCampaignBatch(repo, voiceAgentCallBackend, batchSize);
@@ -366,6 +424,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'scheduleFollowup':
       await handleScheduleFollowup(req, res, access as AuthorizedAccess);
       return;
+    case 'createChatExecution':
+      await handleCreateChatExecution(req, res, access as AuthorizedAccess);
+      return;
+    case 'markChatExecutionSent':
+      await handleMarkChatExecutionSent(req, res, access as AuthorizedAccess);
+      return;
     case 'runBatch':
       await handleRunBatch(req, res);
       return;
@@ -375,7 +439,7 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     default:
       res.status(400).json({
         detail:
-          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, or reconcile',
+          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, createChatExecution, markChatExecutionSent, runBatch, or reconcile',
       });
   }
 });

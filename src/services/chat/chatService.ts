@@ -26,6 +26,16 @@ export interface SendChatMessageOptions {
    * the backend Chat API itself.
    */
   customer360CustomerId?: string;
+  /**
+   * Session 11.9A — Campaign Customer mode's real campaign_target id,
+   * when the chat was initiated from a campaign context. Local-only
+   * orchestration signal consumed by useChatSession to record a Chat
+   * campaign_executions row (see campaignsService.ts) — NEVER forwarded
+   * to the backend Chat API itself, exactly like customer360CustomerId.
+   */
+  campaignTargetId?: string;
+  /** Display-only, for the collapsed "started from" context after binding — never sent upstream. */
+  campaignName?: string;
 }
 
 export async function sendChatMessage(

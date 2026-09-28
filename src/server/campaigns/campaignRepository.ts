@@ -2,6 +2,7 @@ import type {
   Campaign,
   CampaignDetail,
   CampaignExecution,
+  CampaignExecutionChannel,
   CampaignFollowup,
   CampaignStatus,
   CampaignTargetRow,
@@ -68,9 +69,17 @@ export interface CampaignRepository {
 
   selectRunnableTargets(batchSize: number): Promise<RunnableTarget[]>;
 
-  createExecution(targetId: string, now: string, requestPayloadSnapshot?: Record<string, unknown> | null): Promise<CampaignExecution>;
+  createExecution(
+    targetId: string,
+    now: string,
+    requestPayloadSnapshot?: Record<string, unknown> | null,
+    channel?: CampaignExecutionChannel,
+  ): Promise<CampaignExecution>;
 
   markExecutionTriggered(executionId: string, callSid: string, now: string): Promise<void>;
+
+  /** Chat's analogue of markExecutionTriggered — correlates by the internal chat_sessions.id instead of call_sid (Session 11.9A). */
+  markExecutionChatSent(executionId: string, chatSessionId: string, now: string): Promise<void>;
 
   markExecutionFailed(executionId: string, errorDetail: string): Promise<void>;
 

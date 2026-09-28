@@ -145,6 +145,52 @@ export async function retryTarget(
   });
 }
 
+export interface CampaignExecutionResponse {
+  id: string;
+  campaignTargetId: string;
+  sequence: number;
+  status: string;
+  channel: 'voice' | 'chat';
+  chatSessionId: string | null;
+}
+
+/**
+ * Session 11.9A — Integrated Initiate Chat's "Campaign Customer" mode.
+ * Records one Chat-channel attempt against a real campaign_target
+ * BEFORE the /api/chat call is sent, mirroring the Voice batch path's
+ * create-then-send-then-mark sequence (campaignRunner.ts) so the
+ * target's attempt_count/status genuinely reflects the attempt even if
+ * the chat send then fails.
+ */
+export async function createCampaignChatExecution(
+  targetId: string,
+  role = 'unauthenticated',
+): Promise<CampaignExecutionResponse> {
+  return request<CampaignExecutionResponse>('/campaigns', {
+    method: 'POST',
+    query: { action: 'createChatExecution' },
+    body: { targetId },
+    headers: roleHeaders(role),
+  });
+}
+
+/**
+ * Reports the outcome back once known: pass chatSessionId on success
+ * (the internal chat_sessions.id, never the upstream session_id), or
+ * errorDetail (and omit chatSessionId) on failure.
+ */
+export async function markCampaignChatExecutionSent(
+  input: { targetId: string; executionId: string; chatSessionId?: string; errorDetail?: string },
+  role = 'unauthenticated',
+): Promise<{ ok: boolean }> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'markChatExecutionSent' },
+    body: input,
+    headers: roleHeaders(role),
+  });
+}
+
 export async function scheduleFollowup(
   input: {
     targetId: string;

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { closeChatSession, sendChatMessage, type SendChatMessageOptions } from '@/services/chat/chatService';
+import { createCampaignChatExecution, markCampaignChatExecutionSent } from '@/services/campaigns/campaignsService';
 import { isApiError } from '@/services/transport/errors';
 import type { ChatMessage } from '@/types/chat';
 
@@ -30,6 +31,9 @@ export function useChatSession() {
   const [notPersisted, setNotPersisted] = useState(false);
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [pendingIdentity, setPendingIdentity] = useState<SendChatMessageOptions | undefined>(undefined);
+  /** Session 11.9A — set once a Campaign Customer chat's execution row exists, so the outcome can be reported back after the real chat send resolves. */
+  const [campaignExecutionId, setCampaignExecutionId] = useState<string | null>(null);
+  const [campaignName, setCampaignName] = useState<string | null>(null);
 
   const send = useCallback(
     async (text: string, identity?: SendChatMessageOptions) => {
@@ -42,11 +46,37 @@ export function useChatSession() {
         text: trimmed,
         timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, userMessage]);
       setIsSending(true);
       setSendError(null);
       setPendingText(trimmed);
       setPendingIdentity(identity);
+
+      // Session 11.9A — Campaign Customer mode. Only meaningful on the
+      // first turn (no upstreamSessionId yet); mirrors the Voice batch
+      // path's create-execution-before-triggering order
+      // (campaignRunner.ts) so campaign_targets.attempt_count/status
+      // genuinely reflects this attempt even if the send itself then
+      // fails. If the execution can't be created, the chat is NOT sent
+      // — a Campaign Customer chat must be a real, structural link to
+      // the target, never a label attached after the fact.
+      let executionId: string | null = null;
+      if (!upstreamSessionId && identity?.campaignTargetId) {
+        try {
+          const execution = await createCampaignChatExecution(identity.campaignTargetId, role);
+          executionId = execution.id;
+          setCampaignExecutionId(execution.id);
+          setCampaignName(identity.campaignName ?? null);
+        } catch (err) {
+          const message = isApiError(err) ? err.message : err instanceof Error ? err.message : 'Failed to record campaign attempt';
+          setSendError(`Could not start campaign chat: ${message}`);
+          setIsSending(false);
+          setPendingText(null);
+          setPendingIdentity(undefined);
+          return;
+        }
+      }
+
+      setMessages((prev) => [...prev, userMessage]);
 
       try {
         // identity (agent/customer/contact/phone) is only ever supplied
@@ -64,9 +94,29 @@ export function useChatSession() {
         setNotPersisted(result.chatSessionId === '');
         setPendingText(null);
         setPendingIdentity(undefined);
+
+        // Report the outcome back for the campaign_executions row. Only
+        // when a local chat_sessions row actually exists (chatSessionId
+        // truthy) — that row is the FK target for the execution's
+        // chat_session_id. A rare "chat succeeded but local persistence
+        // failed" case is left as an honest gap (execution stays
+        // 'triggering') rather than misreported as either outcome —
+        // see docs/SESSION_11_9A_INTEGRATED_INITIATE_CHAT.md.
+        if (executionId && result.chatSessionId) {
+          void markCampaignChatExecutionSent(
+            { targetId: identity!.campaignTargetId!, executionId, chatSessionId: result.chatSessionId },
+            role,
+          ).catch((err) => console.error('Failed to mark campaign chat execution sent:', err));
+        }
       } catch (err) {
         const message = isApiError(err) ? err.message : err instanceof Error ? err.message : 'Failed to send message';
         setSendError(message);
+        if (executionId) {
+          void markCampaignChatExecutionSent(
+            { targetId: identity!.campaignTargetId!, executionId, errorDetail: message },
+            role,
+          ).catch((markErr) => console.error('Failed to mark campaign chat execution failed:', markErr));
+        }
       } finally {
         setIsSending(false);
       }
@@ -91,6 +141,8 @@ export function useChatSession() {
     setNotPersisted(false);
     setPendingText(null);
     setPendingIdentity(undefined);
+    setCampaignExecutionId(null);
+    setCampaignName(null);
     if (sessionToClose) {
       void closeChatSession(role, sessionToClose).catch((err) => {
         console.error('Failed to close previous chat session:', err);
@@ -111,6 +163,9 @@ export function useChatSession() {
     boundAgentName,
     customerId,
     contactId,
+    /** Session 11.9A — set once a Campaign Customer chat's execution row exists; null for Standalone/Trial. */
+    campaignExecutionId,
+    campaignName,
     send,
     retry,
     startNewChat,

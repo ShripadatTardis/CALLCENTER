@@ -21,6 +21,7 @@ const ChatConsole: React.FC = () => {
     boundAgentName,
     customerId,
     contactId,
+    campaignName,
     send,
     retry,
     startNewChat,
@@ -61,6 +62,7 @@ const ChatConsole: React.FC = () => {
               sessionId={sessionId}
               resolvedCustomerId={customerId}
               resolvedContactId={contactId}
+              boundCampaignName={campaignName}
               onIdentityChange={({ displayLabel: _displayLabel, ...next }) => setIdentity(next)}
               resetKey={resetKey}
             />

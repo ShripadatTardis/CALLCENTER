@@ -304,4 +304,4 @@ regardless).
 
 ## Local commit
 
-`<recorded after commit — see git log>`
+`bdf9435`

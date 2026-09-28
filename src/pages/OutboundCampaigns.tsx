@@ -2,27 +2,49 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCampaigns } from '@/hooks/campaigns/useCampaigns';
-import { useCampaignDetail, useCampaignTargets } from '@/hooks/campaigns/useCampaignDetail';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { CampaignStatStrip } from '@/components/campaigns/CampaignStatStrip';
 import { CampaignFiltersBar } from '@/components/campaigns/CampaignFiltersBar';
 import { CampaignGrid } from '@/components/campaigns/CampaignGrid';
-import { CampaignDetail } from '@/components/campaigns/CampaignDetail';
 import type { CampaignWithStats } from '@/types/campaign';
 
+const PAGE_SIZE = 25;
+
+/**
+ * Session 12.1 — Campaign Detail is now a real route
+ * (/outbound-campaigns/:campaignId, see CampaignDetailPage.tsx) rather
+ * than local state conditionally rendering CampaignDetail inline; this
+ * page is the list/index only, matching the Customers.tsx pattern.
+ *
+ * Real backend pagination wired in (the API already supported
+ * page/pageSize — this was a UI-only gap, same class of fix Customers.tsx
+ * got in Session 11.5B). Search/status remain client-side filters over
+ * the current page only (the campaign list endpoint has no server-side
+ * search/status params, and adding them is out of this session's UI-only
+ * scope) — with only one real production campaign today this isn't
+ * actively broken, but a future session adding real filter dimensions
+ * to a growing campaign list should wire them server-side rather than
+ * extend this client-side filter further.
+ */
 const OutboundCampaigns: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useCampaigns();
+  // A new filter invalidates the previous page number — same discipline
+  // Customers.tsx applies to its own (server-side) search.
+  React.useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedStatus]);
+
+  const { data, isLoading, isError, error, refetch, isFetching } = useCampaigns({ page, pageSize: PAGE_SIZE });
   const campaigns = data?.data ?? [];
-
-  const detailQuery = useCampaignDetail(selectedCampaignId ?? undefined);
-  const targetsQuery = useCampaignTargets(selectedCampaignId ?? undefined, { pageSize: 200 });
+  const totalCount = data?.pagination.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = data?.pagination.page ?? page;
 
   const filteredCampaigns = campaigns.filter((campaign: CampaignWithStats) => {
     const matchesSearch =
@@ -32,55 +54,12 @@ const OutboundCampaigns: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  if (selectedCampaignId) {
-    if (detailQuery.isLoading || targetsQuery.isLoading) {
-      return (
-        <Layout>
-          <div className="min-h-full bg-background p-4 flex items-center gap-2 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading campaign…
-          </div>
-        </Layout>
-      );
-    }
-
-    if (detailQuery.isError || !detailQuery.data) {
-      return (
-        <Layout>
-          <div className="min-h-full bg-background p-4 space-y-4">
-            <Button variant="outline" onClick={() => setSelectedCampaignId(null)}>
-              ← Back to Campaigns
-            </Button>
-            <QueryErrorBanner
-              error={detailQuery.error}
-              onRetry={() => void detailQuery.refetch()}
-              isFetching={detailQuery.isFetching}
-            />
-          </div>
-        </Layout>
-      );
-    }
-
-    return (
-      <Layout>
-        <CampaignDetail
-          campaign={detailQuery.data}
-          targets={targetsQuery.data?.data ?? []}
-          onBack={() => setSelectedCampaignId(null)}
-          onRefetch={() => {
-            void detailQuery.refetch();
-            void targetsQuery.refetch();
-            void refetch();
-          }}
-        />
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
-      <div className="min-h-full bg-background p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      {/* L1 — bounded workspace: fixed-height header/toolbar/stats, the
+          record grid absorbs growth, pager stays pinned below it. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-shrink-0">
           <div>
             <h1 className="text-base font-semibold text-foreground">Outbound Campaigns</h1>
             {data?.scoped && (
@@ -94,25 +73,66 @@ const OutboundCampaigns: React.FC = () => {
         </div>
 
         {isError && (
-          <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={campaigns.length > 0} isFetching={isFetching} />
+          <div className="flex-shrink-0">
+            <QueryErrorBanner error={error} onRetry={() => void refetch()} hasStaleData={campaigns.length > 0} isFetching={isFetching} />
+          </div>
         )}
 
-        <CampaignStatStrip campaigns={campaigns} />
+        <div className="flex-shrink-0">
+          <CampaignStatStrip campaigns={campaigns} />
+        </div>
 
-        <CampaignFiltersBar
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          selectedStatus={selectedStatus}
-          setSelectedStatus={setSelectedStatus}
-        />
+        <div className="flex-shrink-0">
+          <CampaignFiltersBar
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            selectedStatus={selectedStatus}
+            setSelectedStatus={setSelectedStatus}
+          />
+        </div>
 
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm p-4">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading campaigns…
+        <div className="flex-1 min-h-0 overflow-auto">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm p-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading campaigns…
+            </div>
+          ) : (
+            <CampaignGrid
+              campaigns={filteredCampaigns}
+              onViewCampaign={(c) => navigate(`/outbound-campaigns/${c.id}`, { state: { origin: 'outbound-campaigns' } })}
+            />
+          )}
+        </div>
+
+        {totalCount > 0 && (
+          <div className="flex items-center justify-between flex-shrink-0 text-xs text-muted-foreground px-1">
+            <span>
+              {totalCount} total campaign{totalCount === 1 ? '' : 's'} · Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1 || isFetching}
+              >
+                <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages || isFetching}
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </div>
           </div>
-        ) : (
-          <CampaignGrid campaigns={filteredCampaigns} onViewCampaign={(c) => setSelectedCampaignId(c.id)} />
         )}
       </div>
     </Layout>

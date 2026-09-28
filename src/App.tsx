@@ -15,6 +15,7 @@ import CustomerDetail from "./pages/CustomerDetail";
 import ChatConsole from "./pages/ChatConsole";
 import ChatLogs from "./pages/ChatLogs";
 import OutboundCampaigns from "./pages/OutboundCampaigns";
+import CampaignDetailPage from "./pages/CampaignDetailPage";
 import CreateCampaign from "./pages/CreateCampaign";
 import NPSCampaigns from "./pages/NPSCampaigns";
 import LiveView from "./pages/LiveView";
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/chat-logs" element={<ProtectedRoute><ChatLogs /></ProtectedRoute>} />
           <Route path="/outbound-campaigns" element={<ProtectedRoute><OutboundCampaigns /></ProtectedRoute>} />
           <Route path="/outbound-campaigns/create" element={<ProtectedRoute><CreateCampaign /></ProtectedRoute>} />
+          <Route path="/outbound-campaigns/:campaignId" element={<ProtectedRoute><CampaignDetailPage /></ProtectedRoute>} />
           <Route path="/nps-campaigns" element={<ProtectedRoute><NPSCampaigns /></ProtectedRoute>} />
           <Route path="/live-view" element={<ProtectedRoute><LiveView /></ProtectedRoute>} />
           <Route path="/qa-review" element={<ProtectedRoute><QAReview /></ProtectedRoute>} />

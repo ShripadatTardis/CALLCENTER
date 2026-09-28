@@ -97,7 +97,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <CampaignStatusBadge status={campaign.status} dark />
+          <CampaignStatusBadge status={campaign.status} />
           {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
             <Button size="sm" onClick={() => runAction(actions.start)} disabled={actions.start.isPending}>
               Start
@@ -159,7 +159,30 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
       )}
 
       <div>
-        <h2 className="text-[13px] font-semibold text-foreground mb-1.5 px-0.5">Targets ({targets.length})</h2>
+        <h2 className="text-[13px] font-semibold text-foreground mb-1.5 px-0.5">
+          Targets ({campaign.stats.targetCount})
+        </h2>
+        {/*
+          Session 12.1 — the heading now uses campaign.stats.targetCount
+          (a plain COUNT over campaign_targets, always correct) rather
+          than targets.length (the rows actually returned by
+          listTargets, which INNER JOINs customer/contact-point and can
+          therefore silently omit a target whose customer or contact
+          point row doesn't resolve — the root cause of the previously
+          reported "0 targets" vs "Targets (3)" contradiction). If the
+          two disagree, that join-level gap is real and is surfaced
+          honestly here rather than hidden — flagged for a future
+          session, not fixed in 12.1 (fixing it requires a migration
+          change to call_center_campaign_list_targets, out of scope).
+        */}
+        {campaign.stats.targetCount !== targets.length && (
+          <div className="mb-1.5 px-0.5 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+            <AlertTriangle size={11} aria-hidden="true" />
+            {campaign.stats.targetCount} target{campaign.stats.targetCount === 1 ? '' : 's'} exist for this
+            campaign, but only {targets.length} could be loaded below — some targets may reference a customer or
+            contact record that could not be resolved. This is a known backend gap, not lost data.
+          </div>
+        )}
         <div className="overflow-x-auto border border-border rounded-md bg-card/40">
           <table className="w-full text-[13px] text-foreground">
             <thead>
@@ -167,7 +190,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                 <th className="text-left py-2 px-3 font-medium">Name</th>
                 <th className="text-left py-2 px-3 font-medium">Phone</th>
                 <th className="text-left py-2 px-3 font-medium">Status</th>
-                <th className="text-left py-2 px-3 font-medium">Campaign Result</th>
+                <th className="text-left py-2 px-3 font-medium">Current Result</th>
                 <th className="text-left py-2 px-3 font-medium">Next Action</th>
                 <th className="text-left py-2 px-3 font-medium">Follow-up Due</th>
                 <th className="text-right py-2 px-3 font-medium">Attempts</th>

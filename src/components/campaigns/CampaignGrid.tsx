@@ -65,7 +65,7 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                   <div className="text-[11px] text-muted-foreground">by {campaign.createdBy ?? 'unknown'}</div>
                 </td>
                 <td className="py-2 px-3">
-                  <CampaignStatusBadge status={campaign.status} dark />
+                  <CampaignStatusBadge status={campaign.status} />
                 </td>
                 <td className="py-2 px-3 text-foreground">{campaign.agentName ?? campaign.agentId}</td>
                 <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.targetCount}</td>

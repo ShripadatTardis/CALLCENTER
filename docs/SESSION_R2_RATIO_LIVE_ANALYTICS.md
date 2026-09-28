@@ -1,6 +1,6 @@
 # Session R2 — Ratio Live Analytics
 
-Implements the first complete real analytical vertical slice for FCR, Escalation Rate, and AHT, on top of the R1 Ratio Explorer foundation. Implemented directly in this session (no subagents). Not yet committed at the time of writing this section — see §Commit below for the final hash.
+Implements the first complete real analytical vertical slice for FCR, Escalation Rate, and AHT, on top of the R1 Ratio Explorer foundation. Implemented directly in this session (no subagents). Committed locally as `2446aea`. Not deployed.
 
 ## Architecture implemented
 
@@ -127,4 +127,4 @@ Distinguishing exactly what was and wasn't verified:
 
 ## Commit
 
-Local commit only, not deployed — see the final report message for the exact hash.
+`2446aea` — local commit only, not deployed.

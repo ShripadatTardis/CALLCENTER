@@ -136,7 +136,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
         {unclassified > 0 && (
           <div className="flex items-baseline gap-1.5">
-            <span className="font-semibold tabular-nums text-amber-400">{unclassified}</span>
+            <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">{unclassified}</span>
             <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
           </div>
         )}
@@ -212,9 +212,9 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                       <span
                         className={
                           target.resultIsSuccess === true
-                            ? 'text-green-400'
+                            ? 'text-green-700 dark:text-green-400'
                             : target.resultIsSuccess === false
-                              ? 'text-red-400'
+                              ? 'text-red-700 dark:text-red-400'
                               : 'text-muted-foreground'
                         }
                       >
@@ -222,7 +222,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                       </span>
                     ) : (
                       <span className="text-muted-foreground inline-flex items-center gap-1">
-                        {target.latestReconciliationStatus === 'unresolved' && <AlertTriangle size={11} className="text-amber-400" aria-hidden="true" />}
+                        {target.latestReconciliationStatus === 'unresolved' && <AlertTriangle size={11} className="text-amber-700 dark:text-amber-400" aria-hidden="true" />}
                         {reconciliationLabel(target)}
                       </span>
                     )}

@@ -73,7 +73,7 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                 <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.classifiedCount}</td>
                 <td className="py-2 px-3 text-right tabular-nums">
                   {unclassified > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-amber-400">
+                    <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
                       <AlertTriangle size={11} aria-hidden="true" />
                       {unclassified}
                     </span>
@@ -85,7 +85,7 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                   {rate === null ? <span className="text-muted-foreground">—</span> : `${rate.toFixed(0)}%`}
                 </td>
                 <td className="py-2 pr-3 text-right">
-                  <ChevronRight size={14} className="text-slate-600" aria-hidden="true" />
+                  <ChevronRight size={14} className="text-muted-foreground" aria-hidden="true" />
                 </td>
               </tr>
             );

@@ -23,6 +23,8 @@ export interface ChatIdentitySelectorProps {
   resolvedContactId: string | null;
   /** Session 11.9A — the campaign this bound session started from, if any (display only). */
   boundCampaignName: string | null;
+  /** Session 11.9B — whether this bound session is Trial/Test (display only, for visible isolation). */
+  boundIsTrial: boolean;
   /** Fires whenever the operator's selection changes enough to affect the first-turn payload. */
   onIdentityChange: (identity: SendChatMessageOptions & { displayLabel: string | null }) => void;
   /** Reset trigger — bumped by ChatConsole's "New Chat" so this component can clear its own local state. */
@@ -32,9 +34,9 @@ export interface ChatIdentitySelectorProps {
 type InitiationMode = 'standalone' | 'campaign' | 'trial';
 
 /**
- * Session 11.9A — Integrated Initiate Chat. Chat is a CHANNEL of
+ * Session 11.9A/11.9B — Integrated Initiate Chat. Chat is a CHANNEL of
  * VoiceForce's single customer-engagement model, not an independent
- * AI-chat utility (docs/SESSION_11_9A_INTEGRATED_INITIATE_CHAT.md):
+ * AI-chat utility:
  *
  *   Customer 360 -> Campaign/Operational Context -> Call Agent -> Interaction -> Result/Follow-up
  *
@@ -56,6 +58,17 @@ type InitiationMode = 'standalone' | 'campaign' | 'trial';
  * Customer 360) is ever sent as the backend `customer_id`; the internal
  * Customer 360 row UUID travels only as the separately-named,
  * never-forwarded `customer360CustomerId`.
+ *
+ * Session 11.9B — a self-audit of 11.9A found that entering Chat into
+ * the Voice-only campaign_executions/reconciliation lifecycle was
+ * unsafe (docs/SESSION_11_9B_INTEGRATED_CHAT_PERSISTENCE.md). Campaign
+ * Customer mode now carries `campaignId`/`campaignTargetId` straight
+ * through to Chat's own session persistence — a real link to the
+ * selected target, never a Voice execution row. Trial/Test mode always
+ * sets `isTrial: true`, independent of whatever manual identity fields
+ * are filled in — this is what actually keeps a Trial chat out of
+ * Customer 360/campaign production history, not merely the absence of
+ * automatic correlation.
  */
 export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
   isBound,
@@ -64,6 +77,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
   resolvedCustomerId,
   resolvedContactId,
   boundCampaignName,
+  boundIsTrial,
   onIdentityChange,
   resetKey,
 }) => {
@@ -184,6 +198,10 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
   // --- Push the composed identity up to ChatConsole any time a relevant input changes ---
   useEffect(() => {
     if (mode === 'trial') {
+      // isTrial: true unconditionally — this is what actually isolates
+      // a Trial chat from Customer 360/campaign analytics (Session
+      // 11.9B), independent of whether manual identity fields below are
+      // populated with real-looking values.
       if (advancedMode) {
         onIdentityChange({
           agentId: trialAgentId || undefined,
@@ -191,10 +209,11 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
           contactId: manualContactId.trim() || undefined,
           callerName: manualCallerName.trim() || undefined,
           phoneNumber: manualPhone.trim() || undefined,
+          isTrial: true,
           displayLabel: null,
         });
       } else {
-        onIdentityChange({ agentId: trialAgentId || undefined, displayLabel: null });
+        onIdentityChange({ agentId: trialAgentId || undefined, isTrial: true, displayLabel: null });
       }
       return;
     }
@@ -206,6 +225,10 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
         customerId: campaignCif ?? undefined,
         phoneNumber: selectedTarget?.contactRawValue ?? undefined,
         customer360CustomerId: selectedTarget?.customerId ?? undefined,
+        // Session 11.9B — a real link to the selected campaign/target,
+        // persisted directly on the Chat session (never a Voice
+        // campaign_executions row — see this file's top-of-file comment).
+        campaignId: campaignId || undefined,
         campaignTargetId: campaignTargetId || undefined,
         campaignName: selectedCampaign?.name,
         displayLabel: campaignDisplayLabel,
@@ -248,9 +271,15 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
         <Field label="Agent"><div className="h-8 flex items-center text-sm font-medium truncate" title={boundAgentName ?? undefined}>{boundAgentName ?? '—'}</div></Field>
         <Field label="Customer"><div className="h-8 flex items-center text-muted-foreground truncate" title={resolvedCustomerId ?? undefined}>{resolvedCustomerId ?? '—'}</div></Field>
         <Field label="Contact"><div className="h-8 flex items-center text-muted-foreground truncate" title={resolvedContactId ?? undefined}>{resolvedContactId ?? '—'}</div></Field>
-        <Field label={boundCampaignName ? 'Campaign' : 'Channel'}>
+        <Field label={boundIsTrial ? 'Mode' : boundCampaignName ? 'Campaign' : 'Channel'}>
           <div className="h-8 flex items-center text-muted-foreground truncate">
-            {boundCampaignName ?? 'Chat'}
+            {boundIsTrial ? (
+              <Badge variant="outline" className="border-amber-600/50 bg-amber-500/10 text-amber-700 dark:border-amber-500/40 dark:text-amber-400">
+                Trial / Test
+              </Badge>
+            ) : (
+              boundCampaignName ?? 'Chat'
+            )}
           </div>
         </Field>
         <Field label="Session ID"><div className="h-8 flex items-center font-mono text-xs truncate" title={sessionId ?? undefined}>{sessionId ?? '—'}</div></Field>

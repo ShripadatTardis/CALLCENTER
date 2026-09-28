@@ -47,4 +47,14 @@ export interface ChatRepository {
   getCustomerLinks(upstreamSessionIds: string[]): Promise<
     Record<string, { customerId: string; displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null }>
   >;
+
+  /**
+   * Session 11.9B — Trial/Test isolation. Batch, read-only lookup of
+   * each upstream session's local is_trial marker, for every session
+   * that exists locally regardless of whether it has a Customer 360
+   * link — used by chatInteractionSource.ts to exclude Trial sessions
+   * from Customer 360 materialization before Voice/Chat reconciliation
+   * ever sees them. Never used for authorization.
+   */
+  getTrialFlags(upstreamSessionIds: string[]): Promise<Record<string, boolean>>;
 }

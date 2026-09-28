@@ -5,7 +5,6 @@ import type {
   CampaignAgentInputMapping,
   CampaignDetail,
   CampaignExecution,
-  CampaignExecutionChannel,
   CampaignExecutionStatus,
   CampaignFollowup,
   CampaignResultRule,
@@ -271,9 +270,7 @@ interface ExecutionRow {
   campaign_target_id: string;
   sequence: number;
   status: CampaignExecutionStatus;
-  channel: CampaignExecutionChannel;
   call_sid: string | null;
-  chat_session_id: string | null;
   reconciliation_status: ReconciliationStatus;
   reconciled_interaction_id: string | null;
   reconciliation_candidate: Record<string, unknown> | null;
@@ -290,13 +287,7 @@ function mapExecution(row: ExecutionRow): CampaignExecution {
     campaignTargetId: row.campaign_target_id,
     sequence: row.sequence,
     status: row.status,
-    // Defensive fallback: 'voice' matches the migration's own column
-    // default, and covers any environment where
-    // 20261006000000_campaigns_chat_channel_execution.sql has not yet
-    // been applied (the column is simply absent from the row then).
-    channel: row.channel ?? 'voice',
     callSid: row.call_sid,
-    chatSessionId: row.chat_session_id ?? null,
     reconciliationStatus: row.reconciliation_status,
     reconciledInteractionId: row.reconciled_interaction_id,
     reconciliationCandidate: row.reconciliation_candidate,
@@ -488,26 +479,17 @@ export const supabaseCampaignRepository: CampaignRepository = {
     return (rows ?? []).map(mapRunnableTarget);
   },
 
-  async createExecution(targetId, now, requestPayloadSnapshot, channel) {
+  async createExecution(targetId, now, requestPayloadSnapshot) {
     const row = await rpc<ExecutionRow>('call_center_campaign_create_execution', {
       p_target_id: targetId,
       p_now: now,
       p_request_payload_snapshot: requestPayloadSnapshot ?? null,
-      p_channel: channel ?? 'voice',
     });
     return mapExecution(row);
   },
 
   async markExecutionTriggered(executionId, callSid, now) {
     await rpc<null>('call_center_campaign_mark_execution_triggered', { p_execution_id: executionId, p_call_sid: callSid, p_now: now });
-  },
-
-  async markExecutionChatSent(executionId, chatSessionId, now) {
-    await rpc<null>('call_center_campaign_mark_execution_chat_sent', {
-      p_execution_id: executionId,
-      p_chat_session_id: chatSessionId,
-      p_now: now,
-    });
   },
 
   async markExecutionFailed(executionId, errorDetail) {

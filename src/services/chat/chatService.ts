@@ -27,15 +27,28 @@ export interface SendChatMessageOptions {
    */
   customer360CustomerId?: string;
   /**
-   * Session 11.9A — Campaign Customer mode's real campaign_target id,
-   * when the chat was initiated from a campaign context. Local-only
-   * orchestration signal consumed by useChatSession to record a Chat
-   * campaign_executions row (see campaignsService.ts) — NEVER forwarded
-   * to the backend Chat API itself, exactly like customer360CustomerId.
+   * Session 11.9B — the real campaign this chat was initiated from
+   * (Campaign Customer mode only), and the real campaign_target id
+   * within it — both sourced from an operator-selected, real
+   * campaign_targets row, never inferred. Local-only: persisted onto
+   * this app's own chat_sessions row for correlation, NEVER forwarded
+   * to the backend Chat API and NEVER entered into the Voice
+   * campaign_executions/reconciliation lifecycle (see
+   * docs/SESSION_11_9B_INTEGRATED_CHAT_PERSISTENCE.md for why).
    */
+  campaignId?: string;
   campaignTargetId?: string;
-  /** Display-only, for the collapsed "started from" context after binding — never sent upstream. */
+  /** Display-only, for the collapsed "started from" context after binding — never sent upstream, never persisted. */
   campaignName?: string;
+  /**
+   * Session 11.9B — Trial/Test isolation marker. True whenever the
+   * operator is in Trial/Test mode, regardless of whether manual
+   * identity fields are populated — this is what actually prevents a
+   * manually-typed real CIF/phone from silently becoming Customer 360
+   * production history (see chatInteractionSource.ts). Local-only,
+   * never forwarded to the backend Chat API.
+   */
+  isTrial?: boolean;
 }
 
 export async function sendChatMessage(
@@ -48,11 +61,20 @@ export async function sendChatMessage(
   // this app's own /api/chat route — it is never part of ChatRequestDto
   // (the exact upstream backend contract) and is never forwarded to the
   // backend Chat API.
-  const body: ChatRequestDto & { customer360_customer_id?: string } = { message, session_id: sessionId };
+  const body: ChatRequestDto & {
+    customer360_customer_id?: string;
+    campaign_id?: string;
+    campaign_target_id?: string;
+    is_trial?: boolean;
+  } = { message, session_id: sessionId };
   // agent_id/customer_id/contact_id/caller_name/phone_number are only
   // meaningful on the first message of a session — agent_id binds then
   // and every identity field is resolved once and kept on the session
-  // (Chat_Mode_API.docx). Never sent on a continuing turn.
+  // (Chat_Mode_API.docx). Never sent on a continuing turn. Same rule
+  // for the local-only customer360_customer_id/campaign_id/
+  // campaign_target_id/is_trial fields (Session 11.9B) — none of these
+  // four are ever part of ChatRequestDto (the exact upstream contract);
+  // this app's own /api/chat route strips them before forwarding.
   if (!sessionId) {
     if (opts.agentId) body.agent_id = opts.agentId;
     if (opts.customerId) body.customer_id = opts.customerId;
@@ -60,6 +82,9 @@ export async function sendChatMessage(
     if (opts.callerName) body.caller_name = opts.callerName;
     if (opts.phoneNumber) body.phone_number = opts.phoneNumber;
     if (opts.customer360CustomerId) body.customer360_customer_id = opts.customer360CustomerId;
+    if (opts.campaignId) body.campaign_id = opts.campaignId;
+    if (opts.campaignTargetId) body.campaign_target_id = opts.campaignTargetId;
+    if (opts.isTrial) body.is_trial = opts.isTrial;
   }
 
   const dto = await request<ChatResponseDto & { chatSessionId: string | null; persisted: boolean }>('/chat', {

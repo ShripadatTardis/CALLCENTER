@@ -42,7 +42,14 @@ async function handleSend(req: VercelRequest, res: VercelResponse): Promise<void
     return;
   }
 
-  const body = req.body as (ChatRequestDto & { customer360_customer_id?: string }) | undefined;
+  const body = req.body as
+    | (ChatRequestDto & {
+        customer360_customer_id?: string;
+        campaign_id?: string;
+        campaign_target_id?: string;
+        is_trial?: boolean;
+      })
+    | undefined;
   const message = body?.message;
   if (!message || typeof message !== 'string') {
     res.status(400).json({ detail: 'message is required' });
@@ -111,6 +118,15 @@ async function handleSend(req: VercelRequest, res: VercelResponse): Promise<void
       // customer (see chatService.ts) — never part of upstreamPayload,
       // never sent to the backend.
       customer360CustomerId: body?.customer360_customer_id ?? null,
+      // Session 11.9B — same local-only treatment: never part of
+      // upstreamPayload, never sent to the backend. campaign_id/
+      // campaign_target_id come from a real, operator-selected
+      // campaign_targets row (Campaign Customer mode); is_trial is set
+      // whenever the operator is in Trial/Test mode, independent of
+      // what identity fields were typed.
+      campaignId: body?.campaign_id ?? null,
+      campaignTargetId: body?.campaign_target_id ?? null,
+      isTrial: body?.is_trial ?? false,
     });
     chatSessionId = session.id;
     await supabaseChatRepository.appendMessage(chatSessionId, { role: 'user', rawText: message, now });

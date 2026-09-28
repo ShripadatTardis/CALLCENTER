@@ -20,14 +20,6 @@ export type CampaignTargetStatus =
 /** Trigger Call action's own lifecycle only — never conflated with reconciliation status (plan §8). */
 export type CampaignExecutionStatus = 'queued' | 'triggering' | 'triggered' | 'failed';
 
-/**
- * Session 11.9A — Voice and Chat are channels of the same campaign
- * execution model (docs/SESSION_11_9A_INTEGRATED_INITIATE_CHAT.md).
- * 'voice' is the pre-existing, default value for every execution row
- * created before this field existed.
- */
-export type CampaignExecutionChannel = 'voice' | 'chat';
-
 /** A distinct state machine from execution status (plan §8/§14). */
 export type ReconciliationStatus = 'pending' | 'reconciled' | 'unresolved' | 'error';
 
@@ -159,11 +151,7 @@ export interface CampaignExecution {
   campaignTargetId: string;
   sequence: number;
   status: CampaignExecutionStatus;
-  /** Which channel this attempt used — see CampaignExecutionChannel. */
-  channel: CampaignExecutionChannel;
   callSid: string | null;
-  /** Set only for channel='chat' — the internal chat_sessions.id this attempt sent through, never the upstream session_id. */
-  chatSessionId: string | null;
   reconciliationStatus: ReconciliationStatus;
   reconciledInteractionId: string | null;
   reconciliationCandidate: Record<string, unknown> | null;

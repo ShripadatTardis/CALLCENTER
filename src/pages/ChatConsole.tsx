@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageSquarePlus, MessageCircle } from 'lucide-react';
+import { MessageSquarePlus, MessageCircle, FlaskConical } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useChatSession } from '@/hooks/chat/useChatSession';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatComposer } from '@/components/chat/ChatComposer';
@@ -22,6 +23,7 @@ const ChatConsole: React.FC = () => {
     customerId,
     contactId,
     campaignName,
+    isTrialSession,
     send,
     retry,
     startNewChat,
@@ -63,6 +65,7 @@ const ChatConsole: React.FC = () => {
               resolvedCustomerId={customerId}
               resolvedContactId={contactId}
               boundCampaignName={campaignName}
+              boundIsTrial={isTrialSession}
               onIdentityChange={({ displayLabel: _displayLabel, ...next }) => setIdentity(next)}
               resetKey={resetKey}
             />
@@ -81,9 +84,19 @@ const ChatConsole: React.FC = () => {
 
         <Card className="flex-1 min-h-0 flex flex-col bg-card border-border">
           <CardHeader className="py-2 border-b border-border">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
               <MessageCircle className="h-3.5 w-3.5" />
               Conversation {hasActiveSession && <span className="text-xs text-muted-foreground font-normal">(active session)</span>}
+              {isTrialSession && (
+                <Badge
+                  variant="outline"
+                  className="ml-1 gap-1 shrink-0 border-amber-600/50 bg-amber-500/10 text-amber-700 dark:border-amber-500/40 dark:text-amber-400"
+                  title="Excluded from Customer 360 and campaign analytics"
+                >
+                  <FlaskConical className="h-3 w-3" />
+                  Trial / Test
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col min-h-0 pt-3">

@@ -58,6 +58,9 @@ interface SessionRow {
   is_bank_customer: boolean | null;
   upstream_status: string | null;
   history_doc_id: string | null;
+  campaign_id: string | null;
+  campaign_target_id: string | null;
+  is_trial: boolean;
   created_by: string | null;
   message_count: number;
   latest_intent: string | null;
@@ -85,6 +88,13 @@ function mapSession(row: SessionRow): ChatSessionRecord {
     isBankCustomer: row.is_bank_customer,
     upstreamStatus: row.upstream_status,
     historyDocId: row.history_doc_id,
+    // Defensive fallback: matches the migration's own column defaults,
+    // and covers any environment where
+    // 20261007000000_chat_campaign_context_and_trial_marker.sql has not
+    // yet been applied (the columns are simply absent from the row).
+    campaignId: row.campaign_id ?? null,
+    campaignTargetId: row.campaign_target_id ?? null,
+    isTrial: row.is_trial ?? false,
     createdBy: row.created_by,
     messageCount: row.message_count,
     latestIntent: row.latest_intent,
@@ -144,6 +154,9 @@ export const supabaseChatRepository: ChatRepository = {
       p_upstream_status: identity.upstreamStatus ?? null,
       p_history_doc_id: identity.historyDocId ?? null,
       p_customer360_customer_id: identity.customer360CustomerId ?? null,
+      p_campaign_id: identity.campaignId ?? null,
+      p_campaign_target_id: identity.campaignTargetId ?? null,
+      p_is_trial: identity.isTrial ?? false,
     });
     return mapSession(row);
   },
@@ -213,6 +226,17 @@ export const supabaseChatRepository: ChatRepository = {
         primaryPhoneMasked: r.primary_phone_masked,
       };
     }
+    return out;
+  },
+
+  async getTrialFlags(upstreamSessionIds) {
+    if (upstreamSessionIds.length === 0) return {};
+    const rows = await rpc<Array<{ upstream_session_id: string; is_trial: boolean }>>(
+      'call_center_chat_session_trial_flags',
+      { p_upstream_session_ids: upstreamSessionIds },
+    );
+    const out: Record<string, boolean> = {};
+    for (const r of rows ?? []) out[r.upstream_session_id] = r.is_trial;
     return out;
   },
 };

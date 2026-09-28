@@ -116,6 +116,24 @@ function mapRow(dto: ChatSessionRowDto, preferredCustomerId: string | null = nul
   };
 }
 
+/**
+ * Session 11.9B — Trial/Test isolation. Best-effort: if the trial-flag
+ * lookup itself fails (e.g. the 20261007000000 migration hasn't been
+ * applied to this environment yet), this returns an empty map rather
+ * than throwing — reconciliation for real production Chat sessions
+ * must not break because of a not-yet-applied migration. An empty map
+ * means "no known Trial sessions," i.e. today's pre-11.9B behavior,
+ * not a silent new hole introduced by this change.
+ */
+async function getTrialFlagsSafely(upstreamSessionIds: string[]): Promise<Record<string, boolean>> {
+  try {
+    return await supabaseChatRepository.getTrialFlags(upstreamSessionIds);
+  } catch (err) {
+    console.error('Failed to look up Chat Trial/Test flags (treating as none):', err);
+    return {};
+  }
+}
+
 export const chatInteractionSource: InteractionSourceAdapter = {
   async searchByContactPoint(type, normalizedValue) {
     if (type !== 'phone') return [];
@@ -123,17 +141,31 @@ export const chatInteractionSource: InteractionSourceAdapter = {
     const matched = dto.data.sessions.filter(
       (s) => s.phone_number && s.phone_number.replace(/[^0-9]/g, '') === normalizedValue,
     );
-    const links = await supabaseChatRepository.getCustomerLinks(matched.map((s) => s.session_id));
+    const sessionIds = matched.map((s) => s.session_id);
+    const [links, trialFlags] = await Promise.all([
+      supabaseChatRepository.getCustomerLinks(sessionIds),
+      getTrialFlagsSafely(sessionIds),
+    ]);
     return matched
+      .filter((s) => !trialFlags[s.session_id])
       .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
       .filter((s): s is SourceInteraction => s !== null);
   },
 
   async listPage(page, pageSize) {
     const dto = await fetchSessions({ page: String(page), page_size: String(pageSize) });
-    const links = await supabaseChatRepository.getCustomerLinks(dto.data.sessions.map((s) => s.session_id));
+    const sessionIds = dto.data.sessions.map((s) => s.session_id);
+    const [links, trialFlags] = await Promise.all([
+      supabaseChatRepository.getCustomerLinks(sessionIds),
+      getTrialFlagsSafely(sessionIds),
+    ]);
     return {
       rows: dto.data.sessions
+        // Trial/Test sessions are VoiceForce-local operational context,
+        // never a production Customer 360 interaction — excluded here,
+        // before identity resolution ever sees them, regardless of
+        // whether a manually-typed real phone/CIF is present.
+        .filter((s) => !trialFlags[s.session_id])
         .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
         .filter((s): s is SourceInteraction => s !== null),
       totalPages: dto.data.pagination.total_pages,

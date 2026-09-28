@@ -25,6 +25,11 @@ export interface ChatSessionRecord {
   isBankCustomer: boolean | null;
   upstreamStatus: string | null;
   historyDocId: string | null;
+  /** Session 11.9B — the real campaign_targets row this session was initiated from, if any (Campaign Customer mode only). Never inferred, only ever set at creation. */
+  campaignId: string | null;
+  campaignTargetId: string | null;
+  /** Session 11.9B — set once at creation, permanently fixed. VoiceForce-local marker only; never sent to or read from the Call Centre API. */
+  isTrial: boolean;
   createdBy: string | null;
   messageCount: number;
   latestIntent: string | null;
@@ -55,6 +60,24 @@ export interface NewChatSessionIdentity {
    * (never nulled) by the create/touch RPC once set.
    */
   customer360CustomerId?: string | null;
+  /**
+   * Session 11.9B — the real campaign_targets row id, when this chat
+   * was initiated from Campaign Customer mode. Sourced from a real,
+   * operator-selected target (never inferred), and never sent to the
+   * Call Centre API — this is VoiceForce's own operational context,
+   * kept entirely off the Voice campaign_executions/reconciliation
+   * lifecycle. Preserved (never nulled) by the create/touch RPC once set.
+   */
+  campaignId?: string | null;
+  campaignTargetId?: string | null;
+  /**
+   * Session 11.9B — Trial/Test isolation marker. Set once at session
+   * creation and permanently fixed; a later touch call can neither set
+   * nor clear it. Read by chatInteractionSource.ts to exclude Trial
+   * sessions from Customer 360 materialization regardless of what
+   * identity fields were manually typed in Trial mode.
+   */
+  isTrial?: boolean;
 }
 
 export interface ChatMessageRecord {

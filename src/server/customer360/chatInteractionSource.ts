@@ -117,19 +117,34 @@ function mapRow(dto: ChatSessionRowDto, preferredCustomerId: string | null = nul
 }
 
 /**
- * Session 11.9B — Trial/Test isolation. Best-effort: if the trial-flag
- * lookup itself fails (e.g. the 20261007000000 migration hasn't been
- * applied to this environment yet), this returns an empty map rather
- * than throwing — reconciliation for real production Chat sessions
- * must not break because of a not-yet-applied migration. An empty map
- * means "no known Trial sessions," i.e. today's pre-11.9B behavior,
- * not a silent new hole introduced by this change.
+ * Session 11.9B/11.9C — Trial/Test isolation, fail-CLOSED. A session
+ * only ever proceeds into Customer 360 identity resolution when its
+ * trial flag is AFFIRMATIVELY known to be false — `trialFlags[id] ===
+ * false`, checked explicitly by every call site below, never a bare
+ * falsy/`!trialFlags[id]` check. That single discipline covers both
+ * failure modes uniformly, with no separate error path needed:
+ *   - the whole lookup throws (e.g. the 20261007000000 migration isn't
+ *     applied in this environment yet) -> this catches it and returns
+ *     {} -> every id is `undefined` -> excluded;
+ *   - the lookup succeeds but a specific session_id is absent from the
+ *     result (no local chat_sessions row for it) -> also `undefined`
+ *     for that id -> also excluded.
+ * An unknown/undetermined session is therefore excluded from THIS
+ * reconciliation run rather than silently treated as production —
+ * it becomes eligible again the next time reconciliation runs and the
+ * lookup can be answered. Logged for operational diagnosis; real
+ * production Chat reconciliation is unaffected whenever the lookup
+ * succeeds and returns `false` for a session (see call sites).
  */
 async function getTrialFlagsSafely(upstreamSessionIds: string[]): Promise<Record<string, boolean>> {
   try {
     return await supabaseChatRepository.getTrialFlags(upstreamSessionIds);
   } catch (err) {
-    console.error('Failed to look up Chat Trial/Test flags (treating as none):', err);
+    console.error(
+      `Failed to look up Chat Trial/Test flags for ${upstreamSessionIds.length} session(s) — ` +
+        'failing closed: none of them will proceed into Customer 360 reconciliation this run.',
+      err,
+    );
     return {};
   }
 }
@@ -147,7 +162,9 @@ export const chatInteractionSource: InteractionSourceAdapter = {
       getTrialFlagsSafely(sessionIds),
     ]);
     return matched
-      .filter((s) => !trialFlags[s.session_id])
+      // Fail-closed: only an AFFIRMATIVELY-known-false flag proceeds.
+      // true (Trial) and undefined (unknown/lookup failed) are both excluded.
+      .filter((s) => trialFlags[s.session_id] === false)
       .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
       .filter((s): s is SourceInteraction => s !== null);
   },
@@ -165,7 +182,10 @@ export const chatInteractionSource: InteractionSourceAdapter = {
         // never a production Customer 360 interaction — excluded here,
         // before identity resolution ever sees them, regardless of
         // whether a manually-typed real phone/CIF is present.
-        .filter((s) => !trialFlags[s.session_id])
+        // Fail-closed (Session 11.9C): only an AFFIRMATIVELY-known-false
+        // flag proceeds. true (Trial) and undefined (unknown/lookup
+        // failed, or no local row for this session) are both excluded.
+        .filter((s) => trialFlags[s.session_id] === false)
         .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
         .filter((s): s is SourceInteraction => s !== null),
       totalPages: dto.data.pagination.total_pages,

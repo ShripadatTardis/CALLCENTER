@@ -1,40 +1,52 @@
 import { getBackendRatioDefinition } from './ratioRegistry.js';
-import { fetchCompleteCallPopulation, rangeToDateWindow, previousDateWindow } from './callPopulationFetcher.js';
-import { RATIO_CALCULATORS, computeComparison } from './ratioMath.js';
-import { computeBreakdownRows, computeTrendPoints, bucketGranularity, groupByDimension } from './ratioDimensions.js';
+import { callPopulationProvider } from './callPopulationProvider.js';
+import { fetchCompleteCallPopulation, previousDateWindow, rangeToDateWindow } from './callPopulationFetcher.js';
+import { computeComparison } from './ratioMath.js';
+import { groupByDimension } from './ratioDimensions.js';
+import type { AggregationProvider, ProviderFilters } from './aggregationProvider.js';
 import type {
   RatioBreakdownResponseDto,
   RatioDriverResponseDto,
   RatioFilterState,
-  RatioInteractionRefDto,
   RatioInteractionsResponseDto,
   RatioSummaryDto,
   RatioTrendResponseDto,
   RatioUnit,
 } from '../../types/ratio.js';
-import type { CallDataEntryDto } from '../../types/api/calls.js';
 
 /**
- * Ratio / Analytics Service — the ONLY place that turns a raw backend
- * fact into a ratio's summary/trend/breakdown/driver/interactions
- * response. api/analytics/metrics.ts's `resource=ratios` branch is a
- * thin transport wrapper around these functions; no business logic
- * lives there.
+ * Ratio / Analytics Service — the ONLY place that turns an
+ * AggregationProvider's raw result into a ratio's public
+ * summary/trend/breakdown/driver/interactions DTO.
+ * api/analytics/metrics.ts's `resource=ratios` branch is a thin
+ * transport wrapper around these functions; no business logic lives
+ * there.
  *
- * Session R2 scope: FCR, Escalation Rate, and AHT are now genuinely
- * implemented end-to-end (summary/trend/breakdown/interactions, plus
- * drivers for escalation_rate only) over the COMPLETE qualifying call
- * population, fetched server-side via
- * src/server/analytics/callPopulationFetcher.ts — never a single page,
- * never browser-side aggregation. Every other ratio (whatever its
- * registry classification) still returns the same honest R1 "not yet
- * instrumented" shape for every view — this session does not touch
- * them, per the prompt's explicit "do not implement the remaining
- * ratios" boundary.
+ * Session R3: this file now depends on the AggregationProvider
+ * interface (aggregationProvider.ts) rather than orchestrating
+ * fetch+compute inline — `provider` below is the only place that
+ * decides WHICH provider runs. Swapping in a future backend-native
+ * provider is a one-line change here; nothing else in this file, the
+ * API route, or the Ratio Explorer needs to change.
+ *
+ * Implemented ratios (R2: fcr, escalation_rate, aht; R3 adds
+ * resolution_rate, successful_resolution_time). completion_rate
+ * remains explicitly unavailable — see ratioRegistry.ts's
+ * eligibilityNote and docs/SESSION_R3_RATIO_FACT_DERIVED_AND_AGGREGATION_CONTRACT.md.
+ * Every other ratio still returns the R1 "not yet instrumented" shape.
  */
 
-const R2_IMPLEMENTED_RATIOS = new Set(['fcr', 'escalation_rate', 'aht']);
-const UNIT_FOR: Record<string, RatioUnit> = { fcr: 'percent', escalation_rate: 'percent', aht: 'seconds' };
+const provider: AggregationProvider = callPopulationProvider;
+
+const IMPLEMENTED_RATIOS = new Set(['fcr', 'escalation_rate', 'aht', 'resolution_rate', 'successful_resolution_time']);
+const UNIT_FOR: Record<string, RatioUnit> = {
+  fcr: 'percent',
+  escalation_rate: 'percent',
+  resolution_rate: 'percent',
+  aht: 'seconds',
+  successful_resolution_time: 'seconds',
+};
+const PERCENT_RATIOS = new Set(['fcr', 'escalation_rate', 'resolution_rate']);
 
 function emptySummary(ratioId: string, filters: RatioFilterState, unavailableReason: string): RatioSummaryDto {
   return {
@@ -54,73 +66,27 @@ function emptySummary(ratioId: string, filters: RatioFilterState, unavailableRea
   };
 }
 
-/**
- * Applies the breakdown/breakdownValue filter (a dimension not natively
- * supported by the call-data query API — intent/agent/campaign) on an
- * already-fetched population, server-side. direction/outcome ARE native
- * query params and are applied by callPopulationFetcher itself before
- * this ever runs, so filtering here is only for the remaining
- * dimensions — never a second copy of server-side filtering for the
- * same field.
- */
-function applyDrillFilter(calls: CallDataEntryDto[], filters: RatioFilterState): CallDataEntryDto[] {
-  if (!filters.breakdown || !filters.breakdownValue) return calls;
-  if (filters.breakdown === 'direction' || filters.breakdown === 'outcome') return calls; // already applied server-side by the population fetch
-  const value = filters.breakdownValue;
-  return calls.filter((c) => {
-    switch (filters.breakdown) {
-      case 'intent':
-        return c.intent === value;
-      case 'agent':
-        return (c.ai_agent_name || c.ai_agent_id) === value;
-      case 'campaign':
-        return c.campaign_name === value;
-      case 'escalation_reason':
-        return c.escalation_trigger === value;
-      default:
-        return true;
-    }
-  });
-}
-
-async function fetchPopulationForFilters(filters: RatioFilterState) {
-  const { dateFrom, dateTo } = rangeToDateWindow(filters.range);
-  const result = await fetchCompleteCallPopulation({
-    dateFrom,
-    dateTo,
-    direction: filters.direction,
-    outcome: filters.breakdown === 'outcome' && filters.breakdownValue ? (filters.breakdownValue as never) : undefined,
-  });
-  return { ...result, calls: applyDrillFilter(result.calls, filters), dateFrom, dateTo };
-}
-
 export async function getRatioSummary(ratioId: string, filters: RatioFilterState): Promise<RatioSummaryDto> {
   const def = getBackendRatioDefinition(ratioId);
   if (!def) return emptySummary(ratioId, filters, 'Unknown ratio ID.');
-  if (!R2_IMPLEMENTED_RATIOS.has(ratioId)) {
+  if (!IMPLEMENTED_RATIOS.has(ratioId)) {
     return emptySummary(ratioId, filters, def.unavailableReason ?? 'Not yet instrumented in this release.');
   }
 
-  let population: Awaited<ReturnType<typeof fetchPopulationForFilters>>;
+  let result: Awaited<ReturnType<AggregationProvider['getSummary']>>;
   try {
-    population = await fetchPopulationForFilters(filters);
+    result = await provider.getSummary(ratioId, filters);
   } catch {
     return emptySummary(ratioId, filters, 'Live call data temporarily unavailable — Call Centre did not respond.');
   }
 
-  const calculate = RATIO_CALCULATORS[ratioId];
-  const agg = calculate(population.calls);
-
   let comparison = null;
-  const prevWindow = previousDateWindow(population.dateFrom, population.dateTo);
   try {
-    const prevResult = await fetchCompleteCallPopulation({
-      dateFrom: prevWindow.dateFrom,
-      dateTo: prevWindow.dateTo,
-      direction: filters.direction,
-    });
-    const prevAgg = calculate(applyDrillFilter(prevResult.calls, filters));
-    comparison = computeComparison(agg.value, prevAgg.value, UNIT_FOR[ratioId] === 'percent');
+    const { dateFrom, dateTo } = rangeToDateWindow(filters.range);
+    const prevWindow = previousDateWindow(dateFrom, dateTo);
+    const prevFilters: ProviderFilters = { ...filters, dateOverride: prevWindow };
+    const prevResult = await provider.getSummary(ratioId, prevFilters);
+    comparison = computeComparison(result.value, prevResult.value, PERCENT_RATIOS.has(ratioId));
   } catch {
     comparison = null; // a real previous-period fetch failure -> no comparison, never a fabricated one
   }
@@ -128,23 +94,23 @@ export async function getRatioSummary(ratioId: string, filters: RatioFilterState
   return {
     ratioId,
     availability: 'direct',
-    value: agg.value,
+    value: result.value,
     unit: UNIT_FOR[ratioId],
-    numerator: agg.numerator,
-    denominator: agg.denominator,
-    population: population.calls.length,
+    numerator: result.numerator,
+    denominator: result.denominator,
+    population: result.population,
     comparison,
     dataFreshness: new Date().toISOString(),
-    unavailableReason: agg.denominator === 0 ? 'No qualifying interactions in this window.' : null,
+    unavailableReason: result.denominator === 0 ? 'No qualifying interactions in this window.' : null,
     filtersEcho: filters,
-    populationCapped: population.capped,
-    trueTotalRecords: population.trueTotalRecords,
+    populationCapped: result.capped,
+    trueTotalRecords: result.trueTotalRecords,
   };
 }
 
 export async function getRatioTrend(ratioId: string, filters: RatioFilterState): Promise<RatioTrendResponseDto> {
   const def = getBackendRatioDefinition(ratioId);
-  if (!def || !R2_IMPLEMENTED_RATIOS.has(ratioId)) {
+  if (!def || !IMPLEMENTED_RATIOS.has(ratioId)) {
     return {
       ratioId,
       availability: def?.availability ?? 'backend_gap',
@@ -155,28 +121,21 @@ export async function getRatioTrend(ratioId: string, filters: RatioFilterState):
     };
   }
 
-  let population: Awaited<ReturnType<typeof fetchPopulationForFilters>>;
+  const granularity = filters.range === '7d' || filters.range === '30d' ? 'day' : 'hour';
+  let result: Awaited<ReturnType<AggregationProvider['getTrend']>>;
   try {
-    population = await fetchPopulationForFilters(filters);
+    result = await provider.getTrend(ratioId, filters, granularity);
   } catch {
-    return {
-      ratioId,
-      availability: 'direct',
-      unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.',
-      points: [],
-      populationCapped: false,
-      trueTotalRecords: null,
-    };
+    return { ratioId, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', points: [], populationCapped: false, trueTotalRecords: null };
   }
 
-  const points = computeTrendPoints(ratioId, population.calls, bucketGranularity(filters.range));
   return {
     ratioId,
     availability: 'direct',
-    unavailableReason: points.length === 0 ? 'No qualifying interactions in this window.' : null,
-    points,
-    populationCapped: population.capped,
-    trueTotalRecords: population.trueTotalRecords,
+    unavailableReason: result.points.length === 0 ? 'No qualifying interactions in this window.' : null,
+    points: result.points,
+    populationCapped: result.capped,
+    trueTotalRecords: result.trueTotalRecords,
   };
 }
 
@@ -196,7 +155,7 @@ export async function getRatioBreakdown(ratioId: string, dimension: string, filt
       trueTotalRecords: null,
     };
   }
-  if (!R2_IMPLEMENTED_RATIOS.has(ratioId)) {
+  if (!IMPLEMENTED_RATIOS.has(ratioId)) {
     return {
       ratioId,
       dimension: dim,
@@ -208,46 +167,44 @@ export async function getRatioBreakdown(ratioId: string, dimension: string, filt
     };
   }
 
-  let population: Awaited<ReturnType<typeof fetchPopulationForFilters>>;
+  let result: Awaited<ReturnType<AggregationProvider['getBreakdown']>>;
   try {
-    population = await fetchPopulationForFilters(filters);
+    result = await provider.getBreakdown(ratioId, filters, dim);
   } catch {
-    return {
-      ratioId,
-      dimension: dim,
-      availability: 'direct',
-      unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.',
-      rows: [],
-      populationCapped: false,
-      trueTotalRecords: null,
-    };
+    return { ratioId, dimension: dim, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', rows: [], populationCapped: false, trueTotalRecords: null };
   }
 
-  const rows = computeBreakdownRows(ratioId, population.calls, dim);
   return {
     ratioId,
     dimension: dim,
     availability: 'direct',
-    unavailableReason: rows.length === 0 ? 'No qualifying interactions carry this dimension in this window.' : null,
-    rows,
-    populationCapped: population.capped,
-    trueTotalRecords: population.trueTotalRecords,
+    unavailableReason: result.rows.length === 0 ? 'No qualifying interactions carry this dimension in this window.' : null,
+    rows: result.rows.map((r) => ({ dimension: dim, dimensionValue: r.dimensionValue, label: r.label, value: r.value, numerator: r.numerator, denominator: r.denominator, population: r.population, comparison: null })),
+    populationCapped: result.capped,
+    trueTotalRecords: result.trueTotalRecords,
   };
 }
 
+/**
+ * Drivers is deliberately NOT part of the AggregationProvider contract
+ * (spec §10 only lists summary/trend/breakdown/interactions) — it stays
+ * a Ratio-Service-level concern that reads the raw population directly,
+ * exactly as it did in R2, since it's a one-ratio special case
+ * (Escalation Rate only), not a generic operation every ratio needs.
+ */
 export async function getRatioDrivers(ratioId: string, filters: RatioFilterState): Promise<RatioDriverResponseDto> {
   const def = getBackendRatioDefinition(ratioId);
   if (!def?.driverDimension) {
     return { ratioId, availability: def?.availability ?? 'backend_gap', unavailableReason: 'This ratio has no defined driver dimension in the registry.', drivers: [] };
   }
-  // R2: only Escalation Rate has a driver dimension implemented (escalation_reason, from the raw escalation_trigger field — no invented taxonomy).
   if (ratioId !== 'escalation_rate') {
     return { ratioId, availability: def.availability, unavailableReason: def.unavailableReason ?? 'Driver decomposition not yet instrumented for this ratio.', drivers: [] };
   }
 
-  let population: Awaited<ReturnType<typeof fetchPopulationForFilters>>;
+  const { dateFrom, dateTo } = rangeToDateWindow(filters.range);
+  let population: Awaited<ReturnType<typeof fetchCompleteCallPopulation>>;
   try {
-    population = await fetchPopulationForFilters(filters);
+    population = await fetchCompleteCallPopulation({ dateFrom, dateTo, direction: filters.direction });
   } catch {
     return { ratioId, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', drivers: [] };
   }
@@ -272,17 +229,6 @@ export async function getRatioDrivers(ratioId: string, filters: RatioFilterState
   };
 }
 
-function toInteractionRef(call: CallDataEntryDto): RatioInteractionRefDto {
-  return {
-    interactionId: call.call_id,
-    channel: 'voice',
-    timestamp: call.start_time,
-    agentLabel: call.ai_agent_name || call.ai_agent_id || null,
-    intent: call.intent || null,
-    outcome: call.outcome || null,
-  };
-}
-
 export async function getRatioInteractions(
   ratioId: string,
   filters: RatioFilterState,
@@ -290,7 +236,7 @@ export async function getRatioInteractions(
   pageSize: number,
 ): Promise<RatioInteractionsResponseDto> {
   const def = getBackendRatioDefinition(ratioId);
-  if (!def || !R2_IMPLEMENTED_RATIOS.has(ratioId)) {
+  if (!def || !IMPLEMENTED_RATIOS.has(ratioId)) {
     return {
       ratioId,
       availability: def?.availability ?? 'backend_gap',
@@ -304,46 +250,22 @@ export async function getRatioInteractions(
     };
   }
 
-  let population: Awaited<ReturnType<typeof fetchPopulationForFilters>>;
+  let result: Awaited<ReturnType<AggregationProvider['getInteractions']>>;
   try {
-    population = await fetchPopulationForFilters(filters);
+    result = await provider.getInteractions(ratioId, filters, page, pageSize);
   } catch {
-    return {
-      ratioId,
-      availability: 'direct',
-      unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.',
-      rows: [],
-      totalCount: 0,
-      page,
-      pageSize,
-      populationCapped: false,
-      trueTotalRecords: null,
-    };
+    return { ratioId, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', rows: [], totalCount: 0, page, pageSize, populationCapped: false, trueTotalRecords: null };
   }
-
-  // Filtered to exactly the same eligibility rule as the ratio itself,
-  // so "the interactions behind this number" is literally true, not an
-  // approximation — e.g. AHT's interaction list excludes stale-duration
-  // rows the same way computeAht does.
-  const eligible =
-    ratioId === 'fcr'
-      ? population.calls
-      : ratioId === 'escalation_rate'
-        ? population.calls.filter((c) => c.outcome === 'resolved' || c.outcome === 'escalated')
-        : population.calls.filter((c) => typeof c.duration_seconds === 'number' && Number.isFinite(c.duration_seconds));
-
-  const start = (page - 1) * pageSize;
-  const rows = eligible.slice(start, start + pageSize).map(toInteractionRef);
 
   return {
     ratioId,
     availability: 'direct',
-    unavailableReason: eligible.length === 0 ? 'No qualifying interactions in this window.' : null,
-    rows,
-    totalCount: eligible.length,
+    unavailableReason: result.totalCount === 0 ? 'No qualifying interactions in this window.' : null,
+    rows: result.rows,
+    totalCount: result.totalCount,
     page,
     pageSize,
-    populationCapped: population.capped,
-    trueTotalRecords: population.trueTotalRecords,
+    populationCapped: result.capped,
+    trueTotalRecords: result.trueTotalRecords,
   };
 }

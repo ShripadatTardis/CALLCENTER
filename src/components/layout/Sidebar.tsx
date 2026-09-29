@@ -125,8 +125,8 @@ export const Sidebar: React.FC = () => {
             aria-label="Product navigation"
             className="absolute left-[52px] top-0 h-full w-64 bg-sidebar border-r border-sidebar-border shadow-2xl z-50 flex flex-col text-sidebar-foreground"
           >
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-sidebar-border shrink-0">
-              <img src="/lovable-uploads/voiceforce-logo.png" alt="VoiceForce" className="h-8 w-auto rounded bg-white px-1.5 py-1" />
+            <div className="flex items-center justify-between px-3 py-3 border-b border-sidebar-border shrink-0">
+              <img src="/lovable-uploads/voiceforce-logo.png" alt="VoiceForce" className="h-16 w-auto rounded bg-white px-2.5 py-2" />
               <button
                 type="button"
                 aria-label="Close navigation"

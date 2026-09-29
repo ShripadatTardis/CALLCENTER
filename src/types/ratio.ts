@@ -15,6 +15,21 @@
 /** Spec §12 — DIRECT (backend exposes it), DERIVED (service can compute it from real fields), PARTIAL (a real signal exists but the production-grade definition needs another field/taxonomy), BACKEND_GAP (no telemetry yet — must render an honest unavailable state). */
 export type RatioAvailability = 'direct' | 'derived' | 'partial' | 'backend_gap';
 
+/**
+ * Session R4.3 — RUNTIME health/outcome of a single request, kept
+ * strictly separate from `RatioAvailability` (measurement
+ * capability/provenance, set once per ratio by the registry). A
+ * `direct` ratio's availability never changes because of a transient
+ * runtime failure; only its `runtimeState` does.
+ *
+ * - `live` — request succeeded, a valid qualifying population/value exists.
+ * - `no_data` — request succeeded, zero records qualify. Not an error.
+ * - `not_instrumented` — ratio definition exists but isn't implemented/telemetry doesn't exist yet.
+ * - `upstream_rejected` — Call Centre is reachable but rejected the request (4xx — auth/validation/contract mismatch). See `httpStatus`.
+ * - `upstream_unavailable` — genuine connectivity/timeout/5xx/unreachable condition.
+ */
+export type RatioRuntimeState = 'live' | 'no_data' | 'not_instrumented' | 'upstream_rejected' | 'upstream_unavailable';
+
 export type RatioFamily = 'operations' | 'intelligence' | 'quality' | 'business';
 
 export type RatioUnit = 'percent' | 'seconds' | 'count' | 'score' | 'currency';
@@ -54,6 +69,10 @@ export interface RatioComparison {
 export interface RatioSummaryDto {
   ratioId: string;
   availability: RatioAvailability;
+  /** Session R4.3 — see RatioRuntimeState. */
+  runtimeState: RatioRuntimeState;
+  /** Raw HTTP status Call Centre returned, only when runtimeState is 'upstream_rejected'/'upstream_unavailable' with a real response (never for a network-level failure). */
+  httpStatus: number | null;
   /** Null whenever availability is 'backend_gap' or the value genuinely could not be computed — never fabricated. */
   value: number | null;
   unit: RatioUnit;
@@ -91,6 +110,8 @@ export interface RatioTrendPointDto {
 export interface RatioTrendResponseDto {
   ratioId: string;
   availability: RatioAvailability;
+  runtimeState: RatioRuntimeState;
+  httpStatus: number | null;
   unavailableReason: string | null;
   points: RatioTrendPointDto[];
   populationCapped: boolean;
@@ -112,6 +133,8 @@ export interface RatioBreakdownResponseDto {
   ratioId: string;
   dimension: RatioDimension;
   availability: RatioAvailability;
+  runtimeState: RatioRuntimeState;
+  httpStatus: number | null;
   unavailableReason: string | null;
   rows: RatioBreakdownRowDto[];
   populationCapped: boolean;
@@ -128,6 +151,8 @@ export interface RatioDriverRowDto {
 export interface RatioDriverResponseDto {
   ratioId: string;
   availability: RatioAvailability;
+  runtimeState: RatioRuntimeState;
+  httpStatus: number | null;
   unavailableReason: string | null;
   drivers: RatioDriverRowDto[];
 }
@@ -151,6 +176,8 @@ export interface RatioInteractionRefDto {
 export interface RatioInteractionsResponseDto {
   ratioId: string;
   availability: RatioAvailability;
+  runtimeState: RatioRuntimeState;
+  httpStatus: number | null;
   unavailableReason: string | null;
   rows: RatioInteractionRefDto[];
   /** Count of matching records actually found within the (possibly capped) fetched population — see populationCapped. */

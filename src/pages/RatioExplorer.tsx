@@ -102,9 +102,10 @@ const RatioExplorer: React.FC = () => {
           summary={summaryQuery.data}
           isLoading={summaryQuery.isLoading}
           isError={summaryQuery.isError}
+          onRetry={() => summaryQuery.refetch()}
         />
 
-        <RatioTrend trend={trendQuery.data} isLoading={trendQuery.isLoading} />
+        <RatioTrend trend={trendQuery.data} isLoading={trendQuery.isLoading} onRetry={() => trendQuery.refetch()} />
 
         <section className="space-y-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -127,12 +128,13 @@ const RatioExplorer: React.FC = () => {
                 setFilter('breakdownValue', value);
                 setInteractionsPage(1);
               }}
+              onRetry={() => breakdownQuery.refetch()}
             />
           )}
         </section>
 
         {hasBreakdownValue && definition.declaredDriverDimension && (
-          <DriverPanel drivers={driversQuery.data} isLoading={driversQuery.isLoading} hasDriverDimension />
+          <DriverPanel drivers={driversQuery.data} isLoading={driversQuery.isLoading} hasDriverDimension onRetry={() => driversQuery.refetch()} />
         )}
 
         {hasDrillLayer && (
@@ -141,6 +143,7 @@ const RatioExplorer: React.FC = () => {
             isLoading={interactionsQuery.isLoading}
             page={interactionsPage}
             onPageChange={setInteractionsPage}
+            onRetry={() => interactionsQuery.refetch()}
           />
         )}
       </div>

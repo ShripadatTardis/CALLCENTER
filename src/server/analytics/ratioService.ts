@@ -1,6 +1,6 @@
 import { getBackendRatioDefinition } from './ratioRegistry.js';
 import { callPopulationProvider } from './callPopulationProvider.js';
-import { fetchCompleteCallPopulation, previousDateWindow, rangeToDateWindow } from './callPopulationFetcher.js';
+import { CallDataFetchError, fetchCompleteCallPopulation, previousDateWindow, rangeToDateWindow } from './callPopulationFetcher.js';
 import { computeComparison } from './ratioMath.js';
 import { groupByDimension } from './ratioDimensions.js';
 import type { AggregationProvider, ProviderFilters } from './aggregationProvider.js';
@@ -9,10 +9,34 @@ import type {
   RatioDriverResponseDto,
   RatioFilterState,
   RatioInteractionsResponseDto,
+  RatioRuntimeState,
   RatioSummaryDto,
   RatioTrendResponseDto,
   RatioUnit,
 } from '../../types/ratio.js';
+
+/**
+ * Session R4.3 — classifies a caught fetch failure into the two
+ * user-visible runtime states that distinguish "Call Centre answered
+ * but rejected us" from "Call Centre is genuinely unreachable" (see
+ * CallDataFetchError's own doc comment for why this distinction
+ * matters). Returns a safe, human-readable reason that includes the
+ * raw status code when known — never response body/headers/secrets.
+ */
+function classifyFetchFailure(err: unknown): { runtimeState: RatioRuntimeState; httpStatus: number | null; reason: string } {
+  if (err instanceof CallDataFetchError && err.kind === 'rejected') {
+    return {
+      runtimeState: 'upstream_rejected',
+      httpStatus: err.status,
+      reason: `Call Centre rejected this request (HTTP ${err.status}). This is a request-contract problem, not an outage.`,
+    };
+  }
+  return {
+    runtimeState: 'upstream_unavailable',
+    httpStatus: err instanceof CallDataFetchError ? err.status : null,
+    reason: 'Call Centre is currently unreachable — this may be a transient connectivity issue.',
+  };
+}
 
 /**
  * Ratio / Analytics Service — the ONLY place that turns an
@@ -48,10 +72,18 @@ const UNIT_FOR: Record<string, RatioUnit> = {
 };
 const PERCENT_RATIOS = new Set(['fcr', 'escalation_rate', 'resolution_rate']);
 
-function emptySummary(ratioId: string, filters: RatioFilterState, unavailableReason: string): RatioSummaryDto {
+function emptySummary(
+  ratioId: string,
+  filters: RatioFilterState,
+  unavailableReason: string,
+  runtimeState: RatioRuntimeState,
+  httpStatus: number | null = null,
+): RatioSummaryDto {
   return {
     ratioId,
     availability: getBackendRatioDefinition(ratioId)?.availability ?? 'backend_gap',
+    runtimeState,
+    httpStatus,
     value: null,
     unit: UNIT_FOR[ratioId] ?? 'percent',
     numerator: null,
@@ -68,16 +100,17 @@ function emptySummary(ratioId: string, filters: RatioFilterState, unavailableRea
 
 export async function getRatioSummary(ratioId: string, filters: RatioFilterState): Promise<RatioSummaryDto> {
   const def = getBackendRatioDefinition(ratioId);
-  if (!def) return emptySummary(ratioId, filters, 'Unknown ratio ID.');
+  if (!def) return emptySummary(ratioId, filters, 'Unknown ratio ID.', 'not_instrumented');
   if (!IMPLEMENTED_RATIOS.has(ratioId)) {
-    return emptySummary(ratioId, filters, def.unavailableReason ?? 'Not yet instrumented in this release.');
+    return emptySummary(ratioId, filters, def.unavailableReason ?? 'Not yet instrumented in this release.', 'not_instrumented');
   }
 
   let result: Awaited<ReturnType<AggregationProvider['getSummary']>>;
   try {
     result = await provider.getSummary(ratioId, filters);
-  } catch {
-    return emptySummary(ratioId, filters, 'Live call data temporarily unavailable — Call Centre did not respond.');
+  } catch (err) {
+    const { runtimeState, httpStatus, reason } = classifyFetchFailure(err);
+    return emptySummary(ratioId, filters, reason, runtimeState, httpStatus);
   }
 
   let comparison = null;
@@ -91,9 +124,12 @@ export async function getRatioSummary(ratioId: string, filters: RatioFilterState
     comparison = null; // a real previous-period fetch failure -> no comparison, never a fabricated one
   }
 
+  const hasData = result.denominator !== 0;
   return {
     ratioId,
     availability: 'direct',
+    runtimeState: hasData ? 'live' : 'no_data',
+    httpStatus: null,
     value: result.value,
     unit: UNIT_FOR[ratioId],
     numerator: result.numerator,
@@ -101,7 +137,7 @@ export async function getRatioSummary(ratioId: string, filters: RatioFilterState
     population: result.population,
     comparison,
     dataFreshness: new Date().toISOString(),
-    unavailableReason: result.denominator === 0 ? 'No qualifying interactions in this window.' : null,
+    unavailableReason: hasData ? null : 'No qualifying interactions in this window.',
     filtersEcho: filters,
     populationCapped: result.capped,
     trueTotalRecords: result.trueTotalRecords,
@@ -114,6 +150,8 @@ export async function getRatioTrend(ratioId: string, filters: RatioFilterState):
     return {
       ratioId,
       availability: def?.availability ?? 'backend_gap',
+      runtimeState: 'not_instrumented',
+      httpStatus: null,
       unavailableReason: def?.unavailableReason ?? 'Trend not yet instrumented for this ratio.',
       points: [],
       populationCapped: false,
@@ -125,14 +163,18 @@ export async function getRatioTrend(ratioId: string, filters: RatioFilterState):
   let result: Awaited<ReturnType<AggregationProvider['getTrend']>>;
   try {
     result = await provider.getTrend(ratioId, filters, granularity);
-  } catch {
-    return { ratioId, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', points: [], populationCapped: false, trueTotalRecords: null };
+  } catch (err) {
+    const { runtimeState, httpStatus, reason } = classifyFetchFailure(err);
+    return { ratioId, availability: 'direct', runtimeState, httpStatus, unavailableReason: reason, points: [], populationCapped: false, trueTotalRecords: null };
   }
 
+  const hasData = result.points.length > 0;
   return {
     ratioId,
     availability: 'direct',
-    unavailableReason: result.points.length === 0 ? 'No qualifying interactions in this window.' : null,
+    runtimeState: hasData ? 'live' : 'no_data',
+    httpStatus: null,
+    unavailableReason: hasData ? null : 'No qualifying interactions in this window.',
     points: result.points,
     populationCapped: result.capped,
     trueTotalRecords: result.trueTotalRecords,
@@ -149,6 +191,8 @@ export async function getRatioBreakdown(ratioId: string, dimension: string, filt
       ratioId,
       dimension: dim,
       availability: def?.availability ?? 'backend_gap',
+      runtimeState: 'not_instrumented',
+      httpStatus: null,
       unavailableReason: `"${dimension}" is not a supported breakdown dimension for this ratio.`,
       rows: [],
       populationCapped: false,
@@ -160,6 +204,8 @@ export async function getRatioBreakdown(ratioId: string, dimension: string, filt
       ratioId,
       dimension: dim,
       availability: def.availability,
+      runtimeState: 'not_instrumented',
+      httpStatus: null,
       unavailableReason: def.unavailableReason ?? 'Breakdown not yet instrumented for this ratio.',
       rows: [],
       populationCapped: false,
@@ -170,15 +216,19 @@ export async function getRatioBreakdown(ratioId: string, dimension: string, filt
   let result: Awaited<ReturnType<AggregationProvider['getBreakdown']>>;
   try {
     result = await provider.getBreakdown(ratioId, filters, dim);
-  } catch {
-    return { ratioId, dimension: dim, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', rows: [], populationCapped: false, trueTotalRecords: null };
+  } catch (err) {
+    const { runtimeState, httpStatus, reason } = classifyFetchFailure(err);
+    return { ratioId, dimension: dim, availability: 'direct', runtimeState, httpStatus, unavailableReason: reason, rows: [], populationCapped: false, trueTotalRecords: null };
   }
 
+  const hasData = result.rows.length > 0;
   return {
     ratioId,
     dimension: dim,
     availability: 'direct',
-    unavailableReason: result.rows.length === 0 ? 'No qualifying interactions carry this dimension in this window.' : null,
+    runtimeState: hasData ? 'live' : 'no_data',
+    httpStatus: null,
+    unavailableReason: hasData ? null : 'No qualifying interactions carry this dimension in this window.',
     rows: result.rows.map((r) => ({ dimension: dim, dimensionValue: r.dimensionValue, label: r.label, value: r.value, numerator: r.numerator, denominator: r.denominator, population: r.population, comparison: null })),
     populationCapped: result.capped,
     trueTotalRecords: result.trueTotalRecords,
@@ -195,18 +245,19 @@ export async function getRatioBreakdown(ratioId: string, dimension: string, filt
 export async function getRatioDrivers(ratioId: string, filters: RatioFilterState): Promise<RatioDriverResponseDto> {
   const def = getBackendRatioDefinition(ratioId);
   if (!def?.driverDimension) {
-    return { ratioId, availability: def?.availability ?? 'backend_gap', unavailableReason: 'This ratio has no defined driver dimension in the registry.', drivers: [] };
+    return { ratioId, availability: def?.availability ?? 'backend_gap', runtimeState: 'not_instrumented', httpStatus: null, unavailableReason: 'This ratio has no defined driver dimension in the registry.', drivers: [] };
   }
   if (ratioId !== 'escalation_rate') {
-    return { ratioId, availability: def.availability, unavailableReason: def.unavailableReason ?? 'Driver decomposition not yet instrumented for this ratio.', drivers: [] };
+    return { ratioId, availability: def.availability, runtimeState: 'not_instrumented', httpStatus: null, unavailableReason: def.unavailableReason ?? 'Driver decomposition not yet instrumented for this ratio.', drivers: [] };
   }
 
   const { dateFrom, dateTo } = rangeToDateWindow(filters.range);
   let population: Awaited<ReturnType<typeof fetchCompleteCallPopulation>>;
   try {
     population = await fetchCompleteCallPopulation({ dateFrom, dateTo, direction: filters.direction });
-  } catch {
-    return { ratioId, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', drivers: [] };
+  } catch (err) {
+    const { runtimeState, httpStatus, reason } = classifyFetchFailure(err);
+    return { ratioId, availability: 'direct', runtimeState, httpStatus, unavailableReason: reason, drivers: [] };
   }
 
   const escalated = population.calls.filter((c) => c.outcome === 'escalated');
@@ -219,6 +270,8 @@ export async function getRatioDrivers(ratioId: string, filters: RatioFilterState
   return {
     ratioId,
     availability: 'direct',
+    runtimeState: drivers.length === 0 ? 'no_data' : 'live',
+    httpStatus: null,
     unavailableReason:
       drivers.length === 0
         ? total === 0
@@ -240,6 +293,8 @@ export async function getRatioInteractions(
     return {
       ratioId,
       availability: def?.availability ?? 'backend_gap',
+      runtimeState: 'not_instrumented',
+      httpStatus: null,
       unavailableReason: def?.unavailableReason ?? 'Interaction-level drill-down not yet instrumented for this ratio.',
       rows: [],
       totalCount: 0,
@@ -253,14 +308,18 @@ export async function getRatioInteractions(
   let result: Awaited<ReturnType<AggregationProvider['getInteractions']>>;
   try {
     result = await provider.getInteractions(ratioId, filters, page, pageSize);
-  } catch {
-    return { ratioId, availability: 'direct', unavailableReason: 'Live call data temporarily unavailable — Call Centre did not respond.', rows: [], totalCount: 0, page, pageSize, populationCapped: false, trueTotalRecords: null };
+  } catch (err) {
+    const { runtimeState, httpStatus, reason } = classifyFetchFailure(err);
+    return { ratioId, availability: 'direct', runtimeState, httpStatus, unavailableReason: reason, rows: [], totalCount: 0, page, pageSize, populationCapped: false, trueTotalRecords: null };
   }
 
+  const hasData = result.totalCount > 0;
   return {
     ratioId,
     availability: 'direct',
-    unavailableReason: result.totalCount === 0 ? 'No qualifying interactions in this window.' : null,
+    runtimeState: hasData ? 'live' : 'no_data',
+    httpStatus: null,
+    unavailableReason: hasData ? null : 'No qualifying interactions in this window.',
     rows: result.rows,
     totalCount: result.totalCount,
     page,

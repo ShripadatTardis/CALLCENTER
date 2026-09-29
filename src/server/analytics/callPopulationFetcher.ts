@@ -44,6 +44,29 @@ export interface CallPopulationFilters {
   outcome?: string;
 }
 
+/**
+ * Session R4.3 — classifies exactly why a call-data fetch failed, so
+ * ratioService.ts can tell "Call Centre is reachable but rejected our
+ * request" (a 4xx contract/validation problem — the exact class of bug
+ * R4.1 found and fixed) apart from "Call Centre is genuinely
+ * unreachable" (network failure / 5xx). Previously both collapsed into
+ * one generic Error, and ratioService.ts's catch blocks turned BOTH
+ * into the same "Live call data temporarily unavailable" message —
+ * which is exactly how the R4.1 page_size defect went unnoticed for 3
+ * sessions (it looked identical to a real outage). `status` is the raw
+ * HTTP status code only — never response body/headers/secrets.
+ */
+export class CallDataFetchError extends Error {
+  readonly kind: 'rejected' | 'unavailable';
+  readonly status: number | null;
+  constructor(kind: 'rejected' | 'unavailable', message: string, status: number | null = null) {
+    super(message);
+    this.name = 'CallDataFetchError';
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
 async function fetchCallDataPage(
   filters: CallPopulationFilters,
   page: number,
@@ -52,7 +75,7 @@ async function fetchCallDataPage(
   const baseUrl = process.env.VOICEBOT_BASE_URL;
   const apiKey = process.env.VOICEBOT_API_KEY;
   if (!baseUrl || !apiKey) {
-    throw new Error('VOICEBOT_BASE_URL / VOICEBOT_API_KEY are not configured on the server');
+    throw new CallDataFetchError('unavailable', 'VOICEBOT_BASE_URL / VOICEBOT_API_KEY are not configured on the server');
   }
   const query: Record<string, string> = {
     status: 'inactive',
@@ -65,9 +88,22 @@ async function fetchCallDataPage(
   if (filters.outcome) query.outcome = filters.outcome;
 
   const search = new URLSearchParams(query).toString();
-  const res = await fetch(`${baseUrl}/api/v1/call-data?${search}`, { headers: { 'X-API-Key': apiKey } });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/api/v1/call-data?${search}`, { headers: { 'X-API-Key': apiKey } });
+  } catch {
+    // Network-level failure (DNS, connection refused, timeout) — the
+    // exact R2-R4 outage shape: Call Centre was never actually reached.
+    throw new CallDataFetchError('unavailable', 'Call Centre could not be reached.');
+  }
   if (!res.ok) {
-    throw new Error(`call-data request failed: ${res.status}`);
+    // 4xx = Call Centre is up and answered, but rejected the request
+    // (auth, validation, contract mismatch — e.g. the R4.1 page_size
+    // defect). 5xx = Call Centre is up but failing server-side; treated
+    // the same as unreachable for the caller's purposes, since neither
+    // is something the client request itself can be blamed for.
+    const kind = res.status >= 400 && res.status < 500 ? 'rejected' : 'unavailable';
+    throw new CallDataFetchError(kind, `call-data request failed: ${res.status}`, res.status);
   }
   return (await res.json()) as CallDataResponseDto;
 }

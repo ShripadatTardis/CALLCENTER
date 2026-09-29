@@ -7,11 +7,20 @@ export const BreakdownTable: React.FC<{
   breakdown: RatioBreakdownResponseDto | undefined;
   isLoading: boolean;
   onSelectRow: (dimensionValue: string) => void;
-}> = ({ breakdown, isLoading, onSelectRow }) => {
+  onRetry?: () => void;
+}> = ({ breakdown, isLoading, onSelectRow, onRetry }) => {
   if (isLoading) return <div className="text-sm text-muted-foreground p-4">Loading…</div>;
   if (!breakdown) return null;
   if (!breakdown.rows || breakdown.rows.length === 0) {
-    return <RatioUnavailableState reason={breakdown.unavailableReason ?? 'Breakdown not yet instrumented.'} compact />;
+    return (
+      <RatioUnavailableState
+        reason={breakdown.unavailableReason ?? 'Breakdown not yet instrumented.'}
+        runtimeState={breakdown.runtimeState}
+        httpStatus={breakdown.httpStatus}
+        onRetry={onRetry}
+        compact
+      />
+    );
   }
   return (
     <div className="space-y-1.5">

@@ -12,7 +12,7 @@ import type { RatioTrendResponseDto } from '@/types/ratio';
  * tooltip surfaces numerator/denominator/population per point, matching
  * spec's "never show a ratio trend without its population."
  */
-export const RatioTrend: React.FC<{ trend: RatioTrendResponseDto | undefined; isLoading: boolean }> = ({ trend, isLoading }) => {
+export const RatioTrend: React.FC<{ trend: RatioTrendResponseDto | undefined; isLoading: boolean; onRetry?: () => void }> = ({ trend, isLoading, onRetry }) => {
   if (isLoading) {
     return (
       <section>
@@ -87,7 +87,12 @@ export const RatioTrend: React.FC<{ trend: RatioTrendResponseDto | undefined; is
           </details>
         </div>
       ) : (
-        <RatioUnavailableState reason={trend?.unavailableReason ?? 'Trend not yet instrumented.'} />
+        <RatioUnavailableState
+          reason={trend?.unavailableReason ?? 'Trend not yet instrumented.'}
+          runtimeState={trend?.runtimeState}
+          httpStatus={trend?.httpStatus}
+          onRetry={onRetry}
+        />
       )}
     </section>
   );

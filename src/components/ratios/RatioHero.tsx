@@ -26,7 +26,8 @@ export const RatioHero: React.FC<{
   summary: RatioSummaryDto | undefined;
   isLoading: boolean;
   isError: boolean;
-}> = ({ definition, summary: rawSummary, isLoading, isError }) => {
+  onRetry?: () => void;
+}> = ({ definition, summary: rawSummary, isLoading, isError, onRetry }) => {
   // Defensive: treat a malformed (non-object) response the same as "no
   // data" rather than letting a later field access crash — see
   // RatioAvailabilityBadge's identical guard for why this matters under
@@ -43,7 +44,9 @@ export const RatioHero: React.FC<{
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground py-2">Loading…</div>}
-      {isError && !isLoading && <RatioUnavailableState reason="Could not load this ratio right now." compact />}
+      {isError && !isLoading && (
+        <RatioUnavailableState reason="Could not load this ratio right now." runtimeState="upstream_unavailable" onRetry={onRetry} compact />
+      )}
 
       {!isLoading && !isError && summary && summary.value !== null && (
         <div className="flex items-end gap-4 flex-wrap">
@@ -59,7 +62,12 @@ export const RatioHero: React.FC<{
       )}
 
       {!isLoading && !isError && summary && summary.value === null && (
-        <RatioUnavailableState reason={summary.unavailableReason ?? 'Not yet instrumented.'} />
+        <RatioUnavailableState
+          reason={summary.unavailableReason ?? 'Not yet instrumented.'}
+          runtimeState={summary.runtimeState}
+          httpStatus={summary.httpStatus}
+          onRetry={onRetry}
+        />
       )}
 
       {summary?.populationCapped && (

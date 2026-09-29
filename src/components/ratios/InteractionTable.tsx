@@ -10,7 +10,8 @@ export const InteractionTable: React.FC<{
   isLoading: boolean;
   page: number;
   onPageChange: (page: number) => void;
-}> = ({ interactions, isLoading, page, onPageChange }) => {
+  onRetry?: () => void;
+}> = ({ interactions, isLoading, page, onPageChange, onRetry }) => {
   const [openRow, setOpenRow] = useState<RatioInteractionsResponseDto['rows'][number] | null>(null);
 
   if (isLoading) return <div className="text-sm text-muted-foreground p-4">Loading…</div>;
@@ -34,7 +35,13 @@ export const InteractionTable: React.FC<{
         </p>
       )}
       {!interactions.rows || interactions.rows.length === 0 ? (
-        <RatioUnavailableState reason={interactions.unavailableReason ?? 'Interaction drill-down not yet instrumented.'} compact />
+        <RatioUnavailableState
+          reason={interactions.unavailableReason ?? 'Interaction drill-down not yet instrumented.'}
+          runtimeState={interactions.runtimeState}
+          httpStatus={interactions.httpStatus}
+          onRetry={onRetry}
+          compact
+        />
       ) : (
         <>
           <div className="overflow-x-auto border border-border rounded-md bg-card/40">

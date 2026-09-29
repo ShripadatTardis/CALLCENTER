@@ -3,11 +3,12 @@ import { RatioUnavailableState } from './RatioUnavailableState';
 import type { RatioDriverResponseDto } from '@/types/ratio';
 
 /** Spec §4.5 — reason/failure decomposition, only for ratios with a driverDimension. Never invents drivers the backend does not supply. */
-export const DriverPanel: React.FC<{ drivers: RatioDriverResponseDto | undefined; isLoading: boolean; hasDriverDimension: boolean }> = ({
-  drivers,
-  isLoading,
-  hasDriverDimension,
-}) => {
+export const DriverPanel: React.FC<{
+  drivers: RatioDriverResponseDto | undefined;
+  isLoading: boolean;
+  hasDriverDimension: boolean;
+  onRetry?: () => void;
+}> = ({ drivers, isLoading, hasDriverDimension, onRetry }) => {
   if (!hasDriverDimension) return null;
   return (
     <section>
@@ -24,7 +25,13 @@ export const DriverPanel: React.FC<{ drivers: RatioDriverResponseDto | undefined
           ))}
         </div>
       ) : (
-        <RatioUnavailableState reason={drivers?.unavailableReason ?? 'Driver decomposition not yet instrumented.'} compact />
+        <RatioUnavailableState
+          reason={drivers?.unavailableReason ?? 'Driver decomposition not yet instrumented.'}
+          runtimeState={drivers?.runtimeState}
+          httpStatus={drivers?.httpStatus}
+          onRetry={onRetry}
+          compact
+        />
       )}
     </section>
   );

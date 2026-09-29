@@ -34,9 +34,33 @@ The misleading warning banner is a downstream symptom of the same bug, and is it
 
 **This exact class of bug was already found and fixed once before, elsewhere in the codebase** — `CustomerDetail.tsx`'s own `InteractionLookupDialog` hit the identical problem for Customer 360's Voice timeline and was fixed by searching Call Data by the customer's phone number (the field `search` actually matches) and filtering the bounded, paged results down to the exact `call_id` client-side (`findCallByPhoneAndId`, with its own code comment documenting this same root cause, citing `docs/CALL_CENTRE_LIVE_VERIFICATION_POST_OUTAGE.md`). `CampaignDetail.tsx` was simply never updated to the same pattern when it was built.
 
-**Fix** (`src/components/campaigns/CampaignDetail.tsx`): replaced the broken `useCallData({ search: interactionId })` call with the same phone+id lookup pattern (`findCallByPhoneAndId`, bounded to 3 pages × 100 rows, matching `CustomerDetail.tsx`'s existing constants), using the target's own `contactRawValue` (already available and already rendered in the Phone column) as the phone to search by. The dialog's trigger site now looks up the owning target from `targets` (matched by `latestReconciledInteractionId === openInteractionId`) to pass its phone through — no new state variable needed. **Does not touch, weaken, or duplicate the proven `call_sid_equals_call_id` correlation mechanism** — this is a display-layer lookup for an already-reconciled interaction ID, not a new correlation path; no phone/time matching was introduced into reconciliation itself.
+**Fix in commit `92ec1f4`** (`src/components/campaigns/CampaignDetail.tsx`): replaced the broken `useCallData({ search: interactionId })` call with the same phone+id lookup pattern (`findCallByPhoneAndId`, bounded to 3 pages × 100 rows, matching `CustomerDetail.tsx`'s existing constants), using the target's own `contactRawValue` (already available and already rendered in the Phone column) as the phone to search by. **This commit was verified after deployment to be insufficient** — see G.2 follow-up below.
 
-**Status: fixed and verified statically** (`tsc --noEmit` clean, `npm run build` clean, both re-run after this fix). Not yet committed/deployed — see §H.
+### G.2 follow-up — `92ec1f4` was still insufficient; deployed but the drill-down remained broken
+
+**Verified symptom (post-deploy)**: same "Could not load full interaction detail" error, on the same interaction, even though Call Logs opens it successfully with full metadata/recording/transcript. Investigated read-only first, tracing the two paths line by line rather than assuming the phone-search change alone was sufficient.
+
+**Working Call Logs path, traced in full**: `CallLogs.tsx` → `useCallData({status:'inactive', page_size, page, ...filters})` → `useCallData` hook (`src/hooks/calls/useCallData.ts`) resolves `const { user } = useAuth(); const role = user?.role ?? 'unauthenticated';` and calls `fetchCallData(query, role)` → `callsService.ts`'s `fetchCallData` sends `headers: { 'x-user-role': role }` → `api/calls/data.ts` proxies to the real backend, then applies Session 6.2's server-side category authorization: `resolveAccessForRequest(req)` reads that header; unless `access.allCategories || access.authorizedAgentIds === 'all'`, every row is filtered to only agents in the caller's authorized set. The logged-in browser session's role (visible in the screenshots' Operationalize/Observe sidebar sections) resolves to `allCategories: true` or an authorized set that includes `emi-reminder-agent`, so the row survives filtering and the dialog opens with full data — user clicks an already-loaded row object directly (no second fetch), so this path never even exercises the per-ID lookup question.
+
+**Campaign Detail path after `92ec1f4`, traced in full**: `InteractionLookupDialog` → `findCallByPhoneAndId(phone, callId)` → `fetchCallData({search: phone, page, page_size: 100})` — **called with no `role` argument**. `fetchCallData`'s own signature is `fetchCallData(query, role = 'unauthenticated')` — a documented fail-closed default for callers with no role handy, with an explicit code comment stating "every UI call site should pass the current session's role." `92ec1f4` didn't. Server-side, `resolveAccessForRequest` resolves `'unauthenticated'` to (by design) no authorized categories, so `api/calls/data.ts` filters `calls` down to an **empty array** on every request — independent of whether the phone/pagination/call_id logic was otherwise correct.
+
+**Confirmed empirically, live, read-only** (no auth header vs. the browser's real role, same query):
+```
+GET /api/calls/data?search=%2B919930647652   (no x-user-role header)
+→ {"calls":[], "pagination":{"total_records":6,...}}   — matches the observed failure
+
+GET /api/calls/data?search=%2B919930647652   (x-user-role: call_center_head)
+→ {"calls":[{"call_id":"1f599d20-...", full recording/transcript/metadata present}]}
+```
+This single header is the entire discrepancy — phone value, normalization, pagination (`total_pages: 1`, well within the 3-page bound), and exact `call_id` string comparison were all already correct in `92ec1f4`; none of those needed further changes.
+
+**Why the phone-search fix alone looked plausible but wasn't sufficient**: it correctly fixed the *query shape* (searching by phone instead of by `call_id`, matching `CustomerDetail.tsx`'s established pattern) but did not carry over the *authorization* half of that same established pattern — and it turns out `CustomerDetail.tsx`'s `findCallByPhoneAndId` has this identical gap (it also calls `fetchCallData()` with no role argument). This was not fixed here — it is a separate, pre-existing, out-of-scope latent defect in Customer 360's own Voice interaction lookup, flagged for a future session, not touched by this fix (matches "no unrelated refactoring").
+
+**Fix**: `InteractionLookupDialog` now calls `useAuth()` (same hook `useCallData` already uses) to resolve `role`, threads it through `findCallByPhoneAndId(phone, callId, role)` into `fetchCallData({...}, role)`, and includes `role` in the query key (matching `useCallData`'s own convention, so a role switch never serves a stale/wrong-role cached result). This reuses the exact, proven authorization mechanism the working Call Logs path already relies on — not a fourth lookup variant, just the missing half of the pattern `92ec1f4` was already following.
+
+**Verified live** (read-only, no call/campaign action): the same phone-search query with `x-user-role: call_center_head` now returns the full call record — `call_id`, `voice_record_url` (a signed, time-limited S3 URL), and `detailed_transcript` all present, matching what Call Logs already shows for this interaction.
+
+**Status: fixed and verified statically** (`tsc --noEmit` clean, `npm run build` clean, both re-run after this fix). Not yet committed/deployed.
 
 No telephone call was placed or triggered during this investigation or fix. No `runBatch` was invoked. No campaign was created/started/retried, and no target was made runnable.
 
@@ -204,8 +228,12 @@ Do not create or trigger the test campaign yet — this is the exact controlled 
 
 ## Phase H — G.1/G.2 fix commit and manual SQL apply
 
+**G.1: APPLIED AND VERIFIED FIXED** — the SQL below was run against production; Campaign Detail now shows `1 target`, `Targets (1)`, `1 call triggered`, `100.0% success rate`, and the warning banner is gone. Kept here for the historical record/migration file only.
+
+**G.2: fixed in commit `92ec1f4` (phone-search), but that alone was insufficient — see the G.2 follow-up section above for the real root cause (missing `role` header) and the additional fix now staged, not yet committed.**
+
 **Files changed this phase:**
-- `supabase/migrations/20261009000000_campaign_get_stats_key_casing_fix.sql` — new migration (G.1). **Not yet applied to production** — blocked by the sandbox ("Modify Shared Resources"). Run this exact SQL yourself (Supabase SQL editor, or `supabase db push` / the CLI equivalent you normally use — it is a plain `create or replace function`, safe to run directly, no data migration, no lock beyond the function definition itself):
+- `supabase/migrations/20261009000000_campaign_get_stats_key_casing_fix.sql` — new migration (G.1). **Already applied and verified** by the user directly against production. Included here for the historical record only — no further action needed:
   ```sql
   create or replace function public.call_center_campaign_get(p_id uuid)
   returns jsonb language plpgsql security definer set search_path = call_center, pg_temp as $$

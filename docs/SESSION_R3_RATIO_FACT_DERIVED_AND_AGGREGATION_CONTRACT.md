@@ -1,6 +1,6 @@
 # Session R3 — Extend Fact-Derived Ratios + Backend Aggregation Contract
 
-Extends the R2 Ratio engine to Resolution Rate and Successful Resolution Time, deliberately leaves Completion Rate unavailable (with an honest, specific reason), and introduces the AggregationProvider abstraction so today's Vercel population-fetch implementation is clearly an adapter, not the permanent architectural ceiling. Implemented directly in this session (no subagents). Committed locally as `9dd63be`. Not deployed.
+Extends the R2 Ratio engine to Resolution Rate and Successful Resolution Time, deliberately leaves Completion Rate unavailable (with an honest, specific reason), and introduces the AggregationProvider abstraction so today's Vercel population-fetch implementation is clearly an adapter, not the permanent architectural ceiling. Implemented directly in this session (no subagents). Committed locally as `862cba8`. Not deployed.
 
 ## Source semantics discovered
 

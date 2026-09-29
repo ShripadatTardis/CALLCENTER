@@ -233,7 +233,18 @@ No code changes resulted from this update — only this documentation section, a
 
 **No `Start`, `Resume`, `Retry`, `runBatch`, manual reconcile, or Trigger Call action was taken.** The campaign remains `Draft` and structurally cannot be selected by any cron tick until explicitly started.
 
-**EXACT GO ACTION (not yet authorized/performed)**: `POST /api/campaigns?action=start&id=b0de9fae-e9bf-4746-b916-04101cc4dae6` (or the UI's "Start" button on this campaign's detail page) — this is the single action that makes the target eligible for the next `runBatch` cron tick.
+**GO ACTION: AUTHORIZED AND PERFORMED.** The user explicitly authorized `Start` for this campaign only. Performed via the app's own UI (clicked "Start" on the campaign detail page) — same browser-UI mechanism used to build the fixture. Verified immediately after, read-only:
+
+| Check | Result |
+|---|---|
+| Campaign status | `running` ✓ |
+| Target status | still `pending` (Start alone doesn't trigger anything) ✓ |
+| `attempt_count` | `0` ✓ |
+| Executions | `0` ✓ |
+| Results | `0` ✓ |
+| Only runnable target system-wide | confirmed — the eligibility query (`campaigns.status='running'` join) returns exactly this one target and nothing else ✓ |
+
+No `runBatch`, Trigger Call, reconcile, or Retry was invoked. The system is now left untouched, waiting for the scheduled cron windows (2026-09-30 IST: `runBatch` 07:30–08:29, Customer360 reconcile 08:30–09:29, Campaign reconcile 10:30–11:29) to operate the lifecycle unattended.
 
 **Expected sequence once the cron actually fires (or is manually triggered for the first watched test via the Vercel dashboard's "Run now" on the cron job, which is the recommended way to watch the very first run without waiting for the schedule):**
 1. Scheduler invocation: `GET /api/campaigns?action=runBatch&batchSize=5` with `Authorization: Bearer $CRON_SECRET` — visible in Vercel's Cron Jobs log with a 200 response and `{processed:1, triggered:1, failed:0}` (or `failed:1` with a genuine upstream error, per the same honest failure-path semantics already proven in 12.2B).

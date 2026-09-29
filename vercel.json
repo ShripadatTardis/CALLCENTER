@@ -7,6 +7,14 @@
     {
       "path": "/api/customers/admin?action=reconcile&maxPages=2",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/campaigns?action=runBatch&batchSize=5",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/campaigns?action=reconcile&limit=25",
+      "schedule": "0 5 * * *"
     }
   ]
 }

@@ -299,6 +299,26 @@ async function handleReconcile(req: VercelRequest, res: VercelResponse): Promise
   res.status(200).json(result);
 }
 
+/**
+ * Session 12.3 — same narrow scheduler-adapter pattern already proven by
+ * api/customers/admin.ts's Customer 360 Voice reconcile cron: Vercel Cron
+ * only issues GET requests and cannot set custom headers, so it can't
+ * drive the normal POST + X-Admin-Token admin path below. When
+ * CRON_SECRET is set, Vercel automatically attaches
+ * `Authorization: Bearer <CRON_SECRET>` to every Cron invocation of this
+ * deployment. This accepts ONLY that, ONLY for GET, and ONLY for
+ * runBatch/reconcile — manual/admin invocation of either action still
+ * requires the existing POST + X-Admin-Token path unchanged below.
+ * Deliberately duplicated (not imported) from admin.ts's identical
+ * check — both are tiny, self-contained, and keeping them local avoids
+ * coupling two otherwise-independent route files for a 4-line function.
+ */
+function isAuthorizedCronRequest(req: VercelRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return req.headers.authorization === `Bearer ${secret}`;
+}
+
 const GET_ACTIONS = new Set(['list', 'get', 'listTargets']);
 const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile']);
 
@@ -307,11 +327,27 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
 
   const action = queryStr(req, 'action') ?? '';
 
-  if (ADMIN_ACTIONS.has(action)) {
+  // Cron path: a GET on runBatch/reconcile is ONLY ever the scheduler —
+  // reject outright with a clear message if CRON_SECRET auth fails,
+  // rather than falling through into the admin-token check (which would
+  // report a confusing "missing admin token" for what is actually a
+  // missing/invalid cron authorization). Manual/admin invocation of
+  // either action is unaffected: it still comes in as POST, which never
+  // reaches this branch.
+  let isCronAuthorized = false;
+  if (ADMIN_ACTIONS.has(action) && req.method === 'GET') {
+    if (!isAuthorizedCronRequest(req)) {
+      res.status(401).json({ detail: 'Invalid or missing cron authorization' });
+      return;
+    }
+    isCronAuthorized = true;
+  }
+
+  if (ADMIN_ACTIONS.has(action) && !isCronAuthorized) {
     if (!requireAdminToken(req, res)) return;
   }
 
-  const wantsGet = GET_ACTIONS.has(action);
+  const wantsGet = GET_ACTIONS.has(action) || isCronAuthorized;
   if (wantsGet && req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     res.status(405).json({ detail: 'Method not allowed. Use GET.' });

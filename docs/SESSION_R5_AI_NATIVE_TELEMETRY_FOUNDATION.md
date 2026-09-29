@@ -1,6 +1,6 @@
 # Session R5 — AI-Native Telemetry Foundation
 
-Establishes the `interaction_events` fact model, its storage/repository/validation layers, and the future-ratio mapping R6 needs — without implementing any AI-native ratio calculation and without disturbing any existing Ratio/UI code. Implemented directly in this session (no subagents). Committed locally as `dc5f1a2`. **Migration authored, NOT applied to the live database** (see §7/§18). Not deployed.
+Establishes the `interaction_events` fact model, its storage/repository/validation layers, and the future-ratio mapping R6 needs — without implementing any AI-native ratio calculation and without disturbing any existing Ratio/UI code. Implemented directly in this session (no subagents). Committed locally as `5920732`. **Migration authored, NOT applied to the live database** (see §7/§18). Not deployed.
 
 ## 1. Repository reconnaissance
 

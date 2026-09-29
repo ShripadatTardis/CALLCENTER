@@ -27,12 +27,11 @@ export const ContextBar: React.FC<ContextBarProps> = ({ children }) => {
       <div className="flex items-center gap-3 min-w-0">
         {/* Product identity — the sole persistent home for TARDIS/VoiceForce branding. */}
         <div className="flex items-center gap-1.5 shrink-0" aria-label="TARDIS VoiceForce">
-          <div
-            className="w-6 h-6 rounded bg-cyan-600 flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-            aria-hidden="true"
-          >
-            TAR
-          </div>
+          <img
+            src="/lovable-uploads/6138fbbf-ad76-48a4-b751-54274a6fcfa3.png"
+            alt="TARDIS"
+            className="w-6 h-6 rounded shrink-0"
+          />
           <div className="leading-none">
             <div className="text-sm font-bold text-foreground">VoiceForce</div>
             <div className="text-[10px] text-muted-foreground truncate max-w-[160px] hidden sm:block">

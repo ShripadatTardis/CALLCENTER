@@ -60,7 +60,9 @@ This single header is the entire discrepancy — phone value, normalization, pag
 
 **Verified live** (read-only, no call/campaign action): the same phone-search query with `x-user-role: call_center_head` now returns the full call record — `call_id`, `voice_record_url` (a signed, time-limited S3 URL), and `detailed_transcript` all present, matching what Call Logs already shows for this interaction.
 
-**Status: fixed and verified statically** (`tsc --noEmit` clean, `npm run build` clean, both re-run after this fix). Not yet committed/deployed.
+**Status: fixed, committed (`1b96977`), deployed, and verified server-side.** Deployment `dpl_36UA7A8Mw8eeotTqpMTNbBjsAQwg` (`callcenter-3d8ixmbok-sk-tardis-projects.vercel.app`), confirmed newest "Ready"/"Production" via `vercel ls`, `callcenter-three-livid.vercel.app` aliased to it and responding HTTP 200. Post-deploy, re-ran the exact role-authorized Call Data query against the live proxy: `1f599d20-c84a-4167-9c74-fb48780c78ef` found, with `voice_record_url` and a non-empty `detailed_transcript` present. Re-verified read-only that the campaign remains `paused`, the target remains `completed`/`attempt_count: 2`/`effective_result_id` unchanged, and both executions (`788dd055-...` failed/historical, `2f3ac161-...` reconciled) are byte-for-byte unchanged — no mutation occurred from this deploy or its verification.
+
+**UI verification: not performed by this session** — no authenticated browser session was available (this app's auth is client-side/localStorage-only, per the documented no-server-auth limitation; no credentials were available or guessed). Every check possible without a browser session was completed and passed. **Single remaining UI action for the user**: open Campaign Detail for `63dff09b-9db4-43ea-b59c-3242662da8be`, click "Transcript / Recording" on the completed target, and confirm the dialog opens with real transcript/recording content instead of the error.
 
 No telephone call was placed or triggered during this investigation or fix. No `runBatch` was invoked. No campaign was created/started/retried, and no target was made runnable.
 

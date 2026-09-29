@@ -117,3 +117,49 @@ Recommended order: **A first** (the single highest-leverage fix in this entire a
 ## CAMPAIGN PHASE E UNTOUCHED: YES — confirmed via two read-only queries at the end of this audit: campaign `b0de9fae-...` still `running`, target `7c319e38-...` still `pending`/`attempt_count: 0`. No Campaign code, config, or state was written to.
 
 Stopping here per the session's explicit instruction — no implementation performed. Awaiting your review before starting §9-A.
+
+---
+
+## §10 Scope A — implemented, deployed, live-verified (approved and executed)
+
+**Correction accuracy note, as explicitly requested**: the pre-fix production condition was that the Ratio population-fetch path returned `HTTP 422` on every request because it requested `page_size=200` against a backend whose real maximum is `100`. This is a request-parameter defect in this repository's code, confirmed by direct reproduction (§3 above). It is **not** attributable to the R2/R3/R4 backend outages — those were genuine, separate, full-host unreachability events (DNS resolved, TCP connect timed out), verified independently in each of those sessions. The two conditions happened to produce an identical user-facing symptom ("Live call data temporarily unavailable"), which is exactly why the parameter defect went undetected for three sessions — but they are unrelated causes, and this document does not attribute the earlier failures to the backend.
+
+**Fix applied** (`src/server/analytics/callPopulationFetcher.ts`): `DEFAULT_PAGE_SIZE: 200 → 100`, `DEFAULT_MAX_PAGES: 15 → 30` — preserves the exact same disclosed 3000-record population cap (100 × 30 = 3000, unchanged from R2/R3). No ratio definition, formula, eligibility rule, or UI semantic was touched.
+
+**Static verification**: `tsc --noEmit` clean, `npm run build` clean, `npm run lint` — 117 errors/36 warnings, exact baseline match (lint ran successfully this time, not environment-blocked).
+
+**Deployed**: commit `101140f` (bundled with the R4.2 UX refinement — see that session's own report for the UX half), deployment `dpl_FSENzfbSGvzmkVY1iR13a83u5gbn`, confirmed `callcenter-three-livid.vercel.app` aliased to it.
+
+**Live verification, against the deployed instance, all 5 Direct ratios, `range=30d`, real population (not backend summary):**
+
+| Ratio | Value | Numerator | Denominator | Population | Comparison (prev) |
+|---|---|---|---|---|---|
+| FCR | 8.2% | 21 | 257 | 257 | 12.5% (−4.3pp) |
+| Escalation Rate | 91.1% | 215 | 236 | 257 | 87.5% (+3.6pp) |
+| AHT | 29s | 7415 (sum) | 257 | 257 | 28s (+1s) |
+| Resolution Rate | 8.9% | 21 | 236 | 257 | 12.5% (−3.6pp) |
+| Successful Resolution Time | 45s | 955 (sum) | 21 | 257 | 21s (+24s) |
+
+No `422`, no `unavailableReason`, for any ratio, in any view. **Trend** (real bucketed points, e.g. FCR's 30-day series), **breakdown** (real per-dimension rows, e.g. FCR by `intent`), and **interactions drill-down** (real rows with `interactionId`/`agentLabel`/`intent`/`outcome`) all independently confirmed live and working — the full R2/R3-built engine, not just summary.
+
+**Population/cap**: 257 records for the 30-day window (well under the 3000 cap) — `populationCapped: false` for every ratio, as expected; the cap mechanism itself was not re-exercised (would require >3000 real records in one window, which doesn't exist in this dataset) but its logic is unchanged from R2/R3 and untouched by this fix.
+
+**No reliance on the backend's own summary aggregate anywhere** — every value above is computed from the raw per-call population fetched via the (now-fixed) `callPopulationFetcher.ts`, per R2's original architecture. The Escalation Rate finding from §4 (the backend's own `summary.escalation_rate` doesn't match its own per-call data) is preserved here as evidence and **was not used to change anything** — the implementation continues to compute Escalation Rate purely from raw `outcome` values, exactly as R2/R3 designed it, independent of whatever the backend's own summary object reports.
+
+**Completion Rate**: unchanged, still `partial`. Not implemented. No inference was made from `outcome='dropped'` — the evidence from §4/§6 is preserved in this document as a lead for a future session, contingent on the Voice backend owner confirming what `dropped` actually represents.
+
+**R4.2 compatibility**: confirmed live in the same deployment — the Ratio Catalogue's collapsible families, status filter (All/Direct/Partial/Not yet instrumented), and the single-workspace investigation view (breadcrumb, "← All Ratios", state-preserving return) all render and function correctly together with the now-live ratio data (screenshots taken during this session's verification, not attached to this report).
+
+**Campaign Phase E**: confirmed untouched both before and after this implementation — campaign `b0de9fae-...` still `running`, target `7c319e38-...` still `pending`/`attempt_count: 0`, via read-only queries immediately after the browser verification pass.
+
+### R4.1 SCOPE A: PASS
+### LIVE POPULATION FETCH: PASS
+### FCR: 8.2% / numerator 21 / denominator 257
+### ESCALATION RATE: 91.1% / numerator 215 / denominator 236
+### AHT: 29s / population 257
+### RESOLUTION RATE: 8.9% / numerator 21 / denominator 236
+### SUCCESSFUL RESOLUTION TIME: 45s / population 257
+### 3000 CAP/DISCLOSURE: PASS
+### COMPLETION RATE: HOLD
+### R4.2 COMPATIBILITY: PASS
+### CAMPAIGN PHASE E UNTOUCHED: YES

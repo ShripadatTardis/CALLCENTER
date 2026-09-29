@@ -10,6 +10,38 @@ No telephone call was placed or triggered during this session.
 
 ---
 
+## Phase G — Post-deployment UI verification findings (found and fixed)
+
+Two Campaign Detail page defects were reported after deployment, on the same proven 12.2B test campaign. Both investigated read-only first, per instruction; both turned out to be genuine, pre-existing, verification-blocking, low-risk local Call Centre defects — not caused by this session's automation work, not data problems, and not anything wrong with the proven `call_sid_equals_call_id` correlation. Both fixed.
+
+### G.1 — "0 targets" header/count vs. the correctly-rendered target
+
+**Symptom**: header and "Targets (0)" both showed 0, with a warning banner claiming "0 targets exist for this campaign, but only 1 could be loaded below" — while the one real target rendered correctly underneath (`status: completed`, `Resolved`, `attempts: 2`).
+
+**Root cause — API mapping (key-casing mismatch), not a count/query/resolution bug.** `call_center_campaign_get`'s stats subquery has, since it was first written (Session 9.1), built its `jsonb_build_object` with **camelCase** keys (`targetCount`, `triggeredCount`, `classifiedCount`, `successCount`). The TypeScript mapper that consumes it, `mapStats()` in `supabaseCampaignRepository.ts`, has always read **snake_case** (`row.target_count`, etc.) — the exact convention `call_center_campaign_get`'s sibling function, `call_center_campaign_list` (used by the Campaigns grid/list page), correctly uses. Confirmed live by calling the RPC directly: it genuinely computes `targetCount: 1` (the count logic itself is, and always was, correct) — the TS mapper simply never finds a field by any of its expected snake_case names, so every field silently falls back to `?? 0`. This means **every Campaign Detail page, for every campaign, has always shown 0/0/0/0% stats** — a longstanding defect this session happened to be the first to notice, not something Sessions 12.1–12.3 introduced. (The Campaigns list/grid page is unaffected — it uses the correctly snake_cased `call_center_campaign_list`.)
+
+The misleading warning banner is a downstream symptom of the same bug, and is itself inverted in this exact scenario: it reads `{stats.targetCount} target(s) exist… but only {targets.length} could be loaded`, implying the smaller number is the truth and the larger is a loading gap — here it's the reverse (`stats.targetCount` is the broken value; `targets.length` is the real one). A pre-existing Session 12.1 code comment on this same banner documents a *different*, still-real, still-open latent gap (`listTargets`'s INNER JOIN can silently omit a target whose customer/contact doesn't resolve) — that separate concern is untouched and still correctly out of scope; it did not cause this incident (this target's customer/contact both resolve fine) and is not fixed here.
+
+**Fix**: `supabase/migrations/20261009000000_campaign_get_stats_key_casing_fix.sql` — `create or replace function call_center_campaign_get`, renaming the four stats keys from camelCase to snake_case to match `call_center_campaign_list`'s established convention. The underlying `COUNT`/`JOIN` logic is byte-for-byte unchanged — only the four JSON key names change. Zero TypeScript changes needed (the existing `mapStats()`/`StatsRow` were already correct; the SQL was wrong).
+
+**Status: written, NOT yet applied.** Applying this migration to production (`mcp__supabase__apply_migration`) was blocked by the sandbox's own permission classifier ("Modify Shared Resources") — a real, non-destructive `create or replace function` against the already-existing function, but still correctly treated as a shared-resource write requiring the user's own action. See §H for the exact SQL to run.
+
+### G.2 — Transcript/Recording drill-down fails for the proven reconciled interaction
+
+**Symptom**: clicking "Transcript / Recording" on the completed target produced "Could not load full interaction detail for 1f599d20-c84a-4167-9c74-fb48780c78ef right now" — despite the Call Data record being independently confirmed to exist (proven in Session 12.2B).
+
+**Root cause — same already-known, already-documented Call Data API limitation as Session 12.2B's reconciliation defect, just not yet propagated to this one call site.** `CampaignDetail.tsx`'s `InteractionLookupDialog` fetched via `useCallData({ search: interactionId })` — but `/call-data`'s `search` parameter matches `caller_number`/`caller_name`, never `call_id` (the exact same backend behavior found and fixed in `reconcileExecutions.ts` in 12.2B, commit `2baf18b`). Searching by a `call_id` string can never return a match, so the lookup always fails for every reconciled Campaign target, regardless of whether the call genuinely exists.
+
+**This exact class of bug was already found and fixed once before, elsewhere in the codebase** — `CustomerDetail.tsx`'s own `InteractionLookupDialog` hit the identical problem for Customer 360's Voice timeline and was fixed by searching Call Data by the customer's phone number (the field `search` actually matches) and filtering the bounded, paged results down to the exact `call_id` client-side (`findCallByPhoneAndId`, with its own code comment documenting this same root cause, citing `docs/CALL_CENTRE_LIVE_VERIFICATION_POST_OUTAGE.md`). `CampaignDetail.tsx` was simply never updated to the same pattern when it was built.
+
+**Fix** (`src/components/campaigns/CampaignDetail.tsx`): replaced the broken `useCallData({ search: interactionId })` call with the same phone+id lookup pattern (`findCallByPhoneAndId`, bounded to 3 pages × 100 rows, matching `CustomerDetail.tsx`'s existing constants), using the target's own `contactRawValue` (already available and already rendered in the Phone column) as the phone to search by. The dialog's trigger site now looks up the owning target from `targets` (matched by `latestReconciledInteractionId === openInteractionId`) to pass its phone through — no new state variable needed. **Does not touch, weaken, or duplicate the proven `call_sid_equals_call_id` correlation mechanism** — this is a display-layer lookup for an already-reconciled interaction ID, not a new correlation path; no phone/time matching was introduced into reconciliation itself.
+
+**Status: fixed and verified statically** (`tsc --noEmit` clean, `npm run build` clean, both re-run after this fix). Not yet committed/deployed — see §H.
+
+No telephone call was placed or triggered during this investigation or fix. No `runBatch` was invoked. No campaign was created/started/retried, and no target was made runnable.
+
+---
+
 ## Phase A — Read-only architecture audit
 
 1. **`vercel.json` / existing cron jobs (before this session)**: exactly one cron — `/api/customers/admin?action=reconcile&maxPages=2` at `0 3 * * *` (daily, Customer 360 Voice reconciliation). No Campaign automation existed.
@@ -106,6 +138,25 @@ A 3-hour nominal gap between `runBatch` and Campaign reconcile is comfortably pa
 
 **`runBatch` was not invoked against a runnable target this phase**, per the explicit instruction — there is no runnable target to invoke it against regardless (Phase A).
 
+## Phase F — Post-deployment verification (read-only, no call triggered)
+
+Deployed commit: `85a235a`. Deployment `callcenter-9345yeo35-sk-tardis-projects.vercel.app`, confirmed newest "Ready"/"Production" via `vercel ls`; the production alias `callcenter-three-livid.vercel.app` resolves to it and responds HTTP 200.
+
+1. **Deployed implementation**: confirmed via `git log`/`git show` (local matches the reported commit hash) and the deployment listing above.
+2. **Both Campaign cron entries + authentication**: `vercel crons ls` shows all 3 expected entries live —
+   ```
+   /api/campaigns?action=reconcile&limit=25            0 5 * * *
+   /api/campaigns?action=runBatch&batchSize=5           0 2 * * *
+   /api/customers/admin?action=reconcile&maxPages=2     0 3 * * *
+   ```
+   Authentication verified fail-closed: unauthenticated `GET` on both new campaign cron paths returns `401` (checked live, no `Authorization` header and with a deliberately wrong bearer token — both rejected before any repository/backend call, per code review of the auth-first branch order). The real `CRON_SECRET` was never read or used. The manual `POST` admin-token path was not re-exercised live (the sandbox blocked even a token-less POST as a real-world-transaction risk) — unnecessary anyway, since that code path is byte-for-byte unchanged from the already-proven 12.2B implementation.
+3. **Existing Customer360 cron intact**: present, unchanged schedule (`0 3 * * *`), unchanged path — confirmed in the same `crons ls` output above.
+4. **Zero-runnable-target / zero-pending-reconciliation state**: re-verified post-deploy — 0 targets are `pending`/`ready`/eligible `follow_up_due` under any `running` campaign (the 3 `myOutC01` targets remain structurally ineligible, campaign still `stopped`); 0 executions are `reconciliation_status='pending' AND status='triggered'`. Unchanged from the pre-deploy check.
+5. **Previously proven Campaign E2E records intact**: execution `788dd055-...` (failed, historical) and `2f3ac161-...` (`call_sid`/`reconciled_interaction_id` both `1f599d20-...`, `reconciliation_status: reconciled`) both byte-for-byte unchanged; target `a3a23212-...` still `status: completed`, `attempt_count: 2`, `effective_result_id: 43d849c2-...`.
+6. **No duplicate results/interactions**: exactly one `customer_interactions` row for `interaction_id = 1f599d20-...` (count = 1); exactly one `campaign_results` row for `campaign_execution_id = 2f3ac161-...` (count = 1). No new rows were created by this deployment or this verification.
+
+No `runBatch` was invoked, no campaign was created/started, no target was made runnable, and no telephone call was placed or triggered during this verification.
+
 ## Backend update (post-implementation, pre-deploy) — unanswered-call Call Data logging fixed
 
 The Voice Agent team fixed unanswered/no-conversation-call logging after Phase A–D were written. The user independently verified a real example in Call Logs:
@@ -151,12 +202,60 @@ Do not create or trigger the test campaign yet — this is the exact controlled 
 
 **Rollback/stop procedure if anything behaves unexpectedly**: remove the two new entries from `vercel.json`'s `crons` array and redeploy (this immediately stops any future scheduled firing; it does not affect calls already placed or data already written) — or, for a softer stop that keeps the infrastructure but halts activity, set the test campaign's status to `paused`/`stopped` (targets become structurally ineligible immediately, per Phase A §7's eligibility rule, with no code change or redeploy required).
 
+## Phase H — G.1/G.2 fix commit and manual SQL apply
+
+**Files changed this phase:**
+- `supabase/migrations/20261009000000_campaign_get_stats_key_casing_fix.sql` — new migration (G.1). **Not yet applied to production** — blocked by the sandbox ("Modify Shared Resources"). Run this exact SQL yourself (Supabase SQL editor, or `supabase db push` / the CLI equivalent you normally use — it is a plain `create or replace function`, safe to run directly, no data migration, no lock beyond the function definition itself):
+  ```sql
+  create or replace function public.call_center_campaign_get(p_id uuid)
+  returns jsonb language plpgsql security definer set search_path = call_center, pg_temp as $$
+  declare v_campaign jsonb; v_rules jsonb; v_stats jsonb; v_mappings jsonb;
+  begin
+    select to_jsonb(c) into v_campaign from call_center.campaigns c where c.id = p_id;
+    if v_campaign is null then
+      return null;
+    end if;
+
+    select coalesce(jsonb_agg(to_jsonb(r) order by r.priority), '[]'::jsonb) into v_rules
+      from call_center.campaign_result_rules r where r.campaign_id = p_id;
+
+    select coalesce(jsonb_agg(to_jsonb(m) order by m.agent_input_field_code), '[]'::jsonb) into v_mappings
+      from call_center.campaign_agent_input_mappings m where m.campaign_id = p_id;
+
+    select jsonb_build_object(
+      'target_count', count(distinct t.id),
+      'triggered_count', count(distinct e.id) filter (where e.status = 'triggered'),
+      'classified_count', count(distinct t.id) filter (where t.effective_result_id is not null and res.is_success is not null),
+      'success_count', count(distinct t.id) filter (where t.effective_result_id is not null and res.is_success = true)
+    ) into v_stats
+    from call_center.campaign_targets t
+    left join call_center.campaign_executions e on e.campaign_target_id = t.id
+    left join call_center.campaign_results res on res.id = t.effective_result_id
+    where t.campaign_id = p_id;
+
+    return v_campaign || jsonb_build_object('rules', v_rules, 'mappings', v_mappings, 'stats', v_stats);
+  end;
+  $$;
+  ```
+- `src/components/campaigns/CampaignDetail.tsx` — G.2 fix (phone+id Call Data lookup, replacing the broken `search: interactionId` query). Deployed the moment this commit reaches Production via the normal Vercel deploy — no separate manual step needed for this half.
+
+**Verification after you apply the SQL** (read-only, share the output and I'll confirm):
+```sql
+select call_center_campaign_get('63dff09b-9db4-43ea-b59c-3242662da8be'::uuid) -> 'stats';
+```
+Expect `{"target_count": 1, "triggered_count": 1, "classified_count": 1, "success_count": 1}`. The Campaign Detail page's header/section/warning-banner discrepancy should disappear on next load once both the SQL is applied and this commit is deployed.
+
 ## Remaining blockers
 
 1. `npm run lint` could not be run this session (environment-blocked, not code-related) — recommend the user run it locally before or shortly after this deploys, though the change surface is minimal.
 2. Phase E's controlled first automated run has not been executed — it requires the user's explicit authorization, per this session's own scope, and requires importing one fresh runnable target (§ above) since the existing target is already `completed`, not `failed`/`follow_up_due`.
 3. Once deployed, the two new cron entries are **live, standing infrastructure** — they will fire daily going forward regardless of whether Phase E's watched run has happened. Today this is provably harmless (0 runnable targets anywhere), but this changes the instant any campaign target becomes runnable (e.g., via a fresh `importTargets` call or a `follow_up_due` target's `next_action_at` arriving) — at that point the next scheduled `runBatch` **will** place a real call, unattended, without further confirmation. This is the intended purpose of automation, but is called out explicitly since it is a meaningful behavioral change from every prior session in this arc, which required a human to invoke `runBatch` manually every time.
+4. **G.1's SQL migration is written but not applied** — the Campaign Detail stats header will keep showing 0/0/0/0% until you run the SQL in §H yourself.
 
 ## Exact next manual step requiring authorization
 
-Deploy this session's changes to Production (`vercel.json` + `api/campaigns.ts`), then decide whether/when to explicitly authorize Phase E's first watched run (importing one fresh test target and either waiting for the schedule or using Vercel's dashboard "Run now" to trigger the cron on demand for close observation).
+Two independent manual steps remain:
+1. **Commit and deploy** the G.1/G.2 fix (`git add` the migration file + `CampaignDetail.tsx`, commit, `vercel --prod`) — same pattern as every prior commit/deploy this session, blocked for me the same way.
+2. **Apply the G.1 SQL migration** directly against Supabase (§H) — independent of the commit/deploy above; either order works, but the UI fix (G.2) only helps once its own commit is deployed, and the stats fix (G.1) only helps once the SQL is applied.
+
+Separately, decide whether/when to explicitly authorize Phase E's first watched automated run (importing one fresh test target and either waiting for the schedule or using Vercel's dashboard "Run now" to trigger the cron on demand for close observation).

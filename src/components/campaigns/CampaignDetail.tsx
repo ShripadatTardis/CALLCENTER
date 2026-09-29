@@ -1,14 +1,43 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { CampaignStatusBadge } from './CampaignStatusBadge';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
-import { useCallData } from '@/hooks/calls/useCallData';
+import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { formatTimestamp } from '@/lib/format';
 import type { CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
 import type { Interaction } from '@/types/interaction';
+
+const MAX_LOOKUP_PAGES = 3;
+const LOOKUP_PAGE_SIZE = 100;
+
+/**
+ * Session 12.3 fix — /call-data has no call_id-keyed lookup param, only
+ * `search`, which matches caller_number/caller_name, not call_id
+ * (confirmed live; same root cause already documented and fixed for
+ * Customer 360's own interaction lookup — see
+ * CustomerDetail.tsx's findCallByPhoneAndId). This was searching by the
+ * call_id itself (`search: interactionId`), which can never match,
+ * producing "Could not load full interaction detail" for every
+ * reconciled target regardless of whether the call genuinely existed.
+ * Fixed the same way Customer 360 already does: search by the target's
+ * own phone number (the field `search` actually matches), then filter
+ * the bounded, paged results down to the exact call_id. Does not touch
+ * the proven call_sid_equals_call_id correlation — this is a display-
+ * layer lookup, not reconciliation.
+ */
+async function findCallByPhoneAndId(phone: string, callId: string) {
+  for (let page = 1; page <= MAX_LOOKUP_PAGES; page += 1) {
+    const result = await fetchCallData({ search: phone, page, page_size: LOOKUP_PAGE_SIZE });
+    const match = result.interactions.find((i) => i.interactionId === callId);
+    if (match) return match;
+    if (page >= result.pagination.total_pages) break;
+  }
+  return null;
+}
 
 /**
  * Reuses the existing InteractionDetailDialog rather than a
@@ -17,9 +46,11 @@ import type { Interaction } from '@/types/interaction';
  * shown for a target with a reconciled interactionId; a target with no
  * reconciled call has nothing to show yet, honestly (plan §19).
  */
-const InteractionLookupDialog: React.FC<{ interactionId: string; onClose: () => void }> = ({ interactionId, onClose }) => {
-  const { data, isLoading, isError } = useCallData({ search: interactionId, page_size: 1 });
-  const interaction = data?.interactions.find((i) => i.interactionId === interactionId) ?? data?.interactions[0];
+const InteractionLookupDialog: React.FC<{ interactionId: string; phone: string; onClose: () => void }> = ({ interactionId, phone, onClose }) => {
+  const { data: interaction, isLoading, isError } = useQuery({
+    queryKey: ['campaigns', 'voice-interaction-lookup', interactionId, phone],
+    queryFn: () => findCallByPhoneAndId(phone, interactionId),
+  });
 
   if (isLoading) {
     return (
@@ -271,7 +302,16 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
       </div>
 
-      {openInteractionId && <InteractionLookupDialog interactionId={openInteractionId} onClose={() => setOpenInteractionId(null)} />}
+      {openInteractionId && (() => {
+        const owningTarget = targets.find((t) => t.latestReconciledInteractionId === openInteractionId);
+        return owningTarget ? (
+          <InteractionLookupDialog
+            interactionId={openInteractionId}
+            phone={owningTarget.contactRawValue}
+            onClose={() => setOpenInteractionId(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

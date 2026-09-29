@@ -61,7 +61,29 @@ async function tryAuthoritativeMatch(execution: PendingReconciliation, mode: Cor
   if (!mode || !execution.callSid) return null;
 
   if (mode === 'call_sid_equals_call_id') {
-    const dto = await fetchCallData({ search: execution.callSid, page_size: '5' });
+    // Session 12.2B — VERIFICATION-BLOCKING DEFECT FIX. The backend's
+    // `search` query param does NOT match against call_id (confirmed
+    // live: searching call-data with search=<a real call_id> returns
+    // zero results, while search=<caller name> correctly returns
+    // matches, including that exact call by its call_id in the
+    // results). The previous `{ search: execution.callSid }` query
+    // therefore could never find a match, even though
+    // call_sid_equals_call_id was independently, empirically proven
+    // true for two separate controlled test calls the same session
+    // (Session 12.2A: Initiate Call; Session 12.2B: campaign-triggered).
+    //
+    // Fix: date-window the candidate set the same way
+    // findDiagnosticCandidate() below already does (a proven-working
+    // pattern already in this file), then find the EXACT call_id match
+    // from that page. This remains authoritative exact-identifier
+    // matching, not phone/time correlation promoted to authoritative —
+    // the date window only bounds which page we ask the backend for;
+    // the match itself is still `call_id === execution.callSid`.
+    if (!execution.triggeredAt) return null;
+    const triggeredAt = new Date(execution.triggeredAt).getTime();
+    const dateFrom = new Date(triggeredAt - CANDIDATE_WINDOW_MS).toISOString().slice(0, 10);
+    const dateTo = new Date(triggeredAt + CANDIDATE_WINDOW_MS).toISOString().slice(0, 10);
+    const dto = await fetchCallData({ date_from: dateFrom, date_to: dateTo, page_size: '25' });
     return dto.data.calls.find((c) => c.call_id === execution.callSid) ?? null;
   }
 

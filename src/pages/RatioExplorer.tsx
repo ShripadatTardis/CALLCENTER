@@ -48,7 +48,7 @@ const RatioExplorer: React.FC = () => {
       <Layout>
         <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
           <Button variant="outline" size="sm" onClick={() => navigate('/ratios')}>
-            ← Ratios
+            ← All Ratios
           </Button>
           <div className="border border-border rounded-md p-8 text-center text-sm text-muted-foreground bg-card/40">
             "{ratioId}" is not a known ratio.
@@ -64,20 +64,30 @@ const RatioExplorer: React.FC = () => {
     <Layout>
       <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (hasDrillLayer) {
-                popDrillLayer();
-                setInteractionsPage(1);
-              } else {
-                navigate('/ratios');
-              }
-            }}
-          >
-            ← {hasDrillLayer ? 'Back' : 'Ratios'}
-          </Button>
+          <div className="flex items-center gap-3 min-w-0">
+            <Button variant="outline" size="sm" onClick={() => navigate('/ratios')}>
+              ← All Ratios
+            </Button>
+            <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground truncate min-w-0">
+              <button type="button" onClick={() => navigate('/ratios')} className="hover:text-foreground hover:underline">
+                Ratios
+              </button>
+              <span className="mx-1.5">›</span>
+              <span className="text-foreground">{definition.name}</span>
+            </nav>
+            {hasDrillLayer && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  popDrillLayer();
+                  setInteractionsPage(1);
+                }}
+              >
+                ← Back
+              </Button>
+            )}
+          </div>
           <CompareControl />
         </div>
 

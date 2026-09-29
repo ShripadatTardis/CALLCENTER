@@ -19,8 +19,15 @@ import type { RatioFilterState } from '../../types/ratio.js';
  * "completed/historical calls" — reused here, not reinvented.
  */
 
-const DEFAULT_PAGE_SIZE = 200;
-const DEFAULT_MAX_PAGES = 15; // up to 3000 records per fetch — a documented, disclosed cap, not silent
+// Session R4.1 — the real backend rejects page_size > 100 (422
+// validation error), confirmed live. R2/R3 never observed this because
+// the backend was unreachable for every session between R2 and R4.
+// page_size corrected 200 -> 100; maxPages raised 15 -> 30 to preserve
+// the EXACT SAME disclosed 3000-record population cap (100 x 30 =
+// 3000, unchanged from R2/R3's documented and UI-disclosed limit) —
+// not a silent capacity change, only a request-parameter fix.
+const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_MAX_PAGES = 30; // up to 3000 records per fetch — a documented, disclosed cap, not silent
 
 export interface CallPopulationResult {
   calls: CallDataEntryDto[];

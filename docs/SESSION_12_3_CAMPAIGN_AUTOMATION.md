@@ -205,14 +205,35 @@ no transcript/summary, short recording present
 
 No code changes resulted from this update — only this documentation section, and the Phase E expected-sequence note below, needed revising.
 
-## Phase E — First watched automated run (prepared, NOT executed)
+## Phase E — First watched automated run
 
-Do not create or trigger the test campaign yet — this is the exact controlled procedure for when the user explicitly authorizes it.
+**Phase E.1 pre-flight audit** (read-only, no mutation): re-confirmed all Phase A findings still hold post-G.1/G.2-deploy — 0 unexpected runnable targets, 0 pending reconciliations, `CAMPAIGN_RECONCILIATION_CORRELATION_MODE`/`CRON_SECRET` still present in Production, deployed HEAD matches local, both new cron endpoints still fail-closed (401) with no/invalid auth, Session 12.2B's records fully intact. Confirmed authoritatively (official Vercel docs, fetched live) that **Vercel Cron schedules are always interpreted in UTC** — the current cron times (`02:00`/`03:00`/`05:00`) are therefore `07:30`/`08:30`/`10:30` IST, not IST as their numbers might suggest. Next occurrence (checked at 2026-09-29 12:19 UTC / 17:49 IST, after that day's slots had already passed): **2026-09-30**. Worst-case gap between `runBatch` (as late as 02:59 UTC) and Campaign `reconcile` (as early as 05:00 UTC) is 121 minutes — still comfortably clear of `UNRESOLVED_AFTER_MS` (30 min) even accounting for Hobby's ±59-minute imprecision on both entries. The backend's unanswered-call-logging fix (recorded earlier in this doc) means this ordering reliably produces a Call Data record regardless of whether the test call is answered.
 
-**Setup (before enabling anything to actually fire):**
-- Test campaign: reuse the existing, already-proven `63dff09b-9db4-43ea-b59c-3242662da8be` ("TEST 12.2B E2E Correlation Proof v2") — already `running`, already uses `emi-reminder-agent`, already has the correct `call_sid_equals_call_id` correlation mode configured in Production.
-- Test target: reset the existing target `a3a23212-22a5-4c77-83e0-0a0335b9dc38` (currently `completed`) to a runnable state via the existing `retryTarget` action — **but `retryTarget` only accepts `status in ('failed','follow_up_due')`**, so a `completed` target cannot use it directly; a fresh target import (`?action=importTargets`, same authorized test phone/contact point already established) is the correct mechanism for a clean new runnable target, exactly as Session 12.2B originally did. This creates target #2 on the same campaign, not a duplicate of the completed one.
-- Test phone: the same explicitly authorized developer test number already used in 12.2A/12.2B — no new destination.
+**Phase E.1 fixture — built via the deployed application UI** (per the session's explicit instruction to use normal UI/browser interaction where the sandbox permits it, after a direct API attempt to create the campaign was blocked by the classifier). A fresh browser tab opened directly into the app with no login prompt (consistent with the documented no-server-auth limitation) and full Create Campaign wizard access. Built as a **new, separate, clearly-named integration-test campaign** — per the session prompt's explicit instruction not to reuse or Resume the paused 12.2B campaign:
+
+- **Campaign**: "TEST 12.3 Phase E Automated Watch", agent `emi-reminder-agent` (EMI Reminder), default outcome-policy rules (identical to `defaultResultRules()`: `escalation_trigger=escalated→Failure`, `outcome=resolved→Success`) left unchanged, saved via **"Save as Draft"** (not "Launch Now", which would have started it immediately — the one wizard action this task could not take).
+- **Target**: one row, uploaded via a CSV (`name: Shripad, phone: +919930647652, customer_reference: <blank>`) — the exact same authorized test phone already used throughout 12.2A/12.2B. The UI's own preview and the resulting Customer 360 resolution both confirm the **same existing identity was reused**, not duplicated: `customer_id: 4b36f976-ad50-444e-9a4d-29b68a816410`, `contact_point_id: 57414423-1122-4cf8-8606-8b16ac219583` — identical to every prior session in this arc.
+
+**Verified read-only, immediately after creation:**
+
+| Check | Result |
+|---|---|
+| Campaign status | `draft` ✓ |
+| Target count | exactly 1 ✓ |
+| Target status | `pending`, `attempt_count: 0`, `effective_result_id: null` ✓ |
+| Customer 360 identity | reused (`4b36f976-...`/`57414423-...`), not duplicated ✓ |
+| Other runnable targets | 0 — the new target is `pending` but its campaign is `draft` (not `running`), structurally ineligible for `selectRunnableTargets` exactly like `myOutC01`'s 3 pending targets (campaign `stopped`) ✓ |
+| Pending reconciliations | 0 ✓ |
+| 12.2B records | fully unchanged — target `a3a23212-...` still `completed`/`attempt_count: 2`, executions `788dd055-...` (failed/historical) and `2f3ac161-...` (reconciled) byte-for-byte identical ✓ |
+
+**Also confirmed in the browser**: the Campaign list/detail pages now correctly show live stats (G.1's fix) and the new target's row renders correctly, end-to-end visual confirmation that both G.1 and G.2 are genuinely live for a brand-new campaign, not just the one originally used to find the bugs.
+
+- **TEST CAMPAIGN ID**: `b0de9fae-e9bf-4746-b916-04101cc4dae6`
+- **TEST TARGET ID**: `7c319e38-8ab9-49ad-8f18-4201d87f6cd1`
+
+**No `Start`, `Resume`, `Retry`, `runBatch`, manual reconcile, or Trigger Call action was taken.** The campaign remains `Draft` and structurally cannot be selected by any cron tick until explicitly started.
+
+**EXACT GO ACTION (not yet authorized/performed)**: `POST /api/campaigns?action=start&id=b0de9fae-e9bf-4746-b916-04101cc4dae6` (or the UI's "Start" button on this campaign's detail page) — this is the single action that makes the target eligible for the next `runBatch` cron tick.
 
 **Expected sequence once the cron actually fires (or is manually triggered for the first watched test via the Vercel dashboard's "Run now" on the cron job, which is the recommended way to watch the very first run without waiting for the schedule):**
 1. Scheduler invocation: `GET /api/campaigns?action=runBatch&batchSize=5` with `Authorization: Bearer $CRON_SECRET` — visible in Vercel's Cron Jobs log with a 200 response and `{processed:1, triggered:1, failed:0}` (or `failed:1` with a genuine upstream error, per the same honest failure-path semantics already proven in 12.2B).

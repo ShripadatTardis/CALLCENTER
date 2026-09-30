@@ -12,8 +12,21 @@
  * src/lib/ratios/ratioFrontendRegistry.ts.
  */
 
-/** Spec §12 — DIRECT (backend exposes it), DERIVED (service can compute it from real fields), PARTIAL (a real signal exists but the production-grade definition needs another field/taxonomy), BACKEND_GAP (no telemetry yet — must render an honest unavailable state). */
-export type RatioAvailability = 'direct' | 'derived' | 'partial' | 'backend_gap';
+/**
+ * Spec §12 — DIRECT (backend exposes it), DERIVED (service can compute it
+ * from real fields), PARTIAL (a real signal exists but the
+ * production-grade definition needs another field/taxonomy), BACKEND_GAP
+ * (no telemetry yet — must render an honest unavailable state).
+ *
+ * Session R6.3A — AWAITING_TELEMETRY (new): the ratio's definition is
+ * fully specified (purpose/numerator/denominator/exclusions all fixed,
+ * per docs/SESSION_R6_2_CONVERSATION_QUALITY_ARCHITECTURE.md), but its
+ * evidence source (the Interaction Trace API) doesn't exist yet — a
+ * deliberately distinct state from BACKEND_GAP (whose ratios, like CSAT,
+ * have no fixed definition to show at all). Never used for the original
+ * 21 ratios; only Conversation Quality's first 6.
+ */
+export type RatioAvailability = 'direct' | 'derived' | 'partial' | 'backend_gap' | 'awaiting_telemetry';
 
 /**
  * Session R4.3 — RUNTIME health/outcome of a single request, kept
@@ -30,7 +43,7 @@ export type RatioAvailability = 'direct' | 'derived' | 'partial' | 'backend_gap'
  */
 export type RatioRuntimeState = 'live' | 'no_data' | 'not_instrumented' | 'upstream_rejected' | 'upstream_unavailable';
 
-export type RatioFamily = 'operations' | 'intelligence' | 'quality' | 'business';
+export type RatioFamily = 'operations' | 'intelligence' | 'quality' | 'business' | 'conversation_quality';
 
 export type RatioUnit = 'percent' | 'seconds' | 'count' | 'score' | 'currency';
 
@@ -247,4 +260,21 @@ export interface FrontendRatioDefinition {
   declaredDrillDimensions: RatioDimension[];
   /** Same idea as declaredDrillDimensions, for whether a Driver view exists at all. */
   declaredDriverDimension: RatioDimension | null;
+  /**
+   * Session R6.3A — a fully-specified ratio definition with no live data
+   * source yet (see RatioAvailability's `awaiting_telemetry`). Rendered
+   * by RatioHero as a compact structured block IN PLACE of a live
+   * KPI/trend, never alongside one — set only for ratios whose
+   * declaredAvailability is 'awaiting_telemetry'. Kept deliberately terse
+   * (this is a catalogue/investigation view, not the architecture doc it
+   * is sourced from verbatim: docs/SESSION_R6_2_CONVERSATION_QUALITY_ARCHITECTURE.md §C.1).
+   */
+  qualityDefinition?: {
+    purpose: string;
+    whatIsMeasured: string;
+    numerator: string;
+    denominator: string;
+    exclusions?: string;
+    dependency: string;
+  };
 }

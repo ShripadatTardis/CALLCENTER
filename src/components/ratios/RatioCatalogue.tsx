@@ -10,6 +10,8 @@ const STATUS_FILTERS: { value: RatioStatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'direct', label: 'Direct' },
   { value: 'partial', label: 'Partial' },
+  // Session R6.3A — Conversation Quality's first 6 ratios only.
+  { value: 'awaiting_telemetry', label: 'Awaiting Trace API' },
   { value: 'backend_gap', label: 'Not yet instrumented' },
 ];
 
@@ -55,7 +57,7 @@ export const RatioCatalogue: React.FC = () => {
           const allIds = RATIO_CATALOGUE_ORDER.filter((id) => FRONTEND_RATIO_REGISTRY[id]?.family === family);
           if (allIds.length === 0) return null;
 
-          const counts: Record<RatioAvailability, number> = { direct: 0, derived: 0, partial: 0, backend_gap: 0 };
+          const counts: Record<RatioAvailability, number> = { direct: 0, derived: 0, partial: 0, backend_gap: 0, awaiting_telemetry: 0 };
           for (const id of allIds) counts[FRONTEND_RATIO_REGISTRY[id].declaredAvailability]++;
 
           const visibleIds =
@@ -86,6 +88,7 @@ export const RatioCatalogue: React.FC = () => {
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground shrink-0">
                   {counts.direct + counts.derived > 0 && <span>{counts.direct + counts.derived} direct</span>}
                   {counts.partial > 0 && <span>{counts.partial} partial</span>}
+                  {counts.awaiting_telemetry > 0 && <span>{counts.awaiting_telemetry} awaiting trace API</span>}
                   {counts.backend_gap > 0 && <span>{counts.backend_gap} not yet instrumented</span>}
                 </div>
               </button>

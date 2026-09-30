@@ -70,6 +70,38 @@ export const RatioHero: React.FC<{
         />
       )}
 
+      {/* Session R6.3A — a fully-specified ratio with no live evidence source yet (awaiting_telemetry). Never rendered alongside a real KPI/trend/numerator; summary.value is always null here. */}
+      {!isLoading && !isError && definition.qualityDefinition && (
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[12px] text-foreground border border-border/60 rounded-md p-3 bg-background/40">
+          <div className="sm:col-span-2">
+            <dt className="text-[11px] font-medium text-muted-foreground">Purpose</dt>
+            <dd className="mt-0.5">{definition.qualityDefinition.purpose}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-[11px] font-medium text-muted-foreground">What is measured</dt>
+            <dd className="mt-0.5">{definition.qualityDefinition.whatIsMeasured}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium text-muted-foreground">Numerator</dt>
+            <dd className="mt-0.5">{definition.qualityDefinition.numerator}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium text-muted-foreground">Denominator / eligible population</dt>
+            <dd className="mt-0.5">{definition.qualityDefinition.denominator}</dd>
+          </div>
+          {definition.qualityDefinition.exclusions && (
+            <div className="sm:col-span-2">
+              <dt className="text-[11px] font-medium text-muted-foreground">Exclusions</dt>
+              <dd className="mt-0.5">{definition.qualityDefinition.exclusions}</dd>
+            </div>
+          )}
+          <div className="sm:col-span-2 pt-1 border-t border-border/60">
+            <dt className="text-[11px] font-medium text-muted-foreground">Current dependency</dt>
+            <dd className="mt-0.5">{definition.qualityDefinition.dependency}</dd>
+          </div>
+        </dl>
+      )}
+
       {summary?.populationCapped && (
         <p className="text-[11px] text-amber-700 dark:text-amber-400">
           Based on the first {summary.population?.toLocaleString()} of {summary.trueTotalRecords?.toLocaleString()} matching records — not the complete population for this window.

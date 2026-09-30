@@ -12,6 +12,10 @@ const CONFIG: Record<RatioAvailability, { label: string; variant: 'positive' | '
   derived: { label: 'Derived', variant: 'secondary' },
   partial: { label: 'Partial', variant: 'warning' },
   backend_gap: { label: 'Not yet instrumented', variant: 'outline' },
+  // Session R6.3A — deliberately distinct from backend_gap: the
+  // definition is complete, only the evidence source (Interaction Trace
+  // API) is missing. See RatioAvailability's own doc comment.
+  awaiting_telemetry: { label: 'Awaiting Trace API', variant: 'secondary' },
 };
 
 export const RatioAvailabilityBadge: React.FC<{ availability: RatioAvailability; className?: string }> = ({ availability, className }) => {

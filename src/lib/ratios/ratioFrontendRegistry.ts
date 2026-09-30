@@ -27,6 +27,10 @@ export const RATIO_CATALOGUE_ORDER: readonly string[] = [
   'qa_pass_rate', 'compliance_pass_rate', 'csat', 'nps',
   // Business & Economics
   'business_outcome_success', 'conversion_rate', 'cost_per_resolution',
+  // Conversation Quality (Session R6.3A)
+  'context_continuity_rate', 'followup_understanding_rate', 'intent_routing_accuracy',
+  'conversation_recovery_rate', 'unnecessary_clarification_rate', 'task_progression_rate',
+  'reference_resolution_accuracy', 'response_grounding_rate', 'repetition_loop_rate', 'customer_correction_rate',
 ];
 
 export const FRONTEND_RATIO_REGISTRY: Record<string, FrontendRatioDefinition> = {
@@ -177,6 +181,137 @@ export const FRONTEND_RATIO_REGISTRY: Record<string, FrontendRatioDefinition> = 
     helpText: 'Requires cost telemetry, which does not exist in this product yet.',
     declaredAvailability: 'backend_gap', declaredDrillDimensions: [], declaredDriverDimension: null,
   },
+
+  // ---------------------------------------------------------------------
+  // Session R6.3A — Conversation Quality family, per
+  // docs/SESSION_R6_2_CONVERSATION_QUALITY_ARCHITECTURE.md §C. Ratios 1-6
+  // (context_continuity_rate .. task_progression_rate) are fully defined
+  // but have no live evidence source yet (declaredAvailability:
+  // 'awaiting_telemetry', with a qualityDefinition block RatioHero
+  // renders in place of a live KPI). Ratios 7-10 remain 'backend_gap'
+  // (the existing, unmodified not-yet-instrumented treatment) — their
+  // operational definitions are not yet fixed enough to specify a
+  // denominator/numerator defensibly (see R6.2 §C.2 for exactly why
+  // each one is deferred, not merely "harder").
+  // ---------------------------------------------------------------------
+  context_continuity_rate: {
+    id: 'context_continuity_rate', name: 'Context Continuity Rate', shortLabel: 'Context Continuity', family: 'conversation_quality',
+    description: 'When the router continues an existing conversation frame rather than starting a new one, was that objectively correct?',
+    formulaText: 'Correct continuations ÷ continue decisions', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Fully defined (R6.2 §C.1) — awaiting the Interaction Trace API for live per-turn router/frame evidence.',
+    declaredAvailability: 'awaiting_telemetry', declaredDrillDimensions: [], declaredDriverDimension: null,
+    qualityDefinition: {
+      purpose: 'When the router chooses to continue an existing conversation frame instead of starting a new one, was that objectively the correct choice?',
+      whatIsMeasured: 'Correctness of continue-vs-new frame routing decisions.',
+      numerator: 'Continuations judged correct by the Conversation Quality evaluator.',
+      denominator: 'Turns where the router recorded a "continue" decision into an existing frame.',
+      exclusions: 'Turns with a "new"-frame decision, and turns where router/frame evidence wasn’t captured at all.',
+      dependency: 'Structured, event-time router/frame evidence via the Interaction Trace API — not yet available.',
+    },
+  },
+  followup_understanding_rate: {
+    id: 'followup_understanding_rate', name: 'Follow-up Understanding Rate', shortLabel: 'Follow-up Understanding', family: 'conversation_quality',
+    description: 'When the bot asks a question or makes an offer and the customer gives a short reply, does the system correctly understand and act on it?',
+    formulaText: 'Correctly grounded follow-ups ÷ follow-up replies', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Fully defined (R6.2 §C.1) — awaiting the Interaction Trace API for reliable per-turn ordering and evidence.',
+    declaredAvailability: 'awaiting_telemetry', declaredDrillDimensions: [], declaredDriverDimension: null,
+    qualityDefinition: {
+      purpose: 'When the bot asks a question or makes an offer, and the customer gives a short affirmative, negative, or clarifying reply, does the system correctly understand and act on it?',
+      whatIsMeasured: 'Correct grounding of short follow-up replies into the prior offer/question.',
+      numerator: 'Follow-ups where the bot’s response correctly acts on the customer’s reply.',
+      denominator: 'Turns where the prior bot turn ended in a question/offer and the customer’s reply is a short affirmative/negative/clarifying response.',
+      exclusions: 'Replies that introduce a genuinely new topic rather than answering the preceding question.',
+      dependency: 'Per-turn trace evidence with reliable turn ordering via the Interaction Trace API — not yet available.',
+    },
+  },
+  intent_routing_accuracy: {
+    id: 'intent_routing_accuracy', name: 'Intent Routing Accuracy', shortLabel: 'Intent Routing', family: 'conversation_quality',
+    description: 'Independent of continuity, was the intent the router assigned to a turn the objectively correct read of the customer’s utterance?',
+    formulaText: 'Correctly routed turns ÷ evaluated turns', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Fully defined (R6.2 §C.1) — awaiting the Interaction Trace API for structured router-decision evidence.',
+    declaredAvailability: 'awaiting_telemetry', declaredDrillDimensions: [], declaredDriverDimension: null,
+    qualityDefinition: {
+      purpose: 'Independent of continuity, was the intent the router assigned (new or continued) the objectively correct read of the customer’s utterance?',
+      whatIsMeasured: 'Correctness of intent assignment.',
+      numerator: 'Turns where the assigned/continued intent matches the utterance’s actual topic.',
+      denominator: 'Every turn with captured router/frame evidence.',
+      exclusions: 'Turns with no captured router/frame evidence.',
+      dependency: 'Structured router decision evidence via the Interaction Trace API — not yet available.',
+    },
+  },
+  conversation_recovery_rate: {
+    id: 'conversation_recovery_rate', name: 'Conversation Recovery Rate', shortLabel: 'Recovery', family: 'conversation_quality',
+    description: 'After a turn is judged a routing/understanding failure, does the system recover within the next 1–2 turns rather than repeating the same failure?',
+    formulaText: 'Recovered failures ÷ detected failures', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Fully defined (R6.2 §C.1) — awaiting the Interaction Trace API; depends on the same evidence as Context Continuity/Follow-up Understanding/Intent Routing.',
+    declaredAvailability: 'awaiting_telemetry', declaredDrillDimensions: [], declaredDriverDimension: null,
+    qualityDefinition: {
+      purpose: 'After a turn is judged a routing/understanding failure, does the system recover within the next 1–2 turns rather than repeating the same failure?',
+      whatIsMeasured: 'Whether a detected failure is followed by correct grounding of the same underlying request.',
+      numerator: 'Failures followed within 1–2 turns by a correctly grounded response to the same request.',
+      denominator: 'Turns already judged a failure by Context Continuity, Follow-up Understanding, or Intent Routing.',
+      exclusions: 'Failures at the end of a trace with no subsequent turn to evaluate recovery against.',
+      dependency: 'The same trace evidence as Context Continuity/Follow-up Understanding/Intent Routing, plus reliable turn adjacency, via the Interaction Trace API — not yet available.',
+    },
+  },
+  unnecessary_clarification_rate: {
+    id: 'unnecessary_clarification_rate', name: 'Unnecessary Clarification Rate', shortLabel: 'Unnecessary Clarification', family: 'conversation_quality',
+    description: 'How often does the bot ask a clarifying question when the information needed was already available from prior evidence?',
+    formulaText: 'Unnecessary clarifications ÷ clarifying turns', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'down',
+    helpText: 'Fully defined (R6.2 §C.1) — awaiting the Interaction Trace API for structured frame/tool-result evidence.',
+    declaredAvailability: 'awaiting_telemetry', declaredDrillDimensions: [], declaredDriverDimension: null,
+    qualityDefinition: {
+      purpose: 'How often does the bot ask a clarifying question when the information needed to proceed directly was already available (in active frames, prior tool results, or the utterance itself)?',
+      whatIsMeasured: 'Clarifying questions that duplicate already-available evidence.',
+      numerator: 'Clarifications judged unnecessary against that already-available evidence.',
+      denominator: 'Turns whose action is primarily a clarifying question.',
+      exclusions: 'The first clarifying question in a genuinely ambiguous request, where no prior evidence exists.',
+      dependency: 'Structured frame/tool-result evidence via the Interaction Trace API — not yet available.',
+    },
+  },
+  task_progression_rate: {
+    id: 'task_progression_rate', name: 'Task Progression Rate', shortLabel: 'Task Progression', family: 'conversation_quality',
+    description: 'Once a task-oriented tool action succeeds, does the conversation move forward rather than re-asking a question that action already answered or made moot?',
+    formulaText: 'Progressed turns ÷ post-success turns', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Fully defined (R6.2 §C.1) — awaiting the Interaction Trace API for explicit tool success/failure status.',
+    declaredAvailability: 'awaiting_telemetry', declaredDrillDimensions: [], declaredDriverDimension: null,
+    qualityDefinition: {
+      purpose: 'Once a task-oriented tool action succeeds (e.g. a payment link is resent, a lookup completes), does the conversation move forward (confirm, close, or advance) rather than re-asking a question that action already answered or made moot?',
+      whatIsMeasured: 'Whether the turn(s) immediately following a successful task action progress the conversation.',
+      numerator: 'Turns that correctly progress (acknowledge completion, advance, or close) after a successful task action.',
+      denominator: 'Turns immediately following a successful tool_exec in a task-oriented (non-informational-lookup) flow.',
+      exclusions: 'Informational lookups where re-confirming ("anything else?") is a legitimate next step, not repetition.',
+      dependency: 'Explicit per-call tool success/failure status via the Interaction Trace API — not yet available.',
+    },
+  },
+  reference_resolution_accuracy: {
+    id: 'reference_resolution_accuracy', name: 'Reference Resolution Accuracy', shortLabel: 'Reference Resolution', family: 'conversation_quality',
+    description: 'Did the system correctly resolve pronouns/implicit references ("that account," "the remittance") to the right entity?',
+    formulaText: 'Correct resolutions ÷ coreference turns', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Not yet instrumented — too little real coreference-sourced evidence exists yet (R6.2 §A.5 found exactly one example across both audited traces) to define a defensible eligible population or failure taxonomy.',
+    declaredAvailability: 'backend_gap', declaredDrillDimensions: [], declaredDriverDimension: null,
+  },
+  response_grounding_rate: {
+    id: 'response_grounding_rate', name: 'Response Grounding Rate', shortLabel: 'Response Grounding', family: 'conversation_quality',
+    description: 'Is every factual claim in the bot’s response traceable to a specific tool result or RAG reference, with no ungrounded/fabricated detail?',
+    formulaText: 'Grounded claims ÷ evaluated claims', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
+    helpText: 'Not yet instrumented — requires reference/chunk IDs on RAG results (R6.2 §B.2 item 10) to anchor grounding checks structurally rather than comparing free text against free text.',
+    declaredAvailability: 'backend_gap', declaredDrillDimensions: [], declaredDriverDimension: null,
+  },
+  repetition_loop_rate: {
+    id: 'repetition_loop_rate', name: 'Repetition / Loop Rate', shortLabel: 'Repetition / Loop', family: 'conversation_quality',
+    description: 'How often does the system ask the identical (or functionally identical) question 2+ times without the conversation state changing?',
+    formulaText: 'Repeated turns ÷ eligible turns', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'down',
+    helpText: 'Not yet instrumented — needs a precise, non-overlapping definition from Task Progression Rate and Conversation Recovery Rate before it can be defined defensibly (R6.2 §C.2).',
+    declaredAvailability: 'backend_gap', declaredDrillDimensions: [], declaredDriverDimension: null,
+  },
+  customer_correction_rate: {
+    id: 'customer_correction_rate', name: 'Customer Correction Rate', shortLabel: 'Customer Correction', family: 'conversation_quality',
+    description: 'How often does the customer have to explicitly correct or restate something the bot got wrong?',
+    formulaText: 'Corrections ÷ eligible turns', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'down',
+    helpText: 'Not yet instrumented — requires a reliable way to distinguish a correction from the customer simply adding new information (R6.2 §C.2).',
+    declaredAvailability: 'backend_gap', declaredDrillDimensions: [], declaredDriverDimension: null,
+  },
 };
 
 export function getFrontendRatioDefinition(ratioId: string): FrontendRatioDefinition | null {
@@ -188,6 +323,7 @@ export const RATIO_FAMILY_LABELS: Record<string, string> = {
   intelligence: 'Intelligence',
   quality: 'Quality & Experience',
   business: 'Business & Economics',
+  conversation_quality: 'Conversation Quality',
 };
 
-export const RATIO_FAMILY_ORDER: readonly string[] = ['operations', 'intelligence', 'quality', 'business'];
+export const RATIO_FAMILY_ORDER: readonly string[] = ['operations', 'intelligence', 'quality', 'business', 'conversation_quality'];

@@ -6,6 +6,7 @@ import { supabaseCampaignRepository } from '../src/server/campaigns/supabaseCamp
 import { runCampaignBatch, voiceAgentCallBackend } from '../src/server/campaigns/campaignRunner.js';
 import { reconcilePendingExecutions } from '../src/server/campaigns/reconcileExecutions.js';
 import { defaultResultRules } from '../src/server/campaigns/resultRules.js';
+import { validateMappingSourceUniqueness } from '../src/server/campaigns/inputMapping.js';
 import type {
   CallAgentContract,
   CampaignStatus,
@@ -210,6 +211,19 @@ async function handleSetInputMappings(req: VercelRequest, res: VercelResponse, a
   const mappings = (req.body as { mappings?: NewCampaignAgentInputMappingInput[] } | undefined)?.mappings;
   if (!mappings || !Array.isArray(mappings)) {
     res.status(400).json({ detail: 'mappings (body) is required' });
+    return;
+  }
+  // Session 12.4.1 — the persistence boundary re-enforces source
+  // uniqueness regardless of what the UI already prevented, so a stale
+  // or manipulated client payload can never be accepted: the runner must
+  // never have to guess which of two duplicate mappings for the same
+  // source field was intended.
+  const uniqueness = validateMappingSourceUniqueness(mappings);
+  if (!uniqueness.valid) {
+    res.status(400).json({
+      detail: `Duplicate source mapping(s): ${uniqueness.duplicateSourceKeys.join(', ')} — each source field may back only one agent input.`,
+      duplicateSourceKeys: uniqueness.duplicateSourceKeys,
+    });
     return;
   }
   const result = await repo.setInputMappings(id, mappings);

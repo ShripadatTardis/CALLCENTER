@@ -25,6 +25,41 @@ export function validateInputMapping(
 }
 
 /**
+ * Session 12.4.1 — a source field (CSV column or Customer 360 field) may
+ * back at most one agent input within a campaign; otherwise the runner
+ * would have to guess which agent input a real value was "meant" for.
+ * The uniqueness key is `${sourceType}:${sourceField}` — deliberately
+ * NOT the field's display label, so `csv:phone` and `customer360:phone`
+ * never collide with each other despite sharing a label. This is the
+ * single source of truth for the rule; both the persistence boundary
+ * (api/campaigns.ts's handleSetInputMappings, which rejects a stale/
+ * manipulated client payload containing duplicates) and the React UI
+ * (CreateCampaign.tsx, which additionally prevents the invalid state by
+ * excluding an already-used source from the other dropdowns) call this
+ * same function rather than each re-deriving the rule.
+ */
+export interface MappingSourceUniquenessResult {
+  valid: boolean;
+  /** e.g. "csv:customerReference" — the exact colliding source key(s), for a concise, unambiguous message. */
+  duplicateSourceKeys: string[];
+}
+
+export function validateMappingSourceUniqueness(
+  mappings: Array<Pick<CampaignAgentInputMapping, 'sourceType' | 'sourceField'>>,
+): MappingSourceUniquenessResult {
+  const counts = new Map<string, number>();
+  for (const m of mappings) {
+    if (!m.sourceField) continue;
+    const key = `${m.sourceType}:${m.sourceField}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const duplicateSourceKeys = Array.from(counts.entries())
+    .filter(([, count]) => count > 1)
+    .map(([key]) => key);
+  return { valid: duplicateSourceKeys.length === 0, duplicateSourceKeys };
+}
+
+/**
  * Deterministically resolves one target's mapped input values from the
  * three supported source classes (Phase 4) — never an LLM, never a
  * generic external-CRM lookup. Returns only the fields that could

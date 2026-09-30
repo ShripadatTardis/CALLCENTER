@@ -14,6 +14,7 @@ import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { parseTargetsCsv, useImportTargets } from '@/hooks/campaigns/useImportTargets';
 import { defaultResultRules } from '@/lib/defaultResultRules';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
+import { validateMappingSourceUniqueness } from '@/lib/campaignInputMappingUniqueness';
 import { importCampaignTargets, setCampaignInputMappings, startCampaign } from '@/services/campaigns/campaignsService';
 import type { ImportTargetRow, InputMappingSourceType, NewCampaignAgentInputMappingInput, NewResultRuleInput } from '@/types/campaign';
 
@@ -67,6 +68,19 @@ const CreateCampaign: React.FC = () => {
   // own csvFields: target.sourceAttributes).
   const csvColumns = csvRows.length > 0 ? Object.keys(csvRows[0].sourceAttributes ?? {}) : [];
   const requiredFieldsUnmapped = requiredInputFields.filter((f) => !fieldMappings[f.fieldCode]?.sourceField);
+  // Session 12.4.1 — a source field may back only one agent input.
+  // Excludes the field's OWN current selection so re-opening its dropdown
+  // still shows its own already-chosen value; used to hide/disable that
+  // source everywhere else, and released the instant the owning mapping
+  // changes or is cleared (this is just a derived value, recomputed on
+  // every render from fieldMappings — nothing to "release" separately).
+  const sourceKeysUsedByOtherFields = (excludeFieldCode: string): Set<string> =>
+    new Set(
+      Object.entries(fieldMappings)
+        .filter(([code, m]) => code !== excludeFieldCode && m.sourceField)
+        .map(([, m]) => `${m.sourceType}:${m.sourceField}`),
+    );
+  const mappingDuplicates = validateMappingSourceUniqueness(Object.values(fieldMappings));
 
   // Each stage's real completion state — never fabricated, never confuses
   // a partial/legacy Agent Contract with a failure (it's an "available"
@@ -173,6 +187,9 @@ const CreateCampaign: React.FC = () => {
     blockers.push(
       `${requiredFieldsUnmapped.length} required agent input field${requiredFieldsUnmapped.length === 1 ? ' is' : 's are'} not mapped (${requiredFieldsUnmapped.map((f) => f.displayName).join(', ')}).`,
     );
+  }
+  if (!mappingDuplicates.valid) {
+    blockers.push(`Duplicate source mapping(s): ${mappingDuplicates.duplicateSourceKeys.join(', ')} — each source field may back only one agent input.`);
   }
   const isReady = blockers.length === 0;
 
@@ -444,6 +461,12 @@ const CreateCampaign: React.FC = () => {
                     <div className="border border-border rounded divide-y divide-border">
                       {[...requiredInputFields, ...optionalInputFields].map((field) => {
                         const mapping = fieldMappings[field.fieldCode];
+                        const usedElsewhere = sourceKeysUsedByOtherFields(field.fieldCode);
+                        const availableCsvColumns = csvColumns.filter((col) => !usedElsewhere.has(`csv:${col}`));
+                        const customer360Options: Array<{ value: string; label: string }> = [
+                          { value: 'phone_number', label: 'Phone number' },
+                          { value: 'customer_id', label: 'Customer 360 reference (CIF)' },
+                        ].filter((opt) => !usedElsewhere.has(`customer360:${opt.value}`));
                         return (
                           <div key={field.fieldCode} className="p-2.5 space-y-1.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -487,8 +510,16 @@ const CreateCampaign: React.FC = () => {
                                     <SelectValue placeholder="Field…" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="phone_number">Phone number</SelectItem>
-                                    <SelectItem value="customer_id">Customer 360 reference (CIF)</SelectItem>
+                                    {customer360Options.length === 0 && mapping.sourceField === '' && (
+                                      <SelectItem value="__none__" disabled>
+                                        All Customer 360 fields already mapped
+                                      </SelectItem>
+                                    )}
+                                    {customer360Options.map((opt) => (
+                                      <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               )}
@@ -503,7 +534,12 @@ const CreateCampaign: React.FC = () => {
                                     <SelectValue placeholder={csvColumns.length === 0 ? 'No CSV columns' : 'Column…'} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {csvColumns.map((col) => (
+                                    {availableCsvColumns.length === 0 && csvColumns.length > 0 && (
+                                      <SelectItem value="__none__" disabled>
+                                        All CSV columns already mapped
+                                      </SelectItem>
+                                    )}
+                                    {availableCsvColumns.map((col) => (
                                       <SelectItem key={col} value={col}>
                                         {col}
                                       </SelectItem>
@@ -520,6 +556,12 @@ const CreateCampaign: React.FC = () => {
                       <p className="text-[11px] text-amber-700 dark:text-amber-400">
                         {requiredFieldsUnmapped.length} required field{requiredFieldsUnmapped.length === 1 ? '' : 's'} still unmapped — a target missing a
                         required value will not be dialled when the campaign runs.
+                      </p>
+                    )}
+                    {!mappingDuplicates.valid && (
+                      <p className="text-[11px] text-red-400 bg-red-950/40 border border-red-900 rounded p-2">
+                        Duplicate source mapping{mappingDuplicates.duplicateSourceKeys.length === 1 ? '' : 's'}: {mappingDuplicates.duplicateSourceKeys.join(', ')} — each source field may
+                        back only one agent input.
                       </p>
                     )}
                   </div>

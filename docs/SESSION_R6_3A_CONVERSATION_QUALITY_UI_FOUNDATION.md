@@ -63,7 +63,14 @@ Re-ran the existing deterministic suite against the real compiled `ratioMath.ts`
 
 ## Deployed commit/deployment
 
-See the live-verification section below for the exact commit hash and deployment ID recorded after deploying.
+Commit `f475a9e`, deployment `dpl_7ukxb4dGRpeiiyV2Ex3t9WVVHAXx`, confirmed newest "Ready"/"Production" and `callcenter-three-livid.vercel.app` aliased to it.
+
+**Live-verified against the deployed instance** (API + browser, not merely locally):
+- `fcr`/`escalation_rate`/`aht`/`resolution_rate`/`successful_resolution_time` all still `runtimeState: "live"`, `availability: "direct"`, real current values.
+- `context_continuity_rate` returns `availability: "awaiting_telemetry"`, `runtimeState: "not_instrumented"`, `value: null`, with its specific `unavailableReason`.
+- Catalogue: new "Awaiting Trace API" filter tab present; filtering to it isolates exactly the Conversation Quality family with "6 awaiting trace API, 4 not yet instrumented" in the family header; filtering to "Not yet instrumented" correctly shows all 4 ratios 7–10 alongside the pre-existing `backend_gap` ratios from other families, unaffected.
+- Opened `context_continuity_rate`'s investigation view: "Awaiting Trace API" badge, neutral (non-alarming) empty state, full structured definition block (Purpose/What is measured/Numerator/Denominator-eligible-population/Exclusions/Current dependency), no KPI value/numerator/denominator/percentage, no trend graph (Trend section shows the same honest neutral empty state), breadcrumb + "← All Ratios" present.
+- Clicked "← All Ratios": returned to the catalogue with both the "Awaiting Trace API" filter and the Conversation Quality family's expanded state fully preserved (R4.2 catalogue-state-preservation behavior unaffected by the new family/ratios).
 
 ## Confirmation: no API adapter, LLM integration, persistence, or Campaign code was touched
 

@@ -1,26 +1,23 @@
 import type { TriggerCallRequestDto } from '../../types/api/calls.js';
 import type { CallAgentContract, CampaignAgentInputMapping, RunnableTarget } from './types.js';
-import { resolveMappedInputValues } from './inputMapping.js';
+import { resolveMappedInputValues, validateInputMapping } from './inputMapping.js';
 
 /**
- * Session 9.1 Phase 5 — the single deterministic server-side function
- * that builds the Trigger Call request for one campaign execution. This
- * is the one place a future, richer Partner API contract (an
- * `agent_inputs` field carrying the agent's declared input values) would
- * be wired in — the campaign runner itself never builds this payload
- * inline, so that future upgrade stays localized here.
+ * Session 9.1 Phase 5, rewritten Session 12.4 — the single deterministic
+ * server-side function that builds the Trigger Call request for one
+ * campaign execution. This was already the one place a future, richer
+ * Partner API contract (an `agent_inputs` field carrying the agent's
+ * declared input values) would be wired in — confirmed live, now wired.
  *
- * Today's production `TriggerCallRequestDto` (src/types/api/calls.ts,
- * confirmed against the vendor's docs) only accepts
- * to_phone_number/from_phone_number/english_accent/voice_name/agent_id/
- * customer_id — there is no `agent_inputs` field on the live API. This
- * function therefore builds and returns exactly that legacy shape today,
- * and NEVER sends an unknown field the live backend doesn't support.
- * `resolvedInputValues` is still computed and returned alongside the
- * request (for the request_payload_snapshot audit trail, Phase 3/7) even
- * though it isn't sent — so nothing about mapping resolution is lost,
- * and the day a real `agent_inputs` field is confirmed, only the
- * `request` object's shape below needs to change.
+ * `agent_inputs` is built ONLY from values whose `agentInputFieldCode`
+ * matches a field the contract actually declares (`contract.expectedInputFields`)
+ * — never an arbitrary resolved value, since the backend now explicitly
+ * rejects an undeclared input field. The object is omitted entirely
+ * (not sent as `{}`) when the contract declares zero expected input
+ * fields (e.g. the inbound default agent) or when no contract is known
+ * — this is what "preserves legacy/default-agent behavior" means in
+ * practice: such a target's request is byte-for-byte the same shape it
+ * always was.
  */
 export interface BuiltTriggerCallPayload {
   request: TriggerCallRequestDto;
@@ -33,11 +30,22 @@ export function buildTriggerCallPayload(
   contract: CallAgentContract | null,
   mappings: CampaignAgentInputMapping[],
 ): BuiltTriggerCallPayload {
-  const { values, unresolvedRequiredFieldCodes } = resolveMappedInputValues(mappings, {
+  const { values, unresolvedRequiredFieldCodes: unresolvedMapped } = resolveMappedInputValues(mappings, {
     customer360Fields: { phone_number: target.contactRawValue, customer_id: target.sourceCustomerRef ?? undefined },
     csvFields: target.sourceAttributes ?? {},
     campaignFields: {},
   });
+
+  // Session 12.4 fix — resolveMappedInputValues only ever catches "a
+  // mapping exists but its source value is blank"; a contract-required
+  // field with NO mapping row at all was previously invisible to the
+  // caller entirely. validateInputMapping (already existed, previously
+  // unused by the runner) is the one place that checks "every
+  // contract-required field has SOME mapping" — combined here so a
+  // target can never be dialled missing a required value for either
+  // reason.
+  const missingMapping = contract ? validateInputMapping(contract, mappings).missingRequiredFieldCodes : [];
+  const unresolvedRequiredFieldCodes = Array.from(new Set([...missingMapping, ...unresolvedMapped]));
 
   const request: TriggerCallRequestDto = {
     to_phone_number: target.contactRawValue,
@@ -48,11 +56,17 @@ export function buildTriggerCallPayload(
     customer_id: target.sourceCustomerRef ?? undefined,
   };
 
-  // contract is currently unused for the live request shape (legacy API
-  // has nothing to accept beyond the fields above) — kept as a parameter
-  // so a future contractCompleteness === 'complete' branch can extend
-  // `request` with a real agent_inputs field without touching call sites.
-  void contract;
+  const declaredFieldCodes = new Set((contract?.expectedInputFields ?? []).map((f) => f.fieldCode));
+  if (declaredFieldCodes.size > 0) {
+    const agentInputs: Record<string, unknown> = {};
+    let hasAny = false;
+    for (const [code, value] of Object.entries(values)) {
+      if (!declaredFieldCodes.has(code)) continue; // never send an undeclared field — the backend rejects it
+      agentInputs[code] = value;
+      hasAny = true;
+    }
+    if (hasAny) request.agent_inputs = agentInputs;
+  }
 
   return { request, resolvedInputValues: values, unresolvedRequiredFieldCodes };
 }

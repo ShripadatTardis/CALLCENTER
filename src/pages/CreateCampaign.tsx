@@ -14,8 +14,8 @@ import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { parseTargetsCsv, useImportTargets } from '@/hooks/campaigns/useImportTargets';
 import { defaultResultRules } from '@/lib/defaultResultRules';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
-import { importCampaignTargets, startCampaign } from '@/services/campaigns/campaignsService';
-import type { ImportTargetRow, NewResultRuleInput } from '@/types/campaign';
+import { importCampaignTargets, setCampaignInputMappings, startCampaign } from '@/services/campaigns/campaignsService';
+import type { ImportTargetRow, InputMappingSourceType, NewCampaignAgentInputMappingInput, NewResultRuleInput } from '@/types/campaign';
 
 /**
  * Session 10.1 production workflow — 7 stages, no Scheduling step (it
@@ -45,6 +45,11 @@ const CreateCampaign: React.FC = () => {
   const [csvErrors, setCsvErrors] = useState<string[]>([]);
   const [rules, setRules] = useState<NewResultRuleInput[]>(defaultResultRules());
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Session 12.4 — one entry per agent expected_input_field the operator
+  // has mapped so far, keyed by fieldCode. Cleared implicitly whenever
+  // the selected agent changes (a mapping keyed to the old agent's field
+  // codes would be meaningless against a different agent's contract).
+  const [fieldMappings, setFieldMappings] = useState<Record<string, { sourceType: InputMappingSourceType; sourceField: string }>>({});
 
   const { data: agentsData, isLoading: isAgentsLoading } = useAgents();
   const agents = agentsData?.agents ?? [];
@@ -54,6 +59,14 @@ const CreateCampaign: React.FC = () => {
 
   const selectedAgent = agents.find((a) => a.agentId === agentId);
   const agentContract = selectedAgent ? buildAgentContractFromRoster(selectedAgent) : null;
+  const requiredInputFields = agentContract?.expectedInputFields.filter((f) => f.required) ?? [];
+  const optionalInputFields = agentContract?.expectedInputFields.filter((f) => !f.required) ?? [];
+  // Session 12.4 — the extra (non name/phone/customer_reference) CSV
+  // columns actually present in the parsed audience, the only real
+  // candidate set for a 'csv' mapping (matches triggerCallPayload.ts's
+  // own csvFields: target.sourceAttributes).
+  const csvColumns = csvRows.length > 0 ? Object.keys(csvRows[0].sourceAttributes ?? {}) : [];
+  const requiredFieldsUnmapped = requiredInputFields.filter((f) => !fieldMappings[f.fieldCode]?.sourceField);
 
   // Each stage's real completion state — never fabricated, never confuses
   // a partial/legacy Agent Contract with a failure (it's an "available"
@@ -118,6 +131,28 @@ const CreateCampaign: React.FC = () => {
         await importCampaignTargets(campaign.id, csvRows, role);
       }
 
+      // Session 12.4 §5 — persist the operator's field mappings via the
+      // existing campaign_agent_input_mappings architecture. Only rows
+      // with a real sourceField are sent (a field the operator selected
+      // a source TYPE for but never finished choosing a field for is not
+      // a mapping yet). `dataType`/`required` are carried straight from
+      // the agent's own declared contract — never invented here.
+      const mappingsToSave: NewCampaignAgentInputMappingInput[] = Object.entries(fieldMappings)
+        .filter(([, m]) => m.sourceField)
+        .map(([fieldCode, m]) => {
+          const field = agentContract?.expectedInputFields.find((f) => f.fieldCode === fieldCode);
+          return {
+            agentInputFieldCode: fieldCode,
+            sourceType: m.sourceType,
+            sourceField: m.sourceField,
+            required: field?.required ?? false,
+            dataType: field?.dataType ?? null,
+          };
+        });
+      if (mappingsToSave.length > 0) {
+        await setCampaignInputMappings(campaign.id, mappingsToSave, role);
+      }
+
       if (launchImmediately) {
         await startCampaign(campaign.id, role);
       }
@@ -134,6 +169,11 @@ const CreateCampaign: React.FC = () => {
   const blockers: string[] = [];
   if (name.trim().length === 0) blockers.push('Campaign name is required.');
   if (agentId.length === 0) blockers.push('A Call Agent must be selected.');
+  if (requiredFieldsUnmapped.length > 0) {
+    blockers.push(
+      `${requiredFieldsUnmapped.length} required agent input field${requiredFieldsUnmapped.length === 1 ? ' is' : 's are'} not mapped (${requiredFieldsUnmapped.map((f) => f.displayName).join(', ')}).`,
+    );
+  }
   const isReady = blockers.length === 0;
 
   return (
@@ -243,7 +283,13 @@ const CreateCampaign: React.FC = () => {
             {step === 1 && (
               <div className="space-y-1.5 max-w-md">
                 <Label className="text-foreground">Call Agent</Label>
-                <Select value={agentId} onValueChange={setAgentId}>
+                <Select
+                  value={agentId}
+                  onValueChange={(v) => {
+                    setAgentId(v);
+                    setFieldMappings({}); // a mapping keyed to the previous agent's field codes doesn't apply to a different contract
+                  }}
+                >
                   <SelectTrigger className="bg-background border-border text-foreground">
                     <SelectValue placeholder={isAgentsLoading ? 'Loading agents…' : 'Select a Call Agent'} />
                   </SelectTrigger>
@@ -274,11 +320,47 @@ const CreateCampaign: React.FC = () => {
                       </Badge>
                     </div>
                     <div className="text-muted-foreground font-mono text-[11px]">{agentContract.agentId}</div>
-                    {agentContract.contractCompleteness === 'partial' && (
+                    {agentContract.contractCompleteness === 'partial' ? (
                       <p className="text-[12px] text-muted-foreground border-t border-border pt-2">
                         Expected inputs and outcomes are not currently exposed by Call Centre for this agent. This
                         campaign uses the existing Trigger Call contract.
                       </p>
+                    ) : (
+                      <div className="space-y-2 border-t border-border pt-2">
+                        <div>
+                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            Expected inputs ({agentContract.expectedInputFields.length})
+                          </p>
+                          {agentContract.expectedInputFields.length === 0 ? (
+                            <p className="text-[12px] text-muted-foreground">None — this agent takes no campaign-driven inputs.</p>
+                          ) : (
+                            <ul className="text-[12px] space-y-0.5">
+                              {agentContract.expectedInputFields.map((f) => (
+                                <li key={f.fieldCode} className="flex items-center gap-1.5">
+                                  <span className="text-foreground">{f.displayName}</span>
+                                  <span className="text-muted-foreground font-mono text-[10px]">{f.fieldCode}</span>
+                                  {f.required && (
+                                    <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400">
+                                      required
+                                    </Badge>
+                                  )}
+                                  {f.dataType && <span className="text-muted-foreground text-[10px]">({f.dataType}{f.format ? `, ${f.format}` : ''})</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        {agentContract.expectedOutcomes.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                              Advertised outcomes ({agentContract.expectedOutcomes.length})
+                            </p>
+                            <p className="text-[12px] text-muted-foreground">
+                              {agentContract.expectedOutcomes.map((o) => o.displayName).join(', ')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -344,14 +426,103 @@ const CreateCampaign: React.FC = () => {
                   Maps the selected Call Agent's expected input fields to Customer 360 or CSV data. Campaign start
                   is blocked, deterministically, if a required field is left unmapped — never guessed by an AI.
                 </p>
-                {agentContract && agentContract.expectedInputFields.length === 0 ? (
+                {!agentContract && <p className="text-[12px] text-muted-foreground">Select a Call Agent first.</p>}
+                {agentContract && agentContract.expectedInputFields.length === 0 && (
                   <p className="text-[12px] text-muted-foreground border border-border rounded p-2.5 bg-background/60">
-                    Call Centre has not yet declared any expected input fields for this agent — there is nothing to
-                    map. The campaign will call each target using its phone number, the selected agent, and its
-                    Customer 360 reference where known, exactly as it does today.
+                    This agent declares no expected input fields — there is nothing to map. The campaign will call
+                    each target using its phone number, the selected agent, and its Customer 360 reference where
+                    known, exactly as it does today.
                   </p>
-                ) : (
-                  <p className="text-[12px] text-muted-foreground">Select a Call Agent with a discovered contract first.</p>
+                )}
+                {agentContract && agentContract.expectedInputFields.length > 0 && (
+                  <div className="space-y-2">
+                    {csvColumns.length === 0 && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 border border-amber-700/40 rounded p-2">
+                        No CSV columns available yet — upload the Audience CSV (previous stage) to map its columns here, or map fields to Customer 360 data only.
+                      </p>
+                    )}
+                    <div className="border border-border rounded divide-y divide-border">
+                      {[...requiredInputFields, ...optionalInputFields].map((field) => {
+                        const mapping = fieldMappings[field.fieldCode];
+                        return (
+                          <div key={field.fieldCode} className="p-2.5 space-y-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-foreground">{field.displayName}</span>
+                              <span className="text-muted-foreground font-mono text-[10px]">{field.fieldCode}</span>
+                              {field.required ? (
+                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400">
+                                  required
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-border text-muted-foreground">
+                                  optional
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Select
+                                value={mapping?.sourceType ?? ''}
+                                onValueChange={(v) =>
+                                  setFieldMappings((prev) => ({
+                                    ...prev,
+                                    [field.fieldCode]: { sourceType: v as InputMappingSourceType, sourceField: '' },
+                                  }))
+                                }
+                              >
+                                <SelectTrigger className="h-8 w-40 bg-background border-border text-foreground text-[12px]">
+                                  <SelectValue placeholder="Source…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="customer360">Customer 360</SelectItem>
+                                  <SelectItem value="csv">CSV column</SelectItem>
+                                </SelectContent>
+                              </Select>
+
+                              {mapping?.sourceType === 'customer360' && (
+                                <Select
+                                  value={mapping.sourceField}
+                                  onValueChange={(v) => setFieldMappings((prev) => ({ ...prev, [field.fieldCode]: { ...prev[field.fieldCode], sourceField: v } }))}
+                                >
+                                  <SelectTrigger className="h-8 flex-1 bg-background border-border text-foreground text-[12px]">
+                                    <SelectValue placeholder="Field…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="phone_number">Phone number</SelectItem>
+                                    <SelectItem value="customer_id">Customer 360 reference (CIF)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+
+                              {mapping?.sourceType === 'csv' && (
+                                <Select
+                                  value={mapping.sourceField}
+                                  onValueChange={(v) => setFieldMappings((prev) => ({ ...prev, [field.fieldCode]: { ...prev[field.fieldCode], sourceField: v } }))}
+                                  disabled={csvColumns.length === 0}
+                                >
+                                  <SelectTrigger className="h-8 flex-1 bg-background border-border text-foreground text-[12px]">
+                                    <SelectValue placeholder={csvColumns.length === 0 ? 'No CSV columns' : 'Column…'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {csvColumns.map((col) => (
+                                      <SelectItem key={col} value={col}>
+                                        {col}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {requiredFieldsUnmapped.length > 0 && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        {requiredFieldsUnmapped.length} required field{requiredFieldsUnmapped.length === 1 ? '' : 's'} still unmapped — a target missing a
+                        required value will not be dialled when the campaign runs.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -445,7 +616,15 @@ const CreateCampaign: React.FC = () => {
                   status="info"
                 />
                 <ReviewRow label="Audience" value={`${csvRows.length} targets${csvFile ? ` from ${csvFile.name}` : ''}`} status={csvRows.length > 0 ? 'ready' : 'info'} />
-                <ReviewRow label="Input Mapping" value="No required agent inputs today" status="info" />
+                <ReviewRow
+                  label="Input Mapping"
+                  value={
+                    requiredInputFields.length === 0
+                      ? 'No required agent inputs for this agent'
+                      : `${requiredInputFields.length - requiredFieldsUnmapped.length} of ${requiredInputFields.length} required fields mapped`
+                  }
+                  status={requiredFieldsUnmapped.length > 0 ? 'blocker' : 'ready'}
+                />
                 <ReviewRow label="Outcome Policy" value={`${rules.length} rule${rules.length === 1 ? '' : 's'} configured`} status="ready" />
 
                 {!isReady && (

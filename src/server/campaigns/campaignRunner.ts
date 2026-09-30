@@ -11,7 +11,48 @@ import { buildTriggerCallPayload } from './triggerCallPayload.js';
  */
 
 export interface CallBackendAdapter {
-  triggerCall(payload: TriggerCallRequestDto): Promise<TriggerCallResponseDto>;
+  triggerCall(payload: TriggerCallRequestDto, idempotencyKey: string): Promise<TriggerCallResponseDto>;
+}
+
+/**
+ * Session 12.4 — classifies a Trigger Call failure precisely enough that
+ * an ambiguous response can never accidentally be read as "safe to try
+ * again" or, worse, as success. Per the currently documented contract:
+ * - 409 with idempotency_key_conflict: the SAME key was reused with a
+ *   DIFFERENT request body — a real bug (our own key derivation is
+ *   wrong) or a genuine duplicate-body collision; never treated as
+ *   success, never silently retried with a new key from inside this
+ *   function (that would be "generating a fresh key merely because a
+ *   request was retried", exactly what's prohibited).
+ * - 409 with request_in_progress: a call with this exact key is already
+ *   being processed — also never treated as success; the eventual
+ *   correct outcome will be reconciled the normal way once the original
+ *   attempt completes.
+ * - 503: the documented "nothing was dialled, key not consumed" case —
+ *   safe to retry later (e.g. via the existing retryTarget action, which
+ *   creates a NEW execution row and therefore a genuinely new key), but
+ *   this function does not itself retry.
+ * - Any other non-2xx (400/401/403/422/...): the existing pre-dial
+ *   validation-rejection path (unknown/inactive agent_id, missing
+ *   required input, wrong type/format, undeclared input) — unchanged in
+ *   spirit from before this session, now just labeled more precisely.
+ */
+function classifyTriggerCallFailure(status: number, body: unknown, text: string): string {
+  const bodyStr = typeof body === 'object' ? JSON.stringify(body) : text;
+  if (status === 409) {
+    const code = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).error : undefined;
+    if (code === 'idempotency_key_conflict') {
+      return `Trigger Call idempotency conflict: the same Idempotency-Key was reused with a different request body — no call was placed. ${bodyStr}`;
+    }
+    if (code === 'request_in_progress') {
+      return `Trigger Call idempotency conflict: a request with this Idempotency-Key is already in progress — no additional call was placed. ${bodyStr}`;
+    }
+    return `Trigger Call idempotency conflict (409): ${bodyStr}`;
+  }
+  if (status === 503) {
+    return `Trigger Call failed: 503 (Voice Gateway unavailable — nothing was dialled, safe to retry via retryTarget) ${bodyStr}`;
+  }
+  return `Trigger Call failed: ${status} ${bodyStr}`;
 }
 
 /**
@@ -21,7 +62,7 @@ export interface CallBackendAdapter {
  * voiceAgentInteractionSource.ts's own rule.
  */
 export const voiceAgentCallBackend: CallBackendAdapter = {
-  async triggerCall(payload) {
+  async triggerCall(payload, idempotencyKey) {
     const baseUrl = process.env.VOICEBOT_BASE_URL;
     const apiKey = process.env.VOICEBOT_API_KEY;
     if (!baseUrl || !apiKey) {
@@ -29,13 +70,13 @@ export const voiceAgentCallBackend: CallBackendAdapter = {
     }
     const res = await fetch(`${baseUrl}/api/v1/call`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(payload),
     });
     const text = await res.text();
     const body = text ? JSON.parse(text) : undefined;
     if (!res.ok) {
-      throw new Error(`Trigger Call failed: ${res.status} ${typeof body === 'object' ? JSON.stringify(body) : text}`);
+      throw new Error(classifyTriggerCallFailure(res.status, body, text));
     }
     // Documented gotcha (plan §17/Session 1): upstream can return HTTP 200
     // with {error: ...} in the body on a gateway failure.
@@ -80,8 +121,32 @@ export async function runCampaignBatch(
     const { contract, mappings } = await getCampaignContract(target.campaignId);
     const built = buildTriggerCallPayload(target, contract, mappings);
     const execution = await repo.createExecution(target.id, now, built.request as unknown as Record<string, unknown>);
+
+    // Session 12.4 §7 — a target missing a required mapped value must
+    // not be dialled. This is deliberately the SAME check
+    // triggerCallPayload.ts already computes (unresolvedRequiredFieldCodes),
+    // enforced here as a hard gate before any network call — never
+    // fabricated, never guessed; the execution row already exists (for
+    // history/audit) but is marked failed without ever reaching
+    // backend.triggerCall.
+    if (built.unresolvedRequiredFieldCodes.length > 0) {
+      await repo.markExecutionFailed(
+        execution.id,
+        `Not dialled — missing required agent input value(s): ${built.unresolvedRequiredFieldCodes.join(', ')}`,
+      );
+      failed++;
+      continue;
+    }
+
+    // Session 12.4 §3 — the Idempotency-Key is the execution row's own
+    // id: stable and deterministic for this exact attempt (a transport
+    // retry of the SAME triggerCall call reuses the same execution.id,
+    // hence the same key, automatically — no separate key-tracking state
+    // needed), and guaranteed to be a genuinely NEW value whenever a NEW
+    // attempt is created (a fresh createExecution call above, e.g. via
+    // retryTarget's next runBatch pass, always produces a new row id).
     try {
-      const result = await backend.triggerCall(built.request);
+      const result = await backend.triggerCall(built.request, execution.id);
       await repo.markExecutionTriggered(execution.id, result.call_sid, new Date().toISOString());
       triggered++;
     } catch (err) {

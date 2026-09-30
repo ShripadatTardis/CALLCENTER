@@ -14,6 +14,20 @@
 // POST /api/v1/call (Trigger Call)
 // ---------------------------------------------------------------------
 
+/**
+ * Session 12.4 — `agent_inputs` added per the upgraded, currently
+ * documented Trigger Call contract: a flat object of the selected
+ * agent's declared `expected_input_fields[]` field_code -> value. The
+ * backend validates (before dialing) unknown/inactive agent_id, missing
+ * required input, wrong input type/format, and undeclared input —
+ * Call Centre never re-implements that validation as its own source of
+ * truth, only enough local checking to avoid dialing a target it can
+ * already tell is incomplete (see triggerCallPayload.ts). Omitting both
+ * `agent_id` and `agent_inputs` retains the documented legacy/
+ * default-agent behavior unchanged — this field is optional and never
+ * sent as an empty object for an agent that declares zero expected
+ * input fields (e.g. the inbound default agent).
+ */
 export interface TriggerCallRequestDto {
   to_phone_number: string;
   /** Stored on the record only — does NOT change the actual Twilio caller ID. */
@@ -23,6 +37,7 @@ export interface TriggerCallRequestDto {
   agent_id?: string;
   /** Bank CIF/CRM ID, when known. */
   customer_id?: string;
+  agent_inputs?: Record<string, unknown>;
 }
 
 export interface TriggerCallResponseDto {
@@ -134,6 +149,21 @@ export interface CallDataEntryDto {
   is_bank_customer: boolean;
   analysis: CallAnalysisDto;
   detailed_transcript: DetailedTranscriptEntryDto[];
+  /**
+   * Session 12.4 — newly observed on the live response (confirmed
+   * against Phase E's proven call plus a full 689-record scan of every
+   * other real call in this dataset): the schema now HAS a slot for the
+   * agent's actual, classified outcome (per the agent's own
+   * expected_outcomes[] contract — see types/api/agents.ts), but it is
+   * `null` on every single real record observed, including today's own
+   * proven call. **Not yet a usable data source** — do not derive a
+   * Campaign result from this field until it is confirmed populated for
+   * a real interaction. See docs/SESSION_12_4_DYNAMIC_AGENT_CONTRACTS_AND_IDEMPOTENCY.md §8.
+   */
+  actual_outcome_code: string | null;
+  actual_outcome_name: string | null;
+  /** Same status as actual_outcome_code/actual_outcome_name above — the agent's declared output_fields[] values, schema present, never yet populated. */
+  structured_outputs: Record<string, unknown> | null;
 }
 
 export interface CallDataPaginationDto {

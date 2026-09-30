@@ -37,6 +37,8 @@ export interface AgentInputField {
   required: boolean;
   description?: string;
   allowedValues?: string[];
+  /** Session 12.4 — e.g. "YYYY-MM-DD" for a date field. */
+  format?: string;
 }
 
 export interface AgentOutcomeDefinition {
@@ -51,6 +53,8 @@ export interface AgentOutputField {
   displayName: string;
   dataType?: string;
   description?: string;
+  /** Session 12.4 */
+  nullable?: boolean;
 }
 
 export interface CallAgentContract {

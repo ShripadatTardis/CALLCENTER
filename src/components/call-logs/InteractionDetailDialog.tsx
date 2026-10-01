@@ -1,9 +1,9 @@
-
 import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
 import { Search } from 'lucide-react';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
@@ -13,7 +13,6 @@ import {
   formatFractionAsPercent,
   formatPercent,
   formatPhoneNumber,
-  formatStatusLabel,
   formatTimestamp,
 } from '@/lib/format';
 
@@ -23,39 +22,61 @@ interface InteractionDetailDialogProps {
   interaction: Interaction | null;
 }
 
-function getSpeakerColor(speaker: string) {
+/**
+ * UI Session (2026-10-02) — theme-aligned rebuild. Reused primitives
+ * (see the session report for the full audit): `MetricStrip` (the same
+ * compact summary-row component Call Logs/Dashboard/Customer Detail
+ * already use for their own key metrics), `Badge`'s existing
+ * `positive`/`escalated`/`secondary` semantic variants (the same
+ * mapping CallLogs.tsx's own table already uses for the Outcome
+ * column), the `SectionCard`-style quiet container
+ * (`rounded-md border border-border bg-card p-3`, uppercase muted
+ * section label) already established by CustomerDetail.tsx and
+ * CampaignDetail.tsx's result dialogs, and the sidebar's existing
+ * cyan accent token for the one place a restrained AI/customer speaker
+ * distinction is useful in Conversation. No new colors, no new font,
+ * no new dialog shell — only `Dialog`/`DialogContent`/`DialogHeader`/
+ * `DialogTitle` from the existing `@/components/ui/dialog`.
+ *
+ * Still the single shared detail surface for Call Logs, Campaign
+ * Detail's Transcript/Recording, and Customer Detail's Voice timeline
+ * lookup (all three already import this exact component) — redesigning
+ * it once upgrades all three, per the session's explicit reuse
+ * requirement. Data mapping, transcript source reconciliation, and
+ * recording URL are all byte-for-byte unchanged from before this pass.
+ */
+
+function outcomeBadge(outcome: string | undefined): { label: string; variant: 'positive' | 'escalated' | 'secondary' } {
+  if (!outcome) return { label: 'Unclassified', variant: 'secondary' };
+  const label = outcome.charAt(0).toUpperCase() + outcome.slice(1);
+  if (outcome === 'resolved') return { label, variant: 'positive' };
+  if (outcome === 'escalated') return { label, variant: 'escalated' };
+  return { label, variant: 'secondary' };
+}
+
+function speakerTreatment(speaker: string): { label: string; className: string } {
   switch (speaker) {
     case 'customer':
-      return 'bg-blue-100 text-blue-800';
+      return { label: 'Customer', className: 'text-foreground' };
     case 'ai':
-      return 'bg-green-100 text-green-800';
+      return { label: 'AI', className: 'text-cyan-700 dark:text-cyan-400' };
     case 'agent':
-      return 'bg-purple-100 text-purple-800';
+      return { label: 'Agent', className: 'text-foreground' };
     default:
-      return 'bg-muted text-foreground';
+      return { label: speaker.toUpperCase(), className: 'text-muted-foreground' };
   }
 }
 
-function getSentimentColor(sentiment?: string) {
-  switch (sentiment?.toLowerCase()) {
-    case 'positive':
-      return 'text-green-600';
-    case 'negative':
-      return 'text-red-600';
-    case 'neutral':
-      return 'text-yellow-600';
-    default:
-      return 'text-muted-foreground';
-  }
-}
+const SectionCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode }> = ({ title, children, action }) => (
+  <div className="rounded-md border border-border bg-card p-3 space-y-2 flex-shrink-0">
+    <div className="flex items-center justify-between gap-2">
+      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
+      {action}
+    </div>
+    {children}
+  </div>
+);
 
-/**
- * Interaction Detail — expanded from the former TranscriptViewer per the
- * Session 2 plan §4/§5/§8: shows the full metadata set, a real audio
- * element when a recording exists, and reconciles the two transcript
- * sources (embedded call-data.detailed_transcript vs. the dedicated
- * GET /api/calls/session/{id} endpoint) via one clear rule.
- */
 export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = ({
   isOpen,
   onClose,
@@ -84,167 +105,201 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
   if (!interaction) return null;
 
+  const outcome = outcomeBadge(interaction.outcome);
+
+  // Session note (see §5 of the report): every `interaction.analysis`
+  // sub-field was confirmed, across a live sample, to always mirror an
+  // already-shown top-level field 1:1 (sentimentTrend === sentiment,
+  // resolutionStatus === outcome, confidenceScore === intentAccuracy,
+  // keyTopics === tags) — never genuinely unique data. The separate
+  // "Call Centre analysis" box is therefore not rendered; nothing from
+  // it is dropped, since every value it held is already shown in Key
+  // Metrics (Intent confidence, Sentiment), the header badge (outcome),
+  // or the Call Summary tag chips (tags).
+
+  const keyMetrics: MetricStripItem[] = [
+    {
+      label: 'Duration',
+      value: formatDurationLong(interaction.durationSeconds),
+      hint: formatDurationExact(interaction.durationSeconds),
+    },
+    {
+      label: 'FCR',
+      value: interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No',
+    },
+    {
+      // Deliberately labeled "confidence", not "accuracy" — this is the
+      // agent's own reported confidence in its intent classification,
+      // never a measured/verified accuracy figure (see report §4).
+      label: 'Intent confidence',
+      value: formatPercent(interaction.intentAccuracy, 0),
+    },
+    {
+      label: 'Sentiment',
+      value: interaction.sentiment ?? '—',
+    },
+  ];
+
+  const secondaryFacts: Array<[string, React.ReactNode]> = [
+    ['Phone', formatPhoneNumber(interaction.phoneNumber)],
+    [
+      'Authenticated',
+      interaction.wasAuthenticated === null || interaction.wasAuthenticated === undefined
+        ? 'N/A'
+        : interaction.wasAuthenticated
+          ? 'Yes'
+          : 'No',
+    ],
+    ['Escalation', interaction.escalation?.trigger ?? 'None'],
+    ['Campaign', interaction.campaignName ?? '—'],
+  ];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>
-            {interaction.callerName || interaction.phoneNumber} — {interaction.interactionId}
-          </DialogTitle>
+      <DialogContent className="max-w-3xl h-[85vh] max-h-[85vh] overflow-hidden flex flex-col gap-3 p-5">
+        <DialogHeader className="space-y-1 flex-shrink-0">
+          <div className="flex items-start justify-between gap-3 pr-6">
+            <div className="min-w-0">
+              <DialogTitle className="text-base font-semibold text-foreground truncate">
+                {interaction.callerName || formatPhoneNumber(interaction.phoneNumber)}
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                {[interaction.direction, interaction.agentDisplayName ?? interaction.agentId, formatTimestamp(interaction.startTime)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+            <Badge variant={outcome.variant} className="flex-shrink-0 mt-0.5">
+              {outcome.label}
+            </Badge>
+          </div>
+          <p className="text-[11px] font-mono text-muted-foreground truncate">Interaction ID {interaction.interactionId}</p>
         </DialogHeader>
 
-        {/* Metadata */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-muted dark:bg-card p-4 rounded-lg text-sm">
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Phone:</span> {formatPhoneNumber(interaction.phoneNumber)}</div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Agent:</span> {interaction.agentDisplayName ?? interaction.agentId ?? '—'}</div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Direction:</span> {interaction.direction ?? '—'}</div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Status:</span> {formatStatusLabel(interaction.status)}</div>
-          <div title={formatDurationExact(interaction.durationSeconds)}>
-            <span className="text-muted-foreground dark:text-muted-foreground">Duration:</span> {formatDurationLong(interaction.durationSeconds)}
-          </div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Outcome:</span> {interaction.outcome ?? '—'}</div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">FCR:</span> {interaction.fcr === undefined ? '—' : interaction.fcr ? 'Yes' : 'No'}</div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Intent:</span> {interaction.intent ?? '—'}</div>
-          <div>
-            <span className="text-muted-foreground dark:text-muted-foreground">Intent accuracy:</span> {formatPercent(interaction.intentAccuracy, 0)}
-          </div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Sentiment:</span> {interaction.sentiment ?? '—'}</div>
-          <div>
-            <span className="text-muted-foreground dark:text-muted-foreground">Sentiment score:</span>{' '}
-            {formatFractionAsPercent(interaction.sentimentScore)}
-          </div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Campaign:</span> {interaction.campaignName ?? '—'}</div>
-          <div>
-            <span className="text-muted-foreground dark:text-muted-foreground">Authenticated:</span>{' '}
-            {interaction.wasAuthenticated === null || interaction.wasAuthenticated === undefined
-              ? 'N/A'
-              : interaction.wasAuthenticated
-                ? 'Yes'
-                : 'No'}
-          </div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Escalation:</span> {interaction.escalation?.trigger ?? 'None'}</div>
-          <div><span className="text-muted-foreground dark:text-muted-foreground">Started:</span> {formatTimestamp(interaction.startTime)}</div>
-          <div className="col-span-2 md:col-span-4">
-            <span className="text-muted-foreground dark:text-muted-foreground">Summary:</span> {interaction.summary || 'No summary available'}
-          </div>
-          {interaction.tags && interaction.tags.length > 0 && (
-            <div className="col-span-2 md:col-span-4 flex flex-wrap gap-1">
-              {interaction.tags.map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
-              ))}
-            </div>
-          )}
+        <div className="flex-shrink-0">
+          <MetricStrip items={keyMetrics} />
         </div>
 
-        {/* Recording */}
-        <div className="bg-muted dark:bg-card p-4 rounded-lg">
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs text-muted-foreground px-0.5 flex-shrink-0">
+          {secondaryFacts.map(([label, value]) => (
+            <span key={label}>
+              <span className="text-muted-foreground">{label}:</span> <span className="text-foreground">{value}</span>
+            </span>
+          ))}
+        </div>
+
+        {(interaction.summary || (interaction.tags && interaction.tags.length > 0)) && (
+          <SectionCard title="Call Summary">
+            {interaction.summary && <p className="text-sm text-foreground leading-relaxed">{interaction.summary}</p>}
+            {interaction.tags && interaction.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {interaction.tags.map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        )}
+
+        <SectionCard title="Recording">
           {interaction.recording?.url ? (
-            <audio controls className="w-full" src={interaction.recording.url}>
+            <audio controls className="w-full h-9" src={interaction.recording.url}>
               Your browser does not support the audio element.
             </audio>
           ) : (
             <p className="text-sm text-muted-foreground">Recording not available for this interaction.</p>
           )}
-        </div>
-
-        {/* Session 11.3 — Call-Centre-supplied analysis (Interaction.analysis,
-            mapped 1:1 from CallDataEntryDto.analysis in callsMapper.ts). This
-            was already fetched on every call-data row but never rendered
-            anywhere; surfaced here as-is, never recomputed or inferred
-            locally — VoiceForce does not run its own sentiment/analysis. */}
-        {interaction.analysis && (
-          <div className="bg-muted dark:bg-card p-4 rounded-lg">
-            <div className="text-sm font-medium mb-2">Call Centre analysis</div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              <div><span className="text-muted-foreground">Sentiment trend:</span> {interaction.analysis.sentimentTrend ?? '—'}</div>
-              <div><span className="text-muted-foreground">Resolution status:</span> {interaction.analysis.resolutionStatus ?? '—'}</div>
-              <div>
-                <span className="text-muted-foreground">Confidence score:</span>{' '}
-                {interaction.analysis.confidenceScore !== undefined ? `${interaction.analysis.confidenceScore}%` : '—'}
-              </div>
-              <div className="col-span-2">
-                <span className="text-muted-foreground">Key topics:</span>{' '}
-                {interaction.analysis.keyTopics && interaction.analysis.keyTopics.length > 0
-                  ? interaction.analysis.keyTopics.join(', ')
-                  : '—'}
-              </div>
-            </div>
-          </div>
-        )}
+        </SectionCard>
 
         {isActive && liveTranscript.isPollingCapped && (
-          <p className="text-xs text-amber-600">
-            This call is still active. Live updates have paused after 60s to avoid excessive
-            polling — use Refresh below to check for the latest transcript.
+          <p className="text-xs text-amber-700 dark:text-amber-400 flex-shrink-0">
+            This call is still active. Live updates have paused after 60s to avoid excessive polling — use Refresh
+            below to check for the latest transcript.
           </p>
         )}
 
-        {/* Search */}
-        <div className="relative mb-2">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search transcript..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-          {needsLiveFetch && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7"
-              onClick={() => liveTranscript.refetch()}
-              disabled={liveTranscript.isFetching}
-            >
-              Refresh
-            </Button>
-          )}
-        </div>
-
-        {/* Transcript */}
-        <div className="flex-1 overflow-auto space-y-3">
-          {liveTranscript.isLoading && needsLiveFetch && transcript.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Loading transcript…</p>
-          ) : liveTranscript.isError && transcript.length === 0 ? (
-            <div className="text-sm text-amber-700 flex items-center justify-between gap-2">
-              <span>Could not load the transcript from the backend.</span>
-              <Button variant="outline" size="sm" onClick={() => liveTranscript.refetch()}>
-                Retry
-              </Button>
-            </div>
-          ) : filteredTranscript.length === 0 && searchTerm ? (
-            <p className="text-sm text-muted-foreground">No transcript entries match "{searchTerm}".</p>
-          ) : filteredTranscript.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No transcript available for this interaction.</p>
-          ) : (
-            filteredTranscript.map((entry, index) => (
-              <div key={index} className="border-l-4 border-border pl-4 py-2">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Badge className={getSpeakerColor(entry.speaker)}>{entry.speaker.toUpperCase()}</Badge>
-                  <span className="text-sm text-muted-foreground">{entry.timestamp}</span>
-                  {entry.sentiment && (
-                    <span className={`text-xs ${getSentimentColor(entry.sentiment)}`}>{entry.sentiment}</span>
-                  )}
-                  {entry.confidence !== undefined && (
-                    <span className="text-xs text-muted-foreground">{formatFractionAsPercent(entry.confidence)} confidence</span>
-                  )}
-                </div>
-                <p className="text-slate-800 dark:text-foreground leading-relaxed">
-                  {searchTerm
-                    ? entry.text
-                        .split(new RegExp(`(${searchTerm})`, 'gi'))
-                        .map((part, i) =>
-                          part.toLowerCase() === searchTerm.toLowerCase() ? (
-                            <mark key={i} className="bg-yellow-200">{part}</mark>
-                          ) : (
-                            part
-                          ),
-                        )
-                    : entry.text}
-                </p>
+        {/* Session §7/§8 — the one scroll region: everything above is
+            fixed-height, so Conversation gets whatever vertical space
+            remains, with one predictable scrollbar rather than several
+            competing boxes. */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center justify-between gap-2 flex-shrink-0 mb-1.5">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conversation</h3>
+            <div className="flex items-center gap-1.5">
+              {needsLiveFetch && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+                  onClick={() => liveTranscript.refetch()}
+                  disabled={liveTranscript.isFetching}
+                >
+                  Refresh
+                </Button>
+              )}
+              <div className="relative w-52">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+                <Input
+                  placeholder="Search conversation…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
               </div>
-            ))
-          )}
+            </div>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+            {liveTranscript.isLoading && needsLiveFetch && transcript.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">Loading conversation…</p>
+            ) : liveTranscript.isError && transcript.length === 0 ? (
+              <div className="text-sm text-amber-700 dark:text-amber-400 flex items-center justify-between gap-2 py-4">
+                <span>Could not load the conversation from the backend.</span>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => liveTranscript.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            ) : filteredTranscript.length === 0 && searchTerm ? (
+              <p className="text-sm text-muted-foreground py-4">No conversation entries match "{searchTerm}".</p>
+            ) : filteredTranscript.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No conversation available for this interaction.</p>
+            ) : (
+              <div className="divide-y divide-border/60">
+                {filteredTranscript.map((entry, index) => {
+                  const speaker = speakerTreatment(entry.speaker);
+                  return (
+                    <div key={index} className="py-2">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+                        <span className={`font-semibold tracking-wide ${speaker.className}`}>{speaker.label}</span>
+                        <span className="text-muted-foreground">· {entry.timestamp}</span>
+                        {entry.sentiment && <span className="text-muted-foreground">· {entry.sentiment}</span>}
+                        {entry.confidence !== undefined && (
+                          <span className="text-muted-foreground">· {formatFractionAsPercent(entry.confidence)} confidence</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-foreground leading-relaxed mt-0.5">
+                        {searchTerm
+                          ? entry.text
+                              .split(new RegExp(`(${searchTerm})`, 'gi'))
+                              .map((part, i) =>
+                                part.toLowerCase() === searchTerm.toLowerCase() ? (
+                                  <mark key={i} className="bg-amber-200 dark:bg-amber-500/30 dark:text-foreground rounded-sm px-0.5">
+                                    {part}
+                                  </mark>
+                                ) : (
+                                  part
+                                ),
+                              )
+                          : entry.text}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

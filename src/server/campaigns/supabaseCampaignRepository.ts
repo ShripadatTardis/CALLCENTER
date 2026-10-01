@@ -181,6 +181,9 @@ interface TargetRow {
   campaign_result_label: string | null;
   result_is_success: boolean | null;
   result_next_action: string | null;
+  result_actual_outcome_code: string | null;
+  result_actual_outcome_name: string | null;
+  result_structured_outputs: Record<string, unknown> | null;
   latest_execution_status: CampaignExecutionStatus | null;
   latest_reconciliation_status: ReconciliationStatus | null;
   latest_reconciled_interaction_id: string | null;
@@ -206,6 +209,15 @@ function mapTargetRow(row: TargetRow): CampaignTargetRow {
     campaignResultLabel: row.campaign_result_label,
     resultIsSuccess: row.result_is_success,
     resultNextAction: row.result_next_action,
+    // Session 12.5 — undefined (not an explicit null) on the
+    // Customer360-scoped listCustomerTargets row shape, since that SQL
+    // function deliberately does not select these columns (item 10:
+    // no duplication of the Campaign-specific result model into
+    // Customer360); `?? null` normalizes both cases to the same
+    // honest "not available here" value.
+    resultActualOutcomeCode: row.result_actual_outcome_code ?? null,
+    resultActualOutcomeName: row.result_actual_outcome_name ?? null,
+    resultStructuredOutputs: row.result_structured_outputs ?? null,
     latestExecutionStatus: row.latest_execution_status,
     latestReconciliationStatus: row.latest_reconciliation_status,
     latestReconciledInteractionId: row.latest_reconciled_interaction_id,
@@ -506,6 +518,35 @@ export const supabaseCampaignRepository: CampaignRepository = {
     }));
   },
 
+  // Session 12.5 §7 — same row shape as listPendingReconciliations
+  // (both join executions -> targets -> contact points identically),
+  // just a disjoint WHERE clause server-side; reuses the same
+  // PendingReconciliationRow/mapExecution mapping rather than a
+  // parallel shape.
+  async listReconciledMissingActualOutcome(limit) {
+    const rows = await rpc<PendingReconciliationRow[]>('call_center_campaign_list_reconciled_missing_actual_outcome', { p_limit: limit });
+    return (rows ?? []).map((row) => ({
+      ...mapExecution(row),
+      customerId: row.customer_id,
+      campaignId: row.campaign_id,
+      contactRawValue: row.contact_raw_value,
+    }));
+  },
+
+  async enrichActualOutcome(executionId, actualOutcomeCode, actualOutcomeName, structuredOutputs, now) {
+    const outcome = await rpc<{ resultId: string | null; enriched: boolean; reason: string | null }>(
+      'call_center_campaign_enrich_actual_outcome',
+      {
+        p_execution_id: executionId,
+        p_actual_outcome_code: actualOutcomeCode,
+        p_actual_outcome_name: actualOutcomeName,
+        p_structured_outputs: structuredOutputs,
+        p_now: now,
+      },
+    );
+    return outcome;
+  },
+
   async updateReconciliationStatus(executionId, status, reconciledInteractionId, candidate, now, result) {
     const payload = result
       ? {
@@ -522,6 +563,8 @@ export const supabaseCampaignRepository: CampaignRepository = {
           agentId: result.agentId,
           agentName: result.agentName,
           structuredOutputs: result.structuredOutputs,
+          actualOutcomeCode: result.actualOutcomeCode,
+          actualOutcomeName: result.actualOutcomeName,
         }
       : null;
     const outcome = await rpc<{ targetId: string; resultId: string | null }>('call_center_campaign_update_reconciliation_status', {

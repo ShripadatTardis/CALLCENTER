@@ -18,7 +18,29 @@ export function deriveCampaignResult(callData: CallDataEntryDto, rules: Campaign
     outcome: callData.outcome,
     escalation_trigger: callData.escalation_trigger,
     intent: callData.intent,
+    // Session 12.5 §9 — made available as a matchField so an operator
+    // CAN configure a campaign_result_rule against the agent-specific
+    // actual_outcome_code if they choose to (e.g. treat a specific
+    // business outcome as the success signal for that campaign's
+    // outcome policy), without this function — or defaultResultRules()
+    // below — ever doing so automatically. A campaign with no rule
+    // referencing this field behaves byte-for-byte as before.
+    actual_outcome_code: callData.actual_outcome_code,
   };
+
+  // Session 12.5 §3/§4 — the agent-specific business result, read
+  // straight from the authoritatively matched row, computed once here
+  // and attached to BOTH branches below unconditionally. This is
+  // deliberately NOT part of the rule-matching above: whether a
+  // generic campaign_result_rule matched has no bearing on whether the
+  // agent itself reported a business outcome — the two concepts never
+  // overwrite or gate one another. A historical row with both fields
+  // null produces the same null/null pair a pre-Session-12.5 build
+  // would have (via the hardcoded nulls this replaced in
+  // reconcileExecutions.ts).
+  const actualOutcomeCode = callData.actual_outcome_code ?? null;
+  const actualOutcomeName = callData.actual_outcome_name ?? null;
+  const structuredOutputs = callData.structured_outputs ?? null;
 
   const active = rules.filter((r) => r.active).sort((a, b) => a.priority - b.priority);
   const match = active.find((rule) => fieldValue[rule.matchField] === rule.matchValue);
@@ -40,7 +62,9 @@ export function deriveCampaignResult(callData: CallDataEntryDto, rules: Campaign
       // has campaign context, so it always defaults these to null.
       agentId: null,
       agentName: null,
-      structuredOutputs: null,
+      structuredOutputs,
+      actualOutcomeCode,
+      actualOutcomeName,
     };
   }
 
@@ -62,7 +86,9 @@ export function deriveCampaignResult(callData: CallDataEntryDto, rules: Campaign
     nextActionType: match.nextActionType,
     agentId: null,
     agentName: null,
-    structuredOutputs: null,
+    structuredOutputs,
+    actualOutcomeCode,
+    actualOutcomeName,
   };
 }
 

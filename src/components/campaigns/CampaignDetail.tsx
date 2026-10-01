@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { formatTimestamp } from '@/lib/format';
+import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
 import type { CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
 import type { Interaction } from '@/types/interaction';
 
@@ -91,6 +92,93 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; phone: string; 
   return <InteractionDetailDialog isOpen onClose={onClose} interaction={interaction as Interaction} />;
 };
 
+/**
+ * Session 12.5 §8 — shows both result levels clearly without redesigning
+ * the Campaign screen: the existing generic "Current Result" (call-level
+ * outcome, unchanged) alongside the new agent-specific business outcome
+ * and its structured outputs, rendered with the captured agent-contract
+ * snapshot's display names where the backend's returned code/field is
+ * one the campaign's own contract actually declares. An unrecognized
+ * code/field (contract drift) is shown with its raw value and a visible
+ * flag rather than silently dropped or guessed at.
+ */
+const AgentResultDialog: React.FC<{
+  campaign: CampaignDetailType;
+  target: CampaignTargetRow;
+  onClose: () => void;
+}> = ({ campaign, target, onClose }) => {
+  const contract = campaign.agentContractSnapshot;
+  const outcome = classifyActualOutcome(contract, target.resultActualOutcomeCode, target.resultActualOutcomeName);
+  const outputs = classifyStructuredOutputs(contract, target.resultStructuredOutputs);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <div
+        className="bg-card border border-border rounded-lg p-4 max-w-md w-full text-[13px] text-foreground space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-semibold">Agent result</h3>
+
+        <div className="space-y-0.5">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Call outcome</div>
+          <div>{target.campaignResultLabel ?? 'Unclassified'}</div>
+        </div>
+
+        <div className="space-y-0.5">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Agent outcome</div>
+          {outcome.availability === 'unavailable' ? (
+            <div className="text-muted-foreground">Not available for this call</div>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span>{outcome.displayName ?? outcome.code}</span>
+              {outcome.availability === 'unrecognized' && (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                  title="This outcome code is not declared in the campaign's captured agent contract — shown as returned by the backend, not guessed."
+                >
+                  unrecognised
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+
+        {outputs.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Structured outputs</div>
+            <div className="border border-border rounded divide-y divide-border">
+              {outputs.map((field) => (
+                <div key={field.fieldCode} className="flex items-center justify-between gap-2 px-2 py-1">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    {field.displayName}
+                    {!field.known && (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                        title="This field code is not declared in the campaign's captured agent contract."
+                      >
+                        unrecognised
+                      </Badge>
+                    )}
+                  </span>
+                  <span className="text-foreground">{formatOutputValue(field.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function reconciliationLabel(target: CampaignTargetRow): string {
   if (target.effectiveResultId) return target.campaignResultLabel ?? 'Classified';
   switch (target.latestReconciliationStatus) {
@@ -117,6 +205,7 @@ interface CampaignDetailProps {
 export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, targets, onBack, onRefetch }) => {
   const actions = useCampaignActions(campaign.id);
   const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
+  const [agentResultTargetId, setAgentResultTargetId] = useState<string | null>(null);
 
   const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
   const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
@@ -232,6 +321,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                 <th className="text-left py-2 px-3 font-medium">Phone</th>
                 <th className="text-left py-2 px-3 font-medium">Status</th>
                 <th className="text-left py-2 px-3 font-medium">Current Result</th>
+                <th className="text-left py-2 px-3 font-medium">Agent Outcome</th>
                 <th className="text-left py-2 px-3 font-medium">Next Action</th>
                 <th className="text-left py-2 px-3 font-medium">Follow-up Due</th>
                 <th className="text-right py-2 px-3 font-medium">Attempts</th>
@@ -268,6 +358,26 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                       </span>
                     )}
                   </td>
+                  <td className="py-2 px-3">
+                    {(() => {
+                      const outcome = classifyActualOutcome(campaign.agentContractSnapshot, target.resultActualOutcomeCode, target.resultActualOutcomeName);
+                      if (outcome.availability === 'unavailable') return <span className="text-muted-foreground">—</span>;
+                      return (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="text-foreground">{outcome.displayName ?? outcome.code}</span>
+                          {outcome.availability === 'unrecognized' && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                              title="Not declared in this campaign's captured agent contract"
+                            >
+                              unrecognised
+                            </Badge>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="py-2 px-3 text-muted-foreground">{target.resultNextAction ?? '—'}</td>
                   <td className="py-2 px-3 text-muted-foreground">
                     {target.status === 'follow_up_due' && target.nextActionAt ? formatTimestamp(target.nextActionAt) : '—'}
@@ -283,6 +393,16 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                           onClick={() => setOpenInteractionId(target.latestReconciledInteractionId)}
                         >
                           Transcript / Recording
+                        </Button>
+                      )}
+                      {(target.resultActualOutcomeCode || target.resultStructuredOutputs) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-[11px] h-7"
+                          onClick={() => setAgentResultTargetId(target.id)}
+                        >
+                          Agent Result
                         </Button>
                       )}
                       {(target.status === 'failed' || target.status === 'follow_up_due') && (
@@ -302,7 +422,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
               ))}
               {targets.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     No targets imported yet.
                   </td>
                 </tr>
@@ -320,6 +440,13 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             phone={owningTarget.contactRawValue}
             onClose={() => setOpenInteractionId(null)}
           />
+        ) : null;
+      })()}
+
+      {agentResultTargetId && (() => {
+        const target = targets.find((t) => t.id === agentResultTargetId);
+        return target ? (
+          <AgentResultDialog campaign={campaign} target={target} onClose={() => setAgentResultTargetId(null)} />
         ) : null;
       })()}
     </div>

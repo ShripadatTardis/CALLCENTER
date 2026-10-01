@@ -151,13 +151,14 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
 
       if (match) {
         const { rules, agentId, agentName } = await getCampaignInfo(execution.campaignId);
+        // Session 12.5 — deriveCampaignResult now reads
+        // actual_outcome_code/actual_outcome_name/structured_outputs
+        // straight off `match` itself (the authoritatively matched
+        // call-data row — never the diagnostic `candidate`), so no
+        // override is needed here; a historical/legacy match with all
+        // three null produces the same null result it always did.
         const derivedBase = deriveCampaignResult(match, rules);
-        // Session 9.1 Phase 7 — a plain copy of the campaign's own agent
-        // snapshot, never an LLM-derived or fabricated value. No real
-        // structured-output field exists on today's call-data response
-        // (CallDataEntryDto), so this stays null until Call Centre
-        // exposes one (see docs/SESSION_9_1_OUTBOUND_CAMPAIGN_DOMAIN_BUILD.md).
-        const derived = { ...derivedBase, agentId, agentName, structuredOutputs: null };
+        const derived = { ...derivedBase, agentId, agentName };
         await repo.updateReconciliationStatus(execution.id, 'reconciled', match.call_id, candidate, new Date().toISOString(), derived);
         reconciled++;
         continue;
@@ -187,4 +188,73 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
   }
 
   return { processed: pending.length, reconciled, unresolved, stillPending, errors };
+}
+
+export interface EnrichActualOutcomeResult {
+  processed: number;
+  enriched: number;
+  noActualOutcomeYet: number;
+  skipped: number;
+  errors: number;
+}
+
+/**
+ * Session 12.5 §7 — the idempotent enrichment path for an execution
+ * that was already authoritatively reconciled (call_sid == call_id
+ * already proven, campaign_results row already exists) back when the
+ * matched call-data row's actual_outcome_code/structured_outputs were
+ * still null — and the backend has since started populating them.
+ *
+ * Deliberately separate from reconcilePendingExecutions above, not a
+ * variant of it: the candidate set
+ * (repo.listReconciledMissingActualOutcome) is disjoint from
+ * listPendingReconciliations, re-uses the SAME authoritative
+ * call_sid == call_id matching (tryAuthoritativeMatch, not a
+ * reimplementation), and never creates an execution, never calls a
+ * CallBackendAdapter, and never touches reconciliation_status or the
+ * generic call_status/call_outcome/campaignResultCode/isSuccess
+ * already recorded. repo.enrichActualOutcome's own UPDATE-only, only-
+ * when-currently-null guard (see the migration) is what makes this
+ * safe to invoke repeatedly — this function adds no additional
+ * idempotency logic on top of that guard, by design, to avoid two
+ * independent sources of truth for "has this already been enriched."
+ */
+export async function enrichReconciledExecutionsWithActualOutcome(
+  repo: CampaignRepository,
+  limit = 25,
+): Promise<EnrichActualOutcomeResult> {
+  const mode = getCorrelationMode();
+  const candidates = await repo.listReconciledMissingActualOutcome(limit);
+
+  let enriched = 0;
+  let noActualOutcomeYet = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const execution of candidates) {
+    try {
+      const match = await tryAuthoritativeMatch(execution, mode);
+      if (!match || !match.actual_outcome_code) {
+        noActualOutcomeYet++;
+        continue;
+      }
+      const outcome = await repo.enrichActualOutcome(
+        execution.id,
+        match.actual_outcome_code,
+        match.actual_outcome_name ?? null,
+        match.structured_outputs ?? null,
+        new Date().toISOString(),
+      );
+      if (outcome.enriched) {
+        enriched++;
+      } else {
+        skipped++;
+      }
+    } catch (err) {
+      errors++;
+      void err;
+    }
+  }
+
+  return { processed: candidates.length, enriched, noActualOutcomeYet, skipped, errors };
 }

@@ -134,6 +134,20 @@ export interface CampaignTargetRow extends CampaignTarget {
   campaignResultLabel: string | null;
   resultIsSuccess: boolean | null;
   resultNextAction: string | null;
+  /**
+   * Session 12.5 — the agent-specific business outcome/structured
+   * values from the authoritatively matched call-data row, kept
+   * strictly separate from campaignResultCode/campaignResultLabel
+   * above (the existing GENERIC result, still driven only by
+   * campaign_result_rules matching status/outcome/escalation_trigger/
+   * intent). Null on every historical target reconciled before the
+   * backend started populating these fields, and on any target whose
+   * matched call simply had them null — both are valid, honest states,
+   * never backfilled or guessed.
+   */
+  resultActualOutcomeCode: string | null;
+  resultActualOutcomeName: string | null;
+  resultStructuredOutputs: Record<string, unknown> | null;
   latestExecutionStatus: CampaignExecutionStatus | null;
   latestReconciliationStatus: ReconciliationStatus | null;
   latestReconciledInteractionId: string | null;
@@ -209,6 +223,17 @@ export interface CampaignResult {
   agentId: string | null;
   agentName: string | null;
   structuredOutputs: Record<string, unknown> | null;
+  /**
+   * Session 12.5 — the agent-specific business outcome, read directly
+   * from the authoritatively matched call-data row's own
+   * actual_outcome_code/actual_outcome_name. Deliberately separate from
+   * campaignResultCode/campaignResultLabel (the existing generic,
+   * rule-derived result) — see resultRules.ts's deriveCampaignResult
+   * for how both are computed from the same matched row without either
+   * one overwriting the other.
+   */
+  actualOutcomeCode: string | null;
+  actualOutcomeName: string | null;
 }
 
 /** The derived-result payload passed into update_reconciliation_status on a 'reconciled' transition (plan §10/§22). */
@@ -232,6 +257,9 @@ export interface DerivedCampaignResult {
   agentId: string | null;
   agentName: string | null;
   structuredOutputs: Record<string, unknown> | null;
+  /** Session 12.5 — see CampaignResult.actualOutcomeCode/actualOutcomeName above; same values, same provenance. */
+  actualOutcomeCode: string | null;
+  actualOutcomeName: string | null;
 }
 
 export interface CampaignFollowup {

@@ -4,7 +4,7 @@ import { requireAdminToken, readIntQuery, resolveAccessForRequest } from './_cus
 import type { AuthorizedAccess } from '../src/server/customer360/authorizationService.js';
 import { supabaseCampaignRepository } from '../src/server/campaigns/supabaseCampaignRepository.js';
 import { runCampaignBatch, voiceAgentCallBackend } from '../src/server/campaigns/campaignRunner.js';
-import { reconcilePendingExecutions } from '../src/server/campaigns/reconcileExecutions.js';
+import { reconcilePendingExecutions, enrichReconciledExecutionsWithActualOutcome } from '../src/server/campaigns/reconcileExecutions.js';
 import { defaultResultRules } from '../src/server/campaigns/resultRules.js';
 import { validateMappingSourceUniqueness } from '../src/server/campaigns/inputMapping.js';
 import type {
@@ -314,6 +314,20 @@ async function handleReconcile(req: VercelRequest, res: VercelResponse): Promise
 }
 
 /**
+ * Session 12.5 §7 — manual/admin-only trigger for the idempotent
+ * actual-outcome enrichment path. Deliberately NOT added to any
+ * vercel.json cron schedule by this session (Campaign cron schedules
+ * are an explicit regression boundary) — invoked the same way
+ * runBatch/reconcile were historically exercised before/alongside
+ * their own cron wiring, via POST + X-Admin-Token.
+ */
+async function handleEnrichActualOutcomes(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const limit = readIntQuery(req, 'limit', 25);
+  const result = await enrichReconciledExecutionsWithActualOutcome(repo, limit);
+  res.status(200).json(result);
+}
+
+/**
  * Session 12.3 — same narrow scheduler-adapter pattern already proven by
  * api/customers/admin.ts's Customer 360 Voice reconcile cron: Vercel Cron
  * only issues GET requests and cannot set custom headers, so it can't
@@ -334,7 +348,7 @@ function isAuthorizedCronRequest(req: VercelRequest): boolean {
 }
 
 const GET_ACTIONS = new Set(['list', 'get', 'listTargets']);
-const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile']);
+const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile', 'enrichActualOutcomes']);
 
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
@@ -422,10 +436,13 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'reconcile':
       await handleReconcile(req, res);
       return;
+    case 'enrichActualOutcomes':
+      await handleEnrichActualOutcomes(req, res);
+      return;
     default:
       res.status(400).json({
         detail:
-          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, or reconcile',
+          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, or enrichActualOutcomes',
       });
   }
 });

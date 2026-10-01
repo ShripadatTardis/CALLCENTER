@@ -77,6 +77,16 @@ export interface CampaignRepository {
   listPendingReconciliations(limit: number): Promise<PendingReconciliation[]>;
 
   /**
+   * Session 12.5 §7 — the candidate set for the idempotent enrichment
+   * path: executions already authoritatively reconciled whose stored
+   * campaign_results row has no actual_outcome_code yet. Deliberately
+   * disjoint from listPendingReconciliations (which only ever selects
+   * reconciliation_status = 'pending') — an execution never appears in
+   * both lists, and once enriched it drops out of this one too.
+   */
+  listReconciledMissingActualOutcome(limit: number): Promise<PendingReconciliation[]>;
+
+  /**
    * Atomically transitions reconciliation_status and, only on a
    * 'reconciled' transition with `result` supplied, inserts the one
    * corresponding campaign_results row and updates the target's
@@ -91,6 +101,25 @@ export interface CampaignRepository {
     now: string,
     result: DerivedCampaignResult | null,
   ): Promise<{ targetId: string; resultId: string | null }>;
+
+  /**
+   * Session 12.5 §7 — narrow, idempotent UPDATE-only enrichment of an
+   * already-reconciled execution's stored result: fills in
+   * actual_outcome_code/actual_outcome_name/structured_outputs ONLY
+   * when that result currently has no actual_outcome_code, so calling
+   * this twice (or on a result that already has real data) is always a
+   * safe no-op — never a second campaign_results row, never an
+   * overwrite of previously recorded data. Never creates an execution,
+   * never dials, never touches the generic call_status/call_outcome/
+   * campaignResultCode/isSuccess fields on the same row.
+   */
+  enrichActualOutcome(
+    executionId: string,
+    actualOutcomeCode: string | null,
+    actualOutcomeName: string | null,
+    structuredOutputs: Record<string, unknown> | null,
+    now: string,
+  ): Promise<{ resultId: string | null; enriched: boolean; reason: string | null }>;
 
   createFollowup(input: {
     targetId: string;

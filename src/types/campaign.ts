@@ -157,6 +157,17 @@ export interface CampaignTargetRow {
   campaignResultLabel: string | null;
   resultIsSuccess: boolean | null;
   resultNextAction: string | null;
+  /**
+   * Session 12.5 — the agent-specific business outcome from the
+   * authoritatively matched call, kept separate from
+   * campaignResultCode/campaignResultLabel above (still the existing,
+   * generic rule-derived result). Null for every historical target and
+   * for any target whose matched call simply had these fields null —
+   * both honest states, never backfilled or inferred.
+   */
+  resultActualOutcomeCode: string | null;
+  resultActualOutcomeName: string | null;
+  resultStructuredOutputs: Record<string, unknown> | null;
   latestExecutionStatus: CampaignExecutionStatus | null;
   latestReconciliationStatus: ReconciliationStatus | null;
   latestReconciledInteractionId: string | null;

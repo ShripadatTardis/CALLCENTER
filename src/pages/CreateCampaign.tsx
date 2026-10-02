@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -86,6 +86,39 @@ const CreateCampaign: React.FC = () => {
   // candidate set for a 'csv' mapping (matches triggerCallPayload.ts's
   // own csvFields: target.sourceAttributes).
   const csvColumns = csvRows.length > 0 ? Object.keys(csvRows[0].sourceAttributes ?? {}) : [];
+  // Session 12.7 — auto-map a CSV column to an agent input field only
+  // when its header matches the field's code exactly, case-insensitively
+  // (e.g. CSV header "CUSTOMER_NAME" <-> field code "customer_name").
+  // Deliberately exact-match only, never fuzzy/partial — deterministic
+  // and auditable, matching this step's own "never guessed by an AI"
+  // principle. Only fills a field that has no mapping yet; never
+  // overwrites an operator's own manual choice (including a previous
+  // auto-mapping the operator then changed), and never assigns a CSV
+  // column already claimed by another field in the same pass —
+  // preserves the 12.4.1 single-source invariant by construction.
+  useEffect(() => {
+    if (csvColumns.length === 0 || !agentContract || agentContract.expectedInputFields.length === 0) return;
+    setFieldMappings((prev) => {
+      const usedColumns = new Set(
+        Object.values(prev)
+          .filter((m) => m.sourceType === 'csv')
+          .map((m) => m.sourceField),
+      );
+      let changed = false;
+      const next = { ...prev };
+      for (const field of agentContract.expectedInputFields) {
+        if (next[field.fieldCode]) continue;
+        const match = csvColumns.find((col) => col.toLowerCase() === field.fieldCode.toLowerCase() && !usedColumns.has(col));
+        if (match) {
+          next[field.fieldCode] = { sourceType: 'csv', sourceField: match };
+          usedColumns.add(match);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId, csvColumns.join('|')]);
   const requiredFieldsUnmapped = requiredInputFields.filter((f) => !fieldMappings[f.fieldCode]?.sourceField);
   // Session 12.4.1 — a source field may back only one agent input.
   // Excludes the field's OWN current selection so re-opening its dropdown

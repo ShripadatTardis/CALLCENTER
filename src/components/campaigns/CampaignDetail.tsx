@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { CampaignStatusBadge } from './CampaignStatusBadge';
+import { ReasonDialog } from './ReasonDialog';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { useCampaignClassifications } from '@/hooks/campaigns/useCampaigns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -252,6 +253,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   const { data: classifications = [] } = useCampaignClassifications();
   const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
   const [agentResultTargetId, setAgentResultTargetId] = useState<string | null>(null);
+  const [lifecycleDialog, setLifecycleDialog] = useState<'pause' | 'stop' | null>(null);
 
   const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
   const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
@@ -287,7 +289,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             </Button>
           )}
           {campaign.status === 'running' && (
-            <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => runAction(actions.pause)} disabled={actions.pause.isPending}>
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setLifecycleDialog('pause')} disabled={actions.pause.isPending}>
               Pause
             </Button>
           )}
@@ -297,7 +299,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             </Button>
           )}
           {(campaign.status === 'running' || campaign.status === 'paused') && (
-            <Button size="sm" variant="destructive" onClick={() => runAction(actions.stop)} disabled={actions.stop.isPending}>
+            <Button size="sm" variant="destructive" onClick={() => setLifecycleDialog('stop')} disabled={actions.stop.isPending}>
               Stop
             </Button>
           )}
@@ -509,7 +511,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                           variant="outline"
                           className="text-[11px] h-7"
                           disabled={actions.retry.isPending}
-                          onClick={() => actions.retry.mutateAsync(target.id).then(onRefetch)}
+                          onClick={() => actions.retry.mutateAsync({ targetId: target.id, reason: null }).then(onRefetch)}
                         >
                           Retry
                         </Button>
@@ -547,6 +549,27 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           <AgentResultDialog campaign={campaign} target={target} onClose={() => setAgentResultTargetId(null)} />
         ) : null;
       })()}
+
+      <ReasonDialog
+        isOpen={lifecycleDialog !== null}
+        title={lifecycleDialog === 'stop' ? 'Stop campaign' : 'Pause campaign'}
+        description={
+          lifecycleDialog === 'stop'
+            ? 'Stopping is a terminal state — the campaign cannot be resumed afterwards. All history is preserved.'
+            : 'The campaign can be resumed later from where it left off.'
+        }
+        confirmLabel={lifecycleDialog === 'stop' ? 'Stop campaign' : 'Pause campaign'}
+        confirmVariant={lifecycleDialog === 'stop' ? 'destructive' : 'default'}
+        isPending={lifecycleDialog === 'stop' ? actions.stop.isPending : actions.pause.isPending}
+        onCancel={() => setLifecycleDialog(null)}
+        onConfirm={(reason) => {
+          const mutation = lifecycleDialog === 'stop' ? actions.stop : actions.pause;
+          mutation.mutateAsync({ id: campaign.id, reason }).then(() => {
+            setLifecycleDialog(null);
+            onRefetch();
+          });
+        }}
+      />
     </div>
   );
 };

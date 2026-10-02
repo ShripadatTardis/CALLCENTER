@@ -1,15 +1,21 @@
 import { request } from '@/services/transport/httpClient';
 import type {
+  CallAgentContract,
   CampaignAgentInputMapping,
+  CampaignAuditEvent,
   CampaignClassification,
+  CampaignConfigurationVersion,
   CampaignDetail,
   CampaignListResponse,
+  CampaignSkipReason,
+  CampaignTargetMutationResult,
   CampaignTargetsResponse,
   CampaignWithStats,
   CreateCampaignInput,
   ImportTargetRow,
   ImportTargetsResult,
   NewCampaignAgentInputMappingInput,
+  OutcomePolicySnapshot,
 } from '@/types/campaign';
 
 /**
@@ -124,10 +130,12 @@ export async function startCampaign(id: string, role = 'unauthenticated'): Promi
   });
 }
 
-export async function pauseCampaign(id: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
+/** Session 12.7 §14 — the server now requires a non-empty reason to pause. */
+export async function pauseCampaign(id: string, reason: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
   return request<CampaignWithStats>('/campaigns', {
     method: 'POST',
     query: { action: 'pause', id },
+    body: { reason },
     headers: roleHeaders(role),
   });
 }
@@ -140,21 +148,152 @@ export async function resumeCampaign(id: string, role = 'unauthenticated'): Prom
   });
 }
 
-export async function stopCampaign(id: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
+/** Session 12.7 §14 — the server now requires a non-empty reason AND confirm:true to stop. */
+export async function stopCampaign(id: string, reason: string, role = 'unauthenticated'): Promise<CampaignWithStats> {
   return request<CampaignWithStats>('/campaigns', {
     method: 'POST',
     query: { action: 'stop', id },
+    body: { reason, confirm: true },
     headers: roleHeaders(role),
   });
 }
 
 export async function retryTarget(
   targetId: string,
+  reason?: string | null,
   role = 'unauthenticated',
 ): Promise<{ targetId: string; status: string }> {
   return request('/campaigns', {
     method: 'POST',
     query: { action: 'retryTarget', targetId },
+    body: { reason: reason ?? null },
+    headers: roleHeaders(role),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Session 12.7 — Campaign Administration, Configuration Versioning &
+// Target Controls.
+// ---------------------------------------------------------------------
+
+export async function fetchCampaignSkipReasons(): Promise<CampaignSkipReason[]> {
+  const { data } = await request<{ data: CampaignSkipReason[] }>('/campaigns', {
+    method: 'GET',
+    query: { action: 'listSkipReasons' },
+  });
+  return data;
+}
+
+export async function fetchCampaignConfigurationVersions(
+  id: string,
+  role = 'unauthenticated',
+): Promise<CampaignConfigurationVersion[]> {
+  const { data } = await request<{ data: CampaignConfigurationVersion[] }>('/campaigns', {
+    method: 'GET',
+    query: { action: 'listConfigurationVersions', id },
+    headers: roleHeaders(role),
+  });
+  return data;
+}
+
+export async function fetchCampaignAuditEvents(
+  id: string,
+  limit = 200,
+  role = 'unauthenticated',
+): Promise<CampaignAuditEvent[]> {
+  const { data } = await request<{ data: CampaignAuditEvent[] }>('/campaigns', {
+    method: 'GET',
+    query: { action: 'listAuditEvents', id, limit },
+    headers: roleHeaders(role),
+  });
+  return data;
+}
+
+/** §5/§20 — expectedCurrentVersionId must be the version id the caller last saw active (or null if it believes the campaign has never been versioned); a stale value raises a 409. */
+export async function createCampaignConfigurationVersion(
+  id: string,
+  input: {
+    expectedCurrentVersionId: string | null;
+    reason: string;
+    agentId?: string;
+    agentName?: string | null;
+    agentContractSnapshot?: CallAgentContract | null;
+    outcomePolicySnapshot?: OutcomePolicySnapshot | null;
+    mappings?: NewCampaignAgentInputMappingInput[] | null;
+    eventType?: string;
+  },
+  role = 'unauthenticated',
+): Promise<{ versionId: string; versionNumber: number }> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'createConfigurationVersion', id },
+    body: input,
+    headers: roleHeaders(role),
+  });
+}
+
+export async function skipCampaignTarget(
+  targetId: string,
+  reasonCode: string,
+  comment: string | null,
+  role = 'unauthenticated',
+): Promise<CampaignTargetMutationResult> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'skipTarget', targetId },
+    body: { reasonCode, comment },
+    headers: roleHeaders(role),
+  });
+}
+
+export async function holdCampaignTarget(
+  targetId: string,
+  reason: string | null,
+  note: string | null,
+  role = 'unauthenticated',
+): Promise<CampaignTargetMutationResult> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'holdTarget', targetId },
+    body: { reason, note },
+    headers: roleHeaders(role),
+  });
+}
+
+export async function releaseCampaignTargetHold(
+  targetId: string,
+  role = 'unauthenticated',
+): Promise<CampaignTargetMutationResult> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'releaseHold', targetId },
+    headers: roleHeaders(role),
+  });
+}
+
+export async function amendCampaignTarget(
+  targetId: string,
+  sourceAttributes: Record<string, unknown>,
+  reason: string | null,
+  role = 'unauthenticated',
+): Promise<CampaignTargetMutationResult> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'amendTarget', targetId },
+    body: { sourceAttributes, reason },
+    headers: roleHeaders(role),
+  });
+}
+
+export async function addCampaignTargets(
+  id: string,
+  rows: ImportTargetRow[],
+  role = 'unauthenticated',
+): Promise<ImportTargetsResult & { batchId: string }> {
+  return request('/campaigns', {
+    method: 'POST',
+    query: { action: 'addTargets', id },
+    body: { rows },
     headers: roleHeaders(role),
   });
 }

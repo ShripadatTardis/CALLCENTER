@@ -39,11 +39,18 @@ export function useCampaignActions(campaignId?: string) {
   });
 
   const start = useMutation({ mutationFn: (id: string) => startCampaign(id, role), onSuccess: invalidate });
-  const pause = useMutation({ mutationFn: (id: string) => pauseCampaign(id, role), onSuccess: invalidate });
+  // Session 12.7 §14 — pause/stop now require a non-empty reason, enforced server-side.
+  const pause = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => pauseCampaign(id, reason, role),
+    onSuccess: invalidate,
+  });
   const resume = useMutation({ mutationFn: (id: string) => resumeCampaign(id, role), onSuccess: invalidate });
-  const stop = useMutation({ mutationFn: (id: string) => stopCampaign(id, role), onSuccess: invalidate });
+  const stop = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => stopCampaign(id, reason, role),
+    onSuccess: invalidate,
+  });
   const retry = useMutation({
-    mutationFn: (targetId: string) => retryTarget(targetId, role),
+    mutationFn: ({ targetId, reason }: { targetId: string; reason?: string | null }) => retryTarget(targetId, reason, role),
     onSuccess: invalidate,
   });
   const followup = useMutation({

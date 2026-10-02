@@ -15,7 +15,9 @@ export type CampaignTargetStatus =
   | 'failed'
   | 'skipped'
   | 'follow_up_due'
-  | 'closed';
+  | 'closed'
+  /** Session 12.7 — target-level Hold, distinct from campaign-level Pause. Excluded from runner selection the same way 'skipped' already is. */
+  | 'held';
 
 export type CampaignExecutionStatus = 'queued' | 'triggering' | 'triggered' | 'failed';
 export type ReconciliationStatus = 'pending' | 'reconciled' | 'unresolved' | 'error';
@@ -216,6 +218,18 @@ export interface CampaignTargetRow {
   latestExecutionStatus: CampaignExecutionStatus | null;
   latestReconciliationStatus: ReconciliationStatus | null;
   latestReconciledInteractionId: string | null;
+  /** Session 12.7 — which configuration version governed the most recent execution attempt. Null for a legacy/never-versioned execution. */
+  latestConfigurationVersionId: string | null;
+  /** Session 12.7 — present only when this target is currently status='skipped'. */
+  skipReasonCode: string | null;
+  skipComment: string | null;
+  /** Session 12.7 — present only when this target is currently status='held'. Cleared on release. */
+  holdReason: string | null;
+  holdNote: string | null;
+  /** Session 12.7 — the originally imported attributes, captured once and never modified again. Null for a target never amended. */
+  originalSourceAttributes: Record<string, unknown> | null;
+  /** Session 12.7 — groups targets added together via the same CSV/import call. */
+  importBatchId: string | null;
 }
 
 export interface CampaignListResponse {
@@ -274,4 +288,69 @@ export interface RunBatchResult {
   processed: number;
   triggered: number;
   failed: number;
+}
+
+// ---------------------------------------------------------------------
+// Session 12.7 — Campaign Administration, Configuration Versioning &
+// Target Controls.
+// ---------------------------------------------------------------------
+
+export interface CampaignConfigurationVersion {
+  id: string;
+  campaignId: string;
+  versionNumber: number;
+  status: 'active' | 'superseded';
+  agentId: string;
+  agentName: string | null;
+  agentContractSnapshot: CallAgentContract | null;
+  outcomePolicySnapshot: OutcomePolicySnapshot | null;
+  createdAt: string;
+  createdBy: string | null;
+  changeReason: string | null;
+  previousVersionId: string | null;
+}
+
+export interface CampaignAuditEvent {
+  id: string;
+  campaignId: string;
+  eventType: string;
+  actor: string | null;
+  occurredAt: string;
+  campaignTargetId: string | null;
+  campaignExecutionId: string | null;
+  configurationVersionId: string | null;
+  reason: string | null;
+  comment: string | null;
+  detail: Record<string, unknown> | null;
+}
+
+/** System-configured Skip Reason master — always fetched live via fetchCampaignSkipReasons(), never hardcoded. */
+export interface CampaignSkipReason {
+  code: string;
+  label: string;
+  description: string | null;
+  requiresComment: boolean;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface CampaignTargetMutationResult {
+  id: string;
+  campaignId: string;
+  customerId: string;
+  contactPointId: string;
+  status: CampaignTargetStatus;
+  sourceAttributes: Record<string, unknown>;
+  attemptCount: number;
+  lastActionAt: string | null;
+  nextActionAt: string | null;
+  effectiveResultId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  skipReasonCode: string | null;
+  skipComment: string | null;
+  holdReason: string | null;
+  holdNote: string | null;
+  originalSourceAttributes: Record<string, unknown> | null;
+  importBatchId: string | null;
 }

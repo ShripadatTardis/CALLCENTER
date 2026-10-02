@@ -1,10 +1,14 @@
 import type {
   Campaign,
+  CampaignAuditEvent,
   CampaignClassification,
+  CampaignConfigurationVersion,
   CampaignDetail,
   CampaignExecution,
   CampaignFollowup,
+  CampaignSkipReason,
   CampaignStatus,
+  CampaignTargetMutationResult,
   CampaignTargetRow,
   CampaignWithStats,
   CallAgentContract,
@@ -146,7 +150,7 @@ export interface CampaignRepository {
     now: string;
   }): Promise<CampaignFollowup>;
 
-  retryTarget(targetId: string, now: string): Promise<{ targetId: string; status: string }>;
+  retryTarget(targetId: string, now: string, actor?: string | null, reason?: string | null): Promise<{ targetId: string; status: string }>;
 
   /**
    * Session 9.2 — the minimal lookup needed to authorize retryTarget/
@@ -155,4 +159,76 @@ export interface CampaignRepository {
    * campaignId. Returns null if the target doesn't exist.
    */
   getTargetContext(targetId: string): Promise<{ targetId: string; campaignId: string; agentId: string } | null>;
+
+  // ---------------------------------------------------------------------
+  // Session 12.7 — Campaign Administration, Configuration Versioning &
+  // Target Controls. See supabase/migrations/20261012000000_campaign_
+  // administration_versioning_and_target_controls.sql and ..._lookup_
+  // and_batch_stamp.sql for the backing RPCs this adapter calls.
+  // ---------------------------------------------------------------------
+
+  /** System-configured Skip Reason master (call_center.campaign_skip_reasons) — same principle as listClassifications, never hardcoded. */
+  listSkipReasons(): Promise<CampaignSkipReason[]>;
+
+  /** Full version history for one campaign, newest first. */
+  listConfigurationVersions(campaignId: string): Promise<CampaignConfigurationVersion[]>;
+
+  /** The exact configuration version that governed one execution (§16/§17) — null if the version id doesn't resolve (shouldn't happen once stamped, but never fabricated). */
+  getConfigurationVersion(versionId: string): Promise<CampaignConfigurationVersion | null>;
+
+  /** Campaign History's read path — append-only audit log, newest first. */
+  listAuditEvents(campaignId: string, limit?: number): Promise<CampaignAuditEvent[]>;
+
+  /**
+   * The ONLY path for a prospective configuration change on a
+   * launched/paused/running campaign (§5/§20). `expectedCurrentVersionId`
+   * is the optimistic-concurrency token (null means "I believe this
+   * campaign has never been versioned yet"); a stale value raises
+   * `stale_configuration_version` from the database, which the caller
+   * (API layer) must surface as a clear conflict, never silently retry.
+   */
+  createConfigurationVersion(input: {
+    campaignId: string;
+    expectedCurrentVersionId: string | null;
+    now: string;
+    actor: string | null;
+    reason: string | null;
+    agentId?: string | null;
+    agentName?: string | null;
+    agentContractSnapshot?: CallAgentContract | null;
+    outcomePolicySnapshot?: OutcomePolicySnapshot | null;
+    mappings?: NewCampaignAgentInputMappingInput[] | null;
+    eventType?: string;
+  }): Promise<{ versionId: string; versionNumber: number }>;
+
+  /** Status transition with audit + automatic v1 creation on first Start (§6/§14) — the audited counterpart to updateCampaignStatus. */
+  setStatusAudited(id: string, status: CampaignStatus, now: string, actor: string | null, reason: string | null): Promise<Campaign>;
+
+  skipTarget(targetId: string, reasonCode: string, comment: string | null, now: string, actor: string | null): Promise<CampaignTargetMutationResult>;
+
+  holdTarget(targetId: string, reason: string | null, note: string | null, now: string, actor: string | null): Promise<CampaignTargetMutationResult>;
+
+  releaseHold(targetId: string, now: string, actor: string | null): Promise<CampaignTargetMutationResult>;
+
+  /** Merges new values into the target's EFFECTIVE source_attributes, preserving the original on first amendment (§10). */
+  amendTarget(
+    targetId: string,
+    sourceAttributes: Record<string, unknown>,
+    now: string,
+    actor: string | null,
+    reason: string | null,
+  ): Promise<CampaignTargetMutationResult>;
+
+  /**
+   * Add Targets to an existing campaign (§12) — reuses the exact same
+   * identity-resolved per-row path as createCampaign's initial import
+   * (importTargets above), then stamps the resulting target ids with
+   * one batch id and records one audit event.
+   */
+  addTargets(
+    campaignId: string,
+    rows: NewTargetRow[],
+    now: string,
+    actor: string | null,
+  ): Promise<ImportTargetsResult & { batchId: string }>;
 }

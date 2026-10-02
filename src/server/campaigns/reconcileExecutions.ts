@@ -130,21 +130,36 @@ async function getUnresolvedFallbackCode(repo: CampaignRepository): Promise<stri
   return classifications.find((c) => c.isFallbackUnresolved)?.code ?? null;
 }
 
-export async function reconcilePendingExecutions(repo: CampaignRepository, limit = 25): Promise<ReconcileResult> {
-  const mode = getCorrelationMode();
-  const pending = await repo.listPendingReconciliations(limit);
-  const now = Date.now();
-  const unresolvedFallbackCode = await getUnresolvedFallbackCode(repo);
+type GoverningConfigInfo = {
+  rules: CampaignResultRule[];
+  agentId: string | null;
+  agentName: string | null;
+  outcomePolicySnapshot: OutcomePolicySnapshot | null;
+};
 
-  const campaignByCampaign = new Map<
-    string,
-    { rules: CampaignResultRule[]; agentId: string | null; agentName: string | null; outcomePolicySnapshot: OutcomePolicySnapshot | null }
-  >();
-  async function getCampaignInfo(campaignId: string) {
+/**
+ * Session 12.7 §16/§17 — resolves the EXACT configuration that governed
+ * one execution, never "whatever the campaign currently looks like".
+ * When the execution carries a configurationVersionId (stamped at
+ * creation time, immutable thereafter — see call_center_campaign_
+ * create_execution), that specific version's own agent/contract/policy
+ * snapshot is authoritative, cached per versionId for the batch run.
+ * Legacy/never-versioned executions (configurationVersionId null) fall
+ * back to the campaign's own live snapshot — byte-for-byte the same
+ * behavior this function had before 12.7. Generic campaign_result_rules
+ * remain deliberately unversioned (§6/§18 — legacy-only, being phased
+ * out of the new structured-outcome UX), so `rules` always comes from
+ * the live campaign regardless of which branch is taken.
+ */
+function makeGoverningConfigResolver(repo: CampaignRepository) {
+  const campaignByCampaign = new Map<string, GoverningConfigInfo>();
+  const configByVersion = new Map<string, GoverningConfigInfo>();
+
+  async function getCampaignInfo(campaignId: string): Promise<GoverningConfigInfo> {
     const cached = campaignByCampaign.get(campaignId);
     if (cached) return cached;
     const campaign = await repo.getCampaign(campaignId);
-    const entry = {
+    const entry: GoverningConfigInfo = {
       rules: campaign?.rules ?? [],
       agentId: campaign?.agentId ?? null,
       agentName: campaign?.agentName ?? null,
@@ -153,6 +168,37 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
     campaignByCampaign.set(campaignId, entry);
     return entry;
   }
+
+  return async function resolve(campaignId: string, configurationVersionId: string | null): Promise<GoverningConfigInfo> {
+    const liveCampaign = await getCampaignInfo(campaignId);
+    if (!configurationVersionId) return liveCampaign;
+
+    const cached = configByVersion.get(configurationVersionId);
+    if (cached) return cached;
+
+    const version = await repo.getConfigurationVersion(configurationVersionId);
+    // A version id that fails to resolve (shouldn't happen once
+    // stamped — versions are never deleted) honestly falls back to the
+    // live campaign rather than silently fabricating a snapshot.
+    const entry: GoverningConfigInfo = version
+      ? {
+          rules: liveCampaign.rules,
+          agentId: version.agentId,
+          agentName: version.agentName,
+          outcomePolicySnapshot: version.outcomePolicySnapshot,
+        }
+      : liveCampaign;
+    configByVersion.set(configurationVersionId, entry);
+    return entry;
+  };
+}
+
+export async function reconcilePendingExecutions(repo: CampaignRepository, limit = 25): Promise<ReconcileResult> {
+  const mode = getCorrelationMode();
+  const pending = await repo.listPendingReconciliations(limit);
+  const now = Date.now();
+  const unresolvedFallbackCode = await getUnresolvedFallbackCode(repo);
+  const resolveGoverningConfig = makeGoverningConfigResolver(repo);
 
   let reconciled = 0;
   let unresolved = 0;
@@ -174,7 +220,10 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
         : null;
 
       if (match) {
-        const { rules, agentId, agentName, outcomePolicySnapshot } = await getCampaignInfo(execution.campaignId);
+        const { rules, agentId, agentName, outcomePolicySnapshot } = await resolveGoverningConfig(
+          execution.campaignId,
+          execution.configurationVersionId,
+        );
         // Session 12.5 — deriveCampaignResult now reads
         // actual_outcome_code/actual_outcome_name/structured_outputs
         // straight off `match` itself (the authoritatively matched
@@ -254,14 +303,7 @@ export async function enrichReconciledExecutionsWithActualOutcome(
   const mode = getCorrelationMode();
   const candidates = await repo.listReconciledMissingActualOutcome(limit);
   const unresolvedFallbackCode = await getUnresolvedFallbackCode(repo);
-  const policyByCampaign = new Map<string, OutcomePolicySnapshot | null>();
-  async function getOutcomePolicy(campaignId: string): Promise<OutcomePolicySnapshot | null> {
-    if (policyByCampaign.has(campaignId)) return policyByCampaign.get(campaignId) ?? null;
-    const campaign = await repo.getCampaign(campaignId);
-    const policy = campaign?.outcomePolicySnapshot ?? null;
-    policyByCampaign.set(campaignId, policy);
-    return policy;
-  }
+  const resolveGoverningConfig = makeGoverningConfigResolver(repo);
 
   let enriched = 0;
   let noActualOutcomeYet = 0;
@@ -275,7 +317,7 @@ export async function enrichReconciledExecutionsWithActualOutcome(
         noActualOutcomeYet++;
         continue;
       }
-      const outcomePolicySnapshot = await getOutcomePolicy(execution.campaignId);
+      const { outcomePolicySnapshot } = await resolveGoverningConfig(execution.campaignId, execution.configurationVersionId);
       const classification = deriveCampaignClassification(match.actual_outcome_code, outcomePolicySnapshot, unresolvedFallbackCode);
       const outcome = await repo.enrichActualOutcome(
         execution.id,

@@ -15,6 +15,7 @@ import type {
   NewCampaignAgentInputMappingInput,
   NewTargetRow,
   NextActionType,
+  OutcomePolicySnapshot,
 } from '../src/server/campaigns/types.js';
 
 /**
@@ -283,15 +284,43 @@ async function handleImportTargets(req: VercelRequest, res: VercelResponse, acce
   res.status(200).json(result);
 }
 
+interface StatusTransitionBody {
+  reason?: string;
+  actor?: string;
+  /** Required alongside a reason for 'stop' (§14 — "Stop requires reason+confirmation"). Not needed for pause/resume. */
+  confirm?: boolean;
+}
+
+/**
+ * Session 12.7 §14 — every lifecycle transition now goes through the
+ * audited RPC (setStatusAudited, which also auto-creates "v1" the first
+ * time a campaign starts — see §6 of the migration). Pause and Stop
+ * require a non-empty reason; Stop additionally requires
+ * `confirm: true` in the body. Start/Resume are audited the same way
+ * but carry no reason requirement — same as before this session.
+ */
 async function handleStatusTransition(
   req: VercelRequest,
   res: VercelResponse,
   access: AuthorizedAccess,
-  status: string,
+  status: CampaignStatus,
 ): Promise<void> {
   const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
   if (!id) return;
-  const campaign = await repo.updateCampaignStatus(id, status as CampaignStatus, new Date().toISOString());
+  const body = (req.body as StatusTransitionBody | undefined) ?? {};
+  const reason = body.reason?.trim() || null;
+
+  if ((status === 'paused' || status === 'stopped') && !reason) {
+    res.status(400).json({ detail: `A reason is required to ${status === 'paused' ? 'pause' : 'stop'} a campaign.` });
+    return;
+  }
+  if (status === 'stopped' && body.confirm !== true) {
+    res.status(400).json({ detail: 'Stopping a campaign requires confirm: true in the request body.' });
+    return;
+  }
+
+  const actor = body.actor?.trim() || access.role || null;
+  const campaign = await repo.setStatusAudited(id, status, new Date().toISOString(), actor, reason);
   res.status(200).json(campaign);
 }
 
@@ -306,7 +335,9 @@ async function handleRetryTarget(req: VercelRequest, res: VercelResponse, access
     notFound(res);
     return;
   }
-  const result = await repo.retryTarget(targetId, new Date().toISOString());
+  const body = (req.body as { reason?: string; actor?: string } | undefined) ?? {};
+  const actor = body.actor?.trim() || access.role || null;
+  const result = await repo.retryTarget(targetId, new Date().toISOString(), actor, body.reason?.trim() || null);
   res.status(200).json(result);
 }
 
@@ -340,6 +371,229 @@ async function handleScheduleFollowup(req: VercelRequest, res: VercelResponse, a
     now: new Date().toISOString(),
   });
   res.status(200).json(followup);
+}
+
+// ---------------------------------------------------------------------
+// Session 12.7 — Campaign Administration, Configuration Versioning &
+// Target Controls. Every mutation below requires an authorized campaign
+// (via requireAuthorizedCampaign for campaign-scoped actions, or
+// getTargetContext's agentId check for target-scoped ones) — same
+// server-side enforcement discipline as every action above (§19).
+// ---------------------------------------------------------------------
+
+/** System-configured Skip Reason master — not category-gated, same treatment as listClassifications (reference data, not a specific campaign's data). */
+async function handleListSkipReasons(_req: VercelRequest, res: VercelResponse): Promise<void> {
+  const reasons = await repo.listSkipReasons();
+  res.status(200).json({ data: reasons });
+}
+
+async function handleListConfigurationVersions(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
+  const versions = await repo.listConfigurationVersions(id);
+  res.status(200).json({ data: versions });
+}
+
+async function handleListAuditEvents(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
+  const limit = readIntQuery(req, 'limit', 200);
+  const events = await repo.listAuditEvents(id, limit);
+  res.status(200).json({ data: events });
+}
+
+interface CreateConfigurationVersionBody {
+  expectedCurrentVersionId: string | null;
+  reason: string;
+  actor?: string;
+  agentId?: string;
+  agentName?: string | null;
+  agentContractSnapshot?: CallAgentContract | null;
+  outcomePolicySnapshot?: OutcomePolicySnapshot | null;
+  mappings?: Array<{
+    agentInputFieldCode: string;
+    sourceType: InputMappingSourceType;
+    sourceField: string;
+    required?: boolean;
+    dataType?: string | null;
+  }>;
+  eventType?: string;
+}
+
+/**
+ * §5/§20 — the ONLY path for a prospective configuration change on a
+ * launched/paused/running campaign. `expectedCurrentVersionId` is
+ * REQUIRED in the body (explicit null is valid — "I believe this
+ * campaign has never been versioned yet") so a stale client can never
+ * silently clobber a newer version; a mismatch surfaces as 409, not a
+ * generic 500, so the UI can tell the operator to refresh and retry.
+ */
+async function handleCreateConfigurationVersion(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
+  const body = req.body as CreateConfigurationVersionBody | undefined;
+  if (body === undefined || !('expectedCurrentVersionId' in body) || !body.reason?.trim()) {
+    res.status(400).json({ detail: 'expectedCurrentVersionId (nullable) and a non-empty reason are required' });
+    return;
+  }
+  if (body.outcomePolicySnapshot) {
+    const classifications = await repo.listClassifications();
+    const validCodes = new Set(classifications.map((c) => c.code));
+    const invalid = body.outcomePolicySnapshot.mappings
+      .map((m) => m.campaignClassificationCode)
+      .filter((code) => !validCodes.has(code));
+    if (invalid.length > 0) {
+      res.status(400).json({ detail: `Unknown campaign classification code(s): ${Array.from(new Set(invalid)).join(', ')}` });
+      return;
+    }
+  }
+  if (body.mappings) {
+    const uniqueness = validateMappingSourceUniqueness(body.mappings as NewCampaignAgentInputMappingInput[]);
+    if (!uniqueness.valid) {
+      res.status(400).json({
+        detail: `Duplicate source mapping(s): ${uniqueness.duplicateSourceKeys.join(', ')} — each source field may back only one agent input.`,
+        duplicateSourceKeys: uniqueness.duplicateSourceKeys,
+      });
+      return;
+    }
+  }
+  const actor = body.actor?.trim() || access.role || null;
+  try {
+    const result = await repo.createConfigurationVersion({
+      campaignId: id,
+      expectedCurrentVersionId: body.expectedCurrentVersionId,
+      now: new Date().toISOString(),
+      actor,
+      reason: body.reason.trim(),
+      agentId: body.agentId ?? null,
+      agentName: body.agentName ?? null,
+      agentContractSnapshot: body.agentContractSnapshot ?? null,
+      outcomePolicySnapshot: body.outcomePolicySnapshot ?? null,
+      mappings: body.mappings
+        ? body.mappings.map((m) => ({
+            agentInputFieldCode: m.agentInputFieldCode,
+            sourceType: m.sourceType,
+            sourceField: m.sourceField,
+            required: m.required ?? false,
+            dataType: m.dataType ?? null,
+          }))
+        : null,
+      eventType: body.eventType,
+    });
+    res.status(200).json(result);
+  } catch (err) {
+    // §20 — a stale optimistic-concurrency token surfaces as a clear
+    // 409, never a silent overwrite or an opaque 500. The RPC raises
+    // this with errcode 40001; the Supabase client surfaces the message
+    // text, not the errcode, so we match on the stable prefix instead.
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('stale_configuration_version')) {
+      res.status(409).json({ detail: 'This campaign\'s configuration changed since you loaded it. Reload and try again.', code: 'stale_configuration_version' });
+      return;
+    }
+    throw err;
+  }
+}
+
+async function handleSkipTarget(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const targetId = queryStr(req, 'targetId');
+  if (!targetId) {
+    res.status(400).json({ detail: 'targetId is required' });
+    return;
+  }
+  const context = await repo.getTargetContext(targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
+    return;
+  }
+  const body = (req.body as { reasonCode?: string; comment?: string; actor?: string } | undefined) ?? {};
+  if (!body.reasonCode) {
+    res.status(400).json({ detail: 'reasonCode is required' });
+    return;
+  }
+  const actor = body.actor?.trim() || access.role || null;
+  try {
+    const result = await repo.skipTarget(targetId, body.reasonCode, body.comment ?? null, new Date().toISOString(), actor);
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(400).json({ detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+async function handleHoldTarget(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const targetId = queryStr(req, 'targetId');
+  if (!targetId) {
+    res.status(400).json({ detail: 'targetId is required' });
+    return;
+  }
+  const context = await repo.getTargetContext(targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
+    return;
+  }
+  const body = (req.body as { reason?: string; note?: string; actor?: string } | undefined) ?? {};
+  const actor = body.actor?.trim() || access.role || null;
+  try {
+    const result = await repo.holdTarget(targetId, body.reason ?? null, body.note ?? null, new Date().toISOString(), actor);
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(400).json({ detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+async function handleReleaseHold(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const targetId = queryStr(req, 'targetId');
+  if (!targetId) {
+    res.status(400).json({ detail: 'targetId is required' });
+    return;
+  }
+  const context = await repo.getTargetContext(targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
+    return;
+  }
+  const body = (req.body as { actor?: string } | undefined) ?? {};
+  const actor = body.actor?.trim() || access.role || null;
+  try {
+    const result = await repo.releaseHold(targetId, new Date().toISOString(), actor);
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(400).json({ detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+async function handleAmendTarget(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const targetId = queryStr(req, 'targetId');
+  if (!targetId) {
+    res.status(400).json({ detail: 'targetId is required' });
+    return;
+  }
+  const context = await repo.getTargetContext(targetId);
+  if (!context || !isAgentAuthorized(access, context.agentId)) {
+    notFound(res);
+    return;
+  }
+  const body = (req.body as { sourceAttributes?: Record<string, unknown>; reason?: string; actor?: string } | undefined) ?? {};
+  if (!body.sourceAttributes || typeof body.sourceAttributes !== 'object') {
+    res.status(400).json({ detail: 'sourceAttributes (object, body) is required' });
+    return;
+  }
+  const actor = body.actor?.trim() || access.role || null;
+  const result = await repo.amendTarget(targetId, body.sourceAttributes, new Date().toISOString(), actor, body.reason?.trim() || null);
+  res.status(200).json(result);
+}
+
+async function handleAddTargets(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
+  const body = (req.body as { rows?: NewTargetRow[]; actor?: string } | undefined) ?? {};
+  if (!body.rows || !Array.isArray(body.rows)) {
+    res.status(400).json({ detail: 'rows (body) is required' });
+    return;
+  }
+  const actor = body.actor?.trim() || access.role || null;
+  const result = await repo.addTargets(id, body.rows, new Date().toISOString(), actor);
+  res.status(200).json(result);
 }
 
 async function handleRunBatch(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -388,7 +642,15 @@ function isAuthorizedCronRequest(req: VercelRequest): boolean {
   return req.headers.authorization === `Bearer ${secret}`;
 }
 
-const GET_ACTIONS = new Set(['list', 'get', 'listTargets', 'listClassifications']);
+const GET_ACTIONS = new Set([
+  'list',
+  'get',
+  'listTargets',
+  'listClassifications',
+  'listSkipReasons',
+  'listConfigurationVersions',
+  'listAuditEvents',
+]);
 const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile', 'enrichActualOutcomes']);
 
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
@@ -483,10 +745,37 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'enrichActualOutcomes':
       await handleEnrichActualOutcomes(req, res);
       return;
+    case 'listSkipReasons':
+      await handleListSkipReasons(req, res);
+      return;
+    case 'listConfigurationVersions':
+      await handleListConfigurationVersions(req, res, access as AuthorizedAccess);
+      return;
+    case 'listAuditEvents':
+      await handleListAuditEvents(req, res, access as AuthorizedAccess);
+      return;
+    case 'createConfigurationVersion':
+      await handleCreateConfigurationVersion(req, res, access as AuthorizedAccess);
+      return;
+    case 'skipTarget':
+      await handleSkipTarget(req, res, access as AuthorizedAccess);
+      return;
+    case 'holdTarget':
+      await handleHoldTarget(req, res, access as AuthorizedAccess);
+      return;
+    case 'releaseHold':
+      await handleReleaseHold(req, res, access as AuthorizedAccess);
+      return;
+    case 'amendTarget':
+      await handleAmendTarget(req, res, access as AuthorizedAccess);
+      return;
+    case 'addTargets':
+      await handleAddTargets(req, res, access as AuthorizedAccess);
+      return;
     default:
       res.status(400).json({
         detail:
-          'Unknown or missing ?action= — use list, get, listTargets, listClassifications, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, or enrichActualOutcomes',
+          'Unknown or missing ?action= — use list, get, listTargets, listClassifications, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, enrichActualOutcomes, listSkipReasons, listConfigurationVersions, listAuditEvents, createConfigurationVersion, skipTarget, holdTarget, releaseHold, amendTarget, or addTargets',
       });
   }
 });

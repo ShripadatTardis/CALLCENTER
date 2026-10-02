@@ -15,7 +15,9 @@ export type CampaignTargetStatus =
   | 'failed'
   | 'skipped'
   | 'follow_up_due'
-  | 'closed';
+  | 'closed'
+  /** Session 12.7 — target-level Hold, distinct from campaign-level Pause. Excluded from runner selection the same way 'skipped' already is (not in call_center_campaign_select_runnable_targets's status filter). */
+  | 'held';
 
 /** Trigger Call action's own lifecycle only — never conflated with reconciliation status (plan §8). */
 export type CampaignExecutionStatus = 'queued' | 'triggering' | 'triggered' | 'failed';
@@ -52,6 +54,7 @@ export type {
   AgentOutputField,
   CallAgentContract,
 } from '../../types/campaign.js';
+import type { CallAgentContract } from '../../types/campaign.js';
 
 /** The three source classes this build supports (plan Phase 4) — no generic CRM connector. */
 export type InputMappingSourceType = 'customer360' | 'csv' | 'campaign_field';
@@ -64,9 +67,12 @@ export interface CampaignAgentInputMapping {
   sourceField: string;
   required: boolean;
   dataType: string | null;
+  /** Session 12.7 — the configuration version this mapping row belongs to. Null for a never-versioned draft/legacy campaign (current behavior, unchanged). */
+  configurationVersionId: string | null;
 }
 
-export type NewCampaignAgentInputMappingInput = Omit<CampaignAgentInputMapping, 'id' | 'campaignId'>;
+/** configurationVersionId is always server-assigned (never client-supplied) — see createCampaign/createConfigurationVersion. */
+export type NewCampaignAgentInputMappingInput = Omit<CampaignAgentInputMapping, 'id' | 'campaignId' | 'configurationVersionId'>;
 
 /** Deterministic (non-LLM) validation of one campaign's mapping against its agent contract. */
 export interface InputMappingValidationResult {
@@ -119,6 +125,68 @@ export interface CampaignClassification {
   description: string | null;
   isSuccess: boolean;
   isFallbackUnresolved: boolean;
+  sortOrder: number;
+  active: boolean;
+}
+
+/**
+ * Session 12.7 — one row per prospective configuration change. A
+ * campaign keeps one identity; "v1, v2, v3..." are rows here, exactly
+ * one of which is `status: 'active'` at a time. Captures everything an
+ * execution needs to be explained later: the agent, its captured
+ * contract, and the outcome policy in force when that version was
+ * active. Input mappings are NOT duplicated into this shape — they
+ * remain rows in campaign_agent_input_mappings, each tagged with the
+ * configuration_version_id they belong to (see CampaignAgentInputMapping).
+ */
+export interface CampaignConfigurationVersion {
+  id: string;
+  campaignId: string;
+  versionNumber: number;
+  status: 'active' | 'superseded';
+  agentId: string;
+  agentName: string | null;
+  agentContractSnapshot: CallAgentContract | null;
+  outcomePolicySnapshot: OutcomePolicySnapshot | null;
+  createdAt: string;
+  createdBy: string | null;
+  changeReason: string | null;
+  previousVersionId: string | null;
+}
+
+/**
+ * Session 12.7 — the append-only audit log backing Campaign History.
+ * Not full event sourcing — a plain, readable log. `eventType` is free
+ * text (same convention as the existing result_source/follow_up_type
+ * columns) describing an internal technical event, never user-facing
+ * master vocabulary like Campaign Classification.
+ */
+export interface CampaignAuditEvent {
+  id: string;
+  campaignId: string;
+  eventType: string;
+  actor: string | null;
+  occurredAt: string;
+  campaignTargetId: string | null;
+  campaignExecutionId: string | null;
+  configurationVersionId: string | null;
+  reason: string | null;
+  comment: string | null;
+  detail: Record<string, unknown> | null;
+}
+
+/**
+ * Session 12.7 — system-configured Skip Reason master, same principle
+ * as CampaignClassification (12.6): fetched live, never hardcoded.
+ * `requiresComment` is DATA — true only for the seeded "Other" row —
+ * so the "Other requires a comment" rule is never a hardcoded code
+ * comparison in business logic.
+ */
+export interface CampaignSkipReason {
+  code: string;
+  label: string;
+  description: string | null;
+  requiresComment: boolean;
   sortOrder: number;
   active: boolean;
 }
@@ -229,6 +297,18 @@ export interface CampaignTargetRow extends CampaignTarget {
   latestExecutionStatus: CampaignExecutionStatus | null;
   latestReconciliationStatus: ReconciliationStatus | null;
   latestReconciledInteractionId: string | null;
+  /** Session 12.7 — which configuration version governed the most recent execution attempt (§16/§17). Null for a legacy/never-versioned execution. */
+  latestConfigurationVersionId: string | null;
+  /** Session 12.7 — present only when this target is currently status='skipped'. */
+  skipReasonCode: string | null;
+  skipComment: string | null;
+  /** Session 12.7 — present only when this target is currently status='held'. Cleared on release. */
+  holdReason: string | null;
+  holdNote: string | null;
+  /** Session 12.7 — the originally imported attributes, captured once and never modified again. Null for a target never amended and imported before this migration. */
+  originalSourceAttributes: Record<string, unknown> | null;
+  /** Session 12.7 — groups targets added together via the same CSV/import call (initial import or a later Add Targets). */
+  importBatchId: string | null;
 }
 
 /** A runnable target, joined with what the runner (§16) needs to trigger a call. */
@@ -258,6 +338,15 @@ export interface CampaignExecution {
    * created before this field existed.
    */
   requestPayloadSnapshot: Record<string, unknown> | null;
+  /**
+   * Session 12.7 — the configuration version active at the moment this
+   * execution was created (stamped server-side in
+   * call_center_campaign_create_execution, immutable thereafter — same
+   * provenance guarantee as callSid). Null for every execution created
+   * before this migration, and for any execution of a campaign that
+   * has never been versioned.
+   */
+  configurationVersionId: string | null;
 }
 
 export interface PendingReconciliation extends CampaignExecution {
@@ -390,4 +479,32 @@ export interface CustomerCampaignTargetRow extends CampaignTargetRow {
   /** Immutable Call Agent id the campaign is configured against — never agent_version. */
   campaignAgentId: string;
   campaignAgentName: string | null;
+}
+
+/**
+ * Session 12.7 — the bare campaign_targets row returned by the
+ * skip/hold/release/amend mutation RPCs (to_jsonb of the raw row, no
+ * joins) — deliberately NOT the same shape as CampaignTargetRow (which
+ * carries display/join fields these RPCs don't compute). Callers that
+ * need the full display row re-fetch via listTargets after a mutation.
+ */
+export interface CampaignTargetMutationResult {
+  id: string;
+  campaignId: string;
+  customerId: string;
+  contactPointId: string;
+  status: CampaignTargetStatus;
+  sourceAttributes: Record<string, unknown>;
+  attemptCount: number;
+  lastActionAt: string | null;
+  nextActionAt: string | null;
+  effectiveResultId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  skipReasonCode: string | null;
+  skipComment: string | null;
+  holdReason: string | null;
+  holdNote: string | null;
+  originalSourceAttributes: Record<string, unknown> | null;
+  importBatchId: string | null;
 }

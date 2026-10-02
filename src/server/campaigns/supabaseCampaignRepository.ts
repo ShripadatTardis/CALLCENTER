@@ -3,19 +3,24 @@ import type { CampaignRepository } from './campaignRepository.js';
 import type {
   Campaign,
   CampaignAgentInputMapping,
+  CampaignAuditEvent,
+  CampaignConfigurationVersion,
   CampaignDetail,
   CampaignExecution,
   CampaignExecutionStatus,
   CampaignFollowup,
   CampaignResultRule,
+  CampaignSkipReason,
   CampaignStats,
   CampaignStatus,
+  CampaignTargetMutationResult,
   CampaignTargetRow,
   CampaignTargetStatus,
   CampaignWithStats,
   CustomerCampaignTargetRow,
   InputMappingSourceType,
   NextActionType,
+  OutcomePolicySnapshot,
   ReconciliationStatus,
   RunnableTarget,
 } from './types.js';
@@ -157,6 +162,7 @@ interface MappingRow {
   source_field: string;
   required: boolean;
   data_type: string | null;
+  configuration_version_id?: string | null;
 }
 
 function mapMapping(row: MappingRow): CampaignAgentInputMapping {
@@ -168,6 +174,7 @@ function mapMapping(row: MappingRow): CampaignAgentInputMapping {
     sourceField: row.source_field,
     required: row.required,
     dataType: row.data_type,
+    configurationVersionId: row.configuration_version_id ?? null,
   };
 }
 
@@ -199,6 +206,13 @@ interface TargetRow {
   latest_execution_status: CampaignExecutionStatus | null;
   latest_reconciliation_status: ReconciliationStatus | null;
   latest_reconciled_interaction_id: string | null;
+  latest_configuration_version_id?: string | null;
+  skip_reason_code?: string | null;
+  skip_comment?: string | null;
+  hold_reason?: string | null;
+  hold_note?: string | null;
+  original_source_attributes?: Record<string, unknown> | null;
+  import_batch_id?: string | null;
 }
 
 function mapTargetRow(row: TargetRow): CampaignTargetRow {
@@ -236,6 +250,13 @@ function mapTargetRow(row: TargetRow): CampaignTargetRow {
     latestExecutionStatus: row.latest_execution_status,
     latestReconciliationStatus: row.latest_reconciliation_status,
     latestReconciledInteractionId: row.latest_reconciled_interaction_id,
+    latestConfigurationVersionId: row.latest_configuration_version_id ?? null,
+    skipReasonCode: row.skip_reason_code ?? null,
+    skipComment: row.skip_comment ?? null,
+    holdReason: row.hold_reason ?? null,
+    holdNote: row.hold_note ?? null,
+    originalSourceAttributes: row.original_source_attributes ?? null,
+    importBatchId: row.import_batch_id ?? null,
   };
 }
 
@@ -306,6 +327,7 @@ interface ExecutionRow {
   error_detail: string | null;
   created_at: string;
   request_payload_snapshot: Record<string, unknown> | null;
+  configuration_version_id?: string | null;
 }
 
 function mapExecution(row: ExecutionRow): CampaignExecution {
@@ -323,6 +345,7 @@ function mapExecution(row: ExecutionRow): CampaignExecution {
     errorDetail: row.error_detail,
     createdAt: row.created_at,
     requestPayloadSnapshot: row.request_payload_snapshot ?? null,
+    configurationVersionId: row.configuration_version_id ?? null,
   };
 }
 
@@ -353,6 +376,132 @@ function mapFollowup(row: {
     nextCampaignId: row.next_campaign_id,
     notes: row.notes,
     createdAt: row.created_at,
+  };
+}
+
+interface ConfigurationVersionRow {
+  id: string;
+  campaign_id: string;
+  version_number: number;
+  status: 'active' | 'superseded';
+  agent_id: string;
+  agent_name: string | null;
+  agent_contract_snapshot: CampaignConfigurationVersion['agentContractSnapshot'];
+  outcome_policy_snapshot: OutcomePolicySnapshot | null;
+  created_at: string;
+  created_by: string | null;
+  change_reason: string | null;
+  previous_version_id: string | null;
+}
+
+function mapConfigurationVersion(row: ConfigurationVersionRow): CampaignConfigurationVersion {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    versionNumber: row.version_number,
+    status: row.status,
+    agentId: row.agent_id,
+    agentName: row.agent_name,
+    agentContractSnapshot: row.agent_contract_snapshot ?? null,
+    outcomePolicySnapshot: row.outcome_policy_snapshot ?? null,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    changeReason: row.change_reason,
+    previousVersionId: row.previous_version_id,
+  };
+}
+
+interface AuditEventRow {
+  id: string;
+  campaign_id: string;
+  event_type: string;
+  actor: string | null;
+  occurred_at: string;
+  campaign_target_id: string | null;
+  campaign_execution_id: string | null;
+  configuration_version_id: string | null;
+  reason: string | null;
+  comment: string | null;
+  detail: Record<string, unknown> | null;
+}
+
+function mapAuditEvent(row: AuditEventRow): CampaignAuditEvent {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    eventType: row.event_type,
+    actor: row.actor,
+    occurredAt: row.occurred_at,
+    campaignTargetId: row.campaign_target_id,
+    campaignExecutionId: row.campaign_execution_id,
+    configurationVersionId: row.configuration_version_id,
+    reason: row.reason,
+    comment: row.comment,
+    detail: row.detail,
+  };
+}
+
+interface SkipReasonRow {
+  code: string;
+  label: string;
+  description: string | null;
+  requires_comment: boolean;
+  sort_order: number;
+  active: boolean;
+}
+
+function mapSkipReason(row: SkipReasonRow): CampaignSkipReason {
+  return {
+    code: row.code,
+    label: row.label,
+    description: row.description,
+    requiresComment: row.requires_comment,
+    sortOrder: row.sort_order,
+    active: row.active,
+  };
+}
+
+interface TargetMutationRow {
+  id: string;
+  campaign_id: string;
+  customer_id: string;
+  contact_point_id: string;
+  status: CampaignTargetStatus;
+  source_attributes: Record<string, unknown>;
+  attempt_count: number;
+  last_action_at: string | null;
+  next_action_at: string | null;
+  effective_result_id: string | null;
+  created_at: string;
+  updated_at: string;
+  skip_reason_code: string | null;
+  skip_comment: string | null;
+  hold_reason: string | null;
+  hold_note: string | null;
+  original_source_attributes: Record<string, unknown> | null;
+  import_batch_id: string | null;
+}
+
+function mapTargetMutationResult(row: TargetMutationRow): CampaignTargetMutationResult {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    customerId: row.customer_id,
+    contactPointId: row.contact_point_id,
+    status: row.status,
+    sourceAttributes: row.source_attributes ?? {},
+    attemptCount: row.attempt_count,
+    lastActionAt: row.last_action_at,
+    nextActionAt: row.next_action_at,
+    effectiveResultId: row.effective_result_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    skipReasonCode: row.skip_reason_code,
+    skipComment: row.skip_comment,
+    holdReason: row.hold_reason,
+    holdNote: row.hold_note,
+    originalSourceAttributes: row.original_source_attributes,
+    importBatchId: row.import_batch_id,
   };
 }
 
@@ -634,8 +783,13 @@ export const supabaseCampaignRepository: CampaignRepository = {
     return mapFollowup(row);
   },
 
-  async retryTarget(targetId, now) {
-    return rpc('call_center_campaign_retry_target', { p_target_id: targetId, p_now: now });
+  async retryTarget(targetId, now, actor, reason) {
+    return rpc('call_center_campaign_retry_target', {
+      p_target_id: targetId,
+      p_now: now,
+      p_actor: actor ?? null,
+      p_reason: reason ?? null,
+    });
   },
 
   async getTargetContext(targetId) {
@@ -643,5 +797,183 @@ export const supabaseCampaignRepository: CampaignRepository = {
       'call_center_campaign_get_target_context',
       { p_target_id: targetId },
     );
+  },
+
+  async listSkipReasons() {
+    const rows = await rpc<SkipReasonRow[]>('call_center_campaign_skip_reasons_list', {});
+    return (rows ?? []).map(mapSkipReason);
+  },
+
+  async listConfigurationVersions(campaignId) {
+    const rows = await rpc<ConfigurationVersionRow[]>('call_center_campaign_list_configuration_versions', {
+      p_campaign_id: campaignId,
+    });
+    return (rows ?? []).map(mapConfigurationVersion);
+  },
+
+  async getConfigurationVersion(versionId) {
+    const row = await rpc<ConfigurationVersionRow | null>('call_center_campaign_get_configuration_version', {
+      p_version_id: versionId,
+    });
+    return row ? mapConfigurationVersion(row) : null;
+  },
+
+  async listAuditEvents(campaignId, limit = 200) {
+    const rows = await rpc<AuditEventRow[]>('call_center_campaign_list_audit_events', {
+      p_campaign_id: campaignId,
+      p_limit: limit,
+    });
+    return (rows ?? []).map(mapAuditEvent);
+  },
+
+  async createConfigurationVersion({
+    campaignId,
+    expectedCurrentVersionId,
+    now,
+    actor,
+    reason,
+    agentId,
+    agentName,
+    agentContractSnapshot,
+    outcomePolicySnapshot,
+    mappings,
+    eventType,
+  }) {
+    const result = await rpc<{ versionId: string; versionNumber: number }>(
+      'call_center_campaign_create_configuration_version',
+      {
+        p_campaign_id: campaignId,
+        p_expected_current_version_id: expectedCurrentVersionId,
+        p_now: now,
+        p_actor: actor,
+        p_reason: reason,
+        p_agent_id: agentId ?? null,
+        p_agent_name: agentName ?? null,
+        p_agent_contract_snapshot: agentContractSnapshot ?? null,
+        p_outcome_policy_snapshot: outcomePolicySnapshot ?? null,
+        p_mappings: mappings
+          ? mappings.map((m) => ({
+              agentInputFieldCode: m.agentInputFieldCode,
+              sourceType: m.sourceType,
+              sourceField: m.sourceField,
+              required: m.required,
+              dataType: m.dataType,
+            }))
+          : null,
+        p_event_type: eventType ?? 'outcome_mapping_changed',
+      },
+    );
+    return result;
+  },
+
+  async setStatusAudited(id, status, now, actor, reason) {
+    const row = await rpc<CampaignRow>('call_center_campaign_set_status_audited', {
+      p_id: id,
+      p_status: status,
+      p_now: now,
+      p_actor: actor,
+      p_reason: reason,
+    });
+    return mapCampaign(row);
+  },
+
+  async skipTarget(targetId, reasonCode, comment, now, actor) {
+    const row = await rpc<TargetMutationRow>('call_center_campaign_skip_target', {
+      p_target_id: targetId,
+      p_reason_code: reasonCode,
+      p_comment: comment,
+      p_now: now,
+      p_actor: actor,
+    });
+    return mapTargetMutationResult(row);
+  },
+
+  async holdTarget(targetId, reason, note, now, actor) {
+    const row = await rpc<TargetMutationRow>('call_center_campaign_hold_target', {
+      p_target_id: targetId,
+      p_reason: reason,
+      p_note: note,
+      p_now: now,
+      p_actor: actor,
+    });
+    return mapTargetMutationResult(row);
+  },
+
+  async releaseHold(targetId, now, actor) {
+    const row = await rpc<TargetMutationRow>('call_center_campaign_release_hold', {
+      p_target_id: targetId,
+      p_now: now,
+      p_actor: actor,
+    });
+    return mapTargetMutationResult(row);
+  },
+
+  async amendTarget(targetId, sourceAttributes, now, actor, reason) {
+    const row = await rpc<TargetMutationRow>('call_center_campaign_amend_target', {
+      p_target_id: targetId,
+      p_source_attributes: sourceAttributes,
+      p_now: now,
+      p_actor: actor,
+      p_reason: reason,
+    });
+    return mapTargetMutationResult(row);
+  },
+
+  /**
+   * §12 — reuses the exact same identityResolver.ts-based per-row path
+   * as importTargets above (never the old phone-only SQL bulk path),
+   * then stamps the resulting target ids with one batch id via
+   * call_center_campaign_stamp_import_batch (see migration
+   * 20261013000000_campaign_configuration_version_lookup_and_batch_stamp.sql)
+   * — precise id-based stamping, not a timestamp heuristic.
+   */
+  async addTargets(campaignId, rows, now, actor) {
+    let customersCreated = 0;
+    let customersMatched = 0;
+    let rowsSkipped = 0;
+    const createdTargetIds: string[] = [];
+
+    for (const row of rows) {
+      if (!row.phone || !row.phone.trim()) {
+        rowsSkipped++;
+        continue;
+      }
+
+      const resolved = await resolveCustomerIdentity(
+        supabaseCustomerRepository,
+        { externalCustomerId: row.customerReference || null, phoneNumber: row.phone, preferredCustomerId: null },
+        now,
+      );
+
+      if (!resolved || !resolved.contactPointId) {
+        rowsSkipped++;
+        continue;
+      }
+
+      const target = await rpc<{ id: string }>('call_center_campaign_insert_resolved_target', {
+        p_campaign_id: campaignId,
+        p_customer_id: resolved.customerId,
+        p_contact_point_id: resolved.contactPointId,
+        p_source_attributes: row.sourceAttributes,
+        p_now: now,
+      });
+      createdTargetIds.push(target.id);
+
+      if (resolved.created) customersCreated++;
+      else customersMatched++;
+    }
+
+    const batchId = crypto.randomUUID();
+    if (createdTargetIds.length > 0) {
+      await rpc('call_center_campaign_stamp_import_batch', {
+        p_campaign_id: campaignId,
+        p_target_ids: createdTargetIds,
+        p_batch_id: batchId,
+        p_now: now,
+        p_actor: actor,
+      });
+    }
+
+    return { customersCreated, customersMatched, rowsSkipped, batchId };
   },
 };

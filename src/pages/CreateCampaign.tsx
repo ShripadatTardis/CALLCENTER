@@ -136,6 +136,14 @@ const CreateCampaign: React.FC = () => {
   // but Launch (not Save as Draft) is the only thing this blocks.
   const advertisedOutcomes = agentContract?.expectedOutcomes ?? [];
   const requiredOutcomesUnmapped = advertisedOutcomes.filter((o) => !outcomeMappings[o.outcomeCode]);
+  // A policy where no outcome ever counts as success can't produce a
+  // meaningful success rate. `successClassificationCode` is read from
+  // the live, system-owned classifications list (isSuccess is DATA —
+  // never a hardcoded 'SUCCESSFUL' string), so this check stays correct
+  // even if the master vocabulary's codes/labels change later.
+  const successClassificationCode = classifications.find((c) => c.isSuccess)?.code ?? null;
+  const hasSuccessfulMapping =
+    !successClassificationCode || Object.values(outcomeMappings).some((code) => code === successClassificationCode);
   const mappingDuplicates = validateMappingSourceUniqueness(Object.values(fieldMappings));
 
   // Each stage's real completion state — never fabricated, never confuses
@@ -271,6 +279,9 @@ const CreateCampaign: React.FC = () => {
     blockers.push(
       `${requiredOutcomesUnmapped.length} agent outcome${requiredOutcomesUnmapped.length === 1 ? '' : 's'} not mapped to a Campaign Classification (${requiredOutcomesUnmapped.map((o) => o.displayName).join(', ')}).`,
     );
+  }
+  if (advertisedOutcomes.length > 0 && !hasSuccessfulMapping) {
+    blockers.push('At least one agent outcome must be mapped to the Successful Campaign Classification.');
   }
   if (!mappingDuplicates.valid) {
     blockers.push(`Duplicate source mapping(s): ${mappingDuplicates.duplicateSourceKeys.join(', ')} — each source field may back only one agent input.`);
@@ -716,6 +727,12 @@ const CreateCampaign: React.FC = () => {
                         Campaign Classification — required before Launch Now (Save as Draft remains available).
                       </p>
                     )}
+                    {!hasSuccessfulMapping && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        At least one agent outcome must be mapped to the Successful classification — required before
+                        Launch Now (Save as Draft remains available).
+                      </p>
+                    )}
                   </div>
                 )}
                 {advertisedOutcomes.length === 0 && agentContract && (
@@ -831,8 +848,14 @@ const CreateCampaign: React.FC = () => {
                 {advertisedOutcomes.length > 0 && (
                   <ReviewRow
                     label="Agent Outcome Mapping"
-                    value={`${advertisedOutcomes.length - requiredOutcomesUnmapped.length} of ${advertisedOutcomes.length} outcomes mapped to a Campaign Classification`}
-                    status={requiredOutcomesUnmapped.length > 0 ? 'blocker' : 'ready'}
+                    value={
+                      requiredOutcomesUnmapped.length > 0
+                        ? `${advertisedOutcomes.length - requiredOutcomesUnmapped.length} of ${advertisedOutcomes.length} outcomes mapped to a Campaign Classification`
+                        : !hasSuccessfulMapping
+                          ? 'All outcomes mapped, but none as Successful'
+                          : `${advertisedOutcomes.length} of ${advertisedOutcomes.length} outcomes mapped to a Campaign Classification`
+                    }
+                    status={requiredOutcomesUnmapped.length > 0 || !hasSuccessfulMapping ? 'blocker' : 'ready'}
                   />
                 )}
 

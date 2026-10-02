@@ -5,6 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { CampaignStatusBadge } from './CampaignStatusBadge';
 import { ReasonDialog } from './ReasonDialog';
+import { TargetActionsMenu } from './TargetActionsMenu';
+import { AddTargetsDialog } from './AddTargetsDialog';
+import { CampaignHistory } from './CampaignHistory';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { useCampaignClassifications } from '@/hooks/campaigns/useCampaigns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -254,6 +258,8 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
   const [agentResultTargetId, setAgentResultTargetId] = useState<string | null>(null);
   const [lifecycleDialog, setLifecycleDialog] = useState<'pause' | 'stop' | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [addTargetsOpen, setAddTargetsOpen] = useState(false);
 
   const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
   const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
@@ -282,6 +288,9 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setHistoryOpen(true)}>
+            History
+          </Button>
           <CampaignStatusBadge status={campaign.status} />
           {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
             <Button size="sm" onClick={() => runAction(actions.start)} disabled={actions.start.isPending}>
@@ -370,9 +379,14 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
       )}
 
       <div>
-        <h2 className="text-[13px] font-semibold text-foreground mb-1.5 px-0.5">
-          Targets ({campaign.stats.targetCount})
-        </h2>
+        <div className="flex items-center justify-between mb-1.5 px-0.5">
+          <h2 className="text-[13px] font-semibold text-foreground">
+            Targets ({campaign.stats.targetCount})
+          </h2>
+          <Button size="sm" variant="outline" className="h-7 text-[11px] border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setAddTargetsOpen(true)}>
+            Add Targets
+          </Button>
+        </div>
         {/*
           Session 12.1 — the heading now uses campaign.stats.targetCount
           (a plain COUNT over campaign_targets, always correct) rather
@@ -416,9 +430,14 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                   <td className="py-2 px-3 text-foreground">{target.customerDisplayName ?? '—'}</td>
                   <td className="py-2 px-3 text-muted-foreground">{target.contactRawValue}</td>
                   <td className="py-2 px-3">
-                    <Badge variant="outline" className="border-border text-foreground">
+                    <Badge variant="outline" className="border-border text-foreground" title={target.skipReasonCode ? `${target.skipReasonCode}${target.skipComment ? ': ' + target.skipComment : ''}` : target.holdReason ?? undefined}>
                       {target.status.replace('_', ' ')}
                     </Badge>
+                    {target.originalSourceAttributes && (
+                      <Badge variant="outline" className="ml-1 text-[9px] py-0 px-1 border-border text-muted-foreground" title="Target data has been amended — original values preserved">
+                        amended
+                      </Badge>
+                    )}
                   </td>
                   <td className="py-2 px-3">
                     {target.effectiveResultId ? (
@@ -516,6 +535,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                           Retry
                         </Button>
                       )}
+                      <TargetActionsMenu campaignId={campaign.id} target={target} />
                     </div>
                   </td>
                 </tr>
@@ -570,6 +590,31 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           });
         }}
       />
+
+      {historyOpen && (
+        <Dialog open onOpenChange={(open) => !open && setHistoryOpen(false)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Campaign History</DialogTitle>
+              <DialogDescription className="text-xs">
+                A read-only log of status changes, skips, holds, amendments, retries, and target additions for this
+                campaign.
+              </DialogDescription>
+            </DialogHeader>
+            <CampaignHistory campaignId={campaign.id} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {addTargetsOpen && (
+        <AddTargetsDialog
+          campaignId={campaign.id}
+          onClose={() => {
+            setAddTargetsOpen(false);
+            onRefetch();
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -204,6 +204,25 @@ export interface CampaignRepository {
   /** Status transition with audit + automatic v1 creation on first Start (§6/§14) — the audited counterpart to updateCampaignStatus. */
   setStatusAudited(id: string, status: CampaignStatus, now: string, actor: string | null, reason: string | null): Promise<Campaign>;
 
+  /**
+   * Draft-only direct update (§4/item 1) — edits a draft campaign's
+   * agent/contract/outcome-policy/mappings in place, with NO
+   * configuration-version churn (a draft has never been versioned).
+   * Rejects (server-side) if the campaign is no longer a draft —
+   * callers for launched/paused/running campaigns must use
+   * createConfigurationVersion instead.
+   */
+  updateDraftConfiguration(input: {
+    campaignId: string;
+    now: string;
+    actor: string | null;
+    agentId?: string | null;
+    agentName?: string | null;
+    agentContractSnapshot?: CallAgentContract | null;
+    outcomePolicySnapshot?: OutcomePolicySnapshot | null;
+    mappings?: NewCampaignAgentInputMappingInput[] | null;
+  }): Promise<Campaign>;
+
   skipTarget(targetId: string, reasonCode: string, comment: string | null, now: string, actor: string | null): Promise<CampaignTargetMutationResult>;
 
   holdTarget(targetId: string, reason: string | null, note: string | null, now: string, actor: string | null): Promise<CampaignTargetMutationResult>;

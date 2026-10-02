@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchCampaignClassifications, fetchCampaigns } from '@/services/campaigns/campaignsService';
+import {
+  fetchCampaignAuditEvents,
+  fetchCampaignClassifications,
+  fetchCampaignConfigurationVersions,
+  fetchCampaignSkipReasons,
+  fetchCampaigns,
+} from '@/services/campaigns/campaignsService';
 
 export const campaignsKeys = {
   all: ['campaigns'] as const,
@@ -10,6 +16,9 @@ export const campaignsKeys = {
   detail: (id: string) => [...campaignsKeys.details(), id] as const,
   targets: (id: string) => [...campaignsKeys.all, 'targets', id] as const,
   classifications: () => [...campaignsKeys.all, 'classifications'] as const,
+  skipReasons: () => [...campaignsKeys.all, 'skipReasons'] as const,
+  configurationVersions: (id: string) => [...campaignsKeys.all, 'configurationVersions', id] as const,
+  auditEvents: (id: string) => [...campaignsKeys.all, 'auditEvents', id] as const,
 };
 
 /**
@@ -38,5 +47,35 @@ export function useCampaigns(opts: { page?: number; pageSize?: number } = {}) {
   return useQuery({
     queryKey: [...campaignsKeys.list(opts.page, opts.pageSize), role],
     queryFn: () => fetchCampaigns(opts, role),
+  });
+}
+
+/** Session 12.7 — system-configured Skip Reason master, fetched live. */
+export function useCampaignSkipReasons() {
+  return useQuery({
+    queryKey: campaignsKeys.skipReasons(),
+    queryFn: fetchCampaignSkipReasons,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCampaignConfigurationVersions(campaignId: string | undefined) {
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
+  return useQuery({
+    queryKey: [...campaignsKeys.configurationVersions(campaignId ?? ''), role],
+    queryFn: () => fetchCampaignConfigurationVersions(campaignId as string, role),
+    enabled: Boolean(campaignId),
+  });
+}
+
+/** Campaign History's read path. */
+export function useCampaignAuditEvents(campaignId: string | undefined) {
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
+  return useQuery({
+    queryKey: [...campaignsKeys.auditEvents(campaignId ?? ''), role],
+    queryFn: () => fetchCampaignAuditEvents(campaignId as string, 200, role),
+    enabled: Boolean(campaignId),
   });
 }

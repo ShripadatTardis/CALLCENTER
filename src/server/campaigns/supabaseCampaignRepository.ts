@@ -866,6 +866,28 @@ export const supabaseCampaignRepository: CampaignRepository = {
     return result;
   },
 
+  async updateDraftConfiguration({ campaignId, now, actor, agentId, agentName, agentContractSnapshot, outcomePolicySnapshot, mappings }) {
+    const row = await rpc<CampaignRow>('call_center_campaign_update_draft_configuration', {
+      p_campaign_id: campaignId,
+      p_now: now,
+      p_actor: actor,
+      p_agent_id: agentId ?? null,
+      p_agent_name: agentName ?? null,
+      p_agent_contract_snapshot: agentContractSnapshot ?? null,
+      p_outcome_policy_snapshot: outcomePolicySnapshot ?? null,
+      p_mappings: mappings
+        ? mappings.map((m) => ({
+            agentInputFieldCode: m.agentInputFieldCode,
+            sourceType: m.sourceType,
+            sourceField: m.sourceField,
+            required: m.required,
+            dataType: m.dataType,
+          }))
+        : null,
+    });
+    return mapCampaign(row);
+  },
+
   async setStatusAudited(id, status, now, actor, reason) {
     const row = await rpc<CampaignRow>('call_center_campaign_set_status_audited', {
       p_id: id,

@@ -2,15 +2,20 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { campaignsKeys } from './useCampaigns';
 import {
+  addCampaignTargets,
+  amendCampaignTarget,
   createCampaign,
+  holdCampaignTarget,
   pauseCampaign,
+  releaseCampaignTargetHold,
   resumeCampaign,
   retryTarget,
   scheduleFollowup,
+  skipCampaignTarget,
   startCampaign,
   stopCampaign,
 } from '@/services/campaigns/campaignsService';
-import type { CreateCampaignInput } from '@/types/campaign';
+import type { CreateCampaignInput, ImportTargetRow } from '@/types/campaign';
 
 /**
  * Every action genuinely persists real state (plan §15) — never a
@@ -58,5 +63,39 @@ export function useCampaignActions(campaignId?: string) {
     onSuccess: invalidate,
   });
 
-  return { create, start, pause, resume, stop, retry, followup };
+  // Session 12.7 — target controls. All invalidate the same target/detail
+  // queries as every other mutation here, so the table reflects the new
+  // state immediately without a manual refetch call at each call site.
+  const skip = useMutation({
+    mutationFn: ({ targetId, reasonCode, comment }: { targetId: string; reasonCode: string; comment: string | null }) =>
+      skipCampaignTarget(targetId, reasonCode, comment, role),
+    onSuccess: invalidate,
+  });
+  const hold = useMutation({
+    mutationFn: ({ targetId, reason, note }: { targetId: string; reason: string | null; note: string | null }) =>
+      holdCampaignTarget(targetId, reason, note, role),
+    onSuccess: invalidate,
+  });
+  const releaseHold = useMutation({
+    mutationFn: (targetId: string) => releaseCampaignTargetHold(targetId, role),
+    onSuccess: invalidate,
+  });
+  const amend = useMutation({
+    mutationFn: ({
+      targetId,
+      sourceAttributes,
+      reason,
+    }: {
+      targetId: string;
+      sourceAttributes: Record<string, unknown>;
+      reason: string | null;
+    }) => amendCampaignTarget(targetId, sourceAttributes, reason, role),
+    onSuccess: invalidate,
+  });
+  const addTargets = useMutation({
+    mutationFn: ({ id, rows }: { id: string; rows: ImportTargetRow[] }) => addCampaignTargets(id, rows, role),
+    onSuccess: invalidate,
+  });
+
+  return { create, start, pause, resume, stop, retry, followup, skip, hold, releaseHold, amend, addTargets };
 }

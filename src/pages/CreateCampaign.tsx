@@ -743,6 +743,17 @@ const CreateCampaign: React.FC = () => {
                   </p>
                 )}
 
+                {/*
+                  Session 12.7 §6 — hidden from the create UX once the
+                  agent has structured outcomes to map (the table above
+                  is the real outcome mechanism for those agents). The
+                  generic rules state still defaults to
+                  defaultResultRules() and is still submitted on create
+                  — preserved as the required fallback for agents with
+                  no structured outcome contract, and unchanged for
+                  legacy campaigns already using it.
+                */}
+                {advertisedOutcomes.length === 0 && (
                 <div className="space-y-2">
                   <div>
                     <h3 className="text-[13px] font-semibold text-foreground">Generic Call Result Rules</h3>
@@ -818,6 +829,7 @@ const CreateCampaign: React.FC = () => {
                   Add rule
                 </Button>
                 </div>
+                )}
               </div>
             )}
 
@@ -844,7 +856,9 @@ const CreateCampaign: React.FC = () => {
                   }
                   status={requiredFieldsUnmapped.length > 0 ? 'blocker' : 'ready'}
                 />
-                <ReviewRow label="Outcome Policy" value={`${rules.length} generic rule${rules.length === 1 ? '' : 's'} configured`} status="ready" />
+                {advertisedOutcomes.length === 0 && (
+                  <ReviewRow label="Outcome Policy" value={`${rules.length} generic rule${rules.length === 1 ? '' : 's'} configured`} status="ready" />
+                )}
                 {advertisedOutcomes.length > 0 && (
                   <ReviewRow
                     label="Agent Outcome Mapping"

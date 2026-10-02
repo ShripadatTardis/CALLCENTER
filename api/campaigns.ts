@@ -495,6 +495,73 @@ async function handleCreateConfigurationVersion(req: VercelRequest, res: VercelR
   }
 }
 
+interface UpdateDraftConfigurationBody {
+  actor?: string;
+  agentId?: string;
+  agentName?: string | null;
+  agentContractSnapshot?: CallAgentContract | null;
+  outcomePolicySnapshot?: OutcomePolicySnapshot | null;
+  mappings?: Array<{
+    agentInputFieldCode: string;
+    sourceType: InputMappingSourceType;
+    sourceField: string;
+    required?: boolean;
+    dataType?: string | null;
+  }>;
+}
+
+/** §4 — Campaign Settings/Edit for a DRAFT campaign only; the server-side RPC itself rejects a non-draft campaign. */
+async function handleUpdateDraftConfiguration(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
+  const body = (req.body as UpdateDraftConfigurationBody | undefined) ?? {};
+  if (body.outcomePolicySnapshot) {
+    const classifications = await repo.listClassifications();
+    const validCodes = new Set(classifications.map((c) => c.code));
+    const invalid = body.outcomePolicySnapshot.mappings
+      .map((m) => m.campaignClassificationCode)
+      .filter((code) => !validCodes.has(code));
+    if (invalid.length > 0) {
+      res.status(400).json({ detail: `Unknown campaign classification code(s): ${Array.from(new Set(invalid)).join(', ')}` });
+      return;
+    }
+  }
+  if (body.mappings) {
+    const uniqueness = validateMappingSourceUniqueness(body.mappings as NewCampaignAgentInputMappingInput[]);
+    if (!uniqueness.valid) {
+      res.status(400).json({
+        detail: `Duplicate source mapping(s): ${uniqueness.duplicateSourceKeys.join(', ')} — each source field may back only one agent input.`,
+        duplicateSourceKeys: uniqueness.duplicateSourceKeys,
+      });
+      return;
+    }
+  }
+  const actor = body.actor?.trim() || access.role || null;
+  try {
+    const campaign = await repo.updateDraftConfiguration({
+      campaignId: id,
+      now: new Date().toISOString(),
+      actor,
+      agentId: body.agentId ?? null,
+      agentName: body.agentName ?? null,
+      agentContractSnapshot: body.agentContractSnapshot ?? null,
+      outcomePolicySnapshot: body.outcomePolicySnapshot ?? null,
+      mappings: body.mappings
+        ? body.mappings.map((m) => ({
+            agentInputFieldCode: m.agentInputFieldCode,
+            sourceType: m.sourceType,
+            sourceField: m.sourceField,
+            required: m.required ?? false,
+            dataType: m.dataType ?? null,
+          }))
+        : null,
+    });
+    res.status(200).json(campaign);
+  } catch (err) {
+    res.status(400).json({ detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 async function handleSkipTarget(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const targetId = queryStr(req, 'targetId');
   if (!targetId) {
@@ -757,6 +824,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'createConfigurationVersion':
       await handleCreateConfigurationVersion(req, res, access as AuthorizedAccess);
       return;
+    case 'updateDraftConfiguration':
+      await handleUpdateDraftConfiguration(req, res, access as AuthorizedAccess);
+      return;
     case 'skipTarget':
       await handleSkipTarget(req, res, access as AuthorizedAccess);
       return;
@@ -775,7 +845,7 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     default:
       res.status(400).json({
         detail:
-          'Unknown or missing ?action= — use list, get, listTargets, listClassifications, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, enrichActualOutcomes, listSkipReasons, listConfigurationVersions, listAuditEvents, createConfigurationVersion, skipTarget, holdTarget, releaseHold, amendTarget, or addTargets',
+          'Unknown or missing ?action= — use list, get, listTargets, listClassifications, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, enrichActualOutcomes, listSkipReasons, listConfigurationVersions, listAuditEvents, createConfigurationVersion, updateDraftConfiguration, skipTarget, holdTarget, releaseHold, amendTarget, or addTargets',
       });
   }
 });

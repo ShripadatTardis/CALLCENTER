@@ -232,6 +232,26 @@ export async function createCampaignConfigurationVersion(
   });
 }
 
+/** §4 — Draft-only direct edit, no configuration-version churn. The server rejects a non-draft campaign. */
+export async function updateDraftCampaignConfiguration(
+  id: string,
+  input: {
+    agentId?: string;
+    agentName?: string | null;
+    agentContractSnapshot?: CallAgentContract | null;
+    outcomePolicySnapshot?: OutcomePolicySnapshot | null;
+    mappings?: NewCampaignAgentInputMappingInput[] | null;
+  },
+  role = 'unauthenticated',
+): Promise<CampaignWithStats> {
+  return request<CampaignWithStats>('/campaigns', {
+    method: 'POST',
+    query: { action: 'updateDraftConfiguration', id },
+    body: input,
+    headers: roleHeaders(role),
+  });
+}
+
 export async function skipCampaignTarget(
   targetId: string,
   reasonCode: string,

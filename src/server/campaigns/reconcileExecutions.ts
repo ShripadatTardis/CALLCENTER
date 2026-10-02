@@ -151,7 +151,7 @@ type GoverningConfigInfo = {
  * out of the new structured-outcome UX), so `rules` always comes from
  * the live campaign regardless of which branch is taken.
  */
-function makeGoverningConfigResolver(repo: CampaignRepository) {
+export function makeGoverningConfigResolver(repo: CampaignRepository) {
   const campaignByCampaign = new Map<string, GoverningConfigInfo>();
   const configByVersion = new Map<string, GoverningConfigInfo>();
 

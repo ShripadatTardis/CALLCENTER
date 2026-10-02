@@ -50,6 +50,21 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## Verification
+
+This repository's TypeScript source is split across three project configs (`tsconfig.app.json` for `src/` browser code, `tsconfig.node.json` for the Vite config, `tsconfig.api.json` for `api/` Vercel functions). The root `tsconfig.json` is a `"files": []` solution file that only exists to give editors (VS Code) cross-project navigation — **a bare `tsc` / `npx tsc --noEmit` against it silently checks zero files and always exits 0**. It is not a valid verification command for this repo.
+
+Use the canonical scripts instead:
+
+```sh
+npm run typecheck    # the only valid TypeScript check — genuinely checks src/, api/, and vite.config.ts
+npm run verify        # typecheck + production build
+npm run verify:full   # verify + the pure-logic deterministic test suites under .tooling/scripts/
+npm run lint           # eslint — has pre-existing, unrelated lint debt as of Session 12.8; not part of verify/verify:full
+```
+
+`verify:full` deliberately excludes the Playwright/live-browser scripts under `.tooling/scripts/` (they need a running browser against a deployed URL) — those remain available to run manually. See `docs/SESSION_12_8_TYPESCRIPT_AND_VERIFICATION_BASELINE.md` for the full history of this configuration.
+
 ## What technologies are used for this project?
 
 This project is built with:

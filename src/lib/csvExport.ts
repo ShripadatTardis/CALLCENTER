@@ -5,7 +5,7 @@
  * pass already-computed, already-authorized rows — this file has no
  * fetch logic of its own and makes no authorization decisions.
  */
-export function rowsToCsv<T extends Record<string, unknown>>(rows: T[], headers: (keyof T & string)[]): string {
+export function rowsToCsv<T extends object>(rows: T[], headers: (keyof T & string)[]): string {
   const lines = [headers.join(',')];
   for (const row of rows) {
     lines.push(headers.map((h) => JSON.stringify(row[h] ?? '')).join(','));

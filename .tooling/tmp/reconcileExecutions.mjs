@@ -38,7 +38,17 @@ function deriveCampaignResult(callData, rules) {
       agentName: null,
       structuredOutputs,
       actualOutcomeCode,
-      actualOutcomeName
+      actualOutcomeName,
+      // Session 12.6 fields — this pure function has no campaign outcome-
+      // policy context, so it never derives a classification itself. The
+      // real caller (reconcileExecutions.ts) always spreads its own
+      // deriveCampaignClassification() result over this return value, so
+      // these defaults are only ever a fallback, matching the same
+      // "no policy captured" null/false/null deriveCampaignClassification
+      // itself returns.
+      campaignClassificationCode: null,
+      classificationContractDrift: false,
+      classificationNextActionType: null
     };
   }
   const nextAction = match.nextActionType && match.nextActionDelayDays != null ? `${match.nextActionType} in ${match.nextActionDelayDays}d` : match.nextActionType ?? null;
@@ -57,7 +67,12 @@ function deriveCampaignResult(callData, rules) {
     agentName: null,
     structuredOutputs,
     actualOutcomeCode,
-    actualOutcomeName
+    actualOutcomeName,
+    // See the no-match branch above for why these default to the
+    // "no classification derived here" state.
+    campaignClassificationCode: null,
+    classificationContractDrift: false,
+    classificationNextActionType: null
   };
 }
 

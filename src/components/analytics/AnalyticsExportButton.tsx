@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { rowsToCsv, downloadCsv } from '@/lib/csvExport';
 
-interface Props<T extends Record<string, unknown>> {
+interface Props<T extends object> {
   rows: T[];
   headers: (keyof T & string)[];
   filename: string;
@@ -18,7 +18,7 @@ interface Props<T extends Record<string, unknown>> {
  * makes no authorization decision of its own, so a scoped role can never
  * export more than what's already rendered.
  */
-export function AnalyticsExportButton<T extends Record<string, unknown>>({ rows, headers, filename, label, disabled }: Props<T>) {
+export function AnalyticsExportButton<T extends object>({ rows, headers, filename, label, disabled }: Props<T>) {
   return (
     <Button
       variant="outline"

@@ -61,7 +61,11 @@ export function computeBreakdownRows(ratioId: string, calls: CallDataEntryDto[],
     });
   }
   // Largest population first — the operationally interesting rows lead.
-  return rows.sort((a, b) => b.population - a.population);
+  // population is typed number | null (RatioBreakdownRowDto allows an
+  // "unknown population" state elsewhere in the system) even though
+  // this function always sets it to a real groupCalls.length above —
+  // the ?? 0 only guards the type, it never actually fires here.
+  return rows.sort((a, b) => (b.population ?? 0) - (a.population ?? 0));
 }
 
 /** Hourly buckets for short ranges, daily buckets otherwise — a sensible granularity for the selected range, per the R2 prompt. */

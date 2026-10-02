@@ -14,6 +14,7 @@ import { useCampaigns } from '@/hooks/campaigns/useCampaigns';
 import { useCampaignTargets } from '@/hooks/campaigns/useCampaignDetail';
 import { getCustomerDisplayLabel, maskPhoneLast4 } from '@/lib/customerDisplayLabel';
 import type { SendChatMessageOptions } from '@/services/chat/chatService';
+import type { AgentSummary } from '@/services/agents/agentsMapper';
 
 export interface ChatIdentitySelectorProps {
   isBound: boolean;
@@ -140,7 +141,7 @@ export const ChatIdentitySelector: React.FC<ChatIdentitySelectorProps> = ({
       categoryId
         ? (selectedCategory?.agentIds ?? [])
             .map((id) => classification.agentsById.get(id))
-            .filter((a): a is { agentId: string; displayName: string } => Boolean(a))
+            .filter((a): a is AgentSummary => Boolean(a))
         : allAgents,
     [categoryId, selectedCategory, classification.agentsById, allAgents],
   );

@@ -134,3 +134,51 @@ export interface CustomerCampaignRow {
 export interface CustomerCampaignsResponse {
   data: CustomerCampaignRow[];
 }
+
+/**
+ * Session 13.1 — Customer Activity/Diary (DEC-CUST-02). Mirrors
+ * src/server/customer360/activityRepository.ts's `CustomerActivity`
+ * field-for-field; the API (`GET/POST/PATCH /api/customers/{id}?action=activities`)
+ * serializes that server type directly, same convention as every other
+ * shape in this file (see the header comment above).
+ */
+export type ActivityType = 'note' | 'instruction' | 'task' | 'reminder' | 'appointment';
+export type ActivityStatus = 'active' | 'open' | 'completed' | 'cancelled' | 'inactive';
+
+export interface CustomerActivityRow {
+  id: string;
+  customerId: string;
+  activityType: ActivityType;
+  title: string | null;
+  body: string;
+  status: ActivityStatus;
+  priority: string | null;
+  scheduledAt: string | null;
+  dueAt: string | null;
+  completedAt: string | null;
+  assignedUserId: string | null;
+  assignedTeamId: string | null;
+  campaignId: string | null;
+  campaignTargetId: string | null;
+  interactionId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedBy: string | null;
+  updatedAt: string;
+  effectiveFrom: string | null;
+  effectiveUntil: string | null;
+}
+
+export interface CustomerActivitiesResponse {
+  data: CustomerActivityRow[];
+}
+
+export interface NewCustomerActivityPayload {
+  activityType: ActivityType;
+  title?: string | null;
+  body: string;
+  priority?: string | null;
+  scheduledAt?: string | null;
+  dueAt?: string | null;
+  createdBy?: string | null;
+}

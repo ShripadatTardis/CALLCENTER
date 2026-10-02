@@ -1,9 +1,14 @@
 import { request } from '@/services/transport/httpClient';
 import type {
+  ActivityStatus,
+  ActivityType,
+  CustomerActivitiesResponse,
+  CustomerActivityRow,
   CustomerCampaignsResponse,
   CustomerDetailResponse,
   CustomerInteractionsResponse,
   CustomerListResponse,
+  NewCustomerActivityPayload,
 } from '@/types/customer';
 
 /**
@@ -66,5 +71,49 @@ export async function refreshCustomer(role: string, customerId: string): Promise
     method: 'POST',
     query: { action: 'refresh' },
     headers: roleHeaders(role),
+  });
+}
+
+/** Session 13.1 (DEC-CUST-02) — Customer Activity/Diary. */
+export async function fetchCustomerActivities(role: string, customerId: string): Promise<CustomerActivitiesResponse> {
+  return request<CustomerActivitiesResponse>(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'GET',
+    query: { action: 'activities' },
+    headers: roleHeaders(role),
+  });
+}
+
+export async function createCustomerActivity(
+  role: string,
+  customerId: string,
+  payload: NewCustomerActivityPayload,
+): Promise<CustomerActivityRow> {
+  return request<CustomerActivityRow>(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'POST',
+    query: { action: 'activities' },
+    headers: roleHeaders(role),
+    body: payload,
+  });
+}
+
+/**
+ * Closes the Phase 2/3 audit's "status-update capability exists in the
+ * RPC/repository layer but is not reachable from the existing activities
+ * API route" finding (DEC-CUST-02) — this is the minimal PATCH action
+ * that exposes `supabaseActivityRepository.updateActivityStatus`.
+ */
+export async function updateCustomerActivityStatus(
+  role: string,
+  customerId: string,
+  activityId: string,
+  activityType: ActivityType,
+  status: ActivityStatus,
+  updatedBy: string | null,
+): Promise<CustomerActivityRow> {
+  return request<CustomerActivityRow>(`/customers/${encodeURIComponent(customerId)}`, {
+    method: 'PATCH',
+    query: { action: 'activities' },
+    headers: roleHeaders(role),
+    body: { activityId, activityType, status, updatedBy },
   });
 }

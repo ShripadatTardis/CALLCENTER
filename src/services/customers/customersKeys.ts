@@ -5,4 +5,5 @@ export const customersKeys = {
   interactions: (id: string, page: number, role: string, pageSize: number) =>
     ['customers', 'interactions', id, page, role, pageSize] as const,
   campaigns: (id: string, role: string) => ['customers', 'campaigns', id, role] as const,
+  activities: (id: string, role: string) => ['customers', 'activities', id, role] as const,
 };

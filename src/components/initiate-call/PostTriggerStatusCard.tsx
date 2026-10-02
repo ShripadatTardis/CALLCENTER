@@ -14,6 +14,8 @@ interface PostTriggerStatusCardProps {
   isPollCapped?: boolean;
   onRefresh: () => void;
   onDismiss: () => void;
+  /** Session 13.1 (DEC-CUST-03 / LIVE-02) — opens the shared Call Detail lookup for this call's real call_sid. */
+  onViewCallDetail?: () => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export const PostTriggerStatusCard: React.FC<PostTriggerStatusCardProps> = ({
   isPollCapped,
   onRefresh,
   onDismiss,
+  onViewCallDetail,
 }) => {
   const displayStatus = liveStatus ?? call.initialStatus;
 
@@ -66,7 +69,12 @@ export const PostTriggerStatusCard: React.FC<PostTriggerStatusCardProps> = ({
             {formatStatusLabel(displayStatus)}
           </Badge>
           {isPolling && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-          <Button variant="ghost" size="sm" onClick={onRefresh} className="h-7 px-2 ml-auto">
+          {onViewCallDetail && (
+            <Button variant="outline" size="sm" onClick={onViewCallDetail} className="h-7 px-2 ml-auto">
+              View Call Detail
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={onRefresh} className={`h-7 px-2 ${onViewCallDetail ? '' : 'ml-auto'}`}>
             <RefreshCw className="h-3.5 w-3.5 mr-1" />
             Refresh
           </Button>

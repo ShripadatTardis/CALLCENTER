@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Copy, Check, UserRound } from 'lucide-react';
 import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
@@ -57,6 +59,7 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
   onClose,
   sessionId,
 }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const { data, isLoading, isError } = useChatSessionDetail(sessionId ?? undefined);
 
@@ -155,9 +158,28 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
                       .join(' · ')}
                   </p>
                 </div>
-                <Badge variant={session.status === 'active' ? 'secondary' : 'outline'} className="flex-shrink-0 mt-0.5">
-                  {formatStatusLabel(session.status)}
-                </Badge>
+                <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+                  {/* Session 13.1 (DEC-CUST-03) — only rendered when a real
+                      Customer 360 id was resolved server-side. */}
+                  {session.customer360Id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs border-border bg-transparent text-foreground hover:bg-muted"
+                      onClick={() => {
+                        const id = session.customer360Id as string;
+                        onClose();
+                        navigate(`/customers/${id}`, { state: { origin: 'chat-logs' } });
+                      }}
+                    >
+                      <UserRound className="h-3.5 w-3.5 mr-1" />
+                      Customer 360
+                    </Button>
+                  )}
+                  <Badge variant={session.status === 'active' ? 'secondary' : 'outline'}>
+                    {formatStatusLabel(session.status)}
+                  </Badge>
+                </div>
               </div>
               <p className="text-xs font-mono text-muted-foreground flex items-center gap-1.5">
                 <span className="truncate min-w-0">Session ID {session.sessionId}</span>

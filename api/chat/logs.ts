@@ -12,7 +12,7 @@ import type {
 import type { ChatMessage, ChatSessionSummary } from '../../src/types/chat.js';
 import { getCustomerDisplayLabel } from '../../src/lib/customerDisplayLabel.js';
 
-type CustomerLink = { displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null };
+type CustomerLink = { customerId: string; displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null };
 
 function resolveCustomerLabel(backendCustomerId: string | null, link: CustomerLink | undefined): string | null {
   // Session 7.1 follow-up: an authoritative backend CIF is shown as-is
@@ -56,6 +56,7 @@ function toSummaryFromLive(row: ChatSessionListRowDto, link?: CustomerLink): Cha
   return {
     sessionId: row.session_id,
     resolvedCustomerLabel: resolveCustomerLabel(row.customer_id, link),
+    customer360Id: link?.customerId ?? null,
     agentId: row.agent_id ?? null,
     agentName: row.agent_name ?? null,
     customerId: row.customer_id,
@@ -82,6 +83,7 @@ function toSummaryFromLocal(s: ChatSessionRecord, link?: CustomerLink): ChatSess
   return {
     sessionId: s.upstreamSessionId,
     resolvedCustomerLabel: resolveCustomerLabel(s.backendCustomerId, link),
+    customer360Id: link?.customerId ?? null,
     agentId: s.agentId,
     agentName: s.agentName,
     customerId: s.backendCustomerId,

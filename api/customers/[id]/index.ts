@@ -7,7 +7,7 @@ import {
 } from '../../../src/server/customer360/authorizationService.js';
 import { supabaseCampaignRepository } from '../../../src/server/campaigns/supabaseCampaignRepository.js';
 import { supabaseActivityRepository } from '../../../src/server/customer360/supabaseActivityRepository.js';
-import type { ActivityType } from '../../../src/server/customer360/activityRepository.js';
+import type { ActivityStatus, ActivityType } from '../../../src/server/customer360/activityRepository.js';
 
 /**
  * GET /api/customers/{id}                       — authorized Customer 360 view (plan §4, §11, §12, §15)
@@ -101,6 +101,21 @@ async function handleCampaigns(req: VercelRequest, res: VercelResponse): Promise
  * authorization filtering beyond "the customer exists" — activity
  * read/write role scoping is an explicitly flagged open decision (see
  * docs/SESSION_11_5A_CUSTOMER_360_FOUNDATION.md), not guessed at here.
+ *
+ * Session 13.1 (DEC-CUST-02) — confirmed deliberate, not an oversight:
+ * activities are customer-level records with no agent/category
+ * dimension of their own (unlike interactions, which ARE filtered by
+ * authorizedAgentIds in authorizationService.ts). This treats them the
+ * same way customer identity itself is already treated in
+ * buildAuthorizedCustomerView (not category-gated — see that function's
+ * own doc comment). A caller who cannot see this customer at all is
+ * already blocked upstream by the "customer exists" check above; no new
+ * RBAC model is introduced. Residual limitation: an activity linked to a
+ * specific campaign or interaction is NOT additionally filtered by that
+ * campaign's/interaction's agent authorization in this session — closing
+ * that gap correctly requires the general User Management/RBAC work
+ * tracked in docs/CALL_CENTRE_PHASE_4_DECISION_REGISTER.md (DEC-USER-01),
+ * not a speculative filter invented here.
  */
 async function handleListActivities(req: VercelRequest, res: VercelResponse): Promise<void> {
   const id = req.query.id as string;
@@ -159,6 +174,63 @@ async function handleCreateActivity(req: VercelRequest, res: VercelResponse): Pr
   );
 
   res.status(201).json(created);
+}
+
+/**
+ * Session 13.1 (DEC-CUST-02) — closes the Phase 2/3 audit's finding that
+ * `call_center_activity_update_status` exists in the repository/RPC
+ * layer but was not reachable from this route. Status semantics mirror
+ * the table's own check constraint and its activity-type-specific
+ * resting states (20261005000000_...sql comment): notes have no
+ * meaningful lifecycle; instructions toggle active/inactive;
+ * task/reminder/appointment move between open/completed/cancelled. No
+ * new status values are invented here.
+ */
+const ACTIVITY_STATUSES_BY_TYPE: Record<ActivityType, ActivityStatus[]> = {
+  note: [],
+  instruction: ['active', 'inactive'],
+  task: ['open', 'completed', 'cancelled'],
+  reminder: ['open', 'completed', 'cancelled'],
+  appointment: ['open', 'completed', 'cancelled'],
+};
+
+async function handleUpdateActivityStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const id = req.query.id as string;
+
+  const customer = await repo.getCustomer(id);
+  if (!customer) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
+
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const activityId = body.activityId as string | undefined;
+  const activityType = body.activityType as ActivityType | undefined;
+  const status = body.status as ActivityStatus | undefined;
+
+  if (!activityId || !activityType || !ACTIVITY_TYPES.includes(activityType) || !status) {
+    res.status(400).json({ detail: 'activityId, activityType, and status are required' });
+    return;
+  }
+
+  const allowed = ACTIVITY_STATUSES_BY_TYPE[activityType];
+  if (!allowed.includes(status)) {
+    res.status(400).json({
+      detail: allowed.length === 0
+        ? `Activities of type "${activityType}" have no status lifecycle`
+        : `status for "${activityType}" must be one of: ${allowed.join(', ')}`,
+    });
+    return;
+  }
+
+  const updated = await supabaseActivityRepository.updateActivityStatus(
+    activityId,
+    status,
+    (body.updatedBy as string | null) ?? null,
+    new Date().toISOString(),
+  );
+
+  res.status(200).json(updated);
 }
 
 async function handleRefresh(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -225,8 +297,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
       await handleCreateActivity(req, res);
       return;
     }
-    res.setHeader('Allow', 'GET, POST');
-    res.status(405).json({ detail: 'Method not allowed. Use GET or POST.' });
+    if (req.method === 'PATCH') {
+      await handleUpdateActivityStatus(req, res);
+      return;
+    }
+    res.setHeader('Allow', 'GET, POST, PATCH');
+    res.status(405).json({ detail: 'Method not allowed. Use GET, POST, or PATCH.' });
     return;
   }
 

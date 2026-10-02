@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MetricStrip } from '@/components/common/MetricStrip';
 import { FilterPopover } from '@/components/common/FilterPopover';
-import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Mic, RefreshCw } from 'lucide-react';
+import { CustomerActivityPanel } from '@/components/customers/CustomerActivityPanel';
 import { useCustomerDetail } from '@/hooks/customers/useCustomerDetail';
 import { useCustomerInteractions } from '@/hooks/customers/useCustomerInteractions';
 import { useCustomerCampaigns } from '@/hooks/customers/useCustomerCampaigns';
@@ -298,6 +299,31 @@ const CustomerDetail: React.FC = () => {
                       : '—'}
                   </span>
                 </div>
+                {/* Session 13.1 (DEC-CUST-01) — channels/authSummary/
+                    latestAgent were already fetched into `aggregate` by
+                    this same request; only the rendering was missing. */}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-muted-foreground text-xs">Channels used</span>
+                  <span className="text-foreground">
+                    {aggregate?.channels && aggregate.channels.length > 0
+                      ? aggregate.channels.map((c) => formatStatusLabel(c)).join(', ')
+                      : '—'}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-muted-foreground text-xs">Authentication</span>
+                  <span className="text-foreground">
+                    {aggregate?.authSummary.everAuthenticated
+                      ? `Yes${aggregate.authSummary.lastAuthenticatedAt ? ` · last ${formatTimestamp(aggregate.authSummary.lastAuthenticatedAt)}` : ''}`
+                      : 'No authentication evidence on record'}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-muted-foreground text-xs">Latest agent</span>
+                  <span className="text-foreground">
+                    {aggregate?.latestAgentDisplayName ?? aggregate?.latestAgentId ?? '—'}
+                  </span>
+                </div>
               </div>
             </SectionCard>
 
@@ -369,6 +395,8 @@ const CustomerDetail: React.FC = () => {
                         <th className="h-9 px-3 font-medium text-right">Duration</th>
                         <th className="h-9 px-3 font-medium min-w-[6rem] max-w-[10rem]">Outcome</th>
                         <th className="h-9 px-3 font-medium text-right">Sentiment</th>
+                        <th className="h-9 px-3 font-medium text-center" title="Recording available">Rec</th>
+                        <th className="h-9 px-3 font-medium">Escalation</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -410,6 +438,23 @@ const CustomerDetail: React.FC = () => {
                           </td>
                           <td className="py-1.5 px-3 text-right text-muted-foreground whitespace-nowrap tabular-nums">
                             {row.sentimentScore !== null ? formatFractionAsPercent(row.sentimentScore) : '—'}
+                          </td>
+                          {/* Session 13.1 (DEC-CUST-01) — recordingAvailable
+                              is a real boolean (never ambiguous); a dash
+                              means the backend reported no recording, not
+                              "unknown". escalationTrigger is nullable and
+                              its null case is NOT asserted as "Not
+                              escalated" — only the actual trigger value,
+                              when present, is shown (plan §15). */}
+                          <td className="py-1.5 px-3 text-center">
+                            {row.recordingAvailable ? (
+                              <Mic className="h-3.5 w-3.5 text-foreground inline-block" role="img" aria-label="Recording available" />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 px-3 text-muted-foreground whitespace-nowrap max-w-[10rem] truncate" title={row.escalationTrigger ?? undefined}>
+                            {row.escalationTrigger ?? '—'}
                           </td>
                         </tr>
                         );
@@ -501,6 +546,12 @@ const CustomerDetail: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* 5. Activity / Diary — NEW (Session 13.1, DEC-CUST-02).
+                Closes the fully-built-but-unconsumed Activity backend
+                found in Phase 2/3 of the audit. See
+                src/components/customers/CustomerActivityPanel.tsx. */}
+            <CustomerActivityPanel customerId={data.customer.id} />
           </>
           );
         })()}

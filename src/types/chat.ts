@@ -57,6 +57,15 @@ export interface ChatSessionSummary {
    * backend CIF, which may legitimately be null even when this is set).
    */
   resolvedCustomerLabel: string | null;
+  /**
+   * Session 13.1 (DEC-CUST-03) — the real Customer 360 internal id
+   * (`customers.id`), distinct from `customerId` above (the backend's
+   * own CIF/customer identifier, a different value). Already resolved
+   * server-side via call_center_chat_customer_links; previously
+   * discarded before reaching the frontend. Null whenever this session
+   * has no resolved Customer 360 link — never inferred from display text.
+   */
+  customer360Id: string | null;
 }
 
 export interface ChatSessionDetail {

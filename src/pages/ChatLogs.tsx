@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, Loader2, ChevronLeft, ChevronRight, UserRound } from 'lucide-react';
 import { useChatLogs } from '@/hooks/chat/useChatLogs';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
@@ -27,6 +28,7 @@ type StatusFacet = 'any' | 'active' | 'completed';
 type YesNoFacet = 'any' | 'yes' | 'no';
 
 const ChatLogs: React.FC = () => {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [statusFacet, setStatusFacet] = useState<StatusFacet>('any');
   const [agentFilter, setAgentFilter] = useState<string>('all');
@@ -237,6 +239,19 @@ const ChatLogs: React.FC = () => {
                           {contextLabel}
                           <span className="text-muted-foreground"> · {s.latestIntent || 'General'}</span>
                         </span>
+                        {/* Session 13.1 (DEC-CUST-03) — only rendered when
+                            a real Customer 360 id was resolved server-side;
+                            never inferred from the display label. */}
+                        {s.customer360Id && (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline mt-0.5"
+                            onClick={() => navigate(`/customers/${s.customer360Id}`, { state: { origin: 'chat-logs' } })}
+                          >
+                            <UserRound className="h-3 w-3" />
+                            View Customer 360
+                          </button>
+                        )}
                       </td>
                       <td className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
                         <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>

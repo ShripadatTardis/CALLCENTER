@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -254,6 +255,7 @@ interface CampaignDetailProps {
 }
 
 export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, targets, onBack, onRefetch }) => {
+  const navigate = useNavigate();
   const actions = useCampaignActions(campaign.id);
   const { data: classifications = [] } = useCampaignClassifications();
   const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
@@ -434,7 +436,22 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             <tbody>
               {targets.map((target) => (
                 <tr key={target.id} className="border-b border-border/60 last:border-b-0">
-                  <td className="py-2 px-3 text-foreground">{target.customerDisplayName ?? '—'}</td>
+                  <td className="py-2 px-3 text-foreground">
+                    {/* Session 13.1 (DEC-CUST-03) — target.customerId is a
+                        real, non-nullable FK already on every target row;
+                        this is the proven linkage, not a new lookup. */}
+                    {target.customerId ? (
+                      <button
+                        type="button"
+                        className="text-cyan-600 dark:text-cyan-400 hover:underline text-left"
+                        onClick={() => navigate(`/customers/${target.customerId}`, { state: { origin: 'outbound-campaigns' } })}
+                      >
+                        {target.customerDisplayName ?? '—'}
+                      </button>
+                    ) : (
+                      target.customerDisplayName ?? '—'
+                    )}
+                  </td>
                   <td className="py-2 px-3 text-muted-foreground">{target.contactRawValue}</td>
                   <td className="py-2 px-3">
                     <Badge variant="outline" className="border-border text-foreground" title={target.skipReasonCode ? `${target.skipReasonCode}${target.skipComment ? ': ' + target.skipComment : ''}` : target.holdReason ?? undefined}>

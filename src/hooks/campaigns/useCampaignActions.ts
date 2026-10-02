@@ -5,6 +5,7 @@ import {
   addCampaignTargets,
   amendCampaignTarget,
   createCampaign,
+  createCampaignConfigurationVersion,
   holdCampaignTarget,
   pauseCampaign,
   releaseCampaignTargetHold,
@@ -14,6 +15,7 @@ import {
   skipCampaignTarget,
   startCampaign,
   stopCampaign,
+  updateDraftCampaignConfiguration,
 } from '@/services/campaigns/campaignsService';
 import type { CreateCampaignInput, ImportTargetRow } from '@/types/campaign';
 
@@ -97,5 +99,32 @@ export function useCampaignActions(campaignId?: string) {
     onSuccess: invalidate,
   });
 
-  return { create, start, pause, resume, stop, retry, followup, skip, hold, releaseHold, amend, addTargets };
+  // Session 12.7 §4/§5 — Campaign Settings/Edit's two submit paths.
+  const updateDraft = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof updateDraftCampaignConfiguration>[1] }) =>
+      updateDraftCampaignConfiguration(id, input, role),
+    onSuccess: invalidate,
+  });
+  const createConfigurationVersion = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof createCampaignConfigurationVersion>[1] }) =>
+      createCampaignConfigurationVersion(id, input, role),
+    onSuccess: invalidate,
+  });
+
+  return {
+    create,
+    start,
+    pause,
+    resume,
+    stop,
+    retry,
+    followup,
+    skip,
+    hold,
+    releaseHold,
+    amend,
+    addTargets,
+    updateDraft,
+    createConfigurationVersion,
+  };
 }

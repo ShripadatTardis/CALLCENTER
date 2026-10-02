@@ -8,9 +8,10 @@ import { ReasonDialog } from './ReasonDialog';
 import { TargetActionsMenu } from './TargetActionsMenu';
 import { AddTargetsDialog } from './AddTargetsDialog';
 import { CampaignHistory } from './CampaignHistory';
+import { CampaignSettingsDialog } from './CampaignSettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
-import { useCampaignClassifications } from '@/hooks/campaigns/useCampaigns';
+import { useCampaignClassifications, useCampaignConfigurationVersions } from '@/hooks/campaigns/useCampaigns';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
@@ -260,6 +261,9 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   const [lifecycleDialog, setLifecycleDialog] = useState<'pause' | 'stop' | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [addTargetsOpen, setAddTargetsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { data: configurationVersions = [] } = useCampaignConfigurationVersions(campaign.id);
+  const activeConfigurationVersion = configurationVersions.find((v) => v.status === 'active') ?? null;
 
   const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
   const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
@@ -288,6 +292,9 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setSettingsOpen(true)}>
+            Settings
+          </Button>
           <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setHistoryOpen(true)}>
             History
           </Button>
@@ -604,6 +611,17 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             <CampaignHistory campaignId={campaign.id} />
           </DialogContent>
         </Dialog>
+      )}
+
+      {settingsOpen && (
+        <CampaignSettingsDialog
+          campaign={campaign}
+          expectedCurrentVersionId={activeConfigurationVersion?.id ?? null}
+          onClose={() => {
+            setSettingsOpen(false);
+            onRefetch();
+          }}
+        />
       )}
 
       {addTargetsOpen && (

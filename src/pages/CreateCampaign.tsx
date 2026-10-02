@@ -667,37 +667,48 @@ const CreateCampaign: React.FC = () => {
                         reinterprets this campaign's history.
                       </p>
                     </div>
-                    <div className="border border-border rounded divide-y divide-border">
-                      {advertisedOutcomes.map((outcome) => {
-                        const classificationCode = outcomeMappings[outcome.outcomeCode];
-                        return (
-                          <div key={outcome.outcomeCode} className="p-2.5 space-y-1.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-medium text-foreground">{outcome.displayName}</span>
-                              <span className="text-muted-foreground font-mono text-[10px]">{outcome.outcomeCode}</span>
-                            </div>
-                            {outcome.description && <p className="text-[11px] text-muted-foreground">{outcome.description}</p>}
-                            <div className="w-48">
-                              <Label className="text-[10px] text-muted-foreground">Campaign Classification</Label>
-                              <Select
-                                value={classificationCode ?? ''}
-                                onValueChange={(v) => setOutcomeMappings((prev) => ({ ...prev, [outcome.outcomeCode]: v }))}
-                              >
-                                <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
-                                  <SelectValue placeholder="Select…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {classifications.map((c) => (
-                                    <SelectItem key={c.code} value={c.code} title={c.description ?? undefined}>
-                                      {c.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="border border-border rounded overflow-hidden">
+                      <table className="w-full text-[13px] text-foreground">
+                        <thead>
+                          <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
+                            <th className="text-left py-2 px-3 font-medium">Agent Outcome</th>
+                            <th className="text-left py-2 px-3 font-medium">Campaign Classification</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {advertisedOutcomes.map((outcome) => {
+                            const classificationCode = outcomeMappings[outcome.outcomeCode];
+                            return (
+                              <tr key={outcome.outcomeCode} className="border-b border-border/60 last:border-b-0">
+                                <td className="py-2 px-3 align-top">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-medium text-foreground">{outcome.displayName}</span>
+                                    <span className="text-muted-foreground font-mono text-[10px]">{outcome.outcomeCode}</span>
+                                  </div>
+                                  {outcome.description && <p className="text-[11px] text-muted-foreground mt-0.5">{outcome.description}</p>}
+                                </td>
+                                <td className="py-2 px-3 align-top w-56">
+                                  <Select
+                                    value={classificationCode ?? ''}
+                                    onValueChange={(v) => setOutcomeMappings((prev) => ({ ...prev, [outcome.outcomeCode]: v }))}
+                                  >
+                                    <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
+                                      <SelectValue placeholder="Select…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {classifications.map((c) => (
+                                        <SelectItem key={c.code} value={c.code} title={c.description ?? undefined}>
+                                          {c.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                     {requiredOutcomesUnmapped.length > 0 && (
                       <p className="text-[11px] text-amber-700 dark:text-amber-400">

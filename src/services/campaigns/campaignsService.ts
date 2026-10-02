@@ -1,6 +1,7 @@
 import { request } from '@/services/transport/httpClient';
 import type {
   CampaignAgentInputMapping,
+  CampaignClassification,
   CampaignDetail,
   CampaignListResponse,
   CampaignTargetsResponse,
@@ -65,6 +66,19 @@ export async function fetchCampaignTargets(
     query: { action: 'listTargets', id, page: opts.page, pageSize: opts.pageSize },
     headers: roleHeaders(role),
   });
+}
+
+/**
+ * Session 12.6 — the ONLY place the Universal Campaign Classification
+ * vocabulary should be fetched from; never hardcode these codes/labels
+ * in a component.
+ */
+export async function fetchCampaignClassifications(): Promise<CampaignClassification[]> {
+  const { data } = await request<{ data: CampaignClassification[] }>('/campaigns', {
+    method: 'GET',
+    query: { action: 'listClassifications' },
+  });
+  return data;
 }
 
 export async function createCampaign(input: CreateCampaignInput, role = 'unauthenticated'): Promise<CampaignWithStats> {

@@ -1,5 +1,6 @@
 import type {
   Campaign,
+  CampaignClassification,
   CampaignDetail,
   CampaignExecution,
   CampaignFollowup,
@@ -14,6 +15,8 @@ import type {
   NewCampaignAgentInputMappingInput,
   NewCampaignResultRuleInput,
   NewTargetRow,
+  NextActionType,
+  OutcomePolicySnapshot,
   PendingReconciliation,
   ReconciliationStatus,
   RunnableTarget,
@@ -38,9 +41,19 @@ export interface CampaignRepository {
     agentName?: string | null;
     agentContractSnapshot?: CallAgentContract | null;
     mappings?: NewCampaignAgentInputMappingInput[];
+    /** Session 12.6 — captured once at creation, immutable thereafter. Omitted/null for a campaign with no configured outcome policy (legacy behavior preserved). */
+    outcomePolicySnapshot?: OutcomePolicySnapshot | null;
   }): Promise<Campaign>;
 
   setInputMappings(campaignId: string, mappings: NewCampaignAgentInputMappingInput[]): Promise<CampaignAgentInputMapping[]>;
+
+  /**
+   * Session 12.6 — the system-owned Universal Campaign Classification
+   * master list, read live from call_center.campaign_classifications.
+   * The ONLY place this vocabulary should be obtained from — never a
+   * hardcoded array in a UI component or service file.
+   */
+  listClassifications(): Promise<CampaignClassification[]>;
 
   listCampaigns(page: number, pageSize: number): Promise<{ rows: CampaignWithStats[]; totalCount: number }>;
 
@@ -119,6 +132,8 @@ export interface CampaignRepository {
     actualOutcomeName: string | null,
     structuredOutputs: Record<string, unknown> | null,
     now: string,
+    /** Session 12.6 — computed the same way reconciliation computes it (deriveCampaignClassification); omitted/null when the campaign has no captured outcome policy. */
+    classification?: { campaignClassificationCode: string | null; classificationContractDrift: boolean; classificationNextActionType: NextActionType | null } | null,
   ): Promise<{ resultId: string | null; enriched: boolean; reason: string | null }>;
 
   createFollowup(input: {

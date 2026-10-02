@@ -58,6 +58,17 @@ function notFound(res: VercelResponse): void {
   res.status(404).json({ detail: 'Campaign not found' });
 }
 
+/**
+ * Session 12.6 — the ONLY server route that serves the Universal
+ * Campaign Classification vocabulary. Not category-gated (it's
+ * reference data describing the system, not a specific campaign/agent's
+ * data) — same treatment as the Agents roster endpoint.
+ */
+async function handleListClassifications(_req: VercelRequest, res: VercelResponse): Promise<void> {
+  const classifications = await repo.listClassifications();
+  res.status(200).json({ data: classifications });
+}
+
 async function handleList(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
   const page = readIntQuery(req, 'page', 1);
   const pageSize = readIntQuery(req, 'pageSize', 25);
@@ -142,6 +153,11 @@ interface CreateCampaignBody {
     required?: boolean;
     dataType?: string | null;
   }>;
+  /** Session 12.6 — immutable Outcome Policy snapshot, captured at create time. */
+  outcomePolicySnapshot?: {
+    mappings: Array<{ agentOutcomeCode: string; campaignClassificationCode: string; nextActionType?: string | null }>;
+    capturedAt: string;
+  };
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
@@ -153,6 +169,21 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, access: Aut
   if (!isAgentAuthorized(access, body.agentId)) {
     res.status(403).json({ detail: 'Not authorized to create a campaign for this agent' });
     return;
+  }
+  // Session 12.6 — persistence-boundary validation, same discipline as
+  // 12.4.1's mapping-uniqueness check: never trust a client-submitted
+  // classification code without checking it against the live,
+  // system-owned master list, regardless of what the UI already did.
+  if (body.outcomePolicySnapshot) {
+    const classifications = await repo.listClassifications();
+    const validCodes = new Set(classifications.map((c) => c.code));
+    const invalid = body.outcomePolicySnapshot.mappings
+      .map((m) => m.campaignClassificationCode)
+      .filter((code) => !validCodes.has(code));
+    if (invalid.length > 0) {
+      res.status(400).json({ detail: `Unknown campaign classification code(s): ${Array.from(new Set(invalid)).join(', ')}` });
+      return;
+    }
   }
   const now = new Date().toISOString();
   const rules = (body.rules && body.rules.length > 0 ? body.rules : defaultResultRules()).map((r) => ({
@@ -183,6 +214,16 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, access: Aut
       required: m.required ?? false,
       dataType: m.dataType ?? null,
     })),
+    outcomePolicySnapshot: body.outcomePolicySnapshot
+      ? {
+          mappings: body.outcomePolicySnapshot.mappings.map((m) => ({
+            agentOutcomeCode: m.agentOutcomeCode,
+            campaignClassificationCode: m.campaignClassificationCode,
+            nextActionType: (m.nextActionType ?? null) as NextActionType | null,
+          })),
+          capturedAt: body.outcomePolicySnapshot.capturedAt,
+        }
+      : null,
   });
   res.status(201).json(campaign);
 }
@@ -347,7 +388,7 @@ function isAuthorizedCronRequest(req: VercelRequest): boolean {
   return req.headers.authorization === `Bearer ${secret}`;
 }
 
-const GET_ACTIONS = new Set(['list', 'get', 'listTargets']);
+const GET_ACTIONS = new Set(['list', 'get', 'listTargets', 'listClassifications']);
 const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile', 'enrichActualOutcomes']);
 
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
@@ -403,6 +444,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'listTargets':
       await handleListTargets(req, res, access as AuthorizedAccess);
       return;
+    case 'listClassifications':
+      await handleListClassifications(req, res);
+      return;
     case 'create':
       await handleCreate(req, res, access as AuthorizedAccess);
       return;
@@ -442,7 +486,7 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     default:
       res.status(400).json({
         detail:
-          'Unknown or missing ?action= — use list, get, listTargets, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, or enrichActualOutcomes',
+          'Unknown or missing ?action= — use list, get, listTargets, listClassifications, create, importTargets, setInputMappings, start, pause, resume, stop, retryTarget, scheduleFollowup, runBatch, reconcile, or enrichActualOutcomes',
       });
   }
 });

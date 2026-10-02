@@ -15,6 +15,7 @@ import type {
   CampaignWithStats,
   CustomerCampaignTargetRow,
   InputMappingSourceType,
+  NextActionType,
   ReconciliationStatus,
   RunnableTarget,
 } from './types.js';
@@ -63,6 +64,7 @@ interface CampaignRow {
   agent_id: string;
   agent_name: string | null;
   agent_contract_snapshot: Campaign['agentContractSnapshot'];
+  outcome_policy_snapshot: Campaign['outcomePolicySnapshot'];
   status: CampaignStatus;
   created_by: string | null;
   created_at: string;
@@ -81,6 +83,7 @@ function mapCampaign(row: CampaignRow): Campaign {
     agentId: row.agent_id,
     agentName: row.agent_name ?? null,
     agentContractSnapshot: row.agent_contract_snapshot ?? null,
+    outcomePolicySnapshot: row.outcome_policy_snapshot ?? null,
     status: row.status,
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -97,6 +100,9 @@ interface StatsRow {
   triggered_count: number;
   classified_count: number;
   success_count: number;
+  policy_classified_count: number;
+  policy_successful_count: number;
+  classification_counts: Record<string, number>;
 }
 
 function mapStats(row: StatsRow | undefined): CampaignStats {
@@ -105,6 +111,9 @@ function mapStats(row: StatsRow | undefined): CampaignStats {
     triggeredCount: row?.triggered_count ?? 0,
     classifiedCount: row?.classified_count ?? 0,
     successCount: row?.success_count ?? 0,
+    policyClassifiedCount: row?.policy_classified_count ?? 0,
+    policySuccessfulCount: row?.policy_successful_count ?? 0,
+    classificationCounts: row?.classification_counts ?? {},
   };
 }
 
@@ -184,6 +193,9 @@ interface TargetRow {
   result_actual_outcome_code: string | null;
   result_actual_outcome_name: string | null;
   result_structured_outputs: Record<string, unknown> | null;
+  result_classification_code: string | null;
+  result_classification_contract_drift: boolean | null;
+  result_classification_next_action_type: NextActionType | null;
   latest_execution_status: CampaignExecutionStatus | null;
   latest_reconciliation_status: ReconciliationStatus | null;
   latest_reconciled_interaction_id: string | null;
@@ -218,6 +230,9 @@ function mapTargetRow(row: TargetRow): CampaignTargetRow {
     resultActualOutcomeCode: row.result_actual_outcome_code ?? null,
     resultActualOutcomeName: row.result_actual_outcome_name ?? null,
     resultStructuredOutputs: row.result_structured_outputs ?? null,
+    resultClassificationCode: row.result_classification_code ?? null,
+    resultClassificationContractDrift: row.result_classification_contract_drift ?? false,
+    resultClassificationNextActionType: row.result_classification_next_action_type ?? null,
     latestExecutionStatus: row.latest_execution_status,
     latestReconciliationStatus: row.latest_reconciliation_status,
     latestReconciledInteractionId: row.latest_reconciled_interaction_id,
@@ -342,7 +357,7 @@ function mapFollowup(row: {
 }
 
 export const supabaseCampaignRepository: CampaignRepository = {
-  async createCampaign({ name, description, agentId, createdBy, sourceMeta, now, rules, agentName, agentContractSnapshot, mappings }) {
+  async createCampaign({ name, description, agentId, createdBy, sourceMeta, now, rules, agentName, agentContractSnapshot, mappings, outcomePolicySnapshot }) {
     const row = await rpc<CampaignRow>('call_center_campaign_create', {
       p_name: name,
       p_description: description,
@@ -370,8 +385,30 @@ export const supabaseCampaignRepository: CampaignRepository = {
         required: m.required,
         dataType: m.dataType,
       })),
+      p_outcome_policy_snapshot: outcomePolicySnapshot ?? null,
     });
     return mapCampaign(row);
+  },
+
+  async listClassifications() {
+    const rows = await rpc<Array<{
+      code: string;
+      label: string;
+      description: string | null;
+      is_success: boolean;
+      is_fallback_unresolved: boolean;
+      sort_order: number;
+      active: boolean;
+    }>>('call_center_campaign_classifications_list', {});
+    return (rows ?? []).map((r) => ({
+      code: r.code,
+      label: r.label,
+      description: r.description,
+      isSuccess: r.is_success,
+      isFallbackUnresolved: r.is_fallback_unresolved,
+      sortOrder: r.sort_order,
+      active: r.active,
+    }));
   },
 
   async setInputMappings(campaignId, mappings) {
@@ -533,7 +570,7 @@ export const supabaseCampaignRepository: CampaignRepository = {
     }));
   },
 
-  async enrichActualOutcome(executionId, actualOutcomeCode, actualOutcomeName, structuredOutputs, now) {
+  async enrichActualOutcome(executionId, actualOutcomeCode, actualOutcomeName, structuredOutputs, now, classification) {
     const outcome = await rpc<{ resultId: string | null; enriched: boolean; reason: string | null }>(
       'call_center_campaign_enrich_actual_outcome',
       {
@@ -542,6 +579,9 @@ export const supabaseCampaignRepository: CampaignRepository = {
         p_actual_outcome_name: actualOutcomeName,
         p_structured_outputs: structuredOutputs,
         p_now: now,
+        p_campaign_classification_code: classification?.campaignClassificationCode ?? null,
+        p_classification_contract_drift: classification?.classificationContractDrift ?? false,
+        p_classification_next_action_type: classification?.classificationNextActionType ?? null,
       },
     );
     return outcome;
@@ -565,6 +605,9 @@ export const supabaseCampaignRepository: CampaignRepository = {
           structuredOutputs: result.structuredOutputs,
           actualOutcomeCode: result.actualOutcomeCode,
           actualOutcomeName: result.actualOutcomeName,
+          campaignClassificationCode: result.campaignClassificationCode,
+          classificationContractDrift: result.classificationContractDrift,
+          classificationNextActionType: result.classificationNextActionType,
         }
       : null;
     const outcome = await rpc<{ targetId: string; resultId: string | null }>('call_center_campaign_update_reconciliation_status', {

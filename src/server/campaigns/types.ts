@@ -74,6 +74,55 @@ export interface InputMappingValidationResult {
   missingRequiredFieldCodes: string[];
 }
 
+/**
+ * Session 12.6 — a single campaign-specific mapping from one of the
+ * agent's own advertised outcome codes to the system-owned Universal
+ * Campaign Classification vocabulary (see CampaignClassification
+ * below), plus the configured Next Action label for that combination.
+ * `nextActionType` reuses the existing NextActionType vocabulary
+ * unchanged — this session does not invent a second action enum.
+ */
+export interface OutcomePolicyMapping {
+  agentOutcomeCode: string;
+  campaignClassificationCode: string;
+  nextActionType: NextActionType | null;
+}
+
+/**
+ * Immutable, captured once at campaign-creation time — the exact same
+ * pattern as agentContractSnapshot. A campaign's policy never
+ * re-derives itself against a later edit to the live Agent catalogue
+ * or the master classification table; historical results stay
+ * interpretable under the policy that was actually in force when they
+ * were reconciled. Null for every campaign created before Session
+ * 12.6 (legacy — see CampaignDetail/Create UI handling).
+ */
+export interface OutcomePolicySnapshot {
+  mappings: OutcomePolicyMapping[];
+  capturedAt: string;
+}
+
+/**
+ * Session 12.6 — the small, SYSTEM-OWNED, data-driven Universal
+ * Campaign Classification vocabulary (call_center.campaign_classifications).
+ * Fetched live via CampaignRepository.listClassifications(), exactly
+ * the way the Agents roster is fetched live — NEVER hardcoded as a
+ * TypeScript union/array in business logic or UI. `isSuccess` and
+ * `isFallbackUnresolved` are themselves DATA: success-rate logic reads
+ * `isSuccess`, and the one safe "no captured policy / contract drift"
+ * fallback code is identified by `isFallbackUnresolved`, never by
+ * comparing a code string.
+ */
+export interface CampaignClassification {
+  code: string;
+  label: string;
+  description: string | null;
+  isSuccess: boolean;
+  isFallbackUnresolved: boolean;
+  sortOrder: number;
+  active: boolean;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -83,6 +132,8 @@ export interface Campaign {
   agentName: string | null;
   /** Immutable, captured at create time (Phase 2) — never re-derived from a live /agents call. */
   agentContractSnapshot: CallAgentContract | null;
+  /** Immutable, captured at create time (Session 12.6) — see OutcomePolicySnapshot. Null for pre-12.6 campaigns. */
+  outcomePolicySnapshot: OutcomePolicySnapshot | null;
   status: CampaignStatus;
   createdBy: string | null;
   createdAt: string;
@@ -99,6 +150,19 @@ export interface CampaignStats {
   triggeredCount: number;
   classifiedCount: number;
   successCount: number;
+  /**
+   * Session 12.6 — counts driven by the NEW Campaign Classification
+   * layer, computed entirely data-driven server-side (never a
+   * hardcoded classification code in the aggregation). Zero for every
+   * legacy/non-policy-enabled campaign, since none of its results ever
+   * get a campaign_classification_code — the existing
+   * classifiedCount/successCount above remain that campaign's real
+   * statistics, completely unaffected.
+   */
+  policyClassifiedCount: number;
+  policySuccessfulCount: number;
+  /** { classificationCode: count } for whatever codes actually occurred — label resolution happens client-side against the live classifications list, never a hardcoded map here. */
+  classificationCounts: Record<string, number>;
 }
 
 export interface CampaignWithStats extends Campaign {
@@ -148,6 +212,20 @@ export interface CampaignTargetRow extends CampaignTarget {
   resultActualOutcomeCode: string | null;
   resultActualOutcomeName: string | null;
   resultStructuredOutputs: Record<string, unknown> | null;
+  /**
+   * Session 12.6 — the Universal Campaign Classification derived from
+   * resultActualOutcomeCode via the campaign's own captured
+   * outcomePolicySnapshot. Null when the campaign has no captured
+   * policy (legacy) OR the matched call's actual outcome is itself
+   * still null (§8 — "Agent Outcome unavailable" is NOT the same thing
+   * as a classification of UNRESOLVED). `resultClassificationContractDrift`
+   * is true only when an actual outcome exists but the captured policy
+   * has no mapping for it — the safe UNRESOLVED fallback in that case
+   * is still a real classification code, just flagged as drift.
+   */
+  resultClassificationCode: string | null;
+  resultClassificationContractDrift: boolean;
+  resultClassificationNextActionType: NextActionType | null;
   latestExecutionStatus: CampaignExecutionStatus | null;
   latestReconciliationStatus: ReconciliationStatus | null;
   latestReconciledInteractionId: string | null;
@@ -234,6 +312,10 @@ export interface CampaignResult {
    */
   actualOutcomeCode: string | null;
   actualOutcomeName: string | null;
+  /** Session 12.6 — see CampaignTargetRow.resultClassificationCode above for the full explanation. */
+  campaignClassificationCode: string | null;
+  classificationContractDrift: boolean;
+  classificationNextActionType: NextActionType | null;
 }
 
 /** The derived-result payload passed into update_reconciliation_status on a 'reconciled' transition (plan §10/§22). */
@@ -260,6 +342,10 @@ export interface DerivedCampaignResult {
   /** Session 12.5 — see CampaignResult.actualOutcomeCode/actualOutcomeName above; same values, same provenance. */
   actualOutcomeCode: string | null;
   actualOutcomeName: string | null;
+  /** Session 12.6 — computed by deriveCampaignClassification (src/server/campaigns/outcomePolicy.ts) from actualOutcomeCode + the campaign's captured outcomePolicySnapshot. */
+  campaignClassificationCode: string | null;
+  classificationContractDrift: boolean;
+  classificationNextActionType: NextActionType | null;
 }
 
 export interface CampaignFollowup {

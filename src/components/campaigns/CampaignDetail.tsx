@@ -5,13 +5,24 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { CampaignStatusBadge } from './CampaignStatusBadge';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
+import { useCampaignClassifications } from '@/hooks/campaigns/useCampaigns';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { formatTimestamp } from '@/lib/format';
 import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
-import type { CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
+import type { CampaignClassification, CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
 import type { Interaction } from '@/types/interaction';
+
+/**
+ * Session 12.6 — resolves a classification code to its live label,
+ * never a hardcoded lookup. Returns the raw code itself (never
+ * fabricated) if the live master list doesn't have it for some reason
+ * (e.g. a race with the list query still loading).
+ */
+function classificationLabel(classifications: CampaignClassification[], code: string): string {
+  return classifications.find((c) => c.code === code)?.label ?? code;
+}
 
 const MAX_LOOKUP_PAGES = 3;
 const LOOKUP_PAGE_SIZE = 100;
@@ -110,6 +121,7 @@ const AgentResultDialog: React.FC<{
   const contract = campaign.agentContractSnapshot;
   const outcome = classifyActualOutcome(contract, target.resultActualOutcomeCode, target.resultActualOutcomeName);
   const outputs = classifyStructuredOutputs(contract, target.resultStructuredOutputs);
+  const { data: classifications = [] } = useCampaignClassifications();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
@@ -169,6 +181,39 @@ const AgentResultDialog: React.FC<{
           </div>
         )}
 
+        {/* Session 12.6 §11 — the business-policy layer, strictly below
+            the agent-reported level above: Campaign Classification is
+            derived from Agent Outcome via this campaign's OWN captured
+            policy, never re-derived from today's live catalogue. */}
+        <div className="space-y-0.5">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Campaign Classification</div>
+          {!campaign.outcomePolicySnapshot ? (
+            <div className="text-muted-foreground">No outcome policy captured for this campaign (legacy)</div>
+          ) : !target.resultClassificationCode ? (
+            <div className="text-muted-foreground">Agent outcome unavailable — not classified</div>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span>{classificationLabel(classifications, target.resultClassificationCode)}</span>
+              {target.resultClassificationContractDrift && (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                  title="This agent outcome has no mapping in the campaign's captured policy — classified as the safe fallback, not guessed."
+                >
+                  policy drift
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+
+        {target.resultClassificationNextActionType && (
+          <div className="space-y-0.5">
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Next Action</div>
+            <div className="text-foreground">{target.resultClassificationNextActionType.replace('_', ' ')}</div>
+          </div>
+        )}
+
         <div className="flex justify-end">
           <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
             Close
@@ -204,11 +249,19 @@ interface CampaignDetailProps {
 
 export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, targets, onBack, onRefetch }) => {
   const actions = useCampaignActions(campaign.id);
+  const { data: classifications = [] } = useCampaignClassifications();
   const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
   const [agentResultTargetId, setAgentResultTargetId] = useState<string | null>(null);
 
   const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
   const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
+  // Session 12.6 §9/§12 — a SEPARATE, additional statistic, computed
+  // only from the new policy-driven classification layer; the existing
+  // `rate`/`unclassified` above (driven by the generic is_success
+  // column) are completely untouched and remain this campaign's real
+  // statistics regardless of whether it has an outcome policy.
+  const isPolicyEnabled = Boolean(campaign.outcomePolicySnapshot);
+  const policyRate = campaign.stats.policyClassifiedCount > 0 ? (campaign.stats.policySuccessfulCount / campaign.stats.policyClassifiedCount) * 100 : null;
 
   const runAction = (mutation: { mutateAsync: (id: string) => Promise<unknown> }) => {
     mutation.mutateAsync(campaign.id).then(onRefetch);
@@ -270,6 +323,19 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
           </div>
         )}
+        {isPolicyEnabled && (
+          <>
+            <div className="h-4 w-px bg-muted" aria-hidden="true" />
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-semibold tabular-nums text-foreground">{campaign.stats.policyClassifiedCount}</span>
+              <span className="text-muted-foreground text-[11px]">classified (policy)</span>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-semibold tabular-nums text-foreground">{policyRate === null ? '—' : `${policyRate.toFixed(1)}%`}</span>
+              <span className="text-muted-foreground text-[11px]">successful (policy)</span>
+            </div>
+          </>
+        )}
         <div className="h-4 w-px bg-muted" aria-hidden="true" />
         <div className="flex items-baseline gap-1.5">
           <span className="text-foreground">{campaign.agentName ?? campaign.agentId}</span>
@@ -285,6 +351,19 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           Agent contract: partial / legacy — expected input, outcome and output metadata are not currently exposed
           by Call Centre for this agent. This is a Call Centre capability state, not an application error; the
           campaign uses the existing legacy Trigger Call contract.
+        </p>
+      )}
+
+      {/* Session 12.6 §16 — a campaign created before 12.6, or one whose
+          agent advertised no outcomes to map, has no captured policy.
+          Shown only when the agent genuinely has outcomes that COULD
+          have been mapped, so this never clutters a campaign using an
+          agent with none. Never synthesized — Call Outcome/Agent
+          Outcome keep displaying exactly as Session 12.5 left them. */}
+      {!campaign.outcomePolicySnapshot && (campaign.agentContractSnapshot?.expectedOutcomes.length ?? 0) > 0 && (
+        <p className="text-[12px] text-muted-foreground px-3">
+          No Outcome Policy captured for this campaign (legacy) — Agent Outcome is still shown per target where
+          available, but no Campaign Classification is derived from it.
         </p>
       )}
 
@@ -322,6 +401,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                 <th className="text-left py-2 px-3 font-medium">Status</th>
                 <th className="text-left py-2 px-3 font-medium">Current Result</th>
                 <th className="text-left py-2 px-3 font-medium">Agent Outcome</th>
+                <th className="text-left py-2 px-3 font-medium">Campaign Classification</th>
                 <th className="text-left py-2 px-3 font-medium">Next Action</th>
                 <th className="text-left py-2 px-3 font-medium">Follow-up Due</th>
                 <th className="text-right py-2 px-3 font-medium">Attempts</th>
@@ -378,6 +458,24 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                       );
                     })()}
                   </td>
+                  <td className="py-2 px-3">
+                    {!campaign.outcomePolicySnapshot || !target.resultClassificationCode ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-foreground">{classificationLabel(classifications, target.resultClassificationCode)}</span>
+                        {target.resultClassificationContractDrift && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                            title="No captured policy mapping for this agent outcome — safe fallback, not guessed."
+                          >
+                            drift
+                          </Badge>
+                        )}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2 px-3 text-muted-foreground">{target.resultNextAction ?? '—'}</td>
                   <td className="py-2 px-3 text-muted-foreground">
                     {target.status === 'follow_up_due' && target.nextActionAt ? formatTimestamp(target.nextActionAt) : '—'}
@@ -422,7 +520,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
               ))}
               {targets.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-8 text-center text-muted-foreground">
                     No targets imported yet.
                   </td>
                 </tr>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchCampaigns } from '@/services/campaigns/campaignsService';
+import { fetchCampaignClassifications, fetchCampaigns } from '@/services/campaigns/campaignsService';
 
 export const campaignsKeys = {
   all: ['campaigns'] as const,
@@ -9,7 +9,21 @@ export const campaignsKeys = {
   details: () => [...campaignsKeys.all, 'detail'] as const,
   detail: (id: string) => [...campaignsKeys.details(), id] as const,
   targets: (id: string) => [...campaignsKeys.all, 'targets', id] as const,
+  classifications: () => [...campaignsKeys.all, 'classifications'] as const,
 };
+
+/**
+ * Session 12.6 — live Universal Campaign Classification roster, the
+ * same fetch-live-not-hardcode pattern useAgents() already established
+ * for the Agents roster. Reference data, not role-scoped.
+ */
+export function useCampaignClassifications() {
+  return useQuery({
+    queryKey: campaignsKeys.classifications(),
+    queryFn: fetchCampaignClassifications,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 /**
  * Live campaign list — replaces industryCampaignGenerator.ts (plan §1/§25).

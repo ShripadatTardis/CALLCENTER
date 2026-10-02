@@ -95,6 +95,45 @@ export interface CampaignStats {
   triggeredCount: number;
   classifiedCount: number;
   successCount: number;
+  /** Session 12.6 — see CampaignStats doc in src/server/campaigns/types.ts. Zero for legacy/non-policy campaigns. */
+  policyClassifiedCount: number;
+  policySuccessfulCount: number;
+  classificationCounts: Record<string, number>;
+}
+
+/**
+ * Session 12.6 — one campaign-specific mapping from an agent outcome
+ * code to the system-owned Universal Campaign Classification
+ * vocabulary (see CampaignClassification below), plus the configured
+ * Next Action label. Reuses NextActionType unchanged.
+ */
+export interface OutcomePolicyMapping {
+  agentOutcomeCode: string;
+  campaignClassificationCode: string;
+  nextActionType: NextActionType | null;
+}
+
+/** Immutable, captured once at campaign-creation time — same pattern as CallAgentContract. Null for pre-12.6 campaigns. */
+export interface OutcomePolicySnapshot {
+  mappings: OutcomePolicyMapping[];
+  capturedAt: string;
+}
+
+/**
+ * Session 12.6 — the small, SYSTEM-OWNED Universal Campaign
+ * Classification vocabulary. Always fetched live via
+ * useCampaignClassifications() — NEVER hardcoded as a literal array in
+ * a component. `isSuccess`/`isFallbackUnresolved` are data, not
+ * something UI logic re-derives from the code string.
+ */
+export interface CampaignClassification {
+  code: string;
+  label: string;
+  description: string | null;
+  isSuccess: boolean;
+  isFallbackUnresolved: boolean;
+  sortOrder: number;
+  active: boolean;
 }
 
 export interface Campaign {
@@ -104,6 +143,8 @@ export interface Campaign {
   agentId: string;
   agentName: string | null;
   agentContractSnapshot: CallAgentContract | null;
+  /** Session 12.6 — immutable, captured at create time. Null for pre-12.6 campaigns (legacy — no outcome policy). */
+  outcomePolicySnapshot: OutcomePolicySnapshot | null;
   status: CampaignStatus;
   createdBy: string | null;
   createdAt: string;
@@ -168,6 +209,10 @@ export interface CampaignTargetRow {
   resultActualOutcomeCode: string | null;
   resultActualOutcomeName: string | null;
   resultStructuredOutputs: Record<string, unknown> | null;
+  /** Session 12.6 — see CampaignTargetRow doc in src/server/campaigns/types.ts for the full explanation. */
+  resultClassificationCode: string | null;
+  resultClassificationContractDrift: boolean;
+  resultClassificationNextActionType: NextActionType | null;
   latestExecutionStatus: CampaignExecutionStatus | null;
   latestReconciliationStatus: ReconciliationStatus | null;
   latestReconciledInteractionId: string | null;
@@ -207,6 +252,8 @@ export interface CreateCampaignInput {
   agentName?: string;
   agentContractSnapshot?: CallAgentContract;
   mappings?: NewCampaignAgentInputMappingInput[];
+  /** Session 12.6 — omitted/undefined for a campaign with no configured outcome policy (legacy behavior preserved). */
+  outcomePolicySnapshot?: OutcomePolicySnapshot;
 }
 
 export interface ImportTargetRow {

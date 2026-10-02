@@ -16,7 +16,15 @@ import { defaultResultRules } from '@/lib/defaultResultRules';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import { validateMappingSourceUniqueness } from '@/lib/campaignInputMappingUniqueness';
 import { importCampaignTargets, setCampaignInputMappings, startCampaign } from '@/services/campaigns/campaignsService';
-import type { ImportTargetRow, InputMappingSourceType, NewCampaignAgentInputMappingInput, NewResultRuleInput } from '@/types/campaign';
+import { useCampaignClassifications } from '@/hooks/campaigns/useCampaigns';
+import type {
+  ImportTargetRow,
+  InputMappingSourceType,
+  NewCampaignAgentInputMappingInput,
+  NewResultRuleInput,
+  NextActionType,
+  OutcomePolicySnapshot,
+} from '@/types/campaign';
 
 /**
  * Session 10.1 production workflow — 7 stages, no Scheduling step (it
@@ -51,9 +59,14 @@ const CreateCampaign: React.FC = () => {
   // the selected agent changes (a mapping keyed to the old agent's field
   // codes would be meaningless against a different agent's contract).
   const [fieldMappings, setFieldMappings] = useState<Record<string, { sourceType: InputMappingSourceType; sourceField: string }>>({});
+  // Session 12.6 — one entry per agent expected_outcomes[] code,
+  // keyed by agentOutcomeCode. Cleared whenever the selected agent
+  // changes, same reasoning as fieldMappings above.
+  const [outcomeMappings, setOutcomeMappings] = useState<Record<string, { campaignClassificationCode: string; nextActionType: NextActionType | null }>>({});
 
   const { data: agentsData, isLoading: isAgentsLoading } = useAgents();
   const agents = agentsData?.agents ?? [];
+  const { data: classifications = [] } = useCampaignClassifications();
 
   const { create } = useCampaignActions();
   const importMutation = useImportTargets(undefined);
@@ -80,6 +93,10 @@ const CreateCampaign: React.FC = () => {
         .filter(([code, m]) => code !== excludeFieldCode && m.sourceField)
         .map(([, m]) => `${m.sourceType}:${m.sourceField}`),
     );
+  // Session 12.6 §5 — every advertised outcome should be considered,
+  // but Launch (not Save as Draft) is the only thing this blocks.
+  const advertisedOutcomes = agentContract?.expectedOutcomes ?? [];
+  const requiredOutcomesUnmapped = advertisedOutcomes.filter((o) => !outcomeMappings[o.outcomeCode]?.campaignClassificationCode);
   const mappingDuplicates = validateMappingSourceUniqueness(Object.values(fieldMappings));
 
   // Each stage's real completion state — never fabricated, never confuses
@@ -131,6 +148,24 @@ const CreateCampaign: React.FC = () => {
   const handleLaunch = async (launchImmediately: boolean) => {
     setSubmitError(null);
     try {
+      // Session 12.6 §2/§3 — immutable Outcome Policy snapshot, built
+      // only from mappings the operator actually completed (a code
+      // selected a classification for is sent; an outcome left
+      // unconfigured has no mapping row — never defaulted to any
+      // classification). Omitted entirely (undefined, not an empty
+      // snapshot) when the agent advertises no outcomes or none were
+      // mapped, so such a campaign stays honestly "no outcome policy"
+      // rather than a policy with zero mappings.
+      const outcomePolicyMappings = Object.entries(outcomeMappings)
+        .filter(([, m]) => m.campaignClassificationCode)
+        .map(([agentOutcomeCode, m]) => ({
+          agentOutcomeCode,
+          campaignClassificationCode: m.campaignClassificationCode,
+          nextActionType: m.nextActionType,
+        }));
+      const outcomePolicySnapshot: OutcomePolicySnapshot | undefined =
+        outcomePolicyMappings.length > 0 ? { mappings: outcomePolicyMappings, capturedAt: new Date().toISOString() } : undefined;
+
       const campaign = await create.mutateAsync({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -139,6 +174,7 @@ const CreateCampaign: React.FC = () => {
         sourceMeta: csvFile ? { originalFilename: csvFile.name, rowCount: csvRows.length } : undefined,
         agentName: selectedAgent?.displayName,
         agentContractSnapshot: agentContract ?? undefined,
+        outcomePolicySnapshot,
       });
 
       if (csvRows.length > 0) {
@@ -186,6 +222,11 @@ const CreateCampaign: React.FC = () => {
   if (requiredFieldsUnmapped.length > 0) {
     blockers.push(
       `${requiredFieldsUnmapped.length} required agent input field${requiredFieldsUnmapped.length === 1 ? ' is' : 's are'} not mapped (${requiredFieldsUnmapped.map((f) => f.displayName).join(', ')}).`,
+    );
+  }
+  if (requiredOutcomesUnmapped.length > 0) {
+    blockers.push(
+      `${requiredOutcomesUnmapped.length} agent outcome${requiredOutcomesUnmapped.length === 1 ? '' : 's'} not mapped to a Campaign Classification (${requiredOutcomesUnmapped.map((o) => o.displayName).join(', ')}).`,
     );
   }
   if (!mappingDuplicates.valid) {
@@ -305,6 +346,7 @@ const CreateCampaign: React.FC = () => {
                   onValueChange={(v) => {
                     setAgentId(v);
                     setFieldMappings({}); // a mapping keyed to the previous agent's field codes doesn't apply to a different contract
+                    setOutcomeMappings({}); // same reasoning — a different agent's expected_outcomes[] codes
                   }}
                 >
                   <SelectTrigger className="bg-background border-border text-foreground">
@@ -570,12 +612,109 @@ const CreateCampaign: React.FC = () => {
             )}
 
             {step === 5 && (
-              <div className="space-y-2 text-[13px] max-w-2xl">
-                <p className="text-muted-foreground text-[12px]">
-                  Call Centre determines the actual outcome of every call. These deterministic rules — seeded with
-                  generic conservative defaults, not this agent's real expected outcomes (Call Centre does not yet
-                  expose those) — decide what VoiceForce does with it. No AI interpretation happens here.
-                </p>
+              <div className="space-y-4 text-[13px] max-w-2xl">
+                {advertisedOutcomes.length > 0 && (
+                  <div className="space-y-2">
+                    <div>
+                      <h3 className="text-[13px] font-semibold text-foreground">Agent Outcome Mapping</h3>
+                      <p className="text-muted-foreground text-[12px]">
+                        Maps each business outcome {selectedAgent?.displayName ?? 'this agent'} can advertise to a
+                        Universal Campaign Classification. Classification codes are defined centrally by Call Centre,
+                        never invented per campaign. Captured immutably at launch — a later change to this agent's
+                        contract never reinterprets this campaign's history.
+                      </p>
+                    </div>
+                    <div className="border border-border rounded divide-y divide-border">
+                      {advertisedOutcomes.map((outcome) => {
+                        const mapping = outcomeMappings[outcome.outcomeCode];
+                        return (
+                          <div key={outcome.outcomeCode} className="p-2.5 space-y-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-foreground">{outcome.displayName}</span>
+                              <span className="text-muted-foreground font-mono text-[10px]">{outcome.outcomeCode}</span>
+                            </div>
+                            {outcome.description && <p className="text-[11px] text-muted-foreground">{outcome.description}</p>}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <div className="w-48">
+                                <Label className="text-[10px] text-muted-foreground">Campaign Classification</Label>
+                                <Select
+                                  value={mapping?.campaignClassificationCode ?? ''}
+                                  onValueChange={(v) =>
+                                    setOutcomeMappings((prev) => ({
+                                      ...prev,
+                                      [outcome.outcomeCode]: { campaignClassificationCode: v, nextActionType: prev[outcome.outcomeCode]?.nextActionType ?? null },
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
+                                    <SelectValue placeholder="Select…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {classifications.map((c) => (
+                                      <SelectItem key={c.code} value={c.code} title={c.description ?? undefined}>
+                                        {c.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="w-40">
+                                <Label className="text-[10px] text-muted-foreground">Next Action</Label>
+                                <Select
+                                  value={mapping?.nextActionType ?? '__none__'}
+                                  onValueChange={(v) =>
+                                    setOutcomeMappings((prev) => ({
+                                      ...prev,
+                                      [outcome.outcomeCode]: {
+                                        campaignClassificationCode: prev[outcome.outcomeCode]?.campaignClassificationCode ?? '',
+                                        nextActionType: v === '__none__' ? null : (v as NextActionType),
+                                      },
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
+                                    <SelectValue placeholder="None" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">None</SelectItem>
+                                    <SelectItem value="close">Close</SelectItem>
+                                    <SelectItem value="retry">Retry</SelectItem>
+                                    <SelectItem value="follow_up">Follow-up required</SelectItem>
+                                    <SelectItem value="escalate">Escalate</SelectItem>
+                                    <SelectItem value="move_campaign">Move campaign</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {requiredOutcomesUnmapped.length > 0 && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        {requiredOutcomesUnmapped.length} outcome{requiredOutcomesUnmapped.length === 1 ? '' : 's'} not yet mapped to a
+                        Campaign Classification — required before Launch Now (Save as Draft remains available).
+                      </p>
+                    )}
+                  </div>
+                )}
+                {advertisedOutcomes.length === 0 && agentContract && (
+                  <p className="text-[12px] text-muted-foreground border border-border rounded p-2.5 bg-background/60">
+                    {selectedAgent?.displayName ?? 'This agent'} advertises no business outcomes — there is nothing to
+                    map to a Campaign Classification. Reconciled calls for this campaign will show only the generic
+                    call-level result below.
+                  </p>
+                )}
+
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="text-[13px] font-semibold text-foreground">Generic Call Result Rules</h3>
+                    <p className="text-muted-foreground text-[12px]">
+                      Call Centre determines the generic outcome of every call independently of the agent-specific
+                      mapping above. These deterministic rules — seeded with generic conservative defaults — decide
+                      what VoiceForce does with it. No AI interpretation happens here.
+                    </p>
+                  </div>
                 {rules.map((rule, i) => (
                   <div key={i} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end border border-border rounded p-2.5">
                     <div>
@@ -641,6 +780,7 @@ const CreateCampaign: React.FC = () => {
                 >
                   Add rule
                 </Button>
+                </div>
               </div>
             )}
 
@@ -667,7 +807,14 @@ const CreateCampaign: React.FC = () => {
                   }
                   status={requiredFieldsUnmapped.length > 0 ? 'blocker' : 'ready'}
                 />
-                <ReviewRow label="Outcome Policy" value={`${rules.length} rule${rules.length === 1 ? '' : 's'} configured`} status="ready" />
+                <ReviewRow label="Outcome Policy" value={`${rules.length} generic rule${rules.length === 1 ? '' : 's'} configured`} status="ready" />
+                {advertisedOutcomes.length > 0 && (
+                  <ReviewRow
+                    label="Agent Outcome Mapping"
+                    value={`${advertisedOutcomes.length - requiredOutcomesUnmapped.length} of ${advertisedOutcomes.length} outcomes mapped to a Campaign Classification`}
+                    status={requiredOutcomesUnmapped.length > 0 ? 'blocker' : 'ready'}
+                  />
+                )}
 
                 {!isReady && (
                   <div className="border border-red-900 bg-red-950/40 rounded p-2.5 text-red-300 space-y-1">

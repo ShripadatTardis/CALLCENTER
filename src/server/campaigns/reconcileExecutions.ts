@@ -1,7 +1,8 @@
 import type { CampaignRepository } from './campaignRepository.js';
-import type { CampaignResultRule, PendingReconciliation } from './types.js';
+import type { CampaignResultRule, OutcomePolicySnapshot, PendingReconciliation } from './types.js';
 import type { CallDataEntryDto, CallDataResponseDto } from '../../types/api/calls.js';
 import { deriveCampaignResult } from './resultRules.js';
+import { deriveCampaignClassification } from './outcomePolicy.js';
 
 /**
  * Reconciliation (plan §14/§18) — processes campaign_executions rows
@@ -115,17 +116,40 @@ export interface ReconcileResult {
   errors: number;
 }
 
+/**
+ * Session 12.6 — resolves the one classification code whose row is
+ * flagged is_fallback_unresolved in the live master list (never a
+ * hardcoded 'UNRESOLVED' string), cached for the whole batch run. Null
+ * only if the master list is somehow empty/unreachable, in which case
+ * deriveCampaignClassification's contract-drift fallback simply has no
+ * code to fall back to — a real campaign_classification_code is still
+ * never fabricated.
+ */
+async function getUnresolvedFallbackCode(repo: CampaignRepository): Promise<string | null> {
+  const classifications = await repo.listClassifications();
+  return classifications.find((c) => c.isFallbackUnresolved)?.code ?? null;
+}
+
 export async function reconcilePendingExecutions(repo: CampaignRepository, limit = 25): Promise<ReconcileResult> {
   const mode = getCorrelationMode();
   const pending = await repo.listPendingReconciliations(limit);
   const now = Date.now();
+  const unresolvedFallbackCode = await getUnresolvedFallbackCode(repo);
 
-  const campaignByCampaign = new Map<string, { rules: CampaignResultRule[]; agentId: string | null; agentName: string | null }>();
+  const campaignByCampaign = new Map<
+    string,
+    { rules: CampaignResultRule[]; agentId: string | null; agentName: string | null; outcomePolicySnapshot: OutcomePolicySnapshot | null }
+  >();
   async function getCampaignInfo(campaignId: string) {
     const cached = campaignByCampaign.get(campaignId);
     if (cached) return cached;
     const campaign = await repo.getCampaign(campaignId);
-    const entry = { rules: campaign?.rules ?? [], agentId: campaign?.agentId ?? null, agentName: campaign?.agentName ?? null };
+    const entry = {
+      rules: campaign?.rules ?? [],
+      agentId: campaign?.agentId ?? null,
+      agentName: campaign?.agentName ?? null,
+      outcomePolicySnapshot: campaign?.outcomePolicySnapshot ?? null,
+    };
     campaignByCampaign.set(campaignId, entry);
     return entry;
   }
@@ -150,7 +174,7 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
         : null;
 
       if (match) {
-        const { rules, agentId, agentName } = await getCampaignInfo(execution.campaignId);
+        const { rules, agentId, agentName, outcomePolicySnapshot } = await getCampaignInfo(execution.campaignId);
         // Session 12.5 — deriveCampaignResult now reads
         // actual_outcome_code/actual_outcome_name/structured_outputs
         // straight off `match` itself (the authoritatively matched
@@ -158,7 +182,11 @@ export async function reconcilePendingExecutions(repo: CampaignRepository, limit
         // override is needed here; a historical/legacy match with all
         // three null produces the same null result it always did.
         const derivedBase = deriveCampaignResult(match, rules);
-        const derived = { ...derivedBase, agentId, agentName };
+        // Session 12.6 — the one and only place a campaign_classification_code
+        // is assigned, from the same authoritatively matched row's
+        // actual_outcome_code plus this campaign's own captured policy.
+        const classification = deriveCampaignClassification(match.actual_outcome_code ?? null, outcomePolicySnapshot, unresolvedFallbackCode);
+        const derived = { ...derivedBase, agentId, agentName, ...classification };
         await repo.updateReconciliationStatus(execution.id, 'reconciled', match.call_id, candidate, new Date().toISOString(), derived);
         reconciled++;
         continue;
@@ -225,6 +253,15 @@ export async function enrichReconciledExecutionsWithActualOutcome(
 ): Promise<EnrichActualOutcomeResult> {
   const mode = getCorrelationMode();
   const candidates = await repo.listReconciledMissingActualOutcome(limit);
+  const unresolvedFallbackCode = await getUnresolvedFallbackCode(repo);
+  const policyByCampaign = new Map<string, OutcomePolicySnapshot | null>();
+  async function getOutcomePolicy(campaignId: string): Promise<OutcomePolicySnapshot | null> {
+    if (policyByCampaign.has(campaignId)) return policyByCampaign.get(campaignId) ?? null;
+    const campaign = await repo.getCampaign(campaignId);
+    const policy = campaign?.outcomePolicySnapshot ?? null;
+    policyByCampaign.set(campaignId, policy);
+    return policy;
+  }
 
   let enriched = 0;
   let noActualOutcomeYet = 0;
@@ -238,12 +275,15 @@ export async function enrichReconciledExecutionsWithActualOutcome(
         noActualOutcomeYet++;
         continue;
       }
+      const outcomePolicySnapshot = await getOutcomePolicy(execution.campaignId);
+      const classification = deriveCampaignClassification(match.actual_outcome_code, outcomePolicySnapshot, unresolvedFallbackCode);
       const outcome = await repo.enrichActualOutcome(
         execution.id,
         match.actual_outcome_code,
         match.actual_outcome_name ?? null,
         match.structured_outputs ?? null,
         new Date().toISOString(),
+        classification,
       );
       if (outcome.enriched) {
         enriched++;

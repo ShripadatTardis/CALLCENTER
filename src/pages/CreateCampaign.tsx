@@ -22,7 +22,6 @@ import type {
   InputMappingSourceType,
   NewCampaignAgentInputMappingInput,
   NewResultRuleInput,
-  NextActionType,
   OutcomePolicySnapshot,
 } from '@/types/campaign';
 
@@ -59,10 +58,17 @@ const CreateCampaign: React.FC = () => {
   // the selected agent changes (a mapping keyed to the old agent's field
   // codes would be meaningless against a different agent's contract).
   const [fieldMappings, setFieldMappings] = useState<Record<string, { sourceType: InputMappingSourceType; sourceField: string }>>({});
-  // Session 12.6 — one entry per agent expected_outcomes[] code,
-  // keyed by agentOutcomeCode. Cleared whenever the selected agent
-  // changes, same reasoning as fieldMappings above.
-  const [outcomeMappings, setOutcomeMappings] = useState<Record<string, { campaignClassificationCode: string; nextActionType: NextActionType | null }>>({});
+  // Session 12.6, narrowed by 12.6.1 — one entry per agent
+  // expected_outcomes[] code, keyed by agentOutcomeCode, holding ONLY
+  // the Campaign Classification selection. Next Action was removed
+  // from this UI per 12.6.1 — the Outcome Policy step's job is
+  // singular: map an Agent Outcome to what it MEANS for this campaign,
+  // not configure an action with no real execution path yet (see
+  // docs/SESSION_12_6_1_OUTCOME_POLICY_UX_CORRECTION.md). The stored
+  // snapshot still carries a nextActionType field for schema
+  // compatibility with 12.6 — always null for mappings created from
+  // this UI now.
+  const [outcomeMappings, setOutcomeMappings] = useState<Record<string, string>>({});
 
   const { data: agentsData, isLoading: isAgentsLoading } = useAgents();
   const agents = agentsData?.agents ?? [];
@@ -96,7 +102,7 @@ const CreateCampaign: React.FC = () => {
   // Session 12.6 §5 — every advertised outcome should be considered,
   // but Launch (not Save as Draft) is the only thing this blocks.
   const advertisedOutcomes = agentContract?.expectedOutcomes ?? [];
-  const requiredOutcomesUnmapped = advertisedOutcomes.filter((o) => !outcomeMappings[o.outcomeCode]?.campaignClassificationCode);
+  const requiredOutcomesUnmapped = advertisedOutcomes.filter((o) => !outcomeMappings[o.outcomeCode]);
   const mappingDuplicates = validateMappingSourceUniqueness(Object.values(fieldMappings));
 
   // Each stage's real completion state — never fabricated, never confuses
@@ -148,20 +154,24 @@ const CreateCampaign: React.FC = () => {
   const handleLaunch = async (launchImmediately: boolean) => {
     setSubmitError(null);
     try {
-      // Session 12.6 §2/§3 — immutable Outcome Policy snapshot, built
-      // only from mappings the operator actually completed (a code
-      // selected a classification for is sent; an outcome left
+      // Session 12.6 §2/§3, UX narrowed by 12.6.1 — immutable Outcome
+      // Policy snapshot, built only from outcomes the operator actually
+      // mapped to a Campaign Classification (an outcome left
       // unconfigured has no mapping row — never defaulted to any
       // classification). Omitted entirely (undefined, not an empty
       // snapshot) when the agent advertises no outcomes or none were
       // mapped, so such a campaign stays honestly "no outcome policy"
-      // rather than a policy with zero mappings.
+      // rather than a policy with zero mappings. `nextActionType` is
+      // always null here — 12.6.1 removed Next Action from this UI;
+      // the snapshot field itself is kept for schema compatibility,
+      // ready for a future session to populate once a configurable
+      // action has a real execution path.
       const outcomePolicyMappings = Object.entries(outcomeMappings)
-        .filter(([, m]) => m.campaignClassificationCode)
-        .map(([agentOutcomeCode, m]) => ({
+        .filter(([, campaignClassificationCode]) => campaignClassificationCode)
+        .map(([agentOutcomeCode, campaignClassificationCode]) => ({
           agentOutcomeCode,
-          campaignClassificationCode: m.campaignClassificationCode,
-          nextActionType: m.nextActionType,
+          campaignClassificationCode,
+          nextActionType: null,
         }));
       const outcomePolicySnapshot: OutcomePolicySnapshot | undefined =
         outcomePolicyMappings.length > 0 ? { mappings: outcomePolicyMappings, capturedAt: new Date().toISOString() } : undefined;
@@ -618,15 +628,15 @@ const CreateCampaign: React.FC = () => {
                     <div>
                       <h3 className="text-[13px] font-semibold text-foreground">Agent Outcome Mapping</h3>
                       <p className="text-muted-foreground text-[12px]">
-                        Maps each business outcome {selectedAgent?.displayName ?? 'this agent'} can advertise to a
-                        Universal Campaign Classification. Classification codes are defined centrally by Call Centre,
-                        never invented per campaign. Captured immutably at launch — a later change to this agent's
-                        contract never reinterprets this campaign's history.
+                        Define what each Agent Outcome means for this campaign by mapping it to a Campaign
+                        Classification. Classification codes are defined centrally by Call Centre, never invented per
+                        campaign. Captured immutably at launch — a later change to this agent's contract never
+                        reinterprets this campaign's history.
                       </p>
                     </div>
                     <div className="border border-border rounded divide-y divide-border">
                       {advertisedOutcomes.map((outcome) => {
-                        const mapping = outcomeMappings[outcome.outcomeCode];
+                        const classificationCode = outcomeMappings[outcome.outcomeCode];
                         return (
                           <div key={outcome.outcomeCode} className="p-2.5 space-y-1.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -634,57 +644,23 @@ const CreateCampaign: React.FC = () => {
                               <span className="text-muted-foreground font-mono text-[10px]">{outcome.outcomeCode}</span>
                             </div>
                             {outcome.description && <p className="text-[11px] text-muted-foreground">{outcome.description}</p>}
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <div className="w-48">
-                                <Label className="text-[10px] text-muted-foreground">Campaign Classification</Label>
-                                <Select
-                                  value={mapping?.campaignClassificationCode ?? ''}
-                                  onValueChange={(v) =>
-                                    setOutcomeMappings((prev) => ({
-                                      ...prev,
-                                      [outcome.outcomeCode]: { campaignClassificationCode: v, nextActionType: prev[outcome.outcomeCode]?.nextActionType ?? null },
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
-                                    <SelectValue placeholder="Select…" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {classifications.map((c) => (
-                                      <SelectItem key={c.code} value={c.code} title={c.description ?? undefined}>
-                                        {c.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="w-40">
-                                <Label className="text-[10px] text-muted-foreground">Next Action</Label>
-                                <Select
-                                  value={mapping?.nextActionType ?? '__none__'}
-                                  onValueChange={(v) =>
-                                    setOutcomeMappings((prev) => ({
-                                      ...prev,
-                                      [outcome.outcomeCode]: {
-                                        campaignClassificationCode: prev[outcome.outcomeCode]?.campaignClassificationCode ?? '',
-                                        nextActionType: v === '__none__' ? null : (v as NextActionType),
-                                      },
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
-                                    <SelectValue placeholder="None" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">None</SelectItem>
-                                    <SelectItem value="close">Close</SelectItem>
-                                    <SelectItem value="retry">Retry</SelectItem>
-                                    <SelectItem value="follow_up">Follow-up required</SelectItem>
-                                    <SelectItem value="escalate">Escalate</SelectItem>
-                                    <SelectItem value="move_campaign">Move campaign</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                            <div className="w-48">
+                              <Label className="text-[10px] text-muted-foreground">Campaign Classification</Label>
+                              <Select
+                                value={classificationCode ?? ''}
+                                onValueChange={(v) => setOutcomeMappings((prev) => ({ ...prev, [outcome.outcomeCode]: v }))}
+                              >
+                                <SelectTrigger className="h-8 bg-background border-border text-foreground text-[12px]">
+                                  <SelectValue placeholder="Select…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {classifications.map((c) => (
+                                    <SelectItem key={c.code} value={c.code} title={c.description ?? undefined}>
+                                      {c.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                           </div>
                         );

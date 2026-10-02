@@ -146,7 +146,7 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
         const message = err instanceof Error ? err.message : String(err);
         setSubmitError(
           message.includes('stale_configuration_version')
-            ? "This campaign's configuration changed since you opened Settings. Close and reopen, then retry."
+            ? "This campaign's configuration changed since you opened this dialog. Close and reopen, then retry."
             : message,
         );
       });
@@ -156,7 +156,7 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Campaign Settings</DialogTitle>
+          <DialogTitle>Campaign Configuration</DialogTitle>
           <DialogDescription className="text-xs">
             {isDraft
               ? 'This campaign is a draft — changes apply directly, no configuration version is created.'

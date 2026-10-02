@@ -293,7 +293,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setSettingsOpen(true)}>
-            Settings
+            Configuration
           </Button>
           <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setHistoryOpen(true)}>
             History

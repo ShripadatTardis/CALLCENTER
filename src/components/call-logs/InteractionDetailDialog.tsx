@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
-import { Search } from 'lucide-react';
+import { SectionCard } from '@/components/interaction-detail/SectionCard';
+import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
 import {
@@ -67,16 +66,6 @@ function speakerTreatment(speaker: string): { label: string; className: string }
   }
 }
 
-const SectionCard: React.FC<{ title: string; children: React.ReactNode; action?: React.ReactNode }> = ({ title, children, action }) => (
-  <div className="rounded-md border border-border bg-card p-3 space-y-2 flex-shrink-0">
-    <div className="flex items-center justify-between gap-2">
-      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
-      {action}
-    </div>
-    {children}
-  </div>
-);
-
 export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = ({
   isOpen,
   onClose,
@@ -99,9 +88,20 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
     return interaction?.transcript ?? [];
   }, [needsLiveFetch, liveTranscript.data, interaction?.transcript]);
 
-  const filteredTranscript = transcript.filter((entry) =>
-    entry.text.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const conversationEntries: ConversationEntry[] = transcript.map((entry, index) => {
+    const speaker = speakerTreatment(entry.speaker);
+    return {
+      key: index,
+      speakerLabel: speaker.label,
+      speakerClassName: speaker.className,
+      timestamp: entry.timestamp,
+      text: entry.text,
+      metaParts: [
+        entry.sentiment || null,
+        entry.confidence !== undefined ? `${formatFractionAsPercent(entry.confidence)} confidence` : null,
+      ].filter((p): p is string => Boolean(p)),
+    };
+  });
 
   if (!interaction) return null;
 
@@ -173,7 +173,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
               {outcome.label}
             </Badge>
           </div>
-          <p className="text-[11px] font-mono text-muted-foreground truncate">Interaction ID {interaction.interactionId}</p>
+          <p className="text-xs font-mono text-muted-foreground truncate">Interaction ID {interaction.interactionId}</p>
         </DialogHeader>
 
         <div className="flex-shrink-0">
@@ -223,84 +223,20 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         {/* Session §7/§8 — the one scroll region: everything above is
             fixed-height, so Conversation gets whatever vertical space
             remains, with one predictable scrollbar rather than several
-            competing boxes. */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center justify-between gap-2 flex-shrink-0 mb-1.5">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conversation</h3>
-            <div className="flex items-center gap-1.5">
-              {needsLiveFetch && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-                  onClick={() => liveTranscript.refetch()}
-                  disabled={liveTranscript.isFetching}
-                >
-                  Refresh
-                </Button>
-              )}
-              <div className="relative w-52">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
-                <Input
-                  placeholder="Search conversation…"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-            {liveTranscript.isLoading && needsLiveFetch && transcript.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4">Loading conversation…</p>
-            ) : liveTranscript.isError && transcript.length === 0 ? (
-              <div className="text-sm text-amber-700 dark:text-amber-400 flex items-center justify-between gap-2 py-4">
-                <span>Could not load the conversation from the backend.</span>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => liveTranscript.refetch()}>
-                  Retry
-                </Button>
-              </div>
-            ) : filteredTranscript.length === 0 && searchTerm ? (
-              <p className="text-sm text-muted-foreground py-4">No conversation entries match "{searchTerm}".</p>
-            ) : filteredTranscript.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4">No conversation available for this interaction.</p>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {filteredTranscript.map((entry, index) => {
-                  const speaker = speakerTreatment(entry.speaker);
-                  return (
-                    <div key={index} className="py-2">
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
-                        <span className={`font-semibold tracking-wide ${speaker.className}`}>{speaker.label}</span>
-                        <span className="text-muted-foreground">· {entry.timestamp}</span>
-                        {entry.sentiment && <span className="text-muted-foreground">· {entry.sentiment}</span>}
-                        {entry.confidence !== undefined && (
-                          <span className="text-muted-foreground">· {formatFractionAsPercent(entry.confidence)} confidence</span>
-                        )}
-                      </div>
-                      <p className="text-sm text-foreground leading-relaxed mt-0.5">
-                        {searchTerm
-                          ? entry.text
-                              .split(new RegExp(`(${searchTerm})`, 'gi'))
-                              .map((part, i) =>
-                                part.toLowerCase() === searchTerm.toLowerCase() ? (
-                                  <mark key={i} className="bg-amber-200 dark:bg-amber-500/30 dark:text-foreground rounded-sm px-0.5">
-                                    {part}
-                                  </mark>
-                                ) : (
-                                  part
-                                ),
-                              )
-                          : entry.text}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+            competing boxes. Now the shared ConversationTranscript
+            primitive (src/components/interaction-detail) — also used by
+            Chat Detail — rather than a page-local implementation. */}
+        <ConversationTranscript
+          entries={conversationEntries}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          isLoading={liveTranscript.isLoading && needsLiveFetch}
+          isError={liveTranscript.isError}
+          onRetry={() => liveTranscript.refetch()}
+          onRefresh={() => liveTranscript.refetch()}
+          isRefreshing={liveTranscript.isFetching}
+          showRefresh={needsLiveFetch}
+        />
       </DialogContent>
     </Dialog>
   );

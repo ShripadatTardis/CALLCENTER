@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { MetricStrip } from '@/components/common/MetricStrip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowLeft, Bot, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Bot, ChevronDown, ChevronLeft, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { useAgentDetail } from '@/hooks/agents/useAgentDetail';
 import { useClassification } from '@/hooks/classification/useClassification';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
@@ -24,6 +25,8 @@ import {
 } from '@/lib/format';
 
 const FALLBACK = '—';
+const RECENT_INTERACTIONS_PAGE_SIZES = [10, 25, 50] as const;
+const DEFAULT_RECENT_INTERACTIONS_PAGE_SIZE = 10;
 
 /**
  * Small, keyboard-accessible "Data notes" disclosure (Radix Popover —
@@ -62,7 +65,7 @@ const DataNotes: React.FC<{ notes: string[]; title?: string; ariaLabel?: string 
 
 /** A compact label/value pair for the Operational Performance grid — replaces one `flex justify-between` row per card, now in a responsive grid instead of three stacked full-width cards. */
 const MetricRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="flex items-baseline justify-between gap-2 border-b border-border/40 pb-1">
+  <div className="flex items-baseline justify-between gap-2 border-b border-border/40 pb-0.5">
     <span className="text-muted-foreground text-xs">{label}</span>
     <span className="text-foreground text-sm tabular-nums">{value}</span>
   </div>
@@ -124,13 +127,31 @@ const AgentDetail: React.FC = () => {
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
   const [contractOpen, setContractOpen] = useState(false);
+  const [interactionsPage, setInteractionsPage] = useState(1);
+  const [interactionsPageSize, setInteractionsPageSize] = useState<number>(DEFAULT_RECENT_INTERACTIONS_PAGE_SIZE);
 
-  const recentInteractions = [
+  // Both source populations (callInteractions/chatSessions) are already
+  // fully loaded in memory by useAgentDetail — this is a client-side
+  // pagination over a genuinely complete bounded dataset (§2.B of the
+  // Agent Detail density-pass brief), not a slice-and-discard of 20.
+  // Merge BEFORE paginating so Voice and Chat interleave in one true
+  // newest-first order; paginating each source independently and
+  // concatenating pages would silently break chronological order.
+  const allRecentInteractions = [
     ...callInteractions.map((i) => ({ kind: 'call' as const, at: i.startTime, call: i })),
     ...chatSessions.map((s) => ({ kind: 'chat' as const, at: s.updatedAt, chat: s })),
-  ]
-    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-    .slice(0, 20);
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  // Reset to page 1 whenever the agent changes (a stale page number from
+  // a previous agent's longer history must never silently persist).
+  useEffect(() => {
+    setInteractionsPage(1);
+  }, [agentId]);
+
+  const interactionsTotalPages = Math.max(1, Math.ceil(allRecentInteractions.length / interactionsPageSize));
+  const interactionsCurrentPage = Math.min(interactionsPage, interactionsTotalPages);
+  const interactionsStart = (interactionsCurrentPage - 1) * interactionsPageSize;
+  const recentInteractions = allRecentInteractions.slice(interactionsStart, interactionsStart + interactionsPageSize);
 
   // Customer 360 category mapping — VoiceForce's own agent_id -> category
   // assignment (never inferred from intent/transcript/sentiment), reusing
@@ -189,28 +210,44 @@ const AgentDetail: React.FC = () => {
     'Per-agent voice turn latency has no confirmed API source today (analytics/metrics is global/direction-scoped only) — intentionally not shown.',
   ].filter((n): n is string => Boolean(n));
 
+  // Session (Agent Detail density pass §1/§24) — traced exactly how each
+  // source is bounded. Voice and Chat are NOT bounded the same way:
+  // Chat is a genuine "this agent's own most recent 100 sessions" (the
+  // live API is called with agentId, server-filtered). Voice is this
+  // agent's share of the company-wide most-recent-100 call-data rows
+  // (useCallData has no server-side agent filter; filtering happens
+  // client-side after the fetch) — so a low-volume agent's older Voice
+  // calls can fall outside that global window even though they're real,
+  // recent-ish history for THIS agent. Never presented as "this agent's
+  // last 100 calls" anywhere in this file for that reason.
+  const recentInteractionsNotes = [
+    'Chat: this agent\'s own most recent 100 chat sessions (server-filtered by agent).',
+    'Voice: this agent\'s share of the most recent 100 call-data rows company-wide — if this agent has more history than shown, older Voice calls may currently be outside that global window. Not a per-agent cap.',
+    'The count below reflects everything currently loaded for this agent, not this agent\'s all-time interaction total.',
+  ];
+
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
+      <div className="bg-background min-h-full text-foreground p-4 space-y-2.5">
+        <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
           Back to {returnTo.label}
         </Button>
 
         {/* A. Compact Agent Header — identity + counters, one bar instead of four stacked blocks. */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <Bot className="h-6 w-6 text-cyan-400 shrink-0" />
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <Bot className="h-5 w-5 text-cyan-400 shrink-0" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold text-foreground truncate">{agent.displayName}</h1>
+                <h1 className="text-base font-semibold text-foreground truncate">{agent.displayName}</h1>
                 {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
               </div>
-              <p className="text-xs text-muted-foreground font-mono">{agent.agentId}</p>
+              <p className="text-[11px] text-muted-foreground font-mono leading-tight">{agent.agentId}</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-3 py-2.5 border border-border rounded-md bg-card/40 text-[13px]">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-3 py-2 border border-border rounded-md bg-card/40 text-[13px]">
             <span><span className="text-muted-foreground">Direction</span> <span className="text-foreground">{formatStatusLabel(agent.direction)}</span></span>
             <span><span className="text-muted-foreground">Persona</span> <span className="text-foreground">{agent.personaName || FALLBACK}</span></span>
             <span><span className="text-muted-foreground">Language</span> <span className="text-foreground">{agent.language || FALLBACK}</span></span>
@@ -255,7 +292,7 @@ const AgentDetail: React.FC = () => {
         </div>
 
         {/* B. Operational Performance — one compact grid instead of three large cards. */}
-        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <div className="rounded-md border border-border bg-card p-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Operational Performance</div>
             <DataNotes notes={performanceNotes} />
@@ -265,21 +302,21 @@ const AgentDetail: React.FC = () => {
               grouping the old 3-card layout gave for free. Restored as 3
               sub-clusters with a tiny uppercase sub-header each, still one
               compact container (no card-per-group chrome). */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-2">
+            <div className="space-y-1">
               <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Business Outcomes</div>
               <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
               <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
               <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Conversational Quality</div>
               <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
               <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
               <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
               <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Technical Performance</div>
               <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
               <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
@@ -293,7 +330,7 @@ const AgentDetail: React.FC = () => {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
+                className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
                 aria-expanded={contractOpen}
                 aria-controls="agent-contract-panel"
               >
@@ -376,7 +413,7 @@ const AgentDetail: React.FC = () => {
 
         {/* D. Campaign Usage — unchanged data/semantics (Session 11.5A "latest attempt wins" policy), compact. */}
         {agent.direction === 'outbound' && agentCampaigns.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1" title="Reflects each target's current effective result (latest reconciled attempt) — see Session 11.5A">
               Campaign Usage
             </div>
@@ -391,50 +428,118 @@ const AgentDetail: React.FC = () => {
           </div>
         )}
 
-        {/* E. Recent interactions — drill-down into existing detail mechanisms only; given more visual priority by the density reduction above. */}
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Recent Interactions</div>
-          {recentInteractions.length === 0 ? (
+        {/* E. Recent interactions — drill-down into existing detail mechanisms only.
+            Session (Agent Detail density pass) — dense rows (~40-44px, matching
+            the "G1 dense operational grid" convention already established on
+            Call Logs/Live View: h-9 head, py-1.5 cells, not shadcn's default
+            p-4/h-12), full pagination over the complete already-loaded merged
+            population (never an arbitrary 20-row slice-and-discard), and a
+            truthful scope disclosure for the Voice/Chat cap asymmetry traced
+            in recentInteractionsNotes above. */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-1">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recent Interactions</div>
+            {allRecentInteractions.length > 0 && <DataNotes title="Interaction scope" ariaLabel="Interaction scope — what this list represents" notes={recentInteractionsNotes} />}
+          </div>
+          {allRecentInteractions.length === 0 ? (
             <p className="text-sm text-muted-foreground px-1">No recent interactions for this agent.</p>
           ) : (
-            <div className="rounded-md border border-border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    {['Channel', 'When', 'Outcome / Status', ''].map((h) => (
-                      <TableHead key={h} className="text-muted-foreground text-xs">{h}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentInteractions.map((row) =>
-                    row.kind === 'call' ? (
-                      <TableRow key={`call-${row.call.interactionId}`} className="border-border/60 hover:bg-card">
-                        <TableCell><Badge variant="outline" className="text-xs border-slate-600 text-foreground">Voice</Badge></TableCell>
-                        <TableCell className="text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
-                        <TableCell className="text-foreground">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedInteraction(row.call)}>
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      <TableRow key={`chat-${row.chat.sessionId}`} className="border-border/60 hover:bg-card">
-                        <TableCell><Badge variant="outline" className="text-xs border-slate-600 text-foreground">Chat</Badge></TableCell>
-                        <TableCell className="text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
-                        <TableCell className="text-foreground">{formatStatusLabel(row.chat.status)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ),
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <div className="rounded-md border border-border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      {['Channel', 'When', 'Outcome / Status', ''].map((h) => (
+                        <TableHead key={h} className="h-9 px-3 text-muted-foreground text-xs">{h}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentInteractions.map((row) =>
+                      row.kind === 'call' ? (
+                        <TableRow key={`call-${row.call.interactionId}`} className="border-border/60 hover:bg-card">
+                          <TableCell className="py-1.5 px-3"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Voice</Badge></TableCell>
+                          <TableCell className="py-1.5 px-3 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-foreground text-xs">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-right">
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedInteraction(row.call)}>
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        <TableRow key={`chat-${row.chat.sessionId}`} className="border-border/60 hover:bg-card">
+                          <TableCell className="py-1.5 px-3"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Chat</Badge></TableCell>
+                          <TableCell className="py-1.5 px-3 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-foreground text-xs">{formatStatusLabel(row.chat.status)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-right">
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination footer — kept outside the table body (no nested
+                  scroll region; §16 explicitly prefers pagination over a
+                  second internal scrollbar). Always shown once there is at
+                  least one row, so the page-size selector stays reachable
+                  even on a single page. */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+                <span role="status" aria-live="polite">
+                  Showing {interactionsStart + 1}–{Math.min(interactionsStart + interactionsPageSize, allRecentInteractions.length)} of {allRecentInteractions.length} · Page {interactionsCurrentPage} of {interactionsTotalPages}
+                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span>Rows</span>
+                    <Select
+                      value={String(interactionsPageSize)}
+                      onValueChange={(v) => {
+                        setInteractionsPageSize(Number(v));
+                        setInteractionsPage(1);
+                      }}
+                    >
+                      <SelectTrigger aria-label="Rows per page" className="h-7 w-16 text-xs border-border bg-transparent">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RECENT_INTERACTIONS_PAGE_SIZES.map((size) => (
+                          <SelectItem key={size} value={String(size)} className="text-xs">
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      onClick={() => setInteractionsPage(Math.max(1, interactionsCurrentPage - 1))}
+                      disabled={interactionsCurrentPage <= 1}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      onClick={() => setInteractionsPage(Math.min(interactionsTotalPages, interactionsCurrentPage + 1))}
+                      disabled={interactionsCurrentPage >= interactionsTotalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
 

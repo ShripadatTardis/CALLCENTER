@@ -83,6 +83,15 @@ export interface RatioBreakdownResult {
 export interface RatioInteractionRefResult {
   interactionId: string;
   channel: 'voice' | 'chat';
+  /**
+   * Session 13.6 (DEC-RATIO-01) — call-data has no call_id-keyed lookup
+   * param (confirmed repeatedly elsewhere in this codebase: search only
+   * matches caller_number/caller_name). Drill-through needs this to find
+   * the exact interaction via the same proven phone+call_sid lookup
+   * every other screen already uses (src/lib/callLookup.ts) — never a
+   * fallback to "the first row returned."
+   */
+  phoneNumber: string;
   timestamp: string;
   agentLabel: string | null;
   intent: string | null;

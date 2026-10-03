@@ -101,8 +101,8 @@ export const FRONTEND_RATIO_REGISTRY: Record<string, FrontendRatioDefinition> = 
     id: 'authentication_success_rate', name: 'Authentication Success Rate', shortLabel: 'Auth Success', family: 'intelligence',
     description: 'Share of authentication attempts that succeeded.',
     formulaText: 'Successful auth ÷ auth attempts', unit: 'percent', preferredVisualization: 'trend_line', goodDirection: 'up',
-    helpText: 'A real "was authenticated" flag exists; a distinct "attempted" signal does not yet.',
-    declaredAvailability: 'partial', declaredDrillDimensions: [], declaredDriverDimension: null,
+    helpText: 'Computed server-side over interactions where authentication was genuinely attempted (was_authenticated is non-null) — a call that never attempted authentication is excluded, not counted as a failure.',
+    declaredAvailability: 'direct', declaredDrillDimensions: ['intent', 'agent', 'campaign'], declaredDriverDimension: null,
   },
   intent_accuracy: {
     id: 'intent_accuracy', name: 'Intent Accuracy', shortLabel: 'Intent Accuracy', family: 'intelligence',

@@ -41,6 +41,25 @@ import type { RatioComparison } from '../../types/ratio.js';
  *      intersection of Resolution Rate's numerator population and AHT's
  *      duration-validity rule, reusing BOTH existing rules rather than
  *      inventing a third. numerator = sum of those durations.
+ * Authentication Success Rate (Session 13.6, DEC-RATIO-01): denominator =
+ *      calls where was_authenticated is non-null (an authentication flow
+ *      was genuinely attempted — the SAME null-vs-value distinction
+ *      already established elsewhere in this product for this exact
+ *      field, e.g. InteractionDetailDialog/CustomerDetail's "N/A" vs
+ *      "Yes"/"No" treatment: null means no authentication evidence was
+ *      ever recorded, never a silent "not authenticated"). numerator =
+ *      was_authenticated === true. A call where authentication was never
+ *      attempted is excluded from the denominator entirely, not counted
+ *      as a failure.
+ *
+ * Completion Rate and Avoidable Escalation Rate remain explicitly
+ * unavailable after Session 13.6 inspection — see ratioRegistry.ts's
+ * eligibilityNote for each and docs/SESSION_13_6_RATIO_EXPLORER_DATA_CORRECTNESS.md.
+ * Completion Rate's source field (`stage`) has no confirmed real value
+ * set; Avoidable Escalation Rate's source field (`escalation_trigger`)
+ * has no normalized avoidable/unavoidable taxonomy. Neither can be
+ * defensibly built without inventing semantics the real data doesn't
+ * support.
  *
  * Completion Rate is deliberately NOT implemented in R3 — see
  * docs/SESSION_R3_RATIO_FACT_DERIVED_AND_AGGREGATION_CONTRACT.md. No
@@ -113,12 +132,25 @@ export function computeSuccessfulResolutionTime(calls: CallDataEntryDto[]): Rati
   return { value, numerator: Math.round(numerator), denominator };
 }
 
+/** The shared "authentication attempted" population — was_authenticated is non-null. A call where authentication was never attempted is excluded, never counted as a failure. */
+function withAttemptedAuthentication(calls: CallDataEntryDto[]): CallDataEntryDto[] {
+  return calls.filter((c) => c.was_authenticated !== null && c.was_authenticated !== undefined);
+}
+
+export function computeAuthenticationSuccessRate(calls: CallDataEntryDto[]): RatioAggregate {
+  const attempted = withAttemptedAuthentication(calls);
+  const denominator = attempted.length;
+  const numerator = attempted.filter((c) => c.was_authenticated === true).length;
+  return { value: rateOrNull(numerator, denominator), numerator, denominator };
+}
+
 export const RATIO_CALCULATORS: Record<string, (calls: CallDataEntryDto[]) => RatioAggregate> = {
   fcr: computeFcr,
   escalation_rate: computeEscalationRate,
   resolution_rate: computeResolutionRate,
   aht: computeAht,
   successful_resolution_time: computeSuccessfulResolutionTime,
+  authentication_success_rate: computeAuthenticationSuccessRate,
 };
 
 /**
@@ -134,6 +166,7 @@ export const RATIO_ELIGIBLE_POPULATION: Record<string, (calls: CallDataEntryDto[
   resolution_rate: handledCalls,
   aht: withValidDuration,
   successful_resolution_time: (calls) => withValidDuration(calls.filter((c) => c.outcome === 'resolved')),
+  authentication_success_rate: withAttemptedAuthentication,
 };
 
 /** Real equal-length previous-period comparison — pp for percent ratios, plain delta (seconds) for time ratios. Never computed when either side is null (no data). */

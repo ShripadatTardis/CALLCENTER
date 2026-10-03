@@ -47,12 +47,22 @@ function computeSuccessfulResolutionTime(calls) {
   const value = denominator === 0 ? null : Math.round(numerator / denominator);
   return { value, numerator: Math.round(numerator), denominator };
 }
+function withAttemptedAuthentication(calls) {
+  return calls.filter((c) => c.was_authenticated !== null && c.was_authenticated !== void 0);
+}
+function computeAuthenticationSuccessRate(calls) {
+  const attempted = withAttemptedAuthentication(calls);
+  const denominator = attempted.length;
+  const numerator = attempted.filter((c) => c.was_authenticated === true).length;
+  return { value: rateOrNull(numerator, denominator), numerator, denominator };
+}
 var RATIO_CALCULATORS = {
   fcr: computeFcr,
   escalation_rate: computeEscalationRate,
   resolution_rate: computeResolutionRate,
   aht: computeAht,
-  successful_resolution_time: computeSuccessfulResolutionTime
+  successful_resolution_time: computeSuccessfulResolutionTime,
+  authentication_success_rate: computeAuthenticationSuccessRate
 };
 
 // src/server/analytics/ratioDimensions.ts

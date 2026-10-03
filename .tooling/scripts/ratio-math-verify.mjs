@@ -5,7 +5,7 @@
 // reimplementation, it exercises the actual shipped calculation
 // functions against synthetic fixtures. No network/live backend needed.
 
-import { computeFcr, computeEscalationRate, computeAht, computeResolutionRate, computeSuccessfulResolutionTime } from '../tmp/ratioMath.mjs';
+import { computeFcr, computeEscalationRate, computeAht, computeResolutionRate, computeSuccessfulResolutionTime, computeAuthenticationSuccessRate } from '../tmp/ratioMath.mjs';
 
 let pass = 0, fail = 0;
 function assert(name, actual, expected) {
@@ -131,6 +131,63 @@ function assert(name, actual, expected) {
   assert('Successful Resolution Time 0 eligible -> null', computeSuccessfulResolutionTime([{ outcome: 'escalated', duration_seconds: 30 }]), {
     value: null, numerator: 0, denominator: 0,
   });
+}
+
+// --- Session 13.6: Authentication Success Rate (DEC-RATIO-01) ---
+// Tri-state was_authenticated (true/false/null) — null means "never
+// attempted" and must be excluded from the denominator, never counted
+// as a failure.
+
+// all eligible success: 3/3 attempted, all true -> 100%
+{
+  const calls = [{ was_authenticated: true }, { was_authenticated: true }, { was_authenticated: true }];
+  assert('Auth Success Rate all eligible success -> 100%', computeAuthenticationSuccessRate(calls), { value: 100, numerator: 3, denominator: 3 });
+}
+
+// all eligible failure: 3/3 attempted, all false -> legitimate 0%
+{
+  const calls = [{ was_authenticated: false }, { was_authenticated: false }, { was_authenticated: false }];
+  assert('Auth Success Rate all eligible failure -> legitimate 0%', computeAuthenticationSuccessRate(calls), { value: 0, numerator: 0, denominator: 3 });
+}
+
+// mixed: 2 true, 1 false -> 2/3 = 66.7%
+{
+  const calls = [{ was_authenticated: true }, { was_authenticated: true }, { was_authenticated: false }];
+  assert('Auth Success Rate mixed 2/3', computeAuthenticationSuccessRate(calls), { value: 66.7, numerator: 2, denominator: 3 });
+}
+
+// null field: excluded from denominator entirely, never counted as false
+{
+  const calls = [{ was_authenticated: true }, { was_authenticated: null }, { was_authenticated: null }];
+  assert('Auth Success Rate null excluded from denominator', computeAuthenticationSuccessRate(calls), { value: 100, numerator: 1, denominator: 1 });
+}
+
+// missing field (undefined): also excluded, same as null
+{
+  const calls = [{ was_authenticated: true }, {}, { was_authenticated: undefined }];
+  assert('Auth Success Rate missing field excluded from denominator', computeAuthenticationSuccessRate(calls), { value: 100, numerator: 1, denominator: 1 });
+}
+
+// no eligible population: every row null/missing -> null, never 0%
+{
+  const calls = [{ was_authenticated: null }, {}, { was_authenticated: undefined }];
+  assert('Auth Success Rate no eligible population -> null', computeAuthenticationSuccessRate(calls), { value: null, numerator: 0, denominator: 0 });
+}
+
+// empty array -> null
+{
+  assert('Auth Success Rate empty array -> null', computeAuthenticationSuccessRate([]), { value: null, numerator: 0, denominator: 0 });
+}
+
+// numerator never exceeds denominator (mixed with nulls interspersed)
+{
+  const calls = [
+    { was_authenticated: true }, { was_authenticated: null }, { was_authenticated: false },
+    { was_authenticated: true }, { was_authenticated: undefined }, { was_authenticated: true },
+  ];
+  const result = computeAuthenticationSuccessRate(calls);
+  assert('Auth Success Rate numerator <= denominator', result.numerator <= result.denominator, true);
+  assert('Auth Success Rate exact mixed-with-nulls value', result, { value: 75, numerator: 3, denominator: 4 });
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -6,6 +6,7 @@ import type {
   ProviderFilters,
   RatioAggregateResult,
   RatioBreakdownResult,
+  RatioInteractionRefResult,
   RatioInteractionsResult,
   RatioTrendResult,
 } from './aggregationProvider.js';
@@ -49,6 +50,26 @@ function applyDrillFilter(calls: CallDataEntryDto[], filters: ProviderFilters): 
         return true;
     }
   });
+}
+
+/**
+ * Session 13.6 (DEC-RATIO-01) — extracted as a standalone, pure function
+ * (previously inlined in the `.map()` below) purely so it is directly
+ * unit-testable (see .tooling/scripts/ratio-channel-verify.mjs) without
+ * needing to fake the network layer `fetchCompleteCallPopulation` sits
+ * behind. See the doc comment on its call site for why `channel: 'voice'`
+ * is accurate, not a misclassification.
+ */
+export function mapCallToInteractionRef(call: CallDataEntryDto): RatioInteractionRefResult {
+  return {
+    interactionId: call.call_id,
+    channel: 'voice' as const,
+    phoneNumber: call.caller_number,
+    timestamp: call.start_time,
+    agentLabel: call.ai_agent_name || call.ai_agent_id || null,
+    intent: call.intent || null,
+    outcome: call.outcome || null,
+  };
 }
 
 async function fetchPopulationForFilters(filters: ProviderFilters) {
@@ -104,14 +125,7 @@ export const callPopulationProvider: AggregationProvider = {
     const population = await fetchPopulationForFilters(filters);
     const eligible = eligibleFilter(population.calls);
     const start = (page - 1) * pageSize;
-    const rows = eligible.slice(start, start + pageSize).map((call) => ({
-      interactionId: call.call_id,
-      channel: 'voice' as const,
-      timestamp: call.start_time,
-      agentLabel: call.ai_agent_name || call.ai_agent_id || null,
-      intent: call.intent || null,
-      outcome: call.outcome || null,
-    }));
+    const rows: RatioInteractionRefResult[] = eligible.slice(start, start + pageSize).map(mapCallToInteractionRef);
 
     return { rows, totalCount: eligible.length, capped: population.capped, trueTotalRecords: population.trueTotalRecords };
   },

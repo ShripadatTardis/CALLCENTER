@@ -180,6 +180,8 @@ export interface RatioDriverResponseDto {
 export interface RatioInteractionRefDto {
   interactionId: string;
   channel: 'voice' | 'chat';
+  /** Session 13.6 — required for drill-through's stable phone+call_sid lookup; see RatioInteractionRefResult's doc comment (src/server/analytics/aggregationProvider.ts) for why. */
+  phoneNumber: string;
   timestamp: string;
   agentLabel: string | null;
   intent: string | null;

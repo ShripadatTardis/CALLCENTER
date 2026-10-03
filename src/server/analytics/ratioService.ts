@@ -54,23 +54,27 @@ function classifyFetchFailure(err: unknown): { runtimeState: RatioRuntimeState; 
  * API route, or the Ratio Explorer needs to change.
  *
  * Implemented ratios (R2: fcr, escalation_rate, aht; R3 adds
- * resolution_rate, successful_resolution_time). completion_rate
- * remains explicitly unavailable — see ratioRegistry.ts's
- * eligibilityNote and docs/SESSION_R3_RATIO_FACT_DERIVED_AND_AGGREGATION_CONTRACT.md.
- * Every other ratio still returns the R1 "not yet instrumented" shape.
+ * resolution_rate, successful_resolution_time; Session 13.6 adds
+ * authentication_success_rate). completion_rate and
+ * avoidable_escalation_rate remain explicitly unavailable — see
+ * ratioRegistry.ts's eligibilityNote for each,
+ * docs/SESSION_R3_RATIO_FACT_DERIVED_AND_AGGREGATION_CONTRACT.md, and
+ * docs/SESSION_13_6_RATIO_EXPLORER_DATA_CORRECTNESS.md. Every other
+ * ratio still returns the R1 "not yet instrumented" shape.
  */
 
 const provider: AggregationProvider = callPopulationProvider;
 
-const IMPLEMENTED_RATIOS = new Set(['fcr', 'escalation_rate', 'aht', 'resolution_rate', 'successful_resolution_time']);
+const IMPLEMENTED_RATIOS = new Set(['fcr', 'escalation_rate', 'aht', 'resolution_rate', 'successful_resolution_time', 'authentication_success_rate']);
 const UNIT_FOR: Record<string, RatioUnit> = {
   fcr: 'percent',
   escalation_rate: 'percent',
   resolution_rate: 'percent',
   aht: 'seconds',
   successful_resolution_time: 'seconds',
+  authentication_success_rate: 'percent',
 };
-const PERCENT_RATIOS = new Set(['fcr', 'escalation_rate', 'resolution_rate']);
+const PERCENT_RATIOS = new Set(['fcr', 'escalation_rate', 'resolution_rate', 'authentication_success_rate']);
 
 function emptySummary(
   ratioId: string,

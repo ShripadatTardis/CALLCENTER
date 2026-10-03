@@ -82,6 +82,8 @@ export interface CampaignAgentInputMapping {
   sourceField: string;
   required: boolean;
   dataType: string | null;
+  /** Session 13.4 — the configuration version this mapping row belongs to (already returned by the API since Session 12.7; exposed on this type now for Configuration History). Null for a never-versioned draft/legacy campaign. */
+  configurationVersionId: string | null;
 }
 
 export interface NewCampaignAgentInputMappingInput {

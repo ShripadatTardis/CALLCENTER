@@ -9,6 +9,7 @@ import { ReasonDialog } from './ReasonDialog';
 import { TargetActionsMenu } from './TargetActionsMenu';
 import { AddTargetsDialog } from './AddTargetsDialog';
 import { CampaignHistory } from './CampaignHistory';
+import { CampaignConfigurationHistory } from './CampaignConfigurationHistory';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
@@ -18,7 +19,7 @@ import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { formatTimestamp } from '@/lib/format';
 import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
-import type { CampaignClassification, CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
+import type { CampaignClassification, CampaignConfigurationVersion, CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
 import type { Interaction } from '@/types/interaction';
 
 /**
@@ -123,12 +124,17 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; phone: string; 
 const AgentResultDialog: React.FC<{
   campaign: CampaignDetailType;
   target: CampaignTargetRow;
+  configurationVersions: CampaignConfigurationVersion[];
   onClose: () => void;
-}> = ({ campaign, target, onClose }) => {
+}> = ({ campaign, target, configurationVersions, onClose }) => {
   const contract = campaign.agentContractSnapshot;
   const outcome = classifyActualOutcome(contract, target.resultActualOutcomeCode, target.resultActualOutcomeName);
   const outputs = classifyStructuredOutputs(contract, target.resultStructuredOutputs);
   const { data: classifications = [] } = useCampaignClassifications();
+  // Session 13.4 (DEC-CAMP-01 §5) — execution provenance: which configuration version governed this target's most recent execution. Null is a real, honest state (pre-12.7 execution, or a campaign never versioned) — never guessed.
+  const governingVersion = target.latestConfigurationVersionId
+    ? (configurationVersions.find((v) => v.id === target.latestConfigurationVersionId) ?? null)
+    : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
@@ -221,6 +227,22 @@ const AgentResultDialog: React.FC<{
           </div>
         )}
 
+        <div className="space-y-0.5">
+          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Configuration</div>
+          {governingVersion ? (
+            <div className="text-foreground">
+              v{governingVersion.versionNumber}
+              {governingVersion.status === 'superseded' && (
+                <span className="text-muted-foreground"> (superseded)</span>
+              )}
+            </div>
+          ) : (
+            <div className="text-muted-foreground">
+              {target.latestConfigurationVersionId ? 'Configuration version not found' : 'Unversioned (pre-12.7 or never-edited campaign)'}
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end">
           <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
             Close
@@ -262,6 +284,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   const [agentResultTargetId, setAgentResultTargetId] = useState<string | null>(null);
   const [lifecycleDialog, setLifecycleDialog] = useState<'pause' | 'stop' | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [configHistoryOpen, setConfigHistoryOpen] = useState(false);
   const [addTargetsOpen, setAddTargetsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { data: configurationVersions = [] } = useCampaignConfigurationVersions(campaign.id);
@@ -299,6 +322,9 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           </Button>
           <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setHistoryOpen(true)}>
             History
+          </Button>
+          <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setConfigHistoryOpen(true)}>
+            Config History
           </Button>
           <CampaignStatusBadge status={campaign.status} />
           {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
@@ -590,7 +616,12 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
       {agentResultTargetId && (() => {
         const target = targets.find((t) => t.id === agentResultTargetId);
         return target ? (
-          <AgentResultDialog campaign={campaign} target={target} onClose={() => setAgentResultTargetId(null)} />
+          <AgentResultDialog
+            campaign={campaign}
+            target={target}
+            configurationVersions={configurationVersions}
+            onClose={() => setAgentResultTargetId(null)}
+          />
         ) : null;
       })()}
 
@@ -626,6 +657,22 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
               </DialogDescription>
             </DialogHeader>
             <CampaignHistory campaignId={campaign.id} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {configHistoryOpen && (
+        <Dialog open onOpenChange={(open) => !open && setConfigHistoryOpen(false)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Configuration History</DialogTitle>
+              <DialogDescription className="text-xs">
+                Read-only. Every configuration version that has governed this campaign — Agent, Agent Contract, Input
+                Mapping and Outcome Mapping — with the current version marked and a structural diff against the
+                version before it.
+              </DialogDescription>
+            </DialogHeader>
+            <CampaignConfigurationHistory campaign={campaign} />
           </DialogContent>
         </Dialog>
       )}

@@ -460,7 +460,7 @@ const CustomerDetail: React.FC = () => {
                           }}
                         >
                           <td className="py-1.5 px-3 whitespace-nowrap text-foreground">{formatTimestamp(row.startedAt)}</td>
-                          <td className="py-1.5 px-3">
+                          <td className="py-1.5 px-3 whitespace-nowrap">
                             <Badge variant="outline" className="text-xs whitespace-nowrap border-border text-foreground">{row.channel}</Badge>
                             {row.direction && <Badge variant="secondary" className="text-xs whitespace-nowrap ml-1">{row.direction}</Badge>}
                           </td>

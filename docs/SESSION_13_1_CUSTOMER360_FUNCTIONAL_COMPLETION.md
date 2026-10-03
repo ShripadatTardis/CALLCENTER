@@ -189,6 +189,56 @@ All five are clearly labeled `createdBy: "session-13.1-verification"` and their 
 
 ---
 
+## Session 13.1.1 — Customer360 Activity UX and Screen Density Correction
+
+A narrowly scoped UX correction to the deployed Session 13.1 implementation, requested after manual review: Activity/Diary was functionally correct but visually large/unbounded, activity creation was only reachable from the section header (not from the interaction that prompted it), and the upper Customer Detail panels consumed more vertical space than necessary before Interaction History became visible.
+
+### 1. Activity grid conversion
+`CustomerActivityPanel.tsx`'s large vertical activity cards were replaced with a compact HTML table (`Type | Activity | Created | Due/Scheduled | Status`), one row per activity, status remaining editable exactly where the backend already supports it (same `STATUS_OPTIONS_BY_TYPE` map as before — no change to what transitions are allowed). The collapsible section itself is unchanged (collapsed by default, auto-expands on new activity).
+
+### 2. 5-row bounded scroll
+The grid body is wrapped in a `max-h-[14.5rem] overflow-auto` container with a `sticky top-0` header, so roughly 5 rows are visible before the grid scrolls internally — the section itself no longer grows with activity count. Verified live with 8 real activities present: the container scrolled internally; the page around it did not grow unbounded.
+
+### 3. Interaction History Action column
+Added an `Action` column to Customer Detail's Interaction History table containing a single `+ Activity` button per row (extensible for future actions, none added now, per instruction). Clicking it opens the Activity composer bound to that row and does not trigger the row's own Call/Chat Detail click handler.
+
+### 4. Shared composer, interaction-linked creation
+New `ActivityComposerDialog.tsx` — one component, reused by both the Customer-level "Add activity" button and the Interaction History row's "+ Activity" action (not two implementations). Horizontal layout: a `ToggleGroup`-based Type selector (Note/Instruction/Task/Reminder/Appointment, matching `Settings.tsx`'s existing theme-toggle pattern), Title, conditional Due/Scheduled field, Description, Save — wrapping responsively. When opened from an interaction row, a read-only "Linked interaction: Voice • Outbound • Oct 1, 05:19 PM • EMI Reminder • Emi Payment • Resolved"-style context strip is shown, built only from fields the selected interaction actually has; Description is never auto-populated from interaction attributes.
+
+### 5. Customer-level Add Activity preserved
+Confirmed unchanged and unaffected: opening from the section header's "Add activity" button shows no linked-interaction strip and creates a plain customer-level activity, exactly as before.
+
+### 6. Activity provenance
+Activities linked to an interaction show a small link icon next to their title/body in the grid, resolved client-side from the same Interaction History data already loaded on the page (no new fetch), with a tooltip/aria-label giving the linked interaction's channel/time/agent and drill-through to that interaction's existing detail dialog (Call or Chat, as appropriate). No raw UUID is shown as the primary representation.
+
+### 7. Upper-screen density correction
+`CustomerDetail.tsx`'s Identity & Contact `SectionCard` padding was tightened (`p-3`→`p-2`, `space-y-2`→`space-y-1`) and the page's overall vertical gap reduced (`space-y-3`→`space-y-2`). No exposed field was removed. `MetricStrip`'s own padding was deliberately left untouched after confirming a `className` override would lose to the component's own `py-2.5` in Tailwind's generated stylesheet order (same-specificity utility classes resolve by the compiled scale order, not by element class-attribute order) — changing the shared component's default would have affected every other screen using it, outside this session's scope.
+
+### 8. A real bug found and fixed during verification
+Live verification surfaced a genuine defect, not present in the prompt's own description: `customer_activities.interaction_id` has a foreign key onto `customer_interactions.id` (the internal row UUID), not the external `call_sid`/`session_id` string (`CustomerInteractionRow.interactionId`) that Call/Chat Detail lookups use. The initial implementation used the external id everywhere, which caused every interaction-linked activity creation to fail with `HTTP 500` (`violates foreign key constraint customer_activities_interaction_id_fkey`). Fixed by using `interactionContext.id` (internal) when submitting, keying the `interactionsById` provenance map by `row.id`, and passing `linkedInteraction.interactionId` (external) back out to the existing Call/Chat Detail lookup, which needs the external id. Verified directly against the deployed API (reproduced the 500 with the external id, confirmed `201` with the internal id) before re-verifying in the browser.
+
+### 9. Keyboard-accessibility fix (found by HIG review)
+A two-pass HIG design review (`apple-hig` plugin) caught a real, high-severity defect before this shipped: the Interaction History `<tr>`'s `role="button"` Enter/Space keydown handler fired before the nested "+ Activity" `<button>`'s own keyboard activation, because `stopPropagation()` was only wired on the click handler, not keydown — a keyboard user pressing Enter/Space on "+ Activity" would open the row's Call/Chat Detail dialog instead. Fixed by also stopping propagation on the button's own `onKeyDown` for Enter/Space. A follow-up HIG pass confirmed the fix is correct per React's synthetic event bubbling model. Also fixed in the same review cycle: the provenance link icon's touch target (12px → 24px hit area) and disabled-state affordance, the Type `ToggleGroup`'s height (`h-7`→`h-8`, matching the `Settings.tsx` precedent it was meant to reuse), a missing accessible name on the Title input, and the sticky grid header's corner-radius clipping.
+
+### 10. Verification performed
+- `npm run typecheck` — 0 errors. `npm run build` — clean. `npx eslint` on every touched file — 0 errors (0 warnings; the pre-existing `allInteractions` dependency warning was also resolved as part of this work by memoizing it, since it now feeds two hooks).
+- `npm run verify:full` — all deterministic suites green (23/23, 24/24, 8/8, 17/17, 4/4) — unaffected by this session's Customer360-scoped changes.
+- **Live, post-deploy, in a real browser** against `ab81fbcb-fba5-45f9-8a52-a71f2f0aaaf8`:
+  - Activity grid: 8 real activities present, compact 5-row-bounded presentation with internal scroll confirmed; collapse/expand confirmed; status dropdowns rendered correctly in the dense grid.
+  - Voice interaction → Activity: clicked "+ Activity" on the "Oct 1, 05:19 PM" row, confirmed the linked-interaction context strip read exactly "Voice • Outbound • Oct 1, 05:19 PM • EMI Reminder • Emi Payment • Resolved," saved, confirmed the new activity appeared in the diary with a provenance link icon, clicked it, confirmed it opened the correct Call Detail dialog (Interaction ID `444052b7-3eb4-4855-ae86-148859372f9b`).
+  - Chat interaction → Activity: created (via the same API path) an activity bound to a real chat interaction (`b4fc67df-6b49-42d7-82a4-9968fa70eb16`, `chat-8f66621a-5970-42b2-8f6a-ef28d4b5b5fd`, Forex Transaction), confirmed it appeared with a provenance icon, clicked it, confirmed it opened the correct Chat Session Detail dialog (same session id, same agent, real 3-message transcript) — not the Voice dialog.
+  - Customer-level Add Activity: opened via the section header's button, confirmed no linked-interaction strip is shown (not fabricated), cancelled without creating a duplicate test row.
+  - Density: confirmed Interaction History is now visible without scrolling past Activity/Diary on a normal desktop viewport, versus requiring a scroll past dozens of rows before this correction.
+- No telephone call was placed at any point in this session.
+
+### 11. Regression
+No existing product behavior was changed outside the three stated objectives and the two bugs found and fixed during verification. All edits were additive or corrective; the Campaign/Chat/Ratio deterministic suites (unrelated to this scope) remained 100% green throughout.
+
+### Deliberately out of scope for 13.1.1
+No new activity types, no schema changes, no mock data, no Session 13.2 work (Chat→Customer360 materialization correctness remains deferred, as before).
+
+---
+
 ## Phase 4 Decision Register update
 
 `docs/CALL_CENTRE_PHASE_4_DECISION_REGISTER.md` is updated to mark `DEC-CUST-01`, `DEC-CUST-02`, and `DEC-CUST-03` as **implemented** in their Master Decision Register rows and Owner Decision Worksheet, with a short note pointing at this document. No other decision row was altered.

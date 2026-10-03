@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerActivities } from '@/hooks/customers/useCustomerActivities';
@@ -216,16 +216,36 @@ const ActivityRow: React.FC<{ activity: CustomerActivityRow; customerId: string 
 };
 
 export const CustomerActivityPanel: React.FC<{ customerId: string }> = ({ customerId }) => {
+  // Session 13.1 follow-up — collapsed by default so this section doesn't
+  // compete for space with Interaction History right below it; the header
+  // itself (always visible) still surfaces the count so its presence and
+  // contents are discoverable without expanding.
+  const [expanded, setExpanded] = useState(false);
   const { data, isLoading, isError, refetch } = useCustomerActivities(customerId);
   const activities = data?.data ?? [];
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Activity / Diary</div>
-        <NewActivityForm customerId={customerId} onCreated={() => void refetch()} />
+        <button
+          type="button"
+          className="flex items-center gap-1.5 h-7 px-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls="customer-activity-panel-body"
+        >
+          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Activity / Diary
+          {!isLoading && !isError && (
+            <span className="normal-case font-normal text-muted-foreground">
+              ({activities.length})
+            </span>
+          )}
+        </button>
+        <NewActivityForm customerId={customerId} onCreated={() => { setExpanded(true); void refetch(); }} />
       </div>
-      {isLoading ? (
+      <div id="customer-activity-panel-body">
+      {!expanded ? null : isLoading ? (
         <div className="flex justify-center py-6" role="status" aria-live="polite">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           <span className="sr-only">Loading activities…</span>
@@ -241,6 +261,7 @@ export const CustomerActivityPanel: React.FC<{ customerId: string }> = ({ custom
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 };

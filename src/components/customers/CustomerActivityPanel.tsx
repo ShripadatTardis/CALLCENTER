@@ -97,7 +97,12 @@ const ActivityGridRow: React.FC<{
               aria-label={linkedInteraction ? `Linked interaction: ${provenanceTitle}` : 'Linked interaction not currently loaded'}
               className="flex-shrink-0 h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-cyan-600 dark:hover:text-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
               disabled={!linkedInteraction}
-              onClick={() => linkedInteraction && onOpenInteraction?.(activity.interactionId as string, linkedInteraction.channel)}
+              // Drill-through needs the EXTERNAL call_sid/session_id
+              // (linkedInteraction.interactionId) that Call/Chat Detail
+              // lookups use — activity.interactionId is the internal
+              // customer_interactions.id the FK requires, a different
+              // value (see ActivityComposerDialog.tsx's submit comment).
+              onClick={() => linkedInteraction && onOpenInteraction?.(linkedInteraction.interactionId, linkedInteraction.channel)}
             >
               <Link2 className="h-3 w-3" />
             </button>

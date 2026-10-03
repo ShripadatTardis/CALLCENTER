@@ -100,7 +100,12 @@ export const ActivityComposerDialog: React.FC<ActivityComposerDialogProps> = ({
         body: body.trim(),
         dueAt: needsDueAt && dueAt ? new Date(dueAt).toISOString() : null,
         createdBy: user?.name ?? null,
-        interactionId: interactionContext?.interactionId ?? null,
+        // `customer_activities.interaction_id` has a foreign key onto
+        // `customer_interactions.id` (the internal row, confirmed live
+        // via a 500 error during Session 13.1.1 verification) — NOT the
+        // external call_sid/session_id `interactionContext.interactionId`
+        // that Call/Chat Detail lookups use. Use the internal row id.
+        interactionId: interactionContext?.id ?? null,
       });
       toast.success('Activity added');
       reset();

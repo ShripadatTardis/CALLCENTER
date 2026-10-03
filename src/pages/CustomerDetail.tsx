@@ -253,9 +253,14 @@ const CustomerDetail: React.FC = () => {
   const campaigns = campaignsQuery.data?.data ?? [];
   // Session 13.1.1 — reused by CustomerActivityPanel to resolve a
   // compact provenance label for interaction-linked activities, from
-  // data already loaded on this page (no new fetch).
+  // data already loaded on this page (no new fetch). Keyed by the
+  // internal `row.id` (customer_interactions.id) — the same value
+  // customer_activities.interaction_id's foreign key references and the
+  // same value ActivityComposerDialog now binds — NOT `row.interactionId`
+  // (the external call_sid/session_id used only for Call/Chat Detail
+  // lookups).
   const interactionsById = React.useMemo(
-    () => new Map(allInteractions.map((row) => [row.interactionId, row] as const)),
+    () => new Map(allInteractions.map((row) => [row.id, row] as const)),
     [allInteractions],
   );
 

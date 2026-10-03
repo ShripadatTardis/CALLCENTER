@@ -151,7 +151,14 @@ const AgentDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* 1. Agent Identity / Contract — Call Centre-owned, read-only. */}
+        {/* 1. Agent Identity / Contract — Call Centre-owned, read-only.
+            Session 13.3 (DEC-AGENT-01) — full generic exposure of
+            Expected Inputs/Expected Outcomes/Output Fields, closing the
+            Phase 2/3 audit's finding that this section rendered only a
+            1-line "Contract source" label despite the real contract
+            being fetched here already. Same CallAgentContract shape
+            Campaign Configuration and the new AgentContractInputs
+            component consume — not a fourth field definition. */}
         <SectionCard title="Call Agent Contract — Call Centre">
           <div className="flex justify-between"><span className="text-muted-foreground">Direction</span><span className="text-foreground">{formatStatusLabel(agent.direction)}</span></div>
           {/* Persona/Language: demoted per review §8A — genuinely live
@@ -159,17 +166,77 @@ const AgentDetail: React.FC = () => {
               not decision-relevant, so kept as secondary metadata only. */}
           <div className="flex justify-between"><span className="text-muted-foreground">Persona</span><span className="text-foreground">{agent.personaName || FALLBACK}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Language</span><span className="text-foreground">{agent.language || FALLBACK}</span></div>
-          <div className="pt-2 border-t border-border text-[11px] text-muted-foreground space-y-1">
-            {contract.contractCompleteness === 'partial' ? (
+
+          {contract.contractCompleteness === 'partial' ? (
+            <div className="pt-2 border-t border-border text-[11px] text-muted-foreground space-y-1">
               <p>
                 Expected inputs, expected outcomes and structured outputs are not yet published by the live Partner
                 API (contract source: legacy roster only). Nothing is fabricated here — this section will populate
                 automatically once the revised /agents contract is live.
               </p>
-            ) : (
-              <p>Contract source: {contract.contractSource}.</p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-border space-y-3">
+              <div>
+                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                  Expected Inputs {contract.expectedInputFields.length === 0 && <span className="normal-case font-normal">— none declared</span>}
+                </div>
+                {contract.expectedInputFields.length > 0 && (
+                  <div className="space-y-1">
+                    {contract.expectedInputFields.map((f) => (
+                      <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
+                        <span className="text-foreground font-medium">{f.displayName}</span>
+                        <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">{f.dataType || 'string'}</Badge>
+                        {f.required ? (
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1">Required</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Optional</span>
+                        )}
+                        {f.format && <span className="text-muted-foreground">Format: {f.format}</span>}
+                        {f.allowedValues && f.allowedValues.length > 0 && (
+                          <span className="text-muted-foreground">Values: {f.allowedValues.join(', ')}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                  Expected Outcomes {contract.expectedOutcomes.length === 0 && <span className="normal-case font-normal">— none declared</span>}
+                </div>
+                {contract.expectedOutcomes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {contract.expectedOutcomes.map((o) => (
+                      <Badge key={o.outcomeCode} variant="outline" className="text-[10px] py-0 px-1.5 border-border text-foreground" title={o.description}>
+                        {o.displayName}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                  Output Fields {contract.outputFields.length === 0 && <span className="normal-case font-normal">— none declared</span>}
+                </div>
+                {contract.outputFields.length > 0 && (
+                  <div className="space-y-1">
+                    {contract.outputFields.map((f) => (
+                      <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
+                        <span className="text-foreground font-medium">{f.displayName}</span>
+                        <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">{f.dataType || 'string'}</Badge>
+                        {f.nullable && <span className="text-muted-foreground">Nullable</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[11px] text-muted-foreground pt-1 border-t border-border">Contract source: {contract.contractSource}.</p>
+            </div>
+          )}
         </SectionCard>
 
         {/* 2. VoiceForce Usage — bounded-sample counts, labeled honestly. */}

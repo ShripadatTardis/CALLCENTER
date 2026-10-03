@@ -77,6 +77,7 @@ const InitiateCall: React.FC = () => {
   const [viewingCallDetail, setViewingCallDetail] = useState(false);
   const {
     config,
+    contract,
     isLoading,
     callHistory,
     isCallHistoryLoading,
@@ -84,6 +85,8 @@ const InitiateCall: React.FC = () => {
     refetchCallHistory,
     updatePhoneNumber,
     updateSelectedAgent,
+    updateAgentInput,
+    showValidation,
     initiateCall,
     isInitiateCallDisabled,
     lastTriggeredCall,
@@ -132,8 +135,11 @@ const InitiateCall: React.FC = () => {
             <CardContent>
               <CallConfigurationForm
                 config={config}
+                contract={contract}
                 onPhoneNumberChange={updatePhoneNumber}
                 onAgentChange={updateSelectedAgent}
+                onAgentInputChange={updateAgentInput}
+                showValidation={showValidation}
                 onInitiateCall={initiateCall}
                 isLoading={isLoading}
                 isDisabled={isInitiateCallDisabled}

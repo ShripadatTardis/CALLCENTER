@@ -8,4 +8,6 @@
 export interface CallConfiguration {
   phoneNumber: string;
   selectedAgent: string;
+  /** Session 13.3 — direct operator-entered values for the selected agent's declared contract inputs (src/lib/agentContractInputs.ts). Keyed by fieldCode; reset whenever selectedAgent changes. */
+  agentInputs: Record<string, unknown>;
 }

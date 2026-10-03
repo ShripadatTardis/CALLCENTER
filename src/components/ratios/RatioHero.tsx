@@ -4,7 +4,8 @@ import { RatioUnavailableState } from './RatioUnavailableState';
 import type { FrontendRatioDefinition } from '@/types/ratio';
 import type { RatioSummaryDto } from '@/types/ratio';
 
-function formatValue(value: number | null, unit: RatioSummaryDto['unit']): string {
+/** Exported so other consumers of the same RatioSummaryDto shape (e.g. Dashboard's Performance Ratios cards) format a ratio value identically — one formatting rule, not a second copy. */
+export function formatRatioValue(value: number | null, unit: RatioSummaryDto['unit']): string {
   if (value === null) return '—';
   if (unit === 'percent') return `${value.toFixed(1)}%`;
   if (unit === 'seconds') {
@@ -15,6 +16,7 @@ function formatValue(value: number | null, unit: RatioSummaryDto['unit']): strin
   if (unit === 'currency') return `$${value.toFixed(2)}`;
   return String(value);
 }
+const formatValue = formatRatioValue;
 
 /**
  * Spec §4.2/§13 — ratio name, current value, comparison delta (pp for

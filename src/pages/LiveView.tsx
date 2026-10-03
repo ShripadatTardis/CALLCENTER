@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { MetricStrip } from '@/components/common/MetricStrip';
@@ -16,6 +16,7 @@ import { AgentActivityPanel } from '@/components/agents/AgentActivityPanel';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { findCallBySidAndPhone } from '@/lib/callLookup';
+import type { DetailNavigationState } from '@/lib/detailOrigin';
 import {
   formatDurationExact,
   formatDurationLong,
@@ -112,6 +113,14 @@ const LiveCallDetailDialog: React.FC<{
  */
 const LiveView: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Session (Dashboard IA) — Live View has no "detail page" origin concept
+  // of its own (it's a top-level sidebar destination, normally entered
+  // with no Back link at all); this only adds one when Dashboard's
+  // "Active calls" tile is genuinely how the operator got here (the same
+  // navigation-state mechanism src/lib/detailOrigin.ts already
+  // establishes for Agent/Customer/Campaign Detail).
+  const fromDashboard = (location.state as DetailNavigationState | null)?.origin === 'dashboard';
   const live = useLiveCallData();
   const agents = useAgents();
 
@@ -165,9 +174,18 @@ const LiveView: React.FC = () => {
           must never make the *page* taller — only the table's own
           internal scroll region. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
-        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground flex-shrink-0">
-          <div className={`w-1.5 h-1.5 rounded-full ${live.isFetching ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
-          <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground flex-shrink-0">
+          {fromDashboard ? (
+            <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/dashboard')}>
+              ← Back to Dashboard
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full ${live.isFetching ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+            <span>{live.isFetching ? 'Refreshing…' : 'Live — updates every 4s'}</span>
+          </div>
         </div>
 
         {live.isError && (

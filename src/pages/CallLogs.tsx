@@ -1,10 +1,12 @@
 
 import React, { useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { AdvancedFilters, CallLogFilters, CallLogsSearch } from '@/components/call-logs/AdvancedFilters';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import type { DetailNavigationState } from '@/lib/detailOrigin';
 import { Eye, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { Interaction } from '@/types/interaction';
@@ -44,6 +46,13 @@ type ClientFacet = 'any' | 'yes' | 'no';
 const PAGE_SIZE = 50;
 
 const CallLogs: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Dashboard IA session — Dashboard's "View all → Call Logs" links pass
+  // navigation state `{ origin: 'dashboard' }` (src/lib/detailOrigin.ts's
+  // existing mechanism). Entering Call Logs from the sidebar leaves this
+  // undefined, so the page's normal (no back-link) behavior is unchanged.
+  const fromDashboard = (location.state as DetailNavigationState | null)?.origin === 'dashboard';
   const [filters, setFilters] = useState<CallLogFilters>({});
   const [page, setPage] = useState(1);
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
@@ -149,6 +158,13 @@ const CallLogs: React.FC = () => {
           server-side pagination (below) means the table never needs to
           hold more than one page's worth of rows at a time either. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        {fromDashboard && (
+          <div className="flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
+              ← Back to Dashboard
+            </Button>
+          </div>
+        )}
         {summary && (
           <div className="flex-shrink-0">
             <MetricStrip

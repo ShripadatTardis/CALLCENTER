@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { getFrontendRatioDefinition } from '@/lib/ratios/ratioFrontendRegistry';
@@ -13,6 +13,7 @@ import { BreakdownSelector } from '@/components/ratios/BreakdownSelector';
 import { BreakdownTable } from '@/components/ratios/BreakdownTable';
 import { DriverPanel } from '@/components/ratios/DriverPanel';
 import { InteractionTable } from '@/components/ratios/InteractionTable';
+import type { DetailNavigationState } from '@/lib/detailOrigin';
 
 const INTERACTIONS_PAGE_SIZE = 25;
 
@@ -30,6 +31,15 @@ const INTERACTIONS_PAGE_SIZE = 25;
 const RatioExplorer: React.FC = () => {
   const { ratioId } = useParams<{ ratioId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Session (Dashboard IA) — Dashboard deep-links here with navigation
+  // state `{ origin: 'dashboard' }` (src/lib/detailOrigin.ts's existing
+  // mechanism, already used by Agent/Customer/Campaign Detail). Entering
+  // via the Measure sidebar leaves this undefined — the existing
+  // "← All Ratios"/breadcrumb behavior is completely unchanged in that
+  // case, this only ADDS a Dashboard escape route when it's genuinely
+  // the origin.
+  const fromDashboard = (location.state as DetailNavigationState | null)?.origin === 'dashboard';
   const { filters, setFilter, clearFilter, popDrillLayer } = useRatioFilterState();
   const [interactionsPage, setInteractionsPage] = useState(1);
 
@@ -65,13 +75,22 @@ const RatioExplorer: React.FC = () => {
       <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3 min-w-0">
+            {fromDashboard && (
+              <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
+                ← Back to Dashboard
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate('/ratios')}>
               ← All Ratios
             </Button>
             <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground truncate min-w-0">
-              <button type="button" onClick={() => navigate('/ratios')} className="hover:text-foreground hover:underline">
-                Ratios
-              </button>
+              {fromDashboard && (
+                <>
+                  <span>Dashboard</span>
+                  <span className="mx-1.5">/</span>
+                </>
+              )}
+              <span>Ratios</span>
               <span className="mx-1.5">›</span>
               <span className="text-foreground">{definition.name}</span>
             </nav>

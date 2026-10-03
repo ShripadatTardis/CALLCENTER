@@ -449,7 +449,7 @@ const CustomerDetail: React.FC = () => {
               ) : interactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-1 py-4">No interactions in the selected group.</p>
               ) : (
-                <div className="rounded-md border border-border overflow-x-auto overflow-y-auto max-h-[28rem]">
+                <div className="rounded-md border border-border overflow-x-auto overflow-y-auto max-h-[18rem]">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-background z-10">
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">

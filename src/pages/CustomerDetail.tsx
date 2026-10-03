@@ -449,9 +449,9 @@ const CustomerDetail: React.FC = () => {
               ) : interactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-1 py-4">No interactions in the selected group.</p>
               ) : (
-                <div className="rounded-md border border-border overflow-x-auto">
+                <div className="rounded-md border border-border overflow-x-auto overflow-y-auto max-h-[28rem]">
                   <table className="w-full text-sm">
-                    <thead>
+                    <thead className="sticky top-0 bg-background z-10">
                       <tr className="border-b border-border text-left text-xs text-muted-foreground">
                         <th className="h-9 px-3 font-medium whitespace-nowrap">Time</th>
                         <th className="h-9 px-3 font-medium">Channel</th>
@@ -472,7 +472,7 @@ const CustomerDetail: React.FC = () => {
                         return (
                         <tr
                           key={row.id}
-                          className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                          className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-card focus-visible:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
                           role="button"
                           tabIndex={0}
                           onClick={() => setSelectedInteraction({ id: row.interactionId, channel: row.channel })}

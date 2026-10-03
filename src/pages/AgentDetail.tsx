@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MetricStrip } from '@/components/common/MetricStrip';
-import { ArrowLeft, Bot, Loader2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ArrowLeft, Bot, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { useAgentDetail } from '@/hooks/agents/useAgentDetail';
 import { useClassification } from '@/hooks/classification/useClassification';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
@@ -23,47 +25,83 @@ import {
 
 const FALLBACK = '—';
 
-const SectionCard: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
-  <div className="rounded-md border border-border bg-card p-3 space-y-2">
-    <div>
-      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
-      {subtitle && <div className="text-[11px] text-muted-foreground">{subtitle}</div>}
-    </div>
-    {children}
+/**
+ * Small, keyboard-accessible "Data notes" disclosure (Radix Popover —
+ * click/Enter/Space to open, Escape to close, proper focus handling) —
+ * the AGENT_DETAIL_UX_RESTRUCTURE session's replacement for long
+ * provenance/limitation prose previously inlined under every metric
+ * group. Nothing in the notes array is summarized away — every
+ * sentence that was previously visible by default is still here,
+ * verbatim, just one click away instead of always-on.
+ */
+const DataNotes: React.FC<{ notes: string[]; title?: string; ariaLabel?: string }> = ({
+  notes,
+  title = 'Data notes',
+  ariaLabel = 'Data notes — field provenance and limitations',
+}) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        className="inline-flex items-center justify-center h-7 w-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+      >
+        <Info className="h-3.5 w-3.5" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent className="w-80 text-xs space-y-1.5" align="end">
+      <div className="font-semibold text-foreground">{title}</div>
+      <ul className="space-y-1.5 text-muted-foreground list-disc list-inside">
+        {notes.map((note, i) => (
+          <li key={i}>{note}</li>
+        ))}
+      </ul>
+    </PopoverContent>
+  </Popover>
+);
+
+/** A compact label/value pair for the Operational Performance grid — replaces one `flex justify-between` row per card, now in a responsive grid instead of three stacked full-width cards. */
+const MetricRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div className="flex items-baseline justify-between gap-2 border-b border-border/40 pb-1">
+    <span className="text-muted-foreground text-xs">{label}</span>
+    <span className="text-foreground text-sm tabular-nums">{value}</span>
   </div>
 );
 
 /**
  * One operational view per agent (docs/CALL_CENTRE_SESSION6_AGENTS_QUALITY_PLAN.md
- * §12) — every field traces to a real, already-confirmed source (see the
- * plan doc §7/§15) — no composite score, no Tools/Langfuse/Resources tab,
- * no agent-editing control. Drill-down reuses the existing Call Logs /
- * Chat Session detail dialogs unmodified (§13).
+ * §12) — every field traces to a real, already-confirmed source. Drill-down
+ * reuses the existing Call Logs / Chat Session detail dialogs unmodified.
  *
- * Session 11.7 (docs/SCREEN_REVIEW_06_AI_AGENTS.md §9, addendum §8):
- * restructured into a five-section architecture rather than the earlier
- * 2-section "Contract/Usage" proposal, because the pre-existing
- * VoiceForce content here (Business Outcomes / Conversational Quality /
- * Technical Performance / Campaign outcomes) was individually audited
- * and is mostly defensible as-is (§8 of the review). Nothing here was
- * removed merely to simplify the page — every omission below is a
- * traced, documented provenance decision, not a redesign choice.
+ * AGENT_DETAIL_UX_RESTRUCTURE session — presentation/density pass only,
+ * zero backend/semantic changes. Restructured into four layers (see
+ * docs/AGENT_DETAIL_UX_RESTRUCTURE.md for the full before/after):
  *
- * 1. Agent Identity / Contract — Call Centre-owned, read-only. Reuses
- *    the canonical CallAgentContract shape (buildAgentContractFromRoster,
- *    already used by Campaigns — Session 9.1) rather than inventing a
- *    fourth field definition (review §6/§10).
- * 2. VoiceForce Usage — bounded-sample counts, labeled honestly.
- * 3. Operational Performance — only the metrics that survived the
- *    review's per-metric provenance audit; the corrected (stale-excluded)
- *    Avg handle time; future Contract expected_outcomes kept visibly
- *    separate from these historical observed aggregates.
- * 4. Campaign Usage — target/execution/result measures reconciled
- *    against Session 11.5A's confirmed Campaign Result policy ("the
- *    latest successfully reconciled attempt is the current effective
- *    result" — docs/SESSION_11_5A_CUSTOMER_360_FOUNDATION.md §A); this
- *    session does not redefine that policy, only displays it honestly.
- * 5. Recent Interactions — unchanged.
+ * A. Compact Agent Header — identity (name/id/default/direction/persona/
+ *    language/Customer360 category) and the three usage counters
+ *    consolidated into one bar, replacing four previously separate
+ *    blocks (heading, contract-identity rows, MetricStrip, Customer360
+ *    card).
+ * B. Operational Performance — the same Business Outcomes/Conversational
+ *    Quality/Technical Performance metrics as one compact grid instead of
+ *    three large cards; provenance prose moved into a "Data notes"
+ *    popover (DataNotes above) rather than always-on paragraphs.
+ *    "Intent accuracy (voice)" relabeled "Intent confidence (voice)" —
+ *    the underlying call-data `intent_accuracy` field is the model's own
+ *    classifier confidence, never a measured accuracy against ground
+ *    truth (the same finding already established for the Ratio Explorer
+ *    registry's own `intent_accuracy` entry, Session 13.6) — the VALUE
+ *    and its source are byte-for-byte unchanged, only the label is
+ *    corrected.
+ * C. Agent Contract — the full Session 13.3 contract exposure, now a
+ *    collapsible section (default collapsed) with an at-a-glance summary
+ *    line. A contract with zero declared inputs/outcomes/outputs (e.g.
+ *    Inbound Banking Assistant) collapses the three previous "— none
+ *    declared" headers into one concise sentence; the legacy/partial
+ *    contract case is unchanged in substance, only in container.
+ * D. Campaign Usage — unchanged data/semantics, compact MetricStrip.
+ * E. Recent Interactions — unchanged identity/drill-through, given more
+ *    visual priority by the density reduction above it.
  */
 const AgentDetail: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -85,6 +123,7 @@ const AgentDetail: React.FC = () => {
 
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
+  const [contractOpen, setContractOpen] = useState(false);
 
   const recentInteractions = [
     ...callInteractions.map((i) => ({ kind: 'call' as const, at: i.startTime, call: i })),
@@ -95,8 +134,7 @@ const AgentDetail: React.FC = () => {
 
   // Customer 360 category mapping — VoiceForce's own agent_id -> category
   // assignment (never inferred from intent/transcript/sentiment), reusing
-  // the existing classification endpoint (review §9/§12) — no new
-  // backend capability.
+  // the existing classification endpoint — no new backend capability.
   const agentCategories = (classification.data?.categories ?? []).filter((c) => c.agentIds.includes(agentId ?? ''));
 
   if (isLoading) {
@@ -128,8 +166,28 @@ const AgentDetail: React.FC = () => {
   // Canonical Agent Contract (Session 9.1, already consumed by
   // Campaigns' CreateCampaign.tsx) — honestly 'legacy'/'partial' today
   // since the live /agents roster has no expected-input/outcome/output
-  // metadata. Never fabricated here.
+  // metadata for some agents. Never fabricated here.
   const contract = buildAgentContractFromRoster(agent);
+  const contractIsEmpty =
+    contract.contractCompleteness === 'complete' &&
+    contract.expectedInputFields.length === 0 &&
+    contract.expectedOutcomes.length === 0 &&
+    contract.outputFields.length === 0;
+  const contractSummary =
+    contract.contractCompleteness === 'partial'
+      ? 'Not yet published by Partner API'
+      : contractIsEmpty
+        ? 'No declared inputs, outcomes or output fields'
+        : `${contract.expectedInputFields.length} input${contract.expectedInputFields.length === 1 ? '' : 's'} · ${contract.expectedOutcomes.length} expected outcome${contract.expectedOutcomes.length === 1 ? '' : 's'} · ${contract.outputFields.length} output field${contract.outputFields.length === 1 ? '' : 's'}`;
+
+  const performanceNotes = [
+    'Voice business outcomes: call-data outcome/fcr, aggregated. Chat has no documented business-outcome field today — intentionally not shown.',
+    'Intent confidence (voice/chat): the model\'s own classifier confidence, not a measured accuracy against a human-verified ground-truth label — never presented as "accuracy".',
+    callMetrics.staleAhtExcludedCount > 0
+      ? `${callMetrics.staleAhtExcludedCount} call${callMetrics.staleAhtExcludedCount === 1 ? '' : 's'} excluded from Avg handle time (implausible/stale duration, same 4h guard used elsewhere).`
+      : null,
+    'Per-agent voice turn latency has no confirmed API source today (analytics/metrics is global/direction-scoped only) — intentionally not shown.',
+  ].filter((n): n is string => Boolean(n));
 
   return (
     <Layout>
@@ -139,182 +197,189 @@ const AgentDetail: React.FC = () => {
           Back to {returnTo.label}
         </Button>
 
-        {/* Compact identity header */}
-        <div className="flex items-center gap-3">
-          <Bot className="h-6 w-6 text-cyan-400 shrink-0" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-foreground truncate">{agent.displayName}</h1>
-              {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
+        {/* A. Compact Agent Header — identity + counters, one bar instead of four stacked blocks. */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <Bot className="h-6 w-6 text-cyan-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-foreground truncate">{agent.displayName}</h1>
+                {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
+              </div>
+              <p className="text-xs text-muted-foreground font-mono">{agent.agentId}</p>
             </div>
-            <p className="text-xs text-muted-foreground font-mono">{agent.agentId}</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-3 py-2.5 border border-border rounded-md bg-card/40 text-[13px]">
+            <span><span className="text-muted-foreground">Direction</span> <span className="text-foreground">{formatStatusLabel(agent.direction)}</span></span>
+            <span><span className="text-muted-foreground">Persona</span> <span className="text-foreground">{agent.personaName || FALLBACK}</span></span>
+            <span><span className="text-muted-foreground">Language</span> <span className="text-foreground">{agent.language || FALLBACK}</span></span>
+            <span className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-muted-foreground">Category</span>
+              {agentCategories.length === 0 ? (
+                <span className="text-foreground">{FALLBACK}</span>
+              ) : (
+                agentCategories.map((c) => (
+                  <Badge key={c.id} variant="outline" className="text-[11px] py-0 px-1.5 border-slate-600 text-foreground">{c.name}</Badge>
+                ))
+              )}
+            </span>
+            <div className="h-4 w-px bg-muted" aria-hidden="true" />
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-semibold tabular-nums text-foreground">{callMetrics.callsHandled}</span>
+              <span className="text-muted-foreground text-[11px]">Calls handled</span>
+            </span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-semibold tabular-nums text-foreground">{chatMetrics.chatsHandled}</span>
+              <span className="text-muted-foreground text-[11px]">Chats handled</span>
+            </span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-semibold tabular-nums text-foreground">{campaignOutcomes.campaignCount}</span>
+              <span className="text-muted-foreground text-[11px]">Campaigns</span>
+            </span>
+            {/* Session (Agent Detail UX restructure) HIG fix — counter
+                scope ("most recent 100 rows") was previously reachable
+                only via a hover-only native `title`, unreachable on
+                touch/keyboard (WCAG 1.4.13). Same keyboard/tap-accessible
+                Popover pattern as DataNotes below, not a third mechanism. */}
+            <DataNotes
+              title="Counter scope"
+              ariaLabel="Counter scope — what each usage count is based on"
+              notes={[
+                'Calls handled: most recent 100 call-data rows.',
+                'Chats handled: most recent 100 chat sessions.',
+                'Campaigns: most recent 100 campaigns.',
+              ]}
+            />
           </div>
         </div>
 
-        {/* 1. Agent Identity / Contract — Call Centre-owned, read-only.
-            Session 13.3 (DEC-AGENT-01) — full generic exposure of
-            Expected Inputs/Expected Outcomes/Output Fields, closing the
-            Phase 2/3 audit's finding that this section rendered only a
-            1-line "Contract source" label despite the real contract
-            being fetched here already. Same CallAgentContract shape
-            Campaign Configuration and the new AgentContractInputs
-            component consume — not a fourth field definition. */}
-        <SectionCard title="Call Agent Contract — Call Centre">
-          <div className="flex justify-between"><span className="text-muted-foreground">Direction</span><span className="text-foreground">{formatStatusLabel(agent.direction)}</span></div>
-          {/* Persona/Language: demoted per review §8A — genuinely live
-              fields, but undocumented in the revised Partner API spec and
-              not decision-relevant, so kept as secondary metadata only. */}
-          <div className="flex justify-between"><span className="text-muted-foreground">Persona</span><span className="text-foreground">{agent.personaName || FALLBACK}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Language</span><span className="text-foreground">{agent.language || FALLBACK}</span></div>
-
-          {contract.contractCompleteness === 'partial' ? (
-            <div className="pt-2 border-t border-border text-[11px] text-muted-foreground space-y-1">
-              <p>
-                Expected inputs, expected outcomes and structured outputs are not yet published by the live Partner
-                API (contract source: legacy roster only). Nothing is fabricated here — this section will populate
-                automatically once the revised /agents contract is live.
-              </p>
+        {/* B. Operational Performance — one compact grid instead of three large cards. */}
+        <div className="rounded-md border border-border bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Operational Performance</div>
+            <DataNotes notes={performanceNotes} />
+          </div>
+          {/* Session (Agent Detail UX restructure) HIG fix — the previous
+              flat 9-cell grid dropped the Business/Conversational/Technical
+              grouping the old 3-card layout gave for free. Restored as 3
+              sub-clusters with a tiny uppercase sub-header each, still one
+              compact container (no card-per-group chrome). */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-3">
+            <div className="space-y-2">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Business Outcomes</div>
+              <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
+              <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
+              <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
             </div>
-          ) : (
-            <div className="pt-2 border-t border-border space-y-3">
-              <div>
-                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                  Expected Inputs {contract.expectedInputFields.length === 0 && <span className="normal-case font-normal">— none declared</span>}
-                </div>
-                {contract.expectedInputFields.length > 0 && (
-                  <div className="space-y-1">
-                    {contract.expectedInputFields.map((f) => (
-                      <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
-                        <span className="text-foreground font-medium">{f.displayName}</span>
-                        <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">{f.dataType || 'string'}</Badge>
-                        {f.required ? (
-                          <Badge variant="secondary" className="text-[10px] py-0 px-1">Required</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">Optional</span>
-                        )}
-                        {f.format && <span className="text-muted-foreground">Format: {f.format}</span>}
-                        {f.allowedValues && f.allowedValues.length > 0 && (
-                          <span className="text-muted-foreground">Values: {f.allowedValues.join(', ')}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                  Expected Outcomes {contract.expectedOutcomes.length === 0 && <span className="normal-case font-normal">— none declared</span>}
-                </div>
-                {contract.expectedOutcomes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {contract.expectedOutcomes.map((o) => (
-                      <Badge key={o.outcomeCode} variant="outline" className="text-[10px] py-0 px-1.5 border-border text-foreground" title={o.description}>
-                        {o.displayName}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                  Output Fields {contract.outputFields.length === 0 && <span className="normal-case font-normal">— none declared</span>}
-                </div>
-                {contract.outputFields.length > 0 && (
-                  <div className="space-y-1">
-                    {contract.outputFields.map((f) => (
-                      <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
-                        <span className="text-foreground font-medium">{f.displayName}</span>
-                        <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">{f.dataType || 'string'}</Badge>
-                        {f.nullable && <span className="text-muted-foreground">Nullable</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <p className="text-[11px] text-muted-foreground pt-1 border-t border-border">Contract source: {contract.contractSource}.</p>
+            <div className="space-y-2">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Conversational Quality</div>
+              <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
+              <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
+              <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
+              <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
             </div>
-          )}
-        </SectionCard>
-
-        {/* 2. VoiceForce Usage — bounded-sample counts, labeled honestly. */}
-        <MetricStrip
-          items={[
-            { label: 'Calls handled', value: callMetrics.callsHandled, hint: 'Most recent 100 call-data rows' },
-            { label: 'Chats handled', value: chatMetrics.chatsHandled, hint: 'Most recent 100 chat sessions' },
-            { label: 'Campaigns', value: campaignOutcomes.campaignCount, hint: 'Most recent 100 campaigns' },
-          ]}
-        />
-        {classification.data && (
-          <SectionCard title="Customer 360 category mapping — VoiceForce">
-            {agentCategories.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Not assigned to a Customer 360 category.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {agentCategories.map((c) => (
-                  <Badge key={c.id} variant="outline" className="text-xs border-slate-600 text-foreground">{c.name}</Badge>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        )}
-
-        {/* 3. Operational Performance — only the metrics that survived the
-            review's per-metric provenance audit (docs/SCREEN_REVIEW_06_AI_AGENTS.md
-            §8). Kept visibly separate from section 1's future Contract
-            "Expected Outcomes" — this section is historical observed
-            performance, never the agent's designed-to-produce contract. */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 text-sm">
-          <SectionCard title="Business Outcomes" subtitle="Observed — historical aggregate, not the Agent Contract">
-            <div className="flex justify-between"><span className="text-muted-foreground">Resolved</span><span className="text-foreground">{callMetrics.resolvedCount}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Escalated</span><span className="text-foreground">{callMetrics.escalatedCount}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">FCR rate</span><span className="text-foreground">{callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)}</span></div>
-            <p className="text-[11px] text-muted-foreground pt-1 border-t border-border">
-              Voice: call-data outcome/fcr, aggregated. Chat has no documented business-outcome field today — intentionally not shown.
-            </p>
-          </SectionCard>
-
-          <SectionCard title="Conversational Quality">
-            <div className="flex justify-between"><span className="text-muted-foreground">Intent accuracy (voice)</span><span className="text-foreground">{callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Intent confidence (chat)</span><span className="text-foreground">{chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Sentiment (voice)</span><span className="text-foreground">{callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Authenticated (voice/chat)</span><span className="text-foreground">{callMetrics.authenticatedCount} / {chatMetrics.authenticatedCount}</span></div>
-            <p className="text-[11px] text-muted-foreground pt-1 border-t border-border">
-              Intent accuracy: whether this means accuracy-against-ground-truth or classifier-confidence is an open
-              Partner API question (Session 11.3), unresolved here.
-            </p>
-          </SectionCard>
-
-          <SectionCard title="Technical Performance">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Avg handle time (voice)</span>
-              <span className="text-foreground">{formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)}</span>
+            <div className="space-y-2">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Technical Performance</div>
+              <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
+              <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
             </div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Avg turn latency (chat)</span><span className="text-foreground">{chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`}</span></div>
-            <p className="text-[11px] text-muted-foreground pt-1 border-t border-border">
-              {callMetrics.staleAhtExcludedCount > 0
-                ? `${callMetrics.staleAhtExcludedCount} call${callMetrics.staleAhtExcludedCount === 1 ? '' : 's'} excluded from Avg handle time (implausible/stale duration, same 4h guard used elsewhere). `
-                : ''}
-              Per-agent voice turn latency has no confirmed API source today (analytics/metrics is global/direction-scoped only) — intentionally not shown.
-            </p>
-          </SectionCard>
+          </div>
         </div>
 
-        {/* 4. Campaign Usage — VoiceForce-owned. Target/execution/result
-            measures reconciled against Session 11.5A's confirmed Campaign
-            Result policy: classifiedCount/successCount are already
-            target-level, effective_result_id/is_success-based (confirmed
-            in supabase/migrations/20260926090000_campaigns_foundation.sql
-            — classified = effective_result_id set + a matched rule;
-            success = that rule's is_success = true), i.e. each count
-            reflects every target's CURRENT effective result — the most
-            recently reconciled attempt, per 11.5A's confirmed "latest
-            attempt wins" policy. No new/alternative definition introduced
-            here. */}
+        {/* C. Agent Contract — collapsible, collapsed by default; same Session 13.3 content, just not dominating the page. */}
+        <Collapsible open={contractOpen} onOpenChange={setContractOpen}>
+          <div className="rounded-md border border-border bg-card">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left"
+                aria-expanded={contractOpen}
+                aria-controls="agent-contract-panel"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  {contractOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent Contract</span>
+                  <span className="text-sm text-foreground truncate">{contractSummary}</span>
+                </span>
+                <span className="text-[11px] text-muted-foreground flex-shrink-0">Source: {contract.contractSource}</span>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent id="agent-contract-panel">
+              <div className="px-3 pb-3 pt-1 border-t border-border space-y-3 text-sm">
+                {contract.contractCompleteness === 'partial' ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Expected inputs, expected outcomes and structured outputs are not yet published by the live Partner
+                    API (contract source: legacy roster only). Nothing is fabricated here — this section will populate
+                    automatically once the revised /agents contract is live.
+                  </p>
+                ) : contractIsEmpty ? (
+                  <p className="text-[11px] text-muted-foreground">No declared inputs, outcomes or output fields for this agent.</p>
+                ) : (
+                  <>
+                    {contract.expectedInputFields.length > 0 && (
+                      <div>
+                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Expected Inputs</div>
+                        <div className="space-y-1">
+                          {contract.expectedInputFields.map((f) => (
+                            <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
+                              <span className="text-foreground font-medium">{f.displayName}</span>
+                              <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">{f.dataType || 'string'}</Badge>
+                              {f.required ? (
+                                <Badge variant="secondary" className="text-[10px] py-0 px-1">Required</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">Optional</span>
+                              )}
+                              {f.format && <span className="text-muted-foreground">Format: {f.format}</span>}
+                              {f.allowedValues && f.allowedValues.length > 0 && (
+                                <span className="text-muted-foreground">Values: {f.allowedValues.join(', ')}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {contract.expectedOutcomes.length > 0 && (
+                      <div>
+                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Expected Outcomes</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {contract.expectedOutcomes.map((o) => (
+                            <Badge key={o.outcomeCode} variant="outline" className="text-[10px] py-0 px-1.5 border-border text-foreground" title={o.description}>
+                              {o.displayName}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {contract.outputFields.length > 0 && (
+                      <div>
+                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Output Fields</div>
+                        <div className="space-y-1">
+                          {contract.outputFields.map((f) => (
+                            <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
+                              <span className="text-foreground font-medium">{f.displayName}</span>
+                              <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">{f.dataType || 'string'}</Badge>
+                              {f.nullable && <span className="text-muted-foreground">Nullable</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+
+        {/* D. Campaign Usage — unchanged data/semantics (Session 11.5A "latest attempt wins" policy), compact. */}
         {agent.direction === 'outbound' && agentCampaigns.length > 0 && (
-          <SectionCard title="Campaign Usage — VoiceForce" subtitle="Reflects each target's current effective result (latest reconciled attempt) — see Session 11.5A">
+          <div className="space-y-1.5">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1" title="Reflects each target's current effective result (latest reconciled attempt) — see Session 11.5A">
+              Campaign Usage
+            </div>
             <MetricStrip
               items={[
                 { label: 'Campaigns', value: campaignOutcomes.campaignCount },
@@ -323,10 +388,10 @@ const AgentDetail: React.FC = () => {
                 { label: 'Success rate', value: campaignOutcomes.successRate === null ? FALLBACK : formatFractionAsPercent(campaignOutcomes.successRate) },
               ]}
             />
-          </SectionCard>
+          </div>
         )}
 
-        {/* 5. Recent interactions — drill-down into existing detail mechanisms only */}
+        {/* E. Recent interactions — drill-down into existing detail mechanisms only; given more visual priority by the density reduction above. */}
         <div className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Recent Interactions</div>
           {recentInteractions.length === 0 ? (

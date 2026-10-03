@@ -20,6 +20,14 @@
  * §4.1's list of fields to request/confirm — an `undefined` value here
  * is a known upstream gap, not a mapper bug):
  *   customerId, endTime, campaignId.
+ *
+ * Session 13.2 (DEC-CALL-01) — Voice-only, genuinely confirmed-present
+ * on CallDataEntryDto but previously dropped by callsMapper.ts before
+ * reaching this type. `undefined` for a historical call predating these
+ * fields (or for any Chat-sourced Interaction, which never sets them —
+ * see §24 of the session) is a correct, expected absence, not a bug:
+ *   actualOutcomeCode, actualOutcomeName, structuredOutputs,
+ *   isBankCustomer, transcriptDocId, context.
  */
 export interface TranscriptEntry {
   timestamp: string;
@@ -95,4 +103,28 @@ export interface Interaction {
   direction?: 'inbound' | 'outbound';
 
   quality?: unknown;
+
+  // Session 13.2 (DEC-CALL-01) — Voice-only structured agent result.
+  // Deliberately mirrors Campaign's own actualOutcomeCode/actualOutcomeName/
+  // structuredOutputs concepts (Sessions 12.5/12.6) rather than a second
+  // interpretation — src/lib/campaignActualOutcome.ts's classifyActualOutcome/
+  // classifyStructuredOutputs already accept a null contract for exactly
+  // this generic (non-campaign) context. This is the raw backend fact,
+  // distinct from Campaign Classification (an outcome-policy interpretation
+  // of it) and distinct from the generic `outcome`/`status` fields above.
+  /** The agent's own declared business outcome code, when the backend has classified one. Agent-specific — never assume cross-agent meaning. */
+  actualOutcomeCode?: string;
+  actualOutcomeName?: string;
+  /** Agent-declared output_fields[] values, generic key/value — never hardcode an agent-specific key (e.g. EMI's "promised_payment_date") into code that reads this. */
+  structuredOutputs?: Record<string, unknown>;
+
+  // Session 13.2 — Voice-only, model-only (not rendered on the primary
+  // Interaction Detail UI; no existing user workflow consumes them —
+  // see the session doc's CALL-01 table for the exposure decision).
+  /** Genuine backend fact about the caller, when present — never reinterpreted as a broader Customer360 identity claim. */
+  isBankCustomer?: boolean;
+  /** Opaque backend transcript-store reference. No document-retrieval capability exists in this application; preserved for future use only. */
+  transcriptDocId?: string;
+  /** Short backend-provided call-context label (a plain string on the current contract, not structured JSON). Not displayed — see session doc. */
+  context?: string;
 }

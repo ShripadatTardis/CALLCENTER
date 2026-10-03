@@ -66,6 +66,29 @@ export interface ChatSessionSummary {
    * has no resolved Customer 360 link — never inferred from display text.
    */
   customer360Id: string | null;
+  /**
+   * Session 13.2 (DEC-CHAT-01) — real, locally-recorded campaign linkage
+   * (set only for sessions initiated from Chat Console's Campaign
+   * Customer mode — Session 11.9B). `campaignId`/`campaignTargetId` are
+   * stable ids; `campaignName` is resolved through the one existing
+   * authoritative Campaign source server-side (never fabricated). All
+   * three are null when this session has no campaign link — including
+   * every session discovered purely via the external Chat API's live
+   * list, which has no campaign concept of its own.
+   */
+  campaignId: string | null;
+  campaignTargetId: string | null;
+  campaignName: string | null;
+  /**
+   * Session 13.2 (DEC-CHAT-01) — VoiceForce-local Trial/Test isolation
+   * marker (Session 11.9B), set once at session creation. Already
+   * consumed internally by chatInteractionSource.ts to exclude Trial
+   * sessions from Customer 360 materialization; previously invisible in
+   * the UI. `null` (not `false`) when no local session record exists at
+   * all for this upstream id — distinct from a confirmed-non-trial
+   * session, never collapsed to a default.
+   */
+  isTrial: boolean | null;
 }
 
 export interface ChatSessionDetail {

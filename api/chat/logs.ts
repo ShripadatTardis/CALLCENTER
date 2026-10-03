@@ -13,6 +13,7 @@ import type { ChatMessage, ChatSessionSummary } from '../../src/types/chat.js';
 import { getCustomerDisplayLabel } from '../../src/lib/customerDisplayLabel.js';
 
 type CustomerLink = { customerId: string; displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null };
+type CampaignContext = { campaignId: string | null; campaignTargetId: string | null; campaignName: string | null };
 
 function resolveCustomerLabel(backendCustomerId: string | null, link: CustomerLink | undefined): string | null {
   // Session 7.1 follow-up: an authoritative backend CIF is shown as-is
@@ -52,11 +53,25 @@ function resolveCustomerLabel(backendCustomerId: string | null, link: CustomerLi
  * longer key off the internal id at all.
  */
 
-function toSummaryFromLive(row: ChatSessionListRowDto, link?: CustomerLink): ChatSessionSummary {
+function toSummaryFromLive(
+  row: ChatSessionListRowDto,
+  link?: CustomerLink,
+  campaign?: CampaignContext,
+  isTrial?: boolean,
+): ChatSessionSummary {
   return {
     sessionId: row.session_id,
     resolvedCustomerLabel: resolveCustomerLabel(row.customer_id, link),
     customer360Id: link?.customerId ?? null,
+    campaignId: campaign?.campaignId ?? null,
+    campaignTargetId: campaign?.campaignTargetId ?? null,
+    campaignName: campaign?.campaignName ?? null,
+    // Session 13.2 — `undefined` means no local chat_sessions row exists
+    // at all for this upstream id (common for a session discovered
+    // purely via the external Chat API's live list); that is a distinct,
+    // genuinely-unknown state from a confirmed `false`, so it maps to
+    // `null` rather than defaulting to "not trial".
+    isTrial: isTrial ?? null,
     agentId: row.agent_id ?? null,
     agentName: row.agent_name ?? null,
     customerId: row.customer_id,
@@ -79,11 +94,18 @@ function toSummaryFromLive(row: ChatSessionListRowDto, link?: CustomerLink): Cha
   };
 }
 
-function toSummaryFromLocal(s: ChatSessionRecord, link?: CustomerLink): ChatSessionSummary {
+function toSummaryFromLocal(s: ChatSessionRecord, link?: CustomerLink, campaignName?: string | null): ChatSessionSummary {
   return {
     sessionId: s.upstreamSessionId,
     resolvedCustomerLabel: resolveCustomerLabel(s.backendCustomerId, link),
     customer360Id: link?.customerId ?? null,
+    // Local-fallback rows already carry campaignId/campaignTargetId/
+    // isTrial directly on the record (set at creation, Session 11.9B) —
+    // only the display name needs the campaigns join.
+    campaignId: s.campaignId,
+    campaignTargetId: s.campaignTargetId,
+    campaignName: campaignName ?? null,
+    isTrial: s.isTrial,
     agentId: s.agentId,
     agentName: s.agentName,
     customerId: s.backendCustomerId,
@@ -178,9 +200,18 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
         res.status(404).json({ detail: 'Chat session not found' });
         return;
       }
-      const links = await supabaseChatRepository.getCustomerLinks([sessionRow.session_id]);
+      const [links, trialFlags, campaignContexts] = await Promise.all([
+        supabaseChatRepository.getCustomerLinks([sessionRow.session_id]),
+        supabaseChatRepository.getTrialFlags([sessionRow.session_id]),
+        supabaseChatRepository.getCampaignContext([sessionRow.session_id]),
+      ]);
       res.status(200).json({
-        session: toSummaryFromLive(sessionRow, links[sessionRow.session_id]),
+        session: toSummaryFromLive(
+          sessionRow,
+          links[sessionRow.session_id],
+          campaignContexts[sessionRow.session_id],
+          trialFlags[sessionRow.session_id],
+        ),
         messages: messages.map((m) => ({
           id: `${sessionId}-${m.number}`,
           role: m.role === 'customer' ? 'user' : 'ai',
@@ -197,9 +228,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
         return;
       }
       const messages = await supabaseChatRepository.listMessages(local.id);
-      const links = await supabaseChatRepository.getCustomerLinks([local.upstreamSessionId]);
+      const [links, campaignContexts] = await Promise.all([
+        supabaseChatRepository.getCustomerLinks([local.upstreamSessionId]),
+        supabaseChatRepository.getCampaignContext([local.upstreamSessionId]),
+      ]);
       res.status(200).json({
-        session: toSummaryFromLocal(local, links[local.upstreamSessionId]),
+        session: toSummaryFromLocal(local, links[local.upstreamSessionId], campaignContexts[local.upstreamSessionId]?.campaignName),
         messages: messages.map(toMessageFromLocal),
       });
       return;
@@ -233,9 +267,14 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     const rowsAll = dto.data.sessions;
     const rows = authorizedAgentIds === null ? rowsAll : rowsAll.filter((r) => isAuthorized(r.agent_id));
     const scoped = authorizedAgentIds !== null;
-    const links = await supabaseChatRepository.getCustomerLinks(rows.map((r) => r.session_id));
+    const sessionIds = rows.map((r) => r.session_id);
+    const [links, trialFlags, campaignContexts] = await Promise.all([
+      supabaseChatRepository.getCustomerLinks(sessionIds),
+      supabaseChatRepository.getTrialFlags(sessionIds),
+      supabaseChatRepository.getCampaignContext(sessionIds),
+    ]);
     res.status(200).json({
-      data: rows.map((r) => toSummaryFromLive(r, links[r.session_id])),
+      data: rows.map((r) => toSummaryFromLive(r, links[r.session_id], campaignContexts[r.session_id], trialFlags[r.session_id])),
       pagination: scoped
         ? { page: dto.data.pagination.page, pageSize: dto.data.pagination.page_size, totalCount: rows.length, totalPages: 1 }
         : {
@@ -253,9 +292,13 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     const rows = authorizedAgentIds === null ? rowsAll : rowsAll.filter((r) => isAuthorized(r.agentId));
     const scoped = authorizedAgentIds !== null;
     const totalCount = scoped ? rows.length : totalCountAll;
-    const links = await supabaseChatRepository.getCustomerLinks(rows.map((r) => r.upstreamSessionId));
+    const localSessionIds = rows.map((r) => r.upstreamSessionId);
+    const [links, campaignContexts] = await Promise.all([
+      supabaseChatRepository.getCustomerLinks(localSessionIds),
+      supabaseChatRepository.getCampaignContext(localSessionIds),
+    ]);
     res.status(200).json({
-      data: rows.map((r) => toSummaryFromLocal(r, links[r.upstreamSessionId])),
+      data: rows.map((r) => toSummaryFromLocal(r, links[r.upstreamSessionId], campaignContexts[r.upstreamSessionId]?.campaignName)),
       pagination: { page, pageSize, totalCount, totalPages: Math.max(1, Math.ceil(totalCount / pageSize)) },
       source: 'local-fallback',
       ...(scoped ? { scoped: true } : {}),

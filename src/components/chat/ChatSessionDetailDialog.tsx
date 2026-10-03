@@ -127,6 +127,35 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
             '—'
           ),
         ],
+        // Session 13.2 (DEC-CHAT-01) — campaignId is a real, stable id;
+        // campaignName is resolved server-side via the authoritative
+        // campaigns table, never fabricated. A session with a campaignId
+        // but no resolvable name still navigates, labeled "Campaign".
+        [
+          'Campaign',
+          session.campaignId ? (
+            <button
+              type="button"
+              className="text-cyan-600 dark:text-cyan-400 hover:underline inline-block min-h-6 p-1 -m-1"
+              onClick={() => navigate(`/outbound-campaigns/${session.campaignId}`)}
+            >
+              {session.campaignName ?? 'Campaign'}
+            </button>
+          ) : (
+            '—'
+          ),
+        ],
+        // Session 13.2 — isTrial is `null` (shown as —) when no local
+        // record exists at all for this upstream session; `No` only when
+        // a local record confirms it affirmatively, never defaulted.
+        [
+          'Trial',
+          session.isTrial === null ? '—' : session.isTrial ? (
+            <Badge variant="secondary" className="text-xs">Trial</Badge>
+          ) : (
+            'No'
+          ),
+        ],
       ]
     : [];
 

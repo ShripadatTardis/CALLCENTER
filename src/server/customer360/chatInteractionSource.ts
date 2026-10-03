@@ -92,8 +92,44 @@ async function fetchSessions(query: Record<string, string>): Promise<ChatSession
   throw lastError instanceof Error ? lastError : new Error('chat/sessions request failed after retries');
 }
 
-function mapRow(dto: ChatSessionRowDto, preferredCustomerId: string | null = null): SourceInteraction | null {
+/**
+ * Session 13.2 (DEC-CHAT-02 Part A) — field-by-field provenance for the
+ * six values this adapter previously hardcoded to null regardless of
+ * what the source genuinely contained. See the implementation matrix in
+ * docs/SESSION_13_2_INTERACTION_DATA_INTEGRITY.md for the full
+ * field-by-field reasoning; summary per field:
+ *
+ * - campaignName: now resolved (campaignName param below) via the same
+ *   batched call_center_chat_session_campaign_context lookup Chat Logs
+ *   uses — real, not fabricated; null whenever the session has no local
+ *   campaign link (true for every session discovered purely via the
+ *   external Chat API, which has no campaign concept of its own).
+ * - durationSeconds: now computed from started_at/updated_at using the
+ *   exact formula already established as legitimate elsewhere in this
+ *   app for Chat (ChatSessionDetailDialog.tsx's "Session span" metric:
+ *   max(0, (updatedAt - startedAt) seconds)) — not a new definition.
+ * - outcome: remains null. `status` ('active'|'completed') is a session
+ *   lifecycle state, not a business outcome (resolved/escalated) — the
+ *   two concepts are not equivalent, so no mapping is made (plan §10).
+ * - sentimentScore: remains null. The Chat API genuinely has no
+ *   sentiment field anywhere in its documented contract (confirmed
+ *   again this session) — a real upstream gap, not an app oversight.
+ * - escalationTrigger: remains null. Same reason — no escalation
+ *   concept exists in the Chat session contract.
+ * - direction: remains null. Chat genuinely has no inbound/outbound
+ *   concept (unchanged finding, re-confirmed this session).
+ */
+/** Exported for deterministic testing (.tooling/scripts/chat-materialization-verify.mjs), per this repo's "test the real compiled source, not a reimplementation" convention — not solely a test hook, a genuine mapping function. */
+export function mapRow(
+  dto: ChatSessionRowDto,
+  preferredCustomerId: string | null = null,
+  campaignName: string | null = null,
+): SourceInteraction | null {
   if (!dto.phone_number && !dto.customer_id && !preferredCustomerId) return null; // no identity signal at all — cannot materialize a customer/contact
+  const durationSeconds =
+    dto.started_at && dto.updated_at
+      ? Math.max(0, Math.round((new Date(dto.updated_at).getTime() - new Date(dto.started_at).getTime()) / 1000))
+      : null;
   return {
     interactionId: dto.session_id,
     channel: 'chat',
@@ -104,13 +140,13 @@ function mapRow(dto: ChatSessionRowDto, preferredCustomerId: string | null = nul
     agentId: dto.agent_id,
     agentDisplayName: dto.agent_name,
     startedAt: dto.started_at,
-    durationSeconds: null,
+    durationSeconds,
     intent: dto.intent,
-    outcome: null, // chat has no call-outcome concept
-    sentimentScore: null,
+    outcome: null, // session lifecycle status is not a business outcome
+    sentimentScore: null, // genuinely absent from the Chat API contract
     wasAuthenticated: dto.authenticated,
-    escalationTrigger: null,
-    campaignName: null,
+    escalationTrigger: null, // genuinely absent from the Chat API contract
+    campaignName,
     recordingAvailable: false,
     source: 'chat-sessions',
   };
@@ -149,6 +185,25 @@ async function getTrialFlagsSafely(upstreamSessionIds: string[]): Promise<Record
   }
 }
 
+/**
+ * Session 13.2 — unlike trial flags (a gating decision that must fail
+ * closed), a failed campaign-name lookup should not block materializing
+ * otherwise-eligible interactions; it only means campaignName stays
+ * null for this batch, the same honest "unavailable" state as a session
+ * with no campaign link at all.
+ */
+async function getCampaignNamesSafely(upstreamSessionIds: string[]): Promise<Record<string, string | null>> {
+  try {
+    const contexts = await supabaseChatRepository.getCampaignContext(upstreamSessionIds);
+    const out: Record<string, string | null> = {};
+    for (const id of upstreamSessionIds) out[id] = contexts[id]?.campaignName ?? null;
+    return out;
+  } catch (err) {
+    console.error(`Failed to look up Chat campaign context for ${upstreamSessionIds.length} session(s) — campaignName will be null this run.`, err);
+    return {};
+  }
+}
+
 export const chatInteractionSource: InteractionSourceAdapter = {
   async searchByContactPoint(type, normalizedValue) {
     if (type !== 'phone') return [];
@@ -157,24 +212,26 @@ export const chatInteractionSource: InteractionSourceAdapter = {
       (s) => s.phone_number && s.phone_number.replace(/[^0-9]/g, '') === normalizedValue,
     );
     const sessionIds = matched.map((s) => s.session_id);
-    const [links, trialFlags] = await Promise.all([
+    const [links, trialFlags, campaignNames] = await Promise.all([
       supabaseChatRepository.getCustomerLinks(sessionIds),
       getTrialFlagsSafely(sessionIds),
+      getCampaignNamesSafely(sessionIds),
     ]);
     return matched
       // Fail-closed: only an AFFIRMATIVELY-known-false flag proceeds.
       // true (Trial) and undefined (unknown/lookup failed) are both excluded.
       .filter((s) => trialFlags[s.session_id] === false)
-      .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
+      .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null, campaignNames[s.session_id] ?? null))
       .filter((s): s is SourceInteraction => s !== null);
   },
 
   async listPage(page, pageSize) {
     const dto = await fetchSessions({ page: String(page), page_size: String(pageSize) });
     const sessionIds = dto.data.sessions.map((s) => s.session_id);
-    const [links, trialFlags] = await Promise.all([
+    const [links, trialFlags, campaignNames] = await Promise.all([
       supabaseChatRepository.getCustomerLinks(sessionIds),
       getTrialFlagsSafely(sessionIds),
+      getCampaignNamesSafely(sessionIds),
     ]);
     return {
       rows: dto.data.sessions
@@ -186,7 +243,7 @@ export const chatInteractionSource: InteractionSourceAdapter = {
         // flag proceeds. true (Trial) and undefined (unknown/lookup
         // failed, or no local row for this session) are both excluded.
         .filter((s) => trialFlags[s.session_id] === false)
-        .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null))
+        .map((s) => mapRow(s, links[s.session_id]?.customerId ?? null, campaignNames[s.session_id] ?? null))
         .filter((s): s is SourceInteraction => s !== null),
       totalPages: dto.data.pagination.total_pages,
     };

@@ -102,6 +102,19 @@ export function mapCallDataEntryToInteraction(dto: CallDataEntryDto): Interactio
     direction: dto.direction,
 
     quality: undefined,
+
+    // Session 13.2 (DEC-CALL-01) — previously dropped entirely; now
+    // preserved. `|| undefined`/`?? undefined` on each so an empty
+    // string or null from the backend never becomes a misleading
+    // present-but-empty value on the normalized model.
+    actualOutcomeCode: dto.actual_outcome_code || undefined,
+    actualOutcomeName: dto.actual_outcome_name || undefined,
+    structuredOutputs: dto.structured_outputs ?? undefined,
+    // ?? (not ||) — is_bank_customer is a genuine boolean fact; `false`
+    // must never be coerced away, only a true null/undefined should be.
+    isBankCustomer: dto.is_bank_customer ?? undefined,
+    transcriptDocId: dto.transcript_doc_id || undefined,
+    context: dto.context || undefined,
   };
 }
 

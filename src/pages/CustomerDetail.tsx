@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MetricStrip } from '@/components/common/MetricStrip';
 import { FilterPopover } from '@/components/common/FilterPopover';
 import { ArrowLeft, Loader2, Mic, Plus, RefreshCw } from 'lucide-react';
 import { CustomerActivityPanel } from '@/components/customers/CustomerActivityPanel';
@@ -44,18 +43,6 @@ const LOOKUP_PAGE_SIZE = 100;
  */
 const GROUPING_PAGE_SIZE = 500;
 
-/** Session 13.1.1 §8 — tightened from p-3/space-y-2 to p-2/space-y-1 so
- * Identity & Contact reads as a compact information strip rather than a
- * large card, without dropping any exposed field. */
-const SectionCard: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
-  <div className="rounded-md border border-border bg-card p-2 space-y-1">
-    <div>
-      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
-      {subtitle && <div className="text-xs text-muted-foreground">{subtitle}</div>}
-    </div>
-    {children}
-  </div>
-);
 
 /**
  * /call-data has no call_id-keyed lookup param — only `search`, which
@@ -297,87 +284,91 @@ const CustomerDetail: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-lg font-semibold text-foreground">{displayLabel}</h1>
-                {data.customer.sourceCustomerRef && data.customer.sourceCustomerRef !== displayLabel && (
-                  <p className="text-xs text-muted-foreground">Ref: {data.customer.sourceCustomerRef}</p>
-                )}
+            {/* Session 13.2 — consolidated Customer header. Replaces the
+                prior three-layer presentation (heading row + a bordered
+                "Identity & Contact" SectionCard + a separate MetricStrip)
+                with one compact bordered block. No field removed and no
+                data semantics changed — every value below is the exact
+                same aggregate/customer data the prior three blocks read,
+                just laid out densely. The standalone "IDENTITY & CONTACT"
+                section title is dropped since the heading row already
+                establishes that context. */}
+            <div className="rounded-md border border-border bg-card px-3 py-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <h1 className="text-lg font-semibold text-foreground leading-tight min-w-0 truncate" title={displayLabel}>{displayLabel}</h1>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground flex-shrink-0"
+                  onClick={() => refreshMutation.mutate()}
+                  disabled={refreshMutation.isPending}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-                onClick={() => refreshMutation.mutate()}
-                disabled={refreshMutation.isPending}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
 
-            {/* 1. Identity & Contact — only existing canonical Customer 360
-                identity/contact fields already returned by the current
-                APIs; phone numbers are the same raw values already fetched
-                for interaction lookup, masked for display via the same
-                helper the list page/identity label already use — never
-                shown unmasked. */}
-            <SectionCard title="Identity & Contact">
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-muted-foreground text-xs">Customer ref</span>
-                  <span className="text-foreground">{data.customer.sourceCustomerRef ?? '—'}</span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-muted-foreground text-xs">Phone</span>
+              {/* Row 2 — identity/contact context (was the separate
+                  "Identity & Contact" card). Phone stays masked via the
+                  same helper used everywhere else — never shown unmasked.
+                  Session 13.1 (DEC-CUST-01)'s channels/authSummary/
+                  latestAgent fields are unchanged, only relocated. */}
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-xs border-t border-border/60 pt-1.5">
+                {data.customer.sourceCustomerRef && (
+                  <span><span className="text-muted-foreground">Ref</span> <span className="text-foreground">{data.customer.sourceCustomerRef}</span></span>
+                )}
+                <span>
+                  <span className="text-muted-foreground">Phone</span>{' '}
                   <span className="text-foreground">
                     {data.phoneNumbers && data.phoneNumbers.length > 0
                       ? data.phoneNumbers.map((p) => maskPhoneLast4(p) ?? '—').join(', ')
                       : '—'}
                   </span>
-                </div>
-                {/* Session 13.1 (DEC-CUST-01) — channels/authSummary/
-                    latestAgent were already fetched into `aggregate` by
-                    this same request; only the rendering was missing. */}
-                <div className="flex items-baseline gap-2">
-                  <span className="text-muted-foreground text-xs">Channels used</span>
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Channels</span>{' '}
                   <span className="text-foreground">
                     {aggregate?.channels && aggregate.channels.length > 0
                       ? aggregate.channels.map((c) => formatStatusLabel(c)).join(', ')
                       : '—'}
                   </span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-muted-foreground text-xs">Authentication</span>
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Authentication</span>{' '}
                   <span className="text-foreground">
                     {aggregate?.authSummary.everAuthenticated
                       ? `Yes${aggregate.authSummary.lastAuthenticatedAt ? ` · last ${formatTimestamp(aggregate.authSummary.lastAuthenticatedAt)}` : ''}`
-                      : 'No authentication evidence on record'}
+                      : 'No evidence on record'}
                   </span>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-muted-foreground text-xs">Latest agent</span>
-                  <span className="text-foreground">
-                    {aggregate?.latestAgentDisplayName ?? aggregate?.latestAgentId ?? '—'}
-                  </span>
-                </div>
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Latest agent</span>{' '}
+                  <span className="text-foreground">{aggregate?.latestAgentDisplayName ?? aggregate?.latestAgentId ?? '—'}</span>
+                </span>
               </div>
-            </SectionCard>
 
-            {/* 4. Existing Customer 360 summary/aggregate information —
-                unchanged from the prior implementation; only the
-                authorized aggregates already confirmed safe by the
-                Session 11.5 review. */}
-            <MetricStrip
-              items={[
-                { label: 'First seen', value: formatTimestamp(data.customer.firstSeen) },
-                { label: 'Last seen', value: formatTimestamp(data.customer.lastSeen) },
-                { label: 'Visible interactions', value: aggregate?.totalInteractions ?? 0, hint: `${aggregate?.inboundCount ?? 0} inbound · ${aggregate?.outboundCount ?? 0} outbound` },
-                { label: 'Latest intent', value: aggregate?.latestIntent ?? '—' },
-                { label: 'Latest outcome', value: aggregate?.latestOutcome ? formatStatusLabel(aggregate.latestOutcome) : '—' },
-                { label: 'Escalations', value: aggregate?.escalationCount ?? 0, tone: (aggregate?.escalationCount ?? 0) > 0 ? 'warning' : 'default' },
-              ]}
-            />
+              {/* Row 3 — summary metrics (was the separate MetricStrip).
+                  Same six values, same source (`aggregate`/`data.customer`),
+                  dense inline presentation instead of MetricStrip's larger
+                  card-style treatment. */}
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-xs border-t border-border/60 pt-1.5">
+                <span><span className="text-muted-foreground">First seen</span> <span className="text-foreground">{formatTimestamp(data.customer.firstSeen)}</span></span>
+                <span><span className="text-muted-foreground">Last seen</span> <span className="text-foreground">{formatTimestamp(data.customer.lastSeen)}</span></span>
+                <span>
+                  <span className="text-muted-foreground">Visible interactions</span>{' '}
+                  <span className="text-foreground font-medium tabular-nums">{aggregate?.totalInteractions ?? 0}</span>{' '}
+                  <span className="text-muted-foreground">({aggregate?.inboundCount ?? 0} in · {aggregate?.outboundCount ?? 0} out)</span>
+                </span>
+                <span><span className="text-muted-foreground">Latest intent</span> <span className="text-foreground">{aggregate?.latestIntent ?? '—'}</span></span>
+                <span><span className="text-muted-foreground">Latest outcome</span> <span className="text-foreground">{aggregate?.latestOutcome ? formatStatusLabel(aggregate.latestOutcome) : '—'}</span></span>
+                <span>
+                  <span className="text-muted-foreground">Escalations</span>{' '}
+                  <span className={`font-medium tabular-nums ${(aggregate?.escalationCount ?? 0) > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>
+                    {aggregate?.escalationCount ?? 0}
+                  </span>
+                </span>
+              </div>
+            </div>
 
             {/* 3. Activity / Diary — NEW (Session 13.1, DEC-CUST-02).
                 Closes the fully-built-but-unconsumed Activity backend

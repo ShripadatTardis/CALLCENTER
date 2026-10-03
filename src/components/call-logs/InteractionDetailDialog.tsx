@@ -14,6 +14,7 @@ import {
   formatPhoneNumber,
   formatTimestamp,
 } from '@/lib/format';
+import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
 
 interface InteractionDetailDialogProps {
   isOpen: boolean;
@@ -202,6 +203,43 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             )}
           </SectionCard>
         )}
+
+        {/* Session 13.2 (DEC-CALL-01, §20) — "candidate for user-facing
+            exposure" when genuinely populated; historical/Chat-sourced
+            interactions correctly render nothing here (no empty section,
+            per §21). Reuses the exact Session 12.5/12.6 classification
+            helpers Campaign's own Agent Result dialog uses, with a null
+            contract — this dialog has no campaign-contract context, so
+            classifyActualOutcome falls back to the backend's own
+            actualOutcomeName (not fabricated) and classifyStructuredOutputs
+            renders every real key generically (never an agent-specific
+            assumption). This does not duplicate Campaign Detail's Agent
+            Result dialog, which additionally shows Campaign Classification
+            against the captured outcome policy — out of scope here. */}
+        {(() => {
+          const actualOutcome = classifyActualOutcome(null, interaction.actualOutcomeCode ?? null, interaction.actualOutcomeName ?? null);
+          const outputFields = classifyStructuredOutputs(null, interaction.structuredOutputs ?? null);
+          if (actualOutcome.availability === 'unavailable' && outputFields.length === 0) return null;
+          return (
+            <SectionCard title="Agent Outcome">
+              {actualOutcome.availability !== 'unavailable' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-foreground">{actualOutcome.displayName ?? actualOutcome.code}</span>
+                </div>
+              )}
+              {outputFields.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {outputFields.map((f) => (
+                    <div key={f.fieldCode} className="text-xs">
+                      <span className="text-muted-foreground">{f.displayName}:</span>{' '}
+                      <span className="text-foreground break-words">{formatOutputValue(f.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+          );
+        })()}
 
         <SectionCard title="Recording">
           {interaction.recording?.url ? (

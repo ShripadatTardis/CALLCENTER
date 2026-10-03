@@ -57,4 +57,20 @@ export interface ChatRepository {
    * ever sees them. Never used for authorization.
    */
   getTrialFlags(upstreamSessionIds: string[]): Promise<Record<string, boolean>>;
+
+  /**
+   * Session 13.2 (DEC-CHAT-01) — batch, read-only lookup of each
+   * upstream session's locally-recorded campaign linkage
+   * (chat_sessions.campaign_id/campaign_target_id, set only for sessions
+   * initiated from Chat Console's Campaign Customer mode — Session
+   * 11.9B) plus a campaignName resolved through the one existing
+   * authoritative source (call_center.campaigns), never fabricated. A
+   * session with no campaign link returns all-null fields. Deliberately
+   * separate from getTrialFlags/getCustomerLinks — same "any local
+   * session" shape, different join target, neither existing proven
+   * function's semantics touched.
+   */
+  getCampaignContext(upstreamSessionIds: string[]): Promise<
+    Record<string, { campaignId: string | null; campaignTargetId: string | null; campaignName: string | null }>
+  >;
 }

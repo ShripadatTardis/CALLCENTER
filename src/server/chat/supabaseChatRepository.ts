@@ -239,4 +239,20 @@ export const supabaseChatRepository: ChatRepository = {
     for (const r of rows ?? []) out[r.upstream_session_id] = r.is_trial;
     return out;
   },
+
+  async getCampaignContext(upstreamSessionIds) {
+    if (upstreamSessionIds.length === 0) return {};
+    const rows = await rpc<
+      Array<{ upstream_session_id: string; campaign_id: string | null; campaign_target_id: string | null; campaign_name: string | null }>
+    >('call_center_chat_session_campaign_context', { p_upstream_session_ids: upstreamSessionIds });
+    const out: Record<string, { campaignId: string | null; campaignTargetId: string | null; campaignName: string | null }> = {};
+    for (const r of rows ?? []) {
+      out[r.upstream_session_id] = {
+        campaignId: r.campaign_id,
+        campaignTargetId: r.campaign_target_id,
+        campaignName: r.campaign_name,
+      };
+    }
+    return out;
+  },
 };

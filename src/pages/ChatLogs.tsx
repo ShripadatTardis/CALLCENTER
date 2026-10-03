@@ -239,19 +239,42 @@ const ChatLogs: React.FC = () => {
                           {contextLabel}
                           <span className="text-muted-foreground"> · {s.latestIntent || 'General'}</span>
                         </span>
-                        {/* Session 13.1 (DEC-CUST-03) — only rendered when
-                            a real Customer 360 id was resolved server-side;
-                            never inferred from the display label. */}
-                        {s.customer360Id && (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline mt-0.5"
-                            onClick={() => navigate(`/customers/${s.customer360Id}`, { state: { origin: 'chat-logs' } })}
-                          >
-                            <UserRound className="h-3 w-3" />
-                            View Customer 360
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          {/* Session 13.1 (DEC-CUST-03) — only rendered when
+                              a real Customer 360 id was resolved server-side;
+                              never inferred from the display label. */}
+                          {s.customer360Id && (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1"
+                              onClick={() => navigate(`/customers/${s.customer360Id}`, { state: { origin: 'chat-logs' } })}
+                            >
+                              <UserRound className="h-3 w-3" />
+                              View Customer 360
+                            </button>
+                          )}
+                          {/* Session 13.2 (DEC-CHAT-01) — campaignId is a
+                              real, stable id; campaignName is resolved
+                              server-side via the authoritative campaigns
+                              table, never fabricated. A session with a
+                              campaignId but no resolvable name still
+                              navigates, labeled "Campaign" rather than
+                              inventing a name. */}
+                          {s.campaignId && (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1"
+                              onClick={() => navigate(`/outbound-campaigns/${s.campaignId}`)}
+                            >
+                              {s.campaignName ?? 'Campaign'}
+                            </button>
+                          )}
+                          {s.isTrial === true && (
+                            <Badge variant="secondary" className="text-xs">
+                              Trial
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
                         <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>

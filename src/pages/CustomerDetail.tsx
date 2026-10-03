@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MetricStrip } from '@/components/common/MetricStrip';
 import { FilterPopover } from '@/components/common/FilterPopover';
-import { ArrowLeft, Loader2, Mic, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Mic, Plus, RefreshCw } from 'lucide-react';
 import { CustomerActivityPanel } from '@/components/customers/CustomerActivityPanel';
+import { ActivityComposerDialog } from '@/components/customers/ActivityComposerDialog';
 import { useCustomerDetail } from '@/hooks/customers/useCustomerDetail';
 import { useCustomerInteractions } from '@/hooks/customers/useCustomerInteractions';
 import { useCustomerCampaigns } from '@/hooks/customers/useCustomerCampaigns';
@@ -24,7 +25,7 @@ import {
   formatTimestamp,
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
-import type { CustomerCampaignRow } from '@/types/customer';
+import type { CustomerCampaignRow, CustomerInteractionRow } from '@/types/customer';
 import { getCustomerDisplayLabel, maskPhoneLast4 } from '@/lib/customerDisplayLabel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClassification } from '@/hooks/classification/useClassification';
@@ -43,8 +44,11 @@ const LOOKUP_PAGE_SIZE = 100;
  */
 const GROUPING_PAGE_SIZE = 500;
 
+/** Session 13.1.1 §8 — tightened from p-3/space-y-2 to p-2/space-y-1 so
+ * Identity & Contact reads as a compact information strip rather than a
+ * large card, without dropping any exposed field. */
 const SectionCard: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
-  <div className="rounded-md border border-border bg-card p-3 space-y-2">
+  <div className="rounded-md border border-border bg-card p-2 space-y-1">
     <div>
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
       {subtitle && <div className="text-xs text-muted-foreground">{subtitle}</div>}
@@ -212,6 +216,11 @@ const CustomerDetail: React.FC = () => {
   const returnTo = resolveDetailOrigin((location.state as DetailNavigationState | null)?.origin, 'customers');
   const [selectedInteraction, setSelectedInteraction] = useState<{ id: string; channel: string } | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
+  // Session 13.1.1 — Interaction History's "+ Activity" row action opens
+  // the SAME ActivityComposerDialog the Customer-level "Add activity"
+  // button uses (addendum §6: one shared form, not two implementations),
+  // just with this row's data bound as interactionContext.
+  const [activityComposerInteraction, setActivityComposerInteraction] = useState<CustomerInteractionRow | null>(null);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useCustomerDetail(customerId);
   const interactionsQuery = useCustomerInteractions(customerId, 1, GROUPING_PAGE_SIZE);
@@ -220,7 +229,7 @@ const CustomerDetail: React.FC = () => {
   const classification = useClassification();
 
   const aggregate = data?.aggregate;
-  const allInteractions = interactionsQuery.data?.data ?? [];
+  const allInteractions = React.useMemo(() => interactionsQuery.data?.data ?? [], [interactionsQuery.data]);
   const interactionsTotalCount = interactionsQuery.data?.pagination.totalCount ?? allInteractions.length;
   // The grouping fetch itself may still be a partial page if a customer
   // has more interactions than GROUPING_PAGE_SIZE — never silently
@@ -242,10 +251,17 @@ const CustomerDetail: React.FC = () => {
     : allInteractions;
 
   const campaigns = campaignsQuery.data?.data ?? [];
+  // Session 13.1.1 — reused by CustomerActivityPanel to resolve a
+  // compact provenance label for interaction-linked activities, from
+  // data already loaded on this page (no new fetch).
+  const interactionsById = React.useMemo(
+    () => new Map(allInteractions.map((row) => [row.interactionId, row] as const)),
+    [allInteractions],
+  );
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+      <div className="bg-background min-h-full text-foreground p-4 space-y-2">
         <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back to {returnTo.label}
@@ -365,7 +381,11 @@ const CustomerDetail: React.FC = () => {
                 per explicit correction — a customer with dozens of
                 interactions must not bury this behind that list. See
                 src/components/customers/CustomerActivityPanel.tsx. */}
-            <CustomerActivityPanel customerId={data.customer.id} />
+            <CustomerActivityPanel
+              customerId={data.customer.id}
+              interactionsById={interactionsById}
+              onOpenInteraction={(id, channel) => setSelectedInteraction({ id, channel })}
+            />
 
             {/* 4. Interaction History — G1 dense grid, S1 status badges.
                 The Domain->Category->Agent grouping tree is no longer
@@ -422,6 +442,7 @@ const CustomerDetail: React.FC = () => {
                         <th className="h-9 px-3 font-medium text-right">Sentiment</th>
                         <th className="h-9 px-3 font-medium text-center" title="Recording available">Rec</th>
                         <th className="h-9 px-3 font-medium">Escalation</th>
+                        <th className="h-9 px-3 font-medium text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -480,6 +501,35 @@ const CustomerDetail: React.FC = () => {
                           </td>
                           <td className="py-1.5 px-3 text-muted-foreground whitespace-nowrap max-w-[10rem] truncate" title={row.escalationTrigger ?? undefined}>
                             {row.escalationTrigger ?? '—'}
+                          </td>
+                          {/* Session 13.1.1 §3/§7 — extensible Action
+                              column; only "+ Activity" for this session.
+                              Both onClick AND onKeyDown stop propagation:
+                              the row's own role="button" handler listens
+                              for Enter/Space on keydown, and that bubbles
+                              up from this real nested <button> BEFORE the
+                              browser's synthesized click — stopping only
+                              the click left keyboard activation of this
+                              button opening the row's Call/Chat Detail
+                              dialog instead (HIG review finding). */}
+                          <td className="py-1.5 px-3 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActivityComposerInteraction(row);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation();
+                                }
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-0.5" />
+                              Activity
+                            </Button>
                           </td>
                         </tr>
                         );
@@ -581,6 +631,15 @@ const CustomerDetail: React.FC = () => {
             channel={selectedInteraction.channel}
             phoneNumbers={data?.phoneNumbers ?? []}
             onClose={() => setSelectedInteraction(null)}
+          />
+        )}
+
+        {activityComposerInteraction && data && (
+          <ActivityComposerDialog
+            open
+            onClose={() => setActivityComposerInteraction(null)}
+            customerId={data.customer.id}
+            interactionContext={activityComposerInteraction}
           />
         )}
       </div>

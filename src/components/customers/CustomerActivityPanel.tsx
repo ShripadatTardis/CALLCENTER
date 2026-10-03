@@ -1,31 +1,32 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Link2, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerActivities } from '@/hooks/customers/useCustomerActivities';
-import { useCreateCustomerActivity } from '@/hooks/customers/useCreateCustomerActivity';
 import { useUpdateCustomerActivityStatus } from '@/hooks/customers/useUpdateCustomerActivityStatus';
+import { ActivityComposerDialog } from '@/components/customers/ActivityComposerDialog';
 import { formatStatusLabel, formatTimestamp } from '@/lib/format';
 import { isApiError } from '@/services/transport/errors';
-import type { ActivityStatus, ActivityType, CustomerActivityRow } from '@/types/customer';
+import type { ActivityStatus, ActivityType, CustomerActivityRow, CustomerInteractionRow } from '@/types/customer';
 
 /**
- * Session 13.1 (DEC-CUST-02) — Customer Activity/Diary. Closes the
- * audited gap where the backend (customer_activities table, the
- * `GET/POST ?action=activities` API, and the repository layer) was
- * fully built with zero frontend consumer. A lightweight operational
- * diary only — not a CRM/ticketing/workflow engine (plan §4): no
- * assignment UI, no workflow states beyond what the schema's own check
- * constraint already defines, no deletion (the audit confirmed no
- * delete capability exists at any layer — see the session doc).
+ * Session 13.1 (DEC-CUST-02) / 13.1.1 — Customer Activity/Diary. Closes
+ * the audited gap where the backend (customer_activities table, the
+ * `GET/POST/PATCH ?action=activities` API, and the repository layer)
+ * was fully built with zero frontend consumer. A lightweight operational
+ * diary only — not a CRM/ticketing/workflow engine: no assignment UI, no
+ * workflow states beyond what the schema's own check constraint already
+ * defines, no deletion (the audit confirmed no delete capability exists
+ * at any layer — see the session doc).
+ *
+ * Session 13.1.1 — converted from large activity cards to a compact
+ * grid (Type / Activity / Created / Due / Status), bounded to ~5 visible
+ * rows with its own internal scroll, so this section no longer grows
+ * unbounded with activity count or competes for vertical space with
+ * Interaction History right below it.
  */
-
-const ACTIVITY_TYPES: ActivityType[] = ['note', 'instruction', 'task', 'reminder', 'appointment'];
 
 /** Mirrors api/customers/[id]/index.ts's ACTIVITY_STATUSES_BY_TYPE exactly — the frontend never offers a transition the backend would reject. */
 const STATUS_OPTIONS_BY_TYPE: Record<ActivityType, ActivityStatus[]> = {
@@ -42,122 +43,15 @@ function statusBadgeVariant(status: ActivityStatus): 'positive' | 'secondary' | 
   return 'outline';
 }
 
-const NewActivityForm: React.FC<{ customerId: string; onCreated: () => void }> = ({ customerId, onCreated }) => {
-  const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [activityType, setActivityType] = useState<ActivityType>('note');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [dueAt, setDueAt] = useState('');
-  const createMutation = useCreateCustomerActivity(customerId);
+/** Max body height ≈ 5 compact rows (h-9 each) before the grid scrolls internally rather than growing the page. */
+const GRID_MAX_HEIGHT = '14.5rem';
 
-  const needsDueAt = activityType === 'task' || activityType === 'reminder' || activityType === 'appointment';
-
-  const reset = () => {
-    setActivityType('note');
-    setTitle('');
-    setBody('');
-    setDueAt('');
-  };
-
-  const handleSubmit = async () => {
-    if (!body.trim()) {
-      toast.error('Activity content is required');
-      return;
-    }
-    try {
-      await createMutation.mutateAsync({
-        activityType,
-        title: title.trim() ? title.trim() : null,
-        body: body.trim(),
-        dueAt: needsDueAt && dueAt ? new Date(dueAt).toISOString() : null,
-        createdBy: user?.name ?? null,
-      });
-      toast.success('Activity added');
-      reset();
-      setOpen(false);
-      onCreated();
-    } catch (err) {
-      toast.error(isApiError(err) ? err.message : 'Could not add activity');
-    }
-  };
-
-  if (!open) {
-    return (
-      <Button variant="outline" size="sm" className="h-7 text-xs border-border bg-transparent text-foreground hover:bg-muted" onClick={() => setOpen(true)}>
-        <Plus className="h-3.5 w-3.5 mr-1" />
-        Add activity
-      </Button>
-    );
-  }
-
-  return (
-    <div className="rounded-md border border-border bg-background p-2.5 space-y-2">
-      <div className="flex gap-2">
-        <Select value={activityType} onValueChange={(v) => setActivityType(v as ActivityType)}>
-          <SelectTrigger className="h-8 text-xs w-36" aria-label="Activity type">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ACTIVITY_TYPES.map((t) => (
-              <SelectItem key={t} value={t} className="text-xs">
-                {formatStatusLabel(t)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          placeholder="Title (optional)"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="h-8 text-xs flex-1"
-        />
-      </div>
-      <Textarea
-        placeholder={activityType === 'instruction' ? 'Instruction for agents handling this customer…' : 'Details…'}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        className="text-xs min-h-16"
-      />
-      {needsDueAt && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Due</span>
-          <Input
-            type="datetime-local"
-            aria-label="Due date"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            className="h-8 text-xs w-56"
-          />
-        </div>
-      )}
-      <div className="flex gap-2 justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => {
-            reset();
-            setOpen(false);
-          }}
-        >
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => void handleSubmit()}
-          disabled={createMutation.isPending || !body.trim()}
-        >
-          {createMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-          Save
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-const ActivityRow: React.FC<{ activity: CustomerActivityRow; customerId: string }> = ({ activity, customerId }) => {
+const ActivityGridRow: React.FC<{
+  activity: CustomerActivityRow;
+  customerId: string;
+  linkedInteraction?: CustomerInteractionRow;
+  onOpenInteraction?: (interactionId: string, channel: string) => void;
+}> = ({ activity, customerId, linkedInteraction, onOpenInteraction }) => {
   const updateMutation = useUpdateCustomerActivityStatus(customerId);
   const statusOptions = STATUS_OPTIONS_BY_TYPE[activity.activityType];
 
@@ -170,62 +64,116 @@ const ActivityRow: React.FC<{ activity: CustomerActivityRow; customerId: string 
     }
   };
 
+  // Session 13.1.1 (addendum §5/§7) — provenance is a compact, optional
+  // indicator only: resolved client-side from the same Interaction
+  // History data already loaded on this page (no new network call, no
+  // raw UUID shown). When the linked interaction isn't in the currently
+  // loaded set, the activity's own real interactionId is still retained
+  // (it reached the backend at creation time) but no unverified
+  // channel/time is guessed for display.
+  const provenanceTitle = linkedInteraction
+    ? [
+        linkedInteraction.channel ? formatStatusLabel(linkedInteraction.channel) : null,
+        formatTimestamp(linkedInteraction.startedAt),
+        linkedInteraction.agentDisplayName ?? linkedInteraction.agentId,
+      ]
+        .filter(Boolean)
+        .join(' • ')
+    : 'Linked interaction';
+
   return (
-    <div className="flex items-start justify-between gap-3 py-2 border-b border-border/60 last:border-0">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">
-            {formatStatusLabel(activity.activityType)}
-          </Badge>
+    <tr className="border-b border-border/60 last:border-0 h-9 align-middle">
+      <td className="py-1 px-2 whitespace-nowrap">
+        <Badge variant="outline" className="text-[10px] py-0 px-1 border-border text-muted-foreground">
+          {formatStatusLabel(activity.activityType)}
+        </Badge>
+      </td>
+      <td className="py-1 px-2 min-w-0 max-w-[18rem]">
+        <span className="inline-flex items-center gap-1 min-w-0">
+          {activity.interactionId && (
+            <button
+              type="button"
+              title={linkedInteraction ? provenanceTitle : 'Linked interaction not currently loaded'}
+              aria-label={linkedInteraction ? `Linked interaction: ${provenanceTitle}` : 'Linked interaction not currently loaded'}
+              className="flex-shrink-0 h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-cyan-600 dark:hover:text-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
+              disabled={!linkedInteraction}
+              onClick={() => linkedInteraction && onOpenInteraction?.(activity.interactionId as string, linkedInteraction.channel)}
+            >
+              <Link2 className="h-3 w-3" />
+            </button>
+          )}
+          <span className="truncate text-foreground" title={activity.title ? `${activity.title} — ${activity.body}` : activity.body}>
+            {activity.title ?? activity.body}
+          </span>
+        </span>
+      </td>
+      <td className="py-1 px-2 whitespace-nowrap text-muted-foreground text-xs">{formatTimestamp(activity.createdAt)}</td>
+      <td className="py-1 px-2 whitespace-nowrap text-muted-foreground text-xs">
+        {activity.dueAt ? formatTimestamp(activity.dueAt) : '—'}
+      </td>
+      <td className="py-1 px-2 whitespace-nowrap">
+        {statusOptions.length > 0 ? (
+          <Select
+            value={activity.status}
+            onValueChange={(v) => void handleStatusChange(v as ActivityStatus)}
+            disabled={updateMutation.isPending}
+          >
+            <SelectTrigger
+              className="h-6 text-[11px] w-28"
+              aria-label={`Change status for ${activity.title ?? formatStatusLabel(activity.activityType)}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((s) => (
+                <SelectItem key={s} value={s} className="text-xs">
+                  {formatStatusLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
           <Badge variant={statusBadgeVariant(activity.status)} className="text-[10px] py-0 px-1">
             {formatStatusLabel(activity.status)}
           </Badge>
-          {activity.title && <span className="text-sm font-medium text-foreground">{activity.title}</span>}
-        </div>
-        <p className="text-sm text-foreground mt-0.5 whitespace-pre-wrap">{activity.body}</p>
-        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-          <span>{formatTimestamp(activity.createdAt)}</span>
-          {activity.createdBy && <span>by {activity.createdBy}</span>}
-          {activity.dueAt && <span>Due {formatTimestamp(activity.dueAt)}</span>}
-          {activity.completedAt && <span>Completed {formatTimestamp(activity.completedAt)}</span>}
-        </div>
-      </div>
-      {statusOptions.length > 0 && (
-        <Select
-          value={activity.status}
-          onValueChange={(v) => void handleStatusChange(v as ActivityStatus)}
-          disabled={updateMutation.isPending}
-        >
-          <SelectTrigger
-            className="h-7 text-xs w-32 flex-shrink-0"
-            aria-label={`Change status for ${activity.title ?? formatStatusLabel(activity.activityType)}`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((s) => (
-              <SelectItem key={s} value={s} className="text-xs">
-                {formatStatusLabel(s)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    </div>
+        )}
+      </td>
+    </tr>
   );
 };
 
-export const CustomerActivityPanel: React.FC<{ customerId: string }> = ({ customerId }) => {
+export const CustomerActivityPanel: React.FC<{
+  customerId: string;
+  /** Session 13.1.1 — the already-loaded Interaction History rows, keyed by interactionId, used only to resolve a compact provenance label (channel/time/agent) for activities created from an interaction. No new fetch. */
+  interactionsById?: Map<string, CustomerInteractionRow>;
+  onOpenInteraction?: (interactionId: string, channel: string) => void;
+}> = ({ customerId, interactionsById, onOpenInteraction }) => {
   // Session 13.1 follow-up — collapsed by default so this section doesn't
   // compete for space with Interaction History right below it; the header
   // itself (always visible) still surfaces the count so its presence and
   // contents are discoverable without expanding.
   const [expanded, setExpanded] = useState(false);
-  const { data, isLoading, isError, refetch } = useCustomerActivities(customerId);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const { data, isLoading, isError } = useCustomerActivities(customerId);
   const activities = data?.data ?? [];
 
+  // Auto-expand whenever a new activity appears (created either from
+  // this panel's own "Add activity" or from an Interaction History row's
+  // "+ Activity" — both invalidate the same query, so this covers both
+  // origins uniformly without lifting expand/collapse state out of this
+  // component).
+  const prevCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isLoading && !isError) {
+      if (prevCountRef.current !== null && activities.length > prevCountRef.current) {
+        setExpanded(true);
+      }
+      prevCountRef.current = activities.length;
+    }
+  }, [activities.length, isLoading, isError]);
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <button
           type="button"
@@ -242,26 +190,58 @@ export const CustomerActivityPanel: React.FC<{ customerId: string }> = ({ custom
             </span>
           )}
         </button>
-        <NewActivityForm customerId={customerId} onCreated={() => { setExpanded(true); void refetch(); }} />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs border-border bg-transparent text-foreground hover:bg-muted"
+          onClick={() => setComposerOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Add activity
+        </Button>
       </div>
       <div id="customer-activity-panel-body">
-      {!expanded ? null : isLoading ? (
-        <div className="flex justify-center py-6" role="status" aria-live="polite">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="sr-only">Loading activities…</span>
-        </div>
-      ) : isError ? (
-        <p className="text-sm text-muted-foreground px-1 py-2">Activity history is unavailable right now.</p>
-      ) : activities.length === 0 ? (
-        <p className="text-sm text-muted-foreground px-1 py-2">No activities recorded for this customer yet.</p>
-      ) : (
-        <div className="rounded-md border border-border px-3">
-          {activities.map((a) => (
-            <ActivityRow key={a.id} activity={a} customerId={customerId} />
-          ))}
-        </div>
-      )}
+        {!expanded ? null : isLoading ? (
+          <div className="flex justify-center py-6" role="status" aria-live="polite">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="sr-only">Loading activities…</span>
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-muted-foreground px-1 py-2">Activity history is unavailable right now.</p>
+        ) : activities.length === 0 ? (
+          <p className="text-sm text-muted-foreground px-1 py-2">No activities recorded for this customer yet.</p>
+        ) : (
+          <div className="rounded-md border border-border overflow-auto" style={{ maxHeight: GRID_MAX_HEIGHT }}>
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-card z-10">
+                <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
+                  <th className="h-7 px-2 font-medium rounded-tl-md">Type</th>
+                  <th className="h-7 px-2 font-medium">Activity</th>
+                  <th className="h-7 px-2 font-medium whitespace-nowrap">Created</th>
+                  <th className="h-7 px-2 font-medium whitespace-nowrap">Due / Scheduled</th>
+                  <th className="h-7 px-2 font-medium rounded-tr-md">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.map((a) => (
+                  <ActivityGridRow
+                    key={a.id}
+                    activity={a}
+                    customerId={customerId}
+                    linkedInteraction={a.interactionId ? interactionsById?.get(a.interactionId) : undefined}
+                    onOpenInteraction={onOpenInteraction}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+      <ActivityComposerDialog
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        customerId={customerId}
+      />
     </div>
   );
 };

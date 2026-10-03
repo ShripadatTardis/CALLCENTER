@@ -181,4 +181,6 @@ export interface NewCustomerActivityPayload {
   scheduledAt?: string | null;
   dueAt?: string | null;
   createdBy?: string | null;
+  /** Session 13.1.1 — the real, stable interaction identifier from Interaction History's "+ Activity" action. Already supported end-to-end by the existing create-activity API/schema (api/customers/[id]/index.ts, call_center_activity_create); no new linking mechanism. */
+  interactionId?: string | null;
 }

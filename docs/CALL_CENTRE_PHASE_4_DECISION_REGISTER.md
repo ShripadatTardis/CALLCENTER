@@ -3,6 +3,7 @@
 **Status:** Decision-support document only. No code, schema, UI, API, or configuration was modified. No priorities, recommendations, or implementation plan are included. The Owner Decision columns are intentionally blank.
 **Inputs:** `docs/CALL_CENTRE_FUNCTIONAL_AUDIT_PHASE_1_SCREEN_INVENTORY.md`, `docs/CALL_CENTRE_FUNCTIONAL_AUDIT_PHASE_2_DATA_EXPOSURE.md` (corrected), `docs/CALL_CENTRE_FUNCTIONAL_AUDIT_PHASE_3_COMPLETENESS_GAP_REGISTER.md` (corrected)
 **Date:** 2026-10-03
+**Implementation status update (2026-10-03):** `DEC-CUST-01`, `DEC-CUST-02`, and `DEC-CUST-03` have been implemented and deployed per `docs/SESSION_13_1_CUSTOMER360_FUNCTIONAL_COMPLETION.md`, verified against the production deployment (API-level creation/status-update/isolation checks, and a post-deployment correction to both Activity/Diary placement and an interaction-drill-down authorization bug). This is a status note only — it does not assign an Owner Decision disposition to any row below; those remain blank as this document requires.
 
 ---
 
@@ -36,9 +37,9 @@ A fourth category — Phase 3 items that were already classified as deliberately
 
 | Decision ID | Area | Decision to Make | What Already Exists | What Is Missing / Inconsistent | Owner Decision | Notes |
 |---|---|---|---|---|---|---|
-| DEC-CUST-01 | Customer360 | How much of the already-fetched Customer aggregate/interaction data should be represented in Customer Detail? | `channels`, `authSummary`, `latestAgentId/DisplayName` on the customer record; `recordingAvailable`/`escalationTrigger` per interaction row — all fetched into the page's own data object today | None of these five fields are currently rendered | | |
-| DEC-CUST-02 | Customer360 | Should Customer Activity/Diary become part of the operational Customer360 experience? | Full create+list API against a real `customer_activities` table (note/instruction/task/reminder/appointment, campaign/interaction cross-links); a status-update RPC exists one layer below the API | Zero frontend consumer; status-update has no API route either; delete capability doesn't exist at any layer; activity authorization scoping is an explicitly open question in-code | | Introduces an actual user workflow, not just a field — treated as its own decision per the audit's own distinction |
-| DEC-CUST-03 | Customer360 / Campaigns / Chat | Should proven but unused customer-identity relationships be exposed as navigation? | `campaign_targets.customer_id` (real, non-optional FK, already on every target row); `chat_sessions.customer_id` (used only to derive a label) | Neither is used as a clickable link to Customer360 | | Strongest linkage case in the whole audit is the Campaign side (ID already on the wire) |
+| DEC-CUST-01 | Customer360 | How much of the already-fetched Customer aggregate/interaction data should be represented in Customer Detail? | `channels`, `authSummary`, `latestAgentId/DisplayName` on the customer record; `recordingAvailable`/`escalationTrigger` per interaction row — all fetched into the page's own data object today | ~~None of these five fields are currently rendered~~ **IMPLEMENTED (Session 13.1)** — all five now rendered in Customer Detail | | See `docs/SESSION_13_1_CUSTOMER360_FUNCTIONAL_COMPLETION.md` |
+| DEC-CUST-02 | Customer360 | Should Customer Activity/Diary become part of the operational Customer360 experience? | Full create+list API against a real `customer_activities` table (note/instruction/task/reminder/appointment, campaign/interaction cross-links); a status-update RPC exists one layer below the API | ~~Zero frontend consumer; status-update has no API route either~~ **IMPLEMENTED (Session 13.1)** — create/list/status-update all wired and verified; delete remains genuinely absent (no layer supports it); activity authorization scoping residual limitation documented, not resolved | | See `docs/SESSION_13_1_CUSTOMER360_FUNCTIONAL_COMPLETION.md` |
+| DEC-CUST-03 | Customer360 / Campaigns / Chat | Should proven but unused customer-identity relationships be exposed as navigation? | `campaign_targets.customer_id` (real, non-optional FK, already on every target row); `chat_sessions.customer_id` (used only to derive a label) | ~~Neither is used as a clickable link to Customer360~~ **IMPLEMENTED (Session 13.1)** — Campaign target→Customer360, Chat session→Customer360, and Initiate Call→Call Detail navigation all added and verified | | See `docs/SESSION_13_1_CUSTOMER360_FUNCTIONAL_COMPLETION.md` |
 | DEC-CHAT-01 | Chat Logs | Should already-available chat session metadata be shown in Chat Logs? | `chat_sessions.campaign_id`/`campaign_target_id` (real, populated, unread by the API route); `is_trial` (real, functional internally) | Neither reaches the Chat Logs screen | | |
 | DEC-AGENT-01 | AI Agents | Should Agent Detail represent the agent's `contract` object with the same richness it already has in Campaign Configuration? | The same real `contract` object (status, description, expected fields, outcome codes) is fetched by Agent Detail | Agent Detail renders only a 1-line "Contract source" label | | Same data, two different presentations — also a consistency finding (§5) |
 | DEC-CAMP-01 | Campaigns | Should Campaign Detail/History expose legacy result-rule data and full configuration-version history? | 10 rows of legacy `campaign_result_rules` across 5 campaigns, fetched and unread; full `campaign_configuration_versions` snapshot chain, fetched, only the active version's id used | Neither is surfaced; Campaign History shows only an event summary, not a version diff | | |
@@ -232,9 +233,9 @@ Every Phase 3 Gap ID in the register (CUST-01–05, CALL-01–04, CHAT-01–04, 
 
 | Decision | DO NOW | KEEP FOR LATER | DO NOT NEED | EXTERNAL DEPENDENCY | Notes |
 |---|---|---|---|---|---|
-| DEC-CUST-01 — Customer360 aggregate/interaction field exposure | | | | | |
-| DEC-CUST-02 — Customer Activity/Diary | | | | | |
-| DEC-CUST-03 — Customer navigation/relationship exposure | | | | | |
+| DEC-CUST-01 — Customer360 aggregate/interaction field exposure | | | | | IMPLEMENTED (Session 13.1) |
+| DEC-CUST-02 — Customer Activity/Diary | | | | | IMPLEMENTED (Session 13.1) — delete remains out of scope (no backend support) |
+| DEC-CUST-03 — Customer navigation/relationship exposure | | | | | IMPLEMENTED (Session 13.1) |
 | DEC-CHAT-01 — Chat Logs session-metadata exposure | | | | | |
 | DEC-AGENT-01 — Agent Contract exposure parity | | | | | |
 | DEC-CAMP-01 — Campaign historical/configuration exposure | | | | | |

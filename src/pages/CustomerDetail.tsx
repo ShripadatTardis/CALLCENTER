@@ -26,6 +26,7 @@ import {
 import type { Interaction } from '@/types/interaction';
 import type { CustomerCampaignRow } from '@/types/customer';
 import { getCustomerDisplayLabel, maskPhoneLast4 } from '@/lib/customerDisplayLabel';
+import { useAuth } from '@/contexts/AuthContext';
 import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
@@ -60,11 +61,24 @@ const SectionCard: React.FC<{ title: string; subtitle?: string; children: React.
  * `search` actually matches — and filters the (bounded, paged) results
  * down to the exact call_id. Reuses the same fetchCallData the rest of
  * the app already uses; no new endpoint.
+ *
+ * Session 13.1 fix — this function was calling fetchCallData() with no
+ * `role`, which defaults to 'unauthenticated'. api/calls/data.ts applies
+ * server-side category authorization keyed on that role and strips every
+ * row whose agent isn't in the caller's authorized set — for
+ * 'unauthenticated' that's every row (confirmed live: an unauthenticated
+ * /api/calls/data request for a real phone with real calls returns
+ * `total_records: 75, calls: []`), so this lookup always failed with
+ * "Could not load full interaction detail" regardless of which
+ * interaction was clicked. CampaignDetail.tsx's own InteractionLookupDialog
+ * hit and fixed this exact bug previously (its own doc comment describes
+ * it) — this is the same fix applied here, reusing the session's real
+ * role via useAuth(), not a new lookup variant.
  */
-async function findCallByPhoneAndId(phoneNumbers: string[], callId: string) {
+async function findCallByPhoneAndId(phoneNumbers: string[], callId: string, role: string) {
   for (const phone of phoneNumbers) {
     for (let page = 1; page <= MAX_LOOKUP_PAGES; page += 1) {
-      const result = await fetchCallData({ search: phone, page: page, page_size: LOOKUP_PAGE_SIZE });
+      const result = await fetchCallData({ search: phone, page: page, page_size: LOOKUP_PAGE_SIZE }, role);
       const match = result.interactions.find((i) => i.interactionId === callId);
       if (match) return match;
       if (page >= result.pagination.total_pages) break;
@@ -93,10 +107,12 @@ const InteractionLookupDialog: React.FC<{
   onClose: () => void;
 }> = ({ interactionId, channel, phoneNumbers, onClose }) => {
   const isChat = channel === 'chat';
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['customer360', 'voice-interaction-lookup', interactionId, phoneNumbers],
-    queryFn: () => findCallByPhoneAndId(phoneNumbers, interactionId),
+    queryKey: ['customer360', 'voice-interaction-lookup', interactionId, phoneNumbers, role],
+    queryFn: () => findCallByPhoneAndId(phoneNumbers, interactionId, role),
     enabled: !isChat,
   });
   const interaction = data;
@@ -342,7 +358,16 @@ const CustomerDetail: React.FC = () => {
               ]}
             />
 
-            {/* 2. Interaction History — G1 dense grid, S1 status badges.
+            {/* 3. Activity / Diary — NEW (Session 13.1, DEC-CUST-02).
+                Closes the fully-built-but-unconsumed Activity backend
+                found in Phase 2/3 of the audit. Placed directly after
+                Identity & Contact/Summary and before Interaction History
+                per explicit correction — a customer with dozens of
+                interactions must not bury this behind that list. See
+                src/components/customers/CustomerActivityPanel.tsx. */}
+            <CustomerActivityPanel customerId={data.customer.id} />
+
+            {/* 4. Interaction History — G1 dense grid, S1 status badges.
                 The Domain->Category->Agent grouping tree is no longer
                 always-on preamble; it moves into an F1-style optional
                 filter, the same treatment Call Logs 11.3A already
@@ -465,7 +490,7 @@ const CustomerDetail: React.FC = () => {
               )}
             </div>
 
-            {/* 3. Campaign Participation / History — NEW (Session 11.5B
+            {/* 5. Campaign Participation / History — NEW (Session 11.5B
                 §C.3). Consumes Session 11.5A's customer-scoped campaign
                 endpoint; every field here traces to real
                 campaign_targets/executions/results data, no invented
@@ -546,12 +571,6 @@ const CustomerDetail: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* 5. Activity / Diary — NEW (Session 13.1, DEC-CUST-02).
-                Closes the fully-built-but-unconsumed Activity backend
-                found in Phase 2/3 of the audit. See
-                src/components/customers/CustomerActivityPanel.tsx. */}
-            <CustomerActivityPanel customerId={data.customer.id} />
           </>
           );
         })()}

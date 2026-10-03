@@ -13,6 +13,8 @@ Exactly the three decisions the Session 13.1 prompt specified:
 
 Explicitly not touched: Auth, User Management, NPS, Orchestrator, Reports, Settings, WhatsApp consolidation, Ratio work, new upstream APIs, Chat→Customer360 materialization correctness (reserved for Session 13.2), Campaign redesign, reconciliation/merge UI.
 
+**Post-deployment correction (same session, 2026-10-03):** manual inspection of the deployed Customer Detail page surfaced two issues that had to be resolved before this session could close — §13 and §14 document both.
+
 ---
 
 ## 2. Files changed
@@ -59,6 +61,7 @@ Verified live against production customer `ab81fbcb-fba5-45f9-8a52-a71f2f0aaaf8`
 ## 4. Activity/Diary implementation (DEC-CUST-02)
 
 - **List + create**: reused the existing `GET`/`POST ?action=activities` routes unchanged. `CustomerActivityPanel` renders a chronological feed (type badge, status badge, title/body, created/due/completed timestamps, creator when supplied) and a type-aware create form (datetime picker only shown for task/reminder/appointment).
+- **Placement — corrected post-deployment**: the panel was initially mounted after Campaign Participation (the last section on the page). Manual review of the deployed page flagged this as effectively unreachable for a customer with a long Interaction History (one verification customer has 79 interactions). Moved to render directly after Identity & Contact / Summary and before Interaction History — see §13.
 - **All five schema-supported activity types** (note, instruction, task, reminder, appointment) are selectable and were each created and verified against live infrastructure (see §11).
 - **Status update — newly exposed**: added `PATCH ?action=activities` (`handleUpdateActivityStatus` in `api/customers/[id]/index.ts`), calling the existing, previously-unreachable `supabaseActivityRepository.updateActivityStatus` → `call_center_activity_update_status` RPC. Allowed transitions are type-aware and match the table's own check constraint and documented resting-state design exactly:
   - `note`: no status lifecycle (UI shows no status control; API rejects an attempted status change with a 400 naming the reason).
@@ -115,7 +118,13 @@ Every new rendered value was traced database/API → repository/server → API/B
   - `GET /api/customers/{id}` for a real customer returned populated `channels`/`authSummary`/`latestAgentId` fields the previous UI never rendered.
   - `GET /api/customers/{id}?action=activities` returned `{"data":[]}` for that customer (clean empty-state baseline).
   - `GET /api/chat/logs` showed several sessions with a non-null `resolvedCustomerLabel` (proving a resolvable link exists server-side) and `customer360Id: undefined` (confirming the field genuinely didn't reach the response pre-deploy).
-- Post-deploy verification performed against the Vercel deployment (see §10/Evidence): activity create (one per supported type), status-update transitions, validation-failure responses, chat `customer360Id` presence, and the Campaign→Customer/Chat→Customer links rendering with real ids.
+- **Post-deploy API verification performed directly against the production deployment** (commit `a35b3e3`, confirmed Ready in Vercel's deployment list), real customer `ab81fbcb-fba5-45f9-8a52-a71f2f0aaaf8`:
+  - `POST ?action=activities` — created one activity of **each of the 5 types** (note, instruction, task, reminder, appointment); each returned the correct default status (note/instruction → `active`, task/reminder/appointment → `open`) and the fields actually submitted, nothing fabricated.
+  - `POST` with a missing `body` and with an invalid `activityType` both correctly returned `400` with a stable, specific `detail` message — validation failure confirmed, not silently accepted.
+  - `PATCH ?action=activities` — transitioned the test task from `open` → `completed`; response showed `status: "completed"` and a populated `completedAt`. A second `PATCH` attempting to change the test note's status correctly returned `400 {"detail":"Activities of type \"note\" have no status lifecycle"}` — the type-aware rejection works.
+  - `GET ?action=activities` on the same customer returned all 5 created rows in strict `createdAt desc` (chronological) order.
+  - `GET ?action=activities` on a **different** real customer (`4b36f976-ad50-444e-9a4d-29b68a816410`) returned `{"data":[]}` — confirms customer isolation; the test activities do not leak across customers.
+  - `GET /api/chat/logs` after deployment showed real, non-`undefined` `customer360Id` values on sessions that already had a resolved `resolvedCustomerLabel` pre-deploy, confirming the Chat→Customer360 plumbing fix reached production.
 - No telephone call was placed at any point in this session, consistent with the environment-context instruction.
 
 ---
@@ -128,7 +137,17 @@ No existing product behavior was intentionally changed. All edits were additive 
 
 ## 11. Deliberately unsupported Activity operation
 
-**Activity deletion is not implemented**, by explicit instruction and confirmed audit finding (no RPC, no repository method, no schema-level soft-delete state exists). Any disposable test activities created during verification remain in the live `customer_activities` table with no supported way to remove them — see the Evidence section for exactly which test rows were created, so a future session (or direct SQL, if the project owner chooses) can account for them.
+**Activity deletion is not implemented**, by explicit instruction and confirmed audit finding (no RPC, no repository method, no schema-level soft-delete state exists). Disposable test activities created during verification remain in the live `customer_activities` table for customer `ab81fbcb-fba5-45f9-8a52-a71f2f0aaaf8` with no supported way to remove them:
+
+| id | activityType | status | body |
+|---|---|---|---|
+| `7b9416e2-5edb-49ba-9306-2ab134738050` | note | active | "Session 13.1 disposable verification note (voice channel customer)" |
+| `2e0c9191-ddea-4378-9ebd-784c7ea435a9` | instruction | active | "Session 13.1 verification instruction" |
+| `1a64f35c-e87d-401a-9e5c-50bd5a7bb84a` | task | completed | "Session 13.1 verification task" |
+| `c8f02156-58a8-4e10-b2f5-57778ff79ffe` | reminder | open | "Session 13.1 verification reminder" |
+| `e9e1a8b3-552e-4867-9f08-eee8f8008ac0` | appointment | open | "Session 13.1 verification appointment" |
+
+All five are clearly labeled `createdBy: "session-13.1-verification"` and their `body` text self-identifies as a verification row, so they are unambiguous to find and account for later (direct SQL, if the project owner chooses, is the only way to remove them in the absence of a delete capability).
 
 ---
 
@@ -138,6 +157,32 @@ No existing product behavior was intentionally changed. All edits were additive 
 - Activity authorization's residual limitation (campaign/interaction-linked activities are not filtered by that link's own agent authorization) — requires the general User Management/RBAC work (`DEC-USER-01`), not addressed here.
 - Customer360's own chat-session materialization pagination parity — the Phase 2/3 "UNRESOLVED EVIDENCE QUESTION" about scoped-role row-dropping remains open; untouched by this session.
 - `customer_external_identities` consumer path — still unresolved evidence, untouched by this session.
+
+---
+
+## 13. Post-deployment correction 1 — Activity/Diary placement
+
+**Report:** manual inspection of the deployed Customer Detail page confirmed `CUST-01`'s additions (Channels used, Authentication, Latest agent, Rec, Escalation) were visible, but Activity/Diary was not found.
+
+**Investigation:** the code was present and correctly wired (`CustomerActivityPanel` was mounted, its hooks/API calls were correct — confirmed by the API-level verification in §9). The actual defect was information architecture: the panel was mounted as the very last section on the page, after Campaign Participation, which itself comes after the full Interaction History table. For the customer inspected (79 visible interactions), this meant scrolling past dozens of table rows before Activity/Diary ever became visible — in practice indistinguishable from "not implemented" during a normal page review.
+
+**Fix:** moved `<CustomerActivityPanel />` in `src/pages/CustomerDetail.tsx` to render immediately after the Identity & Contact section and the summary `MetricStrip`, and before Interaction History. The page's section order is now: Identity & Contact → Summary → **Activity / Diary** → Interaction History → Campaign Participation, matching the hierarchy specified in the correction request. No other section's content, data source, or behavior was changed — this was a pure reorder of an already-built, already-reviewed component instance (confirmed by a second HIG review pass: 0 findings, since no new markup or props were introduced).
+
+## 14. Post-deployment correction 2 — Interaction drill-down failure
+
+**Report:** clicking interaction `444052b7-3eb4-4855-ae86-148859372f9b` in Customer Interaction History produced "Could not load full interaction detail… right now."
+
+**Investigation (traced exactly as requested — row → id/channel → drill-down provider → detail retrieval → underlying API):**
+1. The row's channel was `voice`, so `InteractionLookupDialog` in `CustomerDetail.tsx` took the Voice path: `findCallByPhoneAndId(phoneNumbers, interactionId)` → `fetchCallData({ search: phone, page, page_size }, ...)` → `GET /api/calls/data` → external Voice Partner API.
+2. Fetched the customer's real (unmasked) phone number server-side (`+917019225475`) and called `GET /api/calls/data?search=+917019225475&page=1&page_size=100` directly against the deployed API with an authorized role (`x-user-role: call_center_head`): the target call_id was the **first result on page 1** — the interaction genuinely exists in the live Voice API, with full detail (outcome, transcript, recording URL, everything).
+3. Repeated the identical request with `x-user-role: unauthenticated` (and with no role header at all, which defaults the same way): `total_records: 75` but **`calls: []`** — every row stripped by `api/calls/data.ts`'s server-side category authorization, which filters by `agent_id` against the caller's authorized set and returns nothing for an unauthenticated caller.
+4. Checked `findCallByPhoneAndId`'s call site in `CustomerDetail.tsx`: it called `fetchCallData({ search: phone, page, page_size: LOOKUP_PAGE_SIZE })` with **no `role` argument at all**, which defaults to `'unauthenticated'` inside `callsService.fetchCallData`. This is the exact same bug `CampaignDetail.tsx`'s own `InteractionLookupDialog` hit and fixed previously (its in-code comment describes the identical incident) — `CustomerDetail.tsx`'s copy of the same lookup pattern was never given the equivalent fix.
+
+**Root cause:** application defect (incorrect/missing authorization parameter on an otherwise-correct API call) — **not** a stale/nonexistent upstream interaction, not an ID-mapping error, not a pagination/materialization mismatch, and not a wrong detail provider. The interaction is real, current, and fully retrievable; the lookup simply queried as an unauthenticated caller every time.
+
+**Fix:** `findCallByPhoneAndId` now accepts a `role` parameter and forwards it to `fetchCallData`; `InteractionLookupDialog` now resolves the real session role via `useAuth()` (identical to how `CampaignDetail.tsx` and the rest of this codebase's Customer/Campaign hooks already do it) and passes it through. No new correlation mechanism, no new endpoint — this restores the existing, already-proven phone+ID lookup to actually use the caller's real authorization.
+
+**Post-fix verification:** re-ran the same direct API call with `x-user-role: call_center_head` against the deployed backend and confirmed call `444052b7-3eb4-4855-ae86-148859372f9b` returns full detail (outcome `resolved`, `actual_outcome_code: PROMISE_TO_PAY`, 12-turn `detailed_transcript`, a signed `voice_record_url`) — exactly what `InteractionDetailDialog` needs to render. The fix is deployed as part of this session's final commit; browser-level re-verification of the click path is the one remaining step the project owner or a follow-up check should perform against the live UI, since this session's own verification was API-level (role-correctness is what the bug and fix are both about, and that is fully confirmed).
 
 ---
 

@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FilterPopover } from '@/components/common/FilterPopover';
-import { ArrowLeft, Loader2, Mic, Plus, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Mic, Plus, RefreshCw } from 'lucide-react';
 import { CustomerActivityPanel } from '@/components/customers/CustomerActivityPanel';
 import { ActivityComposerDialog } from '@/components/customers/ActivityComposerDialog';
 import { useCustomerDetail } from '@/hooks/customers/useCustomerDetail';
@@ -42,6 +42,17 @@ const LOOKUP_PAGE_SIZE = 100;
  * the timeline's own default small page.
  */
 const GROUPING_PAGE_SIZE = 500;
+/**
+ * Session 13.6-adjacent fix (user-reported) — Interaction History has no
+ * cap on how many rows it renders at once (it shows the full, already-
+ * fetched `interactions` array), unlike Call Logs/Chat Logs which both
+ * paginate. A customer with dozens of interactions turned this into a
+ * long unbroken scroll. This is a client-side page of the already-loaded
+ * data (not a new server request — GROUPING_PAGE_SIZE above already
+ * fetches the full bounded set in one request), deliberately different
+ * from Call Logs' server-side pagination for that reason.
+ */
+const INTERACTION_HISTORY_PAGE_SIZE = 25;
 
 
 /**
@@ -203,6 +214,7 @@ const CustomerDetail: React.FC = () => {
   const returnTo = resolveDetailOrigin((location.state as DetailNavigationState | null)?.origin, 'customers');
   const [selectedInteraction, setSelectedInteraction] = useState<{ id: string; channel: string } | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
+  const [interactionHistoryPage, setInteractionHistoryPage] = useState(1);
   // Session 13.1.1 — Interaction History's "+ Activity" row action opens
   // the SAME ActivityComposerDialog the Customer-level "Add activity"
   // button uses (addendum §6: one shared form, not two implementations),
@@ -236,6 +248,12 @@ const CustomerDetail: React.FC = () => {
   const interactions = selectedGroup
     ? allInteractions.filter((i) => (i.agentId ?? null) === selectedGroup.agentId && (i.channel === 'chat' ? 'chat' : 'voice') === selectedGroup.channel)
     : allInteractions;
+  const interactionHistoryTotalPages = Math.max(1, Math.ceil(interactions.length / INTERACTION_HISTORY_PAGE_SIZE));
+  const interactionHistoryCurrentPage = Math.min(interactionHistoryPage, interactionHistoryTotalPages);
+  const pagedInteractions = interactions.slice(
+    (interactionHistoryCurrentPage - 1) * INTERACTION_HISTORY_PAGE_SIZE,
+    interactionHistoryCurrentPage * INTERACTION_HISTORY_PAGE_SIZE,
+  );
 
   const campaigns = campaignsQuery.data?.data ?? [];
   // Session 13.1.1 — reused by CustomerActivityPanel to resolve a
@@ -398,12 +416,18 @@ const CustomerDetail: React.FC = () => {
                   <FilterPopover
                     title="Group by Category / Agent / Channel"
                     activeCount={selectedGroup ? 1 : 0}
-                    onClear={() => setSelectedGroup(null)}
+                    onClear={() => {
+                      setSelectedGroup(null);
+                      setInteractionHistoryPage(1);
+                    }}
                   >
                     <GroupedInteractionTree
                       group={grouped}
                       selected={selectedGroup}
-                      onSelect={setSelectedGroup}
+                      onSelect={(group) => {
+                        setSelectedGroup(group);
+                        setInteractionHistoryPage(1);
+                      }}
                       countsAreExhaustive={groupingIsExhaustive}
                       collapsedByDefault
                     />
@@ -442,7 +466,7 @@ const CustomerDetail: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {interactions.map((row) => {
+                      {pagedInteractions.map((row) => {
                         const outcomeVariant =
                           row.outcome === 'escalated' ? 'escalated' : row.outcome === 'resolved' ? 'positive' : 'secondary';
                         return (
@@ -532,6 +556,36 @@ const CustomerDetail: React.FC = () => {
                       })}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {interactions.length > INTERACTION_HISTORY_PAGE_SIZE && (
+                <div className="flex items-center justify-between flex-shrink-0 text-xs text-muted-foreground px-1">
+                  <span role="status" aria-live="polite">
+                    {interactions.length} interaction{interactions.length === 1 ? '' : 's'} · Page{' '}
+                    {interactionHistoryCurrentPage} of {interactionHistoryTotalPages}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      onClick={() => setInteractionHistoryPage((p) => Math.max(1, p - 1))}
+                      disabled={interactionHistoryCurrentPage <= 1}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      onClick={() => setInteractionHistoryPage((p) => Math.min(interactionHistoryTotalPages, p + 1))}
+                      disabled={interactionHistoryCurrentPage >= interactionHistoryTotalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

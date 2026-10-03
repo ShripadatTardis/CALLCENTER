@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { MetricStrip } from '@/components/common/MetricStrip';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
 import { Search, FileText, UserPlus, Loader2 } from 'lucide-react';
 import { useLiveCallData } from '@/hooks/calls/useLiveCallData';
 import { useAgents } from '@/hooks/agents/useAgents';
+import { useAuth } from '@/contexts/AuthContext';
 import { AgentActivityPanel } from '@/components/agents/AgentActivityPanel';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
+import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import { findCallBySidAndPhone } from '@/lib/callLookup';
 import {
   formatDurationExact,
   formatDurationLong,
@@ -22,6 +24,72 @@ import {
   formatStatusLabel,
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
+
+/**
+ * Session 13.5 (DEC-LIVE-01) — the shared InteractionDetailDialog resolved
+ * two ways: the current call object from the live, still-polling `calls`
+ * array when the call is still in the active subset (§10/§11 — this is
+ * what keeps Duration/Sentiment/transcript genuinely live without any
+ * Live-specific detail logic), or, once a selected call disappears from
+ * that subset (completed and rolled off status=active), a single
+ * non-polled lookup by phone+call_sid (the same proven pattern
+ * InitiateCall.tsx/CampaignDetail.tsx already use) so the shared dialog
+ * can reflect real final data if it has materialized yet (§12 — never
+ * fabricated; a graceful "not available yet" state otherwise). Selection
+ * is tracked by stable interactionId + phone, never by a snapshotted
+ * object, so a 4s poll can never close the dialog or swap its contents
+ * under another id.
+ */
+const LiveCallDetailDialog: React.FC<{
+  callId: string;
+  phone: string;
+  liveMatch: Interaction | undefined;
+  onClose: () => void;
+}> = ({ callId, phone, liveMatch, onClose }) => {
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
+  const fallback = useQuery({
+    queryKey: ['live-view', 'completed-call-lookup', callId, phone, role],
+    queryFn: () => findCallBySidAndPhone(phone, callId, role),
+    enabled: !liveMatch,
+  });
+
+  if (liveMatch) {
+    return <InteractionDetailDialog isOpen onClose={onClose} interaction={liveMatch} />;
+  }
+
+  if (fallback.isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+        <div className="bg-card border border-border rounded-lg p-6 flex items-center gap-3 text-sm text-foreground" onClick={(e) => e.stopPropagation()}>
+          <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+          This call just ended — loading final details…
+          <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (fallback.data) {
+    return <InteractionDetailDialog isOpen onClose={onClose} interaction={fallback.data} />;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+        This call has ended and left the active list. Final details are not available yet — it may still be
+        materializing in Call Data.
+        <div className="mt-3">
+          <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /**
  * Session 3: live data via call-data?status=active, polled every 4s
@@ -50,7 +118,8 @@ const LiveView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [intentFilter, setIntentFilter] = useState('all');
-  const [selectedCall, setSelectedCall] = useState<Interaction | null>(null);
+  // Session 13.5 — stable id+phone identity, not a snapshotted Interaction object (§12).
+  const [selected, setSelected] = useState<{ callId: string; phone: string } | null>(null);
 
   const calls = live.data?.interactions ?? [];
   const summary = live.data?.summary;
@@ -263,75 +332,17 @@ const LiveView: React.FC = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-1.5 px-3">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setSelectedCall(call)}>
-                            <FileText className="h-3.5 w-3.5 mr-1" />
-                            View Details
-                          </Button>
-                        </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>Interaction Details - {call.callerName || call.phoneNumber}</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Caller Information</Label>
-                                    <div className="text-sm bg-muted p-3 rounded-lg">
-                                      <p><strong>Name:</strong> {call.callerName || '—'}</p>
-                                      <p><strong>Phone:</strong> {call.phoneNumber}</p>
-                                      <p><strong>Intent:</strong> {call.intent || '—'}</p>
-                                      <p><strong>Channel:</strong> {call.channel}</p>
-                                      <p><strong>Direction:</strong> {call.direction ?? '—'}</p>
-                                    </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Call Details</Label>
-                                    <div className="text-sm bg-muted p-3 rounded-lg">
-                                      <p title={formatDurationExact(call.durationSeconds)}>
-                                        <strong>Duration:</strong> {formatDurationLong(call.durationSeconds)}
-                                      </p>
-                                      <p><strong>Stage:</strong> {call.stage ?? call.status}</p>
-                                      <p><strong>Sentiment:</strong> {formatFractionAsPercent(call.sentimentScore)}</p>
-                                      <p><strong>Agent:</strong> {call.agentDisplayName ?? call.agentId ?? '—'}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-medium">Recent Transcript</Label>
-                                  <div className="bg-muted p-3 rounded-lg text-sm max-h-40 overflow-y-auto space-y-1">
-                                    {call.transcript && call.transcript.length > 0 ? (
-                                      call.transcript.slice(-6).map((entry, i) => (
-                                        <p key={i}>
-                                          <strong>{entry.speaker === 'ai' ? 'AI Agent' : 'Customer'}:</strong> {entry.text}
-                                        </p>
-                                      ))
-                                    ) : (
-                                      <p className="text-muted-foreground">No transcript available yet for this call.</p>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-medium">Call Analysis</Label>
-                                  <div className="bg-muted p-3 rounded-lg text-sm">
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                        <p><strong>Sentiment Trend:</strong> {call.analysis?.sentimentTrend ?? '—'}</p>
-                                        <p><strong>Key Topics:</strong> {call.analysis?.keyTopics?.join(', ') || '—'}</p>
-                                      </div>
-                                      <div>
-                                        <p><strong>Resolution Status:</strong> {call.analysis?.resolutionStatus ?? '—'}</p>
-                                        <p><strong>Confidence Score:</strong> {call.analysis?.confidenceScore !== undefined ? `${call.analysis.confidenceScore}%` : '—'}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </TableCell>
-                      </TableRow>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+                        onClick={() => setSelected({ callId: call.interactionId, phone: call.phoneNumber })}
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1" />
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                   );
                 })}
                   </TableBody>
@@ -368,6 +379,15 @@ const LiveView: React.FC = () => {
               ))}
             </div>
           </div>
+        )}
+
+        {selected && (
+          <LiveCallDetailDialog
+            callId={selected.callId}
+            phone={selected.phone}
+            liveMatch={calls.find((c) => c.interactionId === selected.callId)}
+            onClose={() => setSelected(null)}
+          />
         )}
       </div>
     </Layout>

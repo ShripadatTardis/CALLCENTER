@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /** Throws if there's no valid session or no Call Centre profile — callers decide how to handle that. */
   const fetchProfile = useCallback(async (): Promise<User> => {
-    const res = await request<{ data: MeResponseData }>('/me');
+    const res = await request<{ data: MeResponseData }>('/admin', { query: { resource: 'me' } });
     return toUser(res.data);
   }, []);
 

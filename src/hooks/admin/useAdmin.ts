@@ -5,6 +5,7 @@ import {
   setUserStatus,
   assignUserRole,
   removeUserRole,
+  provisionUser,
   fetchRoles,
   fetchPermissions,
   setRolePermissions,
@@ -46,6 +47,18 @@ export function useSetUserStatus() {
     onSuccess: (_data, { userId }) => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.users });
       void queryClient.invalidateQueries({ queryKey: adminKeys.user(userId) });
+    },
+  });
+}
+
+export function useProvisionUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ email, displayName, roleCode }: { email: string; displayName: string; roleCode: string }) =>
+      provisionUser(email, displayName, roleCode),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.roles });
     },
   });
 }

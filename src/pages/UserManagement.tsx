@@ -3,11 +3,12 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, UserPlus } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { getRoleDisplayName } from '@/lib/auth';
 import { useAdminUsers, useAdminRoles, useSetUserStatus, useAssignUserRole, useRemoveUserRole } from '@/hooks/admin/useAdmin';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AddUserDialog } from '@/components/admin/AddUserDialog';
 
 /**
  * Session 14.1 — real User Management, replacing the sampleUsers
@@ -20,6 +21,7 @@ const UserManagement: React.FC = () => {
   const canManage = hasPermission(currentUser, 'users.manage');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [addUserOpen, setAddUserOpen] = useState(false);
 
   const { data: users, isLoading, isError } = useAdminUsers();
   const { data: roles } = useAdminRoles();
@@ -45,10 +47,17 @@ const UserManagement: React.FC = () => {
               className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
-          {!canManage && (
+          {canManage ? (
+            <Button size="sm" className="h-8" onClick={() => setAddUserOpen(true)}>
+              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+              Add User
+            </Button>
+          ) : (
             <p className="text-xs text-muted-foreground">View-only — your role doesn't include Manage Users.</p>
           )}
         </div>
+
+        <AddUserDialog open={addUserOpen} onOpenChange={setAddUserOpen} roles={roles ?? []} />
 
         {isError && <p className="text-sm text-destructive">Could not load users.</p>}
 
@@ -104,10 +113,15 @@ const UserManagement: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-3 py-2">
-                        <span className={`flex items-center gap-1.5 text-xs ${u.status === 'active' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                          {u.status === 'active' ? 'Active' : 'Inactive'}
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`flex items-center gap-1.5 text-xs ${u.status === 'active' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                            {u.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                          {u.identityStatus === 'pending' && (
+                            <span className="text-[11px] text-amber-500">Invited — pending sign-in</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         <Button

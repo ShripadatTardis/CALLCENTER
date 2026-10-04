@@ -18,6 +18,8 @@ export interface AdminUserSummary {
   status: 'active' | 'inactive';
   roles: string[];
   createdAt: string;
+  /** Session 14.2 — genuinely derived from the Supabase Auth identity's confirmation state, never fabricated. 'unknown' when it couldn't be resolved. */
+  identityStatus: 'pending' | 'confirmed' | 'unknown';
 }
 
 export interface AdminUserDetail extends AdminUserSummary {
@@ -60,6 +62,23 @@ export async function fetchUsers(): Promise<AdminUserSummary[]> {
 
 export async function fetchUserDetail(userId: string): Promise<AdminUserDetail> {
   const res = await request<{ data: AdminUserDetail }>('/admin', { query: { resource: 'users', id: userId } });
+  return res.data;
+}
+
+/**
+ * Session 14.2 — real Administrator-facing provisioning. No password is
+ * ever collected here; the invited person establishes their own via a
+ * genuine Supabase Auth invite email. Throws an ApiError with
+ * `status === 409` (and `.raw.data` = the existing AdminUserDetail) when
+ * a Call Centre user already exists for this email — callers should
+ * handle that distinctly rather than showing a generic failure.
+ */
+export async function provisionUser(email: string, displayName: string, roleCode: string): Promise<AdminUserDetail> {
+  const res = await request<{ data: AdminUserDetail }>('/admin', {
+    method: 'POST',
+    query: { resource: 'users', action: 'provision' },
+    body: { email, displayName, roleCode },
+  });
   return res.data;
 }
 

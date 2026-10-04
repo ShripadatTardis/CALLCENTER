@@ -7,6 +7,7 @@ import {
   assignActionItem,
   setActionItemStatus,
   resolveActionItem,
+  generateActionItems,
   type ActionItem,
   type ActionItemStatus,
 } from '@/services/actions/actionsService';
@@ -60,6 +61,16 @@ export function useSetActionItemStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'open' | 'in_progress' }) => setActionItemStatus(id, status),
     onSuccess: (item) => invalidateActionItem(queryClient, item),
+  });
+}
+
+export function useGenerateActionItems() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => generateActionItems(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['actions', 'list'] });
+    },
   });
 }
 

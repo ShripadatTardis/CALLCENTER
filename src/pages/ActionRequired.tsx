@@ -4,8 +4,10 @@ import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { useAgents } from '@/hooks/agents/useAgents';
-import { useActionItems } from '@/hooks/actions/useActions';
+import { useActionItems, useGenerateActionItems } from '@/hooks/actions/useActions';
 import { actionItemReasonText, type ActionItem, type ActionItemStatus } from '@/services/actions/actionsService';
 import { formatStaleDurationHuman, formatTimestamp } from '@/lib/format';
 import { resolveDetailOrigin, type DetailNavigationState } from '@/lib/detailOrigin';
@@ -39,6 +41,7 @@ const ActionRequired: React.FC = () => {
 
   const { data, isLoading, isError, refetch } = useActionItems(tab);
   const items = data ?? [];
+  const generateMutation = useGenerateActionItems();
 
   const origin = resolveDetailOrigin((location.state as DetailNavigationState | null)?.origin, 'action-required');
 
@@ -55,15 +58,30 @@ const ActionRequired: React.FC = () => {
             <h1 className="text-base font-semibold text-foreground">Action Required</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Human follow-up work items generated from escalated calls, within your Business Data Scope.</p>
           </div>
-          {origin.path !== '/action-required' && (
-            <button
-              type="button"
-              className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline"
-              onClick={() => navigate(origin.path)}
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={generateMutation.isPending}
+              onClick={() =>
+                generateMutation.mutate(undefined, {
+                  onSuccess: (result) => toast.success(`Checked for new escalations — ${result.created} new, ${result.skipped} already tracked.`),
+                  onError: () => toast.error('Could not check for new escalations.'),
+                })
+              }
             >
-              &larr; Back to {origin.label}
-            </button>
-          )}
+              {generateMutation.isPending ? 'Checking…' : 'Check for new escalations'}
+            </Button>
+            {origin.path !== '/action-required' && (
+              <button
+                type="button"
+                className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline"
+                onClick={() => navigate(origin.path)}
+              >
+                &larr; Back to {origin.label}
+              </button>
+            )}
+          </div>
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as ActionItemStatus)}>

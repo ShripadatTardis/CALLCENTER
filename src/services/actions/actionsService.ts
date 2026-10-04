@@ -92,6 +92,20 @@ export async function setActionItemStatus(id: string, status: 'open' | 'in_progr
   return res.data;
 }
 
+/**
+ * Manual on-demand trigger for the same idempotent generation the daily
+ * cron runs — `requirePermission('actions.view')` server-side is
+ * sufficient (generation itself doesn't need `.assign`/`.resolve`). Safe
+ * to click repeatedly: duplicate candidates are a no-op server-side.
+ */
+export async function generateActionItems(): Promise<{ created: number; skipped: number; triggeredBy: string }> {
+  const res = await request<{ data: { created: number; skipped: number; triggeredBy: string } }>('/admin', {
+    method: 'POST',
+    query: { resource: 'actions', action: 'generate' },
+  });
+  return res.data;
+}
+
 export async function resolveActionItem(
   id: string,
   resolutionCode: NonNullable<ActionItem['resolutionCode']>,

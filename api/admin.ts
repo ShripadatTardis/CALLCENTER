@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore, methodNotAllowed } from './_voicebot.js';
-import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent } from './_auth.js';
+import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent, toAgentAccess } from './_auth.js';
+import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulationFetcher.js';
 
 /**
  * /api/admin — Session 14.1 User Management / Role Management / Audit
@@ -27,6 +28,15 @@ import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAu
  * Session 14.3 adds the Business Data Scope actions (setAgentScope,
  * setCustomerCategoryScope) and the customerCategories read, alongside
  * the existing Session 14.1 functional-permission actions.
+ *
+ * Session 15 adds the Action Required work-item queue, same reason
+ * (zero function-count headroom — see the 12-function note above):
+ *
+ *   GET  /api/admin?resource=actions[&status=open|in_progress|resolved]
+ *   GET  /api/admin?resource=actions&action=get&id=...
+ *   GET  /api/admin?resource=actions&action=eligibleAssignees&id=...
+ *   GET  /api/admin?resource=actions&action=generate   (scheduler only — CRON_SECRET bearer)
+ *   POST /api/admin?resource=actions&action=assign|takeOwnership|setStatus|resolve|generate
  */
 
 function queryStr(req: VercelRequest, key: string): string | undefined {
@@ -385,6 +395,216 @@ async function handleAuditGet(req: VercelRequest, res: VercelResponse): Promise<
   res.status(200).json({ data });
 }
 
+/**
+ * Session 15 — Action Required work-item queue. v1's only enforceable
+ * scope dimension is Agent Scope (customer_id is a genuinely unpopulated
+ * snapshot column today — see the migration's header note), so every
+ * RPC call here only ever passes the agent-scope pair.
+ */
+export function toActionScopeArgs(access: ReturnType<typeof toAgentAccess>): { allAgents: boolean; authorizedAgentIds: string[] } {
+  const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+  return { allAgents, authorizedAgentIds: allAgents ? [] : (access.authorizedAgentIds as string[]) };
+}
+
+/**
+ * Maps the RPCs' `raise exception '<code>'` messages to the right HTTP
+ * status — 404 for "doesn't exist", 403 for a real authorization denial,
+ * 422 for a client-supplied value that's simply invalid. Anything
+ * unrecognized falls back to 500 rather than guessing.
+ */
+export function mapActionItemError(message: string): number {
+  if (/action_item_not_found/.test(message)) return 404;
+  if (/assignment_not_permitted|ownership_required/.test(message)) return 403;
+  if (/assignee_inactive_or_not_found|assignee_out_of_scope|invalid_status_transition/.test(message)) return 422;
+  return 500;
+}
+
+/**
+ * Session 15 — the deliberate anti-flood bootstrap window (plan §11):
+ * only escalated calls within this rolling lookback are eligible for
+ * generation, so old escalated test calls from early sessions don't
+ * suddenly populate the queue. 30 days is the working default (see
+ * docs/SESSION_15_DASHBOARD_ACTION_REQUIRED.md for the rationale).
+ */
+const ACTION_ITEM_BOOTSTRAP_WINDOW_DAYS = 30;
+
+export function actionItemBootstrapWindow(days: number = ACTION_ITEM_BOOTSTRAP_WINDOW_DAYS): { dateFrom: string; dateTo: string } {
+  const now = new Date();
+  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { dateFrom: iso(from), dateTo: iso(now) };
+}
+
+/**
+ * The only genuine, currently-populated "why does this need attention"
+ * signal (see the migration header / session doc): escalated voice
+ * calls, within the bootstrap window. The RPC itself never calls the
+ * Voice API — this function does the fetch, the RPC does the idempotent
+ * persist, same fetch/persist separation api/campaigns.ts's reconcile
+ * path already uses.
+ */
+async function runActionItemsGeneration(actor: { actorType: 'user' | 'system'; actorUserId: string | null }): Promise<{ created: number; skipped: number }> {
+  const { dateFrom, dateTo } = actionItemBootstrapWindow();
+  const population = await fetchCompleteCallPopulation({ outcome: 'escalated', dateFrom, dateTo }, 5, 100);
+  const candidates = population.calls.map((c) => ({
+    sourceInteractionId: c.call_id,
+    agentId: c.ai_agent_id || c.agent_id || null,
+    reasonText: c.escalation_trigger || null,
+  }));
+
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase.rpc('call_center_action_items_generate', {
+    p_candidates: candidates,
+    p_actor_type: actor.actorType,
+    p_actor_user_id: actor.actorUserId,
+  });
+  if (error) throw new Error(error.message);
+  return data as { created: number; skipped: number };
+}
+
+/**
+ * Vercel Cron only issues GET and can't set custom headers — same
+ * narrow scheduler-adapter pattern already proven by api/campaigns.ts
+ * and api/customers/admin.ts (deliberately duplicated, not imported;
+ * both are tiny and self-contained).
+ */
+function isAuthorizedActionsCronRequest(req: VercelRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return req.headers.authorization === `Bearer ${secret}`;
+}
+
+async function handleActionsGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = queryStr(req, 'action');
+
+  if (action === 'generate') {
+    if (!isAuthorizedActionsCronRequest(req)) {
+      res.status(401).json({ detail: 'Invalid or missing cron authorization' });
+      return;
+    }
+    try {
+      const result = await runActionItemsGeneration({ actorType: 'system', actorUserId: null });
+      res.status(200).json({ data: { triggeredBy: 'cron', ...result } });
+    } catch (err) {
+      res.status(502).json({ detail: err instanceof Error ? err.message : 'Generation failed' });
+    }
+    return;
+  }
+
+  if (action === 'eligibleAssignees') {
+    const user = await requirePermission(req, res, 'actions.resolve');
+    if (!user) return;
+    const id = queryStr(req, 'id');
+    if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_action_items_eligible_assignees', { p_id: id });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  const user = await requirePermission(req, res, 'actions.view');
+  if (!user) return;
+  const { allAgents, authorizedAgentIds } = toActionScopeArgs(toAgentAccess(user));
+  const supabase = getServiceRoleClient();
+
+  if (action === 'get') {
+    const id = queryStr(req, 'id');
+    if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_action_items_get', {
+      p_id: id, p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    if (!data) { res.status(404).json({ detail: 'Action item not found' }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  const status = queryStr(req, 'status') ?? null;
+  const { data, error } = await supabase.rpc('call_center_action_items_list', {
+    p_status: status, p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+  });
+  if (error) { res.status(500).json({ detail: error.message }); return; }
+  res.status(200).json({ data });
+}
+
+/**
+ * assign/takeOwnership/setStatus/resolve all require at least
+ * `actions.resolve` — the floor that lets anyone take unassigned work.
+ * `actorHasManageAny` (true only when the caller also holds
+ * `actions.assign`) is passed through to the RPC, which re-enforces the
+ * ownership rule itself rather than trusting this flag blindly from the
+ * route (plan §7 — Functional Permission + Business Data Scope + Work
+ * Ownership, never a role-name check).
+ */
+async function handleActionsPost(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = queryStr(req, 'action');
+
+  if (action === 'generate') {
+    const user = await requirePermission(req, res, 'actions.view');
+    if (!user) return;
+    try {
+      const result = await runActionItemsGeneration({ actorType: 'user', actorUserId: user.id });
+      res.status(200).json({ data: { triggeredBy: 'manual', ...result } });
+    } catch (err) {
+      res.status(502).json({ detail: err instanceof Error ? err.message : 'Generation failed' });
+    }
+    return;
+  }
+
+  const actingUser = await requirePermission(req, res, 'actions.resolve');
+  if (!actingUser) return;
+  const actorHasManageAny = actingUser.permissions.includes('actions.assign');
+  const supabase = getServiceRoleClient();
+
+  if (action === 'assign' || action === 'takeOwnership') {
+    const body = (req.body ?? {}) as { id?: string; assigneeUserId?: string };
+    const id = body.id;
+    const assigneeUserId = action === 'takeOwnership' ? actingUser.id : body.assigneeUserId;
+    if (typeof id !== 'string' || typeof assigneeUserId !== 'string') {
+      res.status(422).json({ detail: 'id (and assigneeUserId for assign) are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_action_items_assign', {
+      p_id: id, p_assignee_user_id: assigneeUserId, p_actor_user_id: actingUser.id, p_actor_has_manage_any: actorHasManageAny,
+    });
+    if (error) { res.status(mapActionItemError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'setStatus') {
+    const { id, status } = (req.body ?? {}) as { id?: string; status?: string };
+    if (typeof id !== 'string' || typeof status !== 'string') {
+      res.status(422).json({ detail: 'id and status are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_action_items_set_status', {
+      p_id: id, p_status: status, p_actor_user_id: actingUser.id, p_actor_has_manage_any: actorHasManageAny,
+    });
+    if (error) { res.status(mapActionItemError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'resolve') {
+    const { id, resolutionCode, resolutionNote } = (req.body ?? {}) as { id?: string; resolutionCode?: string; resolutionNote?: string };
+    if (typeof id !== 'string' || typeof resolutionCode !== 'string') {
+      res.status(422).json({ detail: 'id and resolutionCode are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_action_items_resolve', {
+      p_id: id, p_resolution_code: resolutionCode, p_resolution_note: resolutionNote?.trim() || null,
+      p_actor_user_id: actingUser.id, p_actor_has_manage_any: actorHasManageAny,
+    });
+    if (error) { res.status(mapActionItemError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -427,5 +647,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, or audit' });
+  if (resource === 'actions') {
+    if (req.method === 'GET') { await handleActionsGet(req, res); return; }
+    if (req.method === 'POST') { await handleActionsPost(req, res); return; }
+    methodNotAllowed(res, ['GET', 'POST']);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, or actions' });
 });

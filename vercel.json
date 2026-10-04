@@ -15,6 +15,10 @@
     {
       "path": "/api/campaigns?action=reconcile&limit=25",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/admin?resource=actions&action=generate",
+      "schedule": "15 4 * * *"
     }
   ]
 }

@@ -32,6 +32,7 @@ import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
 import RoleManagement from "./pages/RoleManagement";
 import AuditTrail from "./pages/AuditTrail";
+import ActionRequired from "./pages/ActionRequired";
 import Settings from "./pages/Settings";
 import WhatsAppAuthenticate from "./pages/WhatsAppAuthenticate";
 import Orchestrator from "./pages/Orchestrator";
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/whatsapp-authenticate" element={<WhatsAppAuthenticate />} />
           <Route path="/dashboard" element={<ProtectedRoute permission="dashboard.view"><Dashboard /></ProtectedRoute>} />
           <Route path="/initiate-call" element={<ProtectedRoute permission="calls.initiate"><InitiateCall /></ProtectedRoute>} />
+          <Route path="/action-required" element={<ProtectedRoute permission="actions.view"><ActionRequired /></ProtectedRoute>} />
           <Route path="/call-logs" element={<ProtectedRoute permission="calls.view"><CallLogs /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute permission="customers.view"><Customers /></ProtectedRoute>} />
           <Route path="/customers/:customerId" element={<ProtectedRoute permission="customers.view"><CustomerDetail /></ProtectedRoute>} />

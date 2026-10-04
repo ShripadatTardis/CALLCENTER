@@ -57,7 +57,15 @@ async function getAuthenticatedUser(req) {
     displayName: identity.displayName,
     status: identity.status,
     roles: identity.roles,
-    permissions: identity.permissions
+    permissions: identity.permissions,
+    dataScope: identity.dataScope
+  };
+}
+function toAgentAccess(user) {
+  return {
+    role: user.id,
+    allCategories: user.dataScope.allAgents,
+    authorizedAgentIds: user.dataScope.allAgents ? "all" : user.dataScope.agentIds
   };
 }
 function evaluatePermission(user, permissionKey) {
@@ -95,6 +103,67 @@ async function recordAuditEvent(params) {
     });
   } catch {
   }
+}
+
+// src/server/analytics/callPopulationFetcher.ts
+var DEFAULT_PAGE_SIZE = 100;
+var DEFAULT_MAX_PAGES = 30;
+var CallDataFetchError = class extends Error {
+  kind;
+  status;
+  constructor(kind, message, status = null) {
+    super(message);
+    this.name = "CallDataFetchError";
+    this.kind = kind;
+    this.status = status;
+  }
+};
+async function fetchCallDataPage(filters, page, pageSize) {
+  const baseUrl = process.env.VOICEBOT_BASE_URL;
+  const apiKey = process.env.VOICEBOT_API_KEY;
+  if (!baseUrl || !apiKey) {
+    throw new CallDataFetchError("unavailable", "VOICEBOT_BASE_URL / VOICEBOT_API_KEY are not configured on the server");
+  }
+  const query = {
+    status: "inactive",
+    page: String(page),
+    page_size: String(pageSize)
+  };
+  if (filters.dateFrom) query.date_from = filters.dateFrom;
+  if (filters.dateTo) query.date_to = filters.dateTo;
+  if (filters.direction) query.direction = filters.direction;
+  if (filters.outcome) query.outcome = filters.outcome;
+  const search = new URLSearchParams(query).toString();
+  let res;
+  try {
+    res = await fetch(`${baseUrl}/api/v1/call-data?${search}`, { headers: { "X-API-Key": apiKey } });
+  } catch {
+    throw new CallDataFetchError("unavailable", "Call Centre could not be reached.");
+  }
+  if (!res.ok) {
+    const kind = res.status >= 400 && res.status < 500 ? "rejected" : "unavailable";
+    throw new CallDataFetchError(kind, `call-data request failed: ${res.status}`, res.status);
+  }
+  return await res.json();
+}
+async function fetchCompleteCallPopulation(filters, maxPages = DEFAULT_MAX_PAGES, pageSize = DEFAULT_PAGE_SIZE) {
+  const calls = [];
+  let trueTotalRecords = 0;
+  let capped = false;
+  for (let page = 1; page <= maxPages; page++) {
+    const dto = await fetchCallDataPage(filters, page, pageSize);
+    calls.push(...dto.data.calls ?? []);
+    trueTotalRecords = dto.data.pagination?.total_records ?? calls.length;
+    const totalPages = dto.data.pagination?.total_pages ?? page;
+    if (page >= totalPages) {
+      capped = false;
+      break;
+    }
+    if (page === maxPages) {
+      capped = true;
+    }
+  }
+  return { calls, trueTotalRecords, capped };
 }
 
 // api/admin.ts
@@ -333,13 +402,13 @@ async function handleRolesPost(req, res) {
   const actingUser = await requirePermission(req, res, "roles.manage");
   if (!actingUser) return;
   const action = queryStr(req, "action");
+  const supabase = getServiceRoleClient();
   if (action === "setPermissions") {
     const { roleCode, permissionKeys } = req.body ?? {};
     if (typeof roleCode !== "string" || !Array.isArray(permissionKeys)) {
       res.status(422).json({ detail: "roleCode and permissionKeys (array) are required" });
       return;
     }
-    const supabase = getServiceRoleClient();
     const { data, error } = await supabase.rpc("call_center_roles_set_permissions", {
       p_role_code: roleCode,
       p_permission_keys: permissionKeys,
@@ -352,7 +421,56 @@ async function handleRolesPost(req, res) {
     res.status(200).json({ data });
     return;
   }
+  if (action === "setAgentScope") {
+    const { roleCode, allAgents, agentIds } = req.body ?? {};
+    if (typeof roleCode !== "string" || typeof allAgents !== "boolean" || !Array.isArray(agentIds)) {
+      res.status(422).json({ detail: "roleCode, allAgents (boolean), and agentIds (array) are required" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_roles_set_agent_scope", {
+      p_role_code: roleCode,
+      p_all_agents: allAgents,
+      p_agent_ids: agentIds,
+      p_actor_user_id: actingUser.id
+    });
+    if (error) {
+      res.status(500).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data });
+    return;
+  }
+  if (action === "setCustomerCategoryScope") {
+    const { roleCode, allCategories, categoryIds } = req.body ?? {};
+    if (typeof roleCode !== "string" || typeof allCategories !== "boolean" || !Array.isArray(categoryIds)) {
+      res.status(422).json({ detail: "roleCode, allCategories (boolean), and categoryIds (array) are required" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_roles_set_customer_category_scope", {
+      p_role_code: roleCode,
+      p_all_categories: allCategories,
+      p_category_ids: categoryIds,
+      p_actor_user_id: actingUser.id
+    });
+    if (error) {
+      res.status(500).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data });
+    return;
+  }
   res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+async function handleCustomerCategoriesGet(req, res) {
+  const user = await requirePermission(req, res, "roles.view");
+  if (!user) return;
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase.rpc("call_center_customer_categories_list");
+  if (error) {
+    res.status(500).json({ detail: error.message });
+    return;
+  }
+  res.status(200).json({ data });
 }
 async function handleAuditGet(req, res) {
   const user = await requirePermission(req, res, "audit.view");
@@ -372,6 +490,194 @@ async function handleAuditGet(req, res) {
     return;
   }
   res.status(200).json({ data });
+}
+function toActionScopeArgs(access) {
+  const allAgents = access.allCategories || access.authorizedAgentIds === "all";
+  return { allAgents, authorizedAgentIds: allAgents ? [] : access.authorizedAgentIds };
+}
+function mapActionItemError(message) {
+  if (/action_item_not_found/.test(message)) return 404;
+  if (/assignment_not_permitted|ownership_required/.test(message)) return 403;
+  if (/assignee_inactive_or_not_found|assignee_out_of_scope|invalid_status_transition/.test(message)) return 422;
+  return 500;
+}
+var ACTION_ITEM_BOOTSTRAP_WINDOW_DAYS = 30;
+function actionItemBootstrapWindow(days = ACTION_ITEM_BOOTSTRAP_WINDOW_DAYS) {
+  const now = /* @__PURE__ */ new Date();
+  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1e3);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return { dateFrom: iso(from), dateTo: iso(now) };
+}
+async function runActionItemsGeneration(actor) {
+  const { dateFrom, dateTo } = actionItemBootstrapWindow();
+  const population = await fetchCompleteCallPopulation({ outcome: "escalated", dateFrom, dateTo }, 5, 100);
+  const candidates = population.calls.map((c) => ({
+    sourceInteractionId: c.call_id,
+    agentId: c.ai_agent_id || c.agent_id || null,
+    reasonText: c.escalation_trigger || null
+  }));
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase.rpc("call_center_action_items_generate", {
+    p_candidates: candidates,
+    p_actor_type: actor.actorType,
+    p_actor_user_id: actor.actorUserId
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+function isAuthorizedActionsCronRequest(req) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return req.headers.authorization === `Bearer ${secret}`;
+}
+async function handleActionsGet(req, res) {
+  const action = queryStr(req, "action");
+  if (action === "generate") {
+    if (!isAuthorizedActionsCronRequest(req)) {
+      res.status(401).json({ detail: "Invalid or missing cron authorization" });
+      return;
+    }
+    try {
+      const result = await runActionItemsGeneration({ actorType: "system", actorUserId: null });
+      res.status(200).json({ data: { triggeredBy: "cron", ...result } });
+    } catch (err) {
+      res.status(502).json({ detail: err instanceof Error ? err.message : "Generation failed" });
+    }
+    return;
+  }
+  if (action === "eligibleAssignees") {
+    const user2 = await requirePermission(req, res, "actions.resolve");
+    if (!user2) return;
+    const id = queryStr(req, "id");
+    if (!id) {
+      res.status(422).json({ detail: "id is required" });
+      return;
+    }
+    const supabase2 = getServiceRoleClient();
+    const { data: data2, error: error2 } = await supabase2.rpc("call_center_action_items_eligible_assignees", { p_id: id });
+    if (error2) {
+      res.status(500).json({ detail: error2.message });
+      return;
+    }
+    res.status(200).json({ data: data2 });
+    return;
+  }
+  const user = await requirePermission(req, res, "actions.view");
+  if (!user) return;
+  const { allAgents, authorizedAgentIds } = toActionScopeArgs(toAgentAccess(user));
+  const supabase = getServiceRoleClient();
+  if (action === "get") {
+    const id = queryStr(req, "id");
+    if (!id) {
+      res.status(422).json({ detail: "id is required" });
+      return;
+    }
+    const { data: data2, error: error2 } = await supabase.rpc("call_center_action_items_get", {
+      p_id: id,
+      p_all_agents: allAgents,
+      p_authorized_agent_ids: authorizedAgentIds
+    });
+    if (error2) {
+      res.status(500).json({ detail: error2.message });
+      return;
+    }
+    if (!data2) {
+      res.status(404).json({ detail: "Action item not found" });
+      return;
+    }
+    res.status(200).json({ data: data2 });
+    return;
+  }
+  const status = queryStr(req, "status") ?? null;
+  const { data, error } = await supabase.rpc("call_center_action_items_list", {
+    p_status: status,
+    p_all_agents: allAgents,
+    p_authorized_agent_ids: authorizedAgentIds
+  });
+  if (error) {
+    res.status(500).json({ detail: error.message });
+    return;
+  }
+  res.status(200).json({ data });
+}
+async function handleActionsPost(req, res) {
+  const action = queryStr(req, "action");
+  if (action === "generate") {
+    const user = await requirePermission(req, res, "actions.view");
+    if (!user) return;
+    try {
+      const result = await runActionItemsGeneration({ actorType: "user", actorUserId: user.id });
+      res.status(200).json({ data: { triggeredBy: "manual", ...result } });
+    } catch (err) {
+      res.status(502).json({ detail: err instanceof Error ? err.message : "Generation failed" });
+    }
+    return;
+  }
+  const actingUser = await requirePermission(req, res, "actions.resolve");
+  if (!actingUser) return;
+  const actorHasManageAny = actingUser.permissions.includes("actions.assign");
+  const supabase = getServiceRoleClient();
+  if (action === "assign" || action === "takeOwnership") {
+    const body = req.body ?? {};
+    const id = body.id;
+    const assigneeUserId = action === "takeOwnership" ? actingUser.id : body.assigneeUserId;
+    if (typeof id !== "string" || typeof assigneeUserId !== "string") {
+      res.status(422).json({ detail: "id (and assigneeUserId for assign) are required" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_action_items_assign", {
+      p_id: id,
+      p_assignee_user_id: assigneeUserId,
+      p_actor_user_id: actingUser.id,
+      p_actor_has_manage_any: actorHasManageAny
+    });
+    if (error) {
+      res.status(mapActionItemError(error.message)).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data });
+    return;
+  }
+  if (action === "setStatus") {
+    const { id, status } = req.body ?? {};
+    if (typeof id !== "string" || typeof status !== "string") {
+      res.status(422).json({ detail: "id and status are required" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_action_items_set_status", {
+      p_id: id,
+      p_status: status,
+      p_actor_user_id: actingUser.id,
+      p_actor_has_manage_any: actorHasManageAny
+    });
+    if (error) {
+      res.status(mapActionItemError(error.message)).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data });
+    return;
+  }
+  if (action === "resolve") {
+    const { id, resolutionCode, resolutionNote } = req.body ?? {};
+    if (typeof id !== "string" || typeof resolutionCode !== "string") {
+      res.status(422).json({ detail: "id and resolutionCode are required" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_action_items_resolve", {
+      p_id: id,
+      p_resolution_code: resolutionCode,
+      p_resolution_note: resolutionNote?.trim() || null,
+      p_actor_user_id: actingUser.id,
+      p_actor_has_manage_any: actorHasManageAny
+    });
+    if (error) {
+      res.status(mapActionItemError(error.message)).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data });
+    return;
+  }
+  res.status(400).json({ detail: `Unknown action: ${action}` });
 }
 var admin_default = withErrorBoundary(async (req, res) => {
   noStore(res);
@@ -416,6 +722,14 @@ var admin_default = withErrorBoundary(async (req, res) => {
     await handlePermissionsGet(req, res);
     return;
   }
+  if (resource === "customerCategories") {
+    if (req.method !== "GET") {
+      methodNotAllowed(res, ["GET"]);
+      return;
+    }
+    await handleCustomerCategoriesGet(req, res);
+    return;
+  }
   if (resource === "audit") {
     if (req.method !== "GET") {
       methodNotAllowed(res, ["GET"]);
@@ -424,9 +738,24 @@ var admin_default = withErrorBoundary(async (req, res) => {
     await handleAuditGet(req, res);
     return;
   }
-  res.status(400).json({ detail: "Unknown or missing ?resource= \u2014 use me, users, roles, permissions, or audit" });
+  if (resource === "actions") {
+    if (req.method === "GET") {
+      await handleActionsGet(req, res);
+      return;
+    }
+    if (req.method === "POST") {
+      await handleActionsPost(req, res);
+      return;
+    }
+    methodNotAllowed(res, ["GET", "POST"]);
+    return;
+  }
+  res.status(400).json({ detail: "Unknown or missing ?resource= \u2014 use me, users, roles, permissions, audit, or actions" });
 });
 export {
+  actionItemBootstrapWindow,
   admin_default as default,
-  getAppOrigin
+  getAppOrigin,
+  mapActionItemError,
+  toActionScopeArgs
 };

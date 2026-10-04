@@ -19,6 +19,7 @@ import {
   Percent,
   KeyRound,
   ScrollText,
+  ListChecks,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -66,6 +67,7 @@ export const PILLARS: Pillar[] = [
     blurb: 'Intervene in AI operations',
     items: [
       { name: 'Initiate Call', href: '/initiate-call', icon: Phone, permission: 'calls.initiate' },
+      { name: 'Action Required', href: '/action-required', icon: ListChecks, permission: 'actions.view' },
       // Session 14.1 — no dedicated "send chat" permission exists in the
       // finalized vocabulary (the real capability inventory only
       // surfaced customers.activity.* and calls.initiate as genuine

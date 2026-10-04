@@ -34,13 +34,15 @@ const AuditTrail: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <div>
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern A, same recipe as CallLogs.tsx. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <div className="flex-shrink-0">
           <h1 className="text-base font-semibold text-foreground">Audit Trail</h1>
           <p className="text-xs text-muted-foreground mt-0.5">Security and operationally significant actions — who did what, when, and whether it succeeded.</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           <Input
             placeholder="Filter by action…"
             value={actionFilter}
@@ -70,9 +72,9 @@ const AuditTrail: React.FC = () => {
           </Select>
         </div>
 
-        {isError && <p className="text-sm text-destructive">Could not load the audit trail.</p>}
+        {isError && <p className="text-sm text-destructive flex-shrink-0">Could not load the audit trail.</p>}
 
-        <div className="rounded-md border border-border overflow-x-auto">
+        <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">

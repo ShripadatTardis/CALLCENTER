@@ -37,7 +37,9 @@ const Analytics: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern B: root is the single scroll region. */}
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
         <AnalyticsTimeWindowControl query={query} onChange={setQuery} />
 
         <Tabs defaultValue="overview">

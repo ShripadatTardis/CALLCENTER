@@ -19,7 +19,9 @@ const Ratios: React.FC = () => {
   const fromDashboard = (location.state as DetailNavigationState | null)?.origin === 'dashboard';
   return (
     <Layout>
-      <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern B: root is the single scroll region. */}
+      <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-3 text-foreground">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-base font-semibold text-foreground">Ratios</h1>

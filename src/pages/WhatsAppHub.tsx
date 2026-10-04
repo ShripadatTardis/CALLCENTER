@@ -6,7 +6,8 @@ import { WhatsAppDashboard } from '@/components/whatsapp/WhatsAppDashboard';
 const WhatsAppHub: React.FC = () => {
   return (
     <Layout>
-      <div className="bg-background min-h-full p-3">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) — Pattern B. */}
+      <div className="bg-background h-full min-h-0 overflow-y-auto p-3">
         <WhatsAppDashboard />
       </div>
     </Layout>

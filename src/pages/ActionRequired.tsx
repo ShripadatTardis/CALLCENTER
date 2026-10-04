@@ -52,8 +52,12 @@ const ActionRequired: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern A: root fills Layout's main height as a flex column;
+          header/tab-list stay flex-shrink-0; the item list is the single
+          flex-1 min-h-0 overflow-auto region. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-shrink-0">
           <div>
             <h1 className="text-base font-semibold text-foreground">Action Required</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Human follow-up work items generated from escalated calls, within your Business Data Scope.</p>
@@ -84,13 +88,13 @@ const ActionRequired: React.FC = () => {
           </div>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as ActionItemStatus)}>
-          <TabsList>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as ActionItemStatus)} className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="flex-shrink-0">
             <TabsTrigger value="open">Open</TabsTrigger>
             <TabsTrigger value="in_progress">In Progress</TabsTrigger>
             <TabsTrigger value="resolved">Resolved</TabsTrigger>
           </TabsList>
-          <TabsContent value={tab} className="mt-2">
+          <TabsContent value={tab} className="mt-2 flex-1 min-h-0 overflow-auto">
             {isLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

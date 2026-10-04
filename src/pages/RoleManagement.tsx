@@ -47,8 +47,12 @@ const RoleManagement: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <div>
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern A: root fills Layout's main height as a flex column; role
+          cards + the optional expanded Data Scope editor are flex-shrink-0;
+          the permission matrix alone is flex-1 min-h-0 overflow-auto. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <div className="flex-shrink-0">
           <h1 className="text-base font-semibold text-foreground">Role Management</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {canManage
@@ -62,8 +66,8 @@ const RoleManagement: React.FC = () => {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <>
-            <div className="space-y-2">
+          <div className="flex-1 min-h-0 flex flex-col gap-3">
+            <div className="space-y-2 flex-shrink-0">
               <div className="flex flex-wrap gap-2">
                 {(roles ?? []).map((r) => {
                   const isExpanded = expandedRole === r.code;
@@ -98,7 +102,7 @@ const RoleManagement: React.FC = () => {
               })()}
             </div>
 
-            <div className="rounded-md border border-border overflow-x-auto">
+            <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
@@ -152,7 +156,7 @@ const RoleManagement: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          </>
+          </div>
         )}
       </div>
     </Layout>

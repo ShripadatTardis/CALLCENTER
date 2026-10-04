@@ -163,7 +163,8 @@ const Reports: React.FC = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) — Pattern B. */}
+      <div className="h-full min-h-0 overflow-y-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{industryName} Reports</h1>

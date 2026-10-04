@@ -6,7 +6,8 @@ import { FormattingHub as FormattingHubComponent } from '@/components/formatting
 const FormattingHub: React.FC = () => {
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) — Pattern B. */}
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground">
         <FormattingHubComponent />
       </div>
     </Layout>

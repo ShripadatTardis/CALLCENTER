@@ -189,18 +189,15 @@ function currentResultBadgeVariant(target: CustomerCampaignRow): 'positive' | 'e
 }
 
 /**
- * Session 11.5B — L1 note: this page keeps ordinary page-level scroll
- * (min-h-full) rather than a single strict zero-delta L1 region. Unlike
- * Customer Index (a genuinely unbounded, backend-record-count-driven
- * list — L1 required and implemented there), Customer Detail's own
- * interaction/campaign volume per customer is bounded in practice
- * (max ~566 interactions across ALL 26 customers combined, and campaign
- * participation is a handful of rows per customer per §12 of the
- * Session 11.5 review). Forcing a single shared scroll region across
- * four independent sections would need a tabbed/panel redesign larger
- * than this session's scope (§17's "document the deviation" escape
- * hatch) — the compact sections below already avoid the "long CRM
- * profile page" failure mode the standard is actually guarding against.
+ * Session 11.5B — L1 note: this page deliberately avoided a multi-pane
+ * split-scroll (Pattern A) redesign since its interaction/campaign
+ * volume per customer is bounded in practice. Superseded in part by the
+ * app-wide viewport-framing correction (follow-up to Session 15): the
+ * page root is now still the single scroll region (Pattern B — not a
+ * Pattern A multi-section split, so the original reasoning above still
+ * holds for *that* choice), but it now scrolls WITHIN Layout's `<main>`
+ * (`h-full min-h-0 overflow-y-auto`) instead of growing the browser
+ * document — the actual bug the app-wide correction fixes.
  */
 const CustomerDetail: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
@@ -271,7 +268,7 @@ const CustomerDetail: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-2">
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-2">
         <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back to {returnTo.label}

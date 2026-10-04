@@ -37,8 +37,10 @@ const UserManagement: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern A, same recipe as CallLogs.tsx. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2 flex-shrink-0">
           <div className="relative w-64">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
             <Input
@@ -60,9 +62,9 @@ const UserManagement: React.FC = () => {
 
         <AddUserDialog open={addUserOpen} onOpenChange={setAddUserOpen} roles={roles ?? []} />
 
-        {isError && <p className="text-sm text-destructive">Could not load users.</p>}
+        {isError && <p className="text-sm text-destructive flex-shrink-0">Could not load users.</p>}
 
-        <div className="rounded-md border border-border overflow-x-auto">
+        <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">

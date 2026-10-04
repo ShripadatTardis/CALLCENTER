@@ -28,8 +28,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* min-w-0 is required on a flex child that contains wide content
               (grids, tables) — without it, flex items refuse to shrink below
               their content's intrinsic width, and the whole page overflows
-              horizontally instead of scrolling within `main`. */}
-          <main className="flex-1 min-w-0 overflow-auto bg-background">
+              horizontally instead of scrolling within `main`.
+
+              App-wide viewport-framing correction (follow-up to Session 15):
+              min-h-0 is the equivalent fix for the vertical axis — without
+              it, a flex child's default min-height:auto lets `main` grow
+              past its allotted height to fit tall page content instead of
+              clipping+scrolling it, which pushes the whole `h-screen` shell
+              past 100vh and the BROWSER document scrolls (confirmed root
+              cause of the reported bug). Every page's own root div is still
+              responsible for being a well-behaved flex child in turn (see
+              the "L1"/Pattern A/B conventions in CallLogs.tsx etc.) — this
+              is the one missing ancestor-level guarantee that makes that
+              page-level contract reliable instead of accidental. */}
+          <main className="flex-1 min-w-0 min-h-0 overflow-auto bg-background">
             {children}
           </main>
         </div>

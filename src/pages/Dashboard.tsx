@@ -186,7 +186,10 @@ const Dashboard: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-3 space-y-2">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern B: root is the single scroll region (Sidebar/ContextBar
+          chrome stays pinned via Layout's own h-full min-h-0 main). */}
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-3 space-y-2">
         {(recent.isError || agents.isError) && (
           <QueryErrorBanner
             error={recent.error ?? agents.error}

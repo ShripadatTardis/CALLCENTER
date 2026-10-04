@@ -56,7 +56,7 @@ const RatioExplorer: React.FC = () => {
   if (!ratioId || !definition) {
     return (
       <Layout>
-        <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
+        <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-3 text-foreground">
           <Button variant="outline" size="sm" onClick={() => navigate('/ratios')}>
             ← All Ratios
           </Button>
@@ -72,7 +72,9 @@ const RatioExplorer: React.FC = () => {
 
   return (
     <Layout>
-      <div className="min-h-full bg-background p-4 space-y-3 text-foreground">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern B: root is the single scroll region. */}
+      <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-3 text-foreground">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3 min-w-0">
             {fromDashboard && (

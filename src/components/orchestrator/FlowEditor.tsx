@@ -109,7 +109,13 @@ export const FlowEditor: React.FC<FlowEditorProps> = ({ flowId }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    // App-wide viewport-framing correction (follow-up to Session 15): this
+    // already had the right internal flex-1/overflow structure, it was
+    // just sized against the browser viewport (h-screen) instead of
+    // Layout's own <main> region — h-screen here stacked on top of the
+    // outer h-screen shell, which is the "double full-viewport" variant
+    // of the same bug the rest of this correction fixes.
+    <div className="h-full min-h-0 flex flex-col bg-background">
       {/* Toolbar — flex-wrap so all controls stay reachable at narrow
           widths instead of running off-screen (found during Session
           10.5B's responsive survey: this row has no wrap/scroll handling

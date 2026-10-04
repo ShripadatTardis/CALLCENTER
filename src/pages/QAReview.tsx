@@ -193,8 +193,12 @@ const QAReview: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
-        <p className="text-xs text-muted-foreground max-w-3xl">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern A, same recipe as CallLogs.tsx: root fills Layout's main
+          height and is a flex column; everything above the table is
+          flex-shrink-0; the table alone is flex-1 min-h-0 overflow-auto. */}
+      <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground max-w-3xl flex-shrink-0">
           Read-only review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
           Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
           (duration, latency where available). No composite quality score — see AI Agents for the agent-level
@@ -213,7 +217,7 @@ const QAReview: React.FC = () => {
           />
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           <div className="relative w-52">
             <Input
               placeholder="Search intent…"
@@ -322,35 +326,39 @@ const QAReview: React.FC = () => {
         </div>
 
         {view === 'grouped' && !isLoading && rows.length > 0 && (
-          <GroupedInteractionTree group={grouped} selected={selectedGroup} onSelect={setSelectedGroup} countsAreExhaustive={false} />
+          <div className="flex-shrink-0 max-h-[30vh] overflow-y-auto">
+            <GroupedInteractionTree group={grouped} selected={selectedGroup} onSelect={setSelectedGroup} countsAreExhaustive={false} />
+          </div>
         )}
 
-        <ActiveFilterChips
-          chips={[
-            ...(channelFilter !== ALL ? [{ key: 'channel', label: `Channel: ${channelFilter}`, onRemove: () => setChannelFilter(ALL) }] : []),
-            ...(agentFilter !== ALL ? [{ key: 'agent', label: `Agent: ${agentFilter}`, onRemove: () => setAgentFilter(ALL) }] : []),
-            ...(outcomeFilter !== ALL ? [{ key: 'outcome', label: `Outcome: ${outcomeFilter}`, onRemove: () => setOutcomeFilter(ALL) }] : []),
-            ...(escalationFilter !== ALL ? [{ key: 'escalation', label: `Escalation: ${escalationFilter}`, onRemove: () => setEscalationFilter(ALL) }] : []),
-            ...(fcrFilter !== ALL ? [{ key: 'fcr', label: `FCR: ${fcrFilter}`, onRemove: () => setFcrFilter(ALL) }] : []),
-            ...(sentimentFilter !== ALL ? [{ key: 'sentiment', label: `Sentiment: ${sentimentFilter}`, onRemove: () => setSentimentFilter(ALL) }] : []),
-            ...(intentSearch ? [{ key: 'intent', label: `Intent: ${intentSearch}`, onRemove: () => setIntentSearch('') }] : []),
-            ...(campaignOnly ? [{ key: 'campaign', label: 'Campaign interactions only', onRemove: () => setCampaignOnly(false) }] : []),
-            ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
-          ]}
-          onClearAll={() => {
-            setChannelFilter(ALL);
-            setAgentFilter(ALL);
-            setOutcomeFilter(ALL);
-            setEscalationFilter(ALL);
-            setFcrFilter(ALL);
-            setSentimentFilter(ALL);
-            setIntentSearch('');
-            setCampaignOnly(false);
-            setSelectedGroup(null);
-          }}
-        />
+        <div className="flex-shrink-0">
+          <ActiveFilterChips
+            chips={[
+              ...(channelFilter !== ALL ? [{ key: 'channel', label: `Channel: ${channelFilter}`, onRemove: () => setChannelFilter(ALL) }] : []),
+              ...(agentFilter !== ALL ? [{ key: 'agent', label: `Agent: ${agentFilter}`, onRemove: () => setAgentFilter(ALL) }] : []),
+              ...(outcomeFilter !== ALL ? [{ key: 'outcome', label: `Outcome: ${outcomeFilter}`, onRemove: () => setOutcomeFilter(ALL) }] : []),
+              ...(escalationFilter !== ALL ? [{ key: 'escalation', label: `Escalation: ${escalationFilter}`, onRemove: () => setEscalationFilter(ALL) }] : []),
+              ...(fcrFilter !== ALL ? [{ key: 'fcr', label: `FCR: ${fcrFilter}`, onRemove: () => setFcrFilter(ALL) }] : []),
+              ...(sentimentFilter !== ALL ? [{ key: 'sentiment', label: `Sentiment: ${sentimentFilter}`, onRemove: () => setSentimentFilter(ALL) }] : []),
+              ...(intentSearch ? [{ key: 'intent', label: `Intent: ${intentSearch}`, onRemove: () => setIntentSearch('') }] : []),
+              ...(campaignOnly ? [{ key: 'campaign', label: 'Campaign interactions only', onRemove: () => setCampaignOnly(false) }] : []),
+              ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
+            ]}
+            onClearAll={() => {
+              setChannelFilter(ALL);
+              setAgentFilter(ALL);
+              setOutcomeFilter(ALL);
+              setEscalationFilter(ALL);
+              setFcrFilter(ALL);
+              setSentimentFilter(ALL);
+              setIntentSearch('');
+              setCampaignOnly(false);
+              setSelectedGroup(null);
+            }}
+          />
+        </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1 flex-shrink-0">
           <ListChecks className="h-3.5 w-3.5" />
           Interactions — {filteredRows.length} shown
         </div>
@@ -362,7 +370,7 @@ const QAReview: React.FC = () => {
         ) : filteredRows.length === 0 ? (
           <p className="text-sm text-muted-foreground px-1">No interactions match the current filters.</p>
         ) : (
-          <div className="rounded-md border border-border overflow-x-auto">
+          <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">

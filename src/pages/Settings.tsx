@@ -23,7 +23,8 @@ const Settings: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) — Pattern B. */}
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
         <div className="flex items-center justify-end">
           <Button size="sm" className="h-8 bg-cyan-600 hover:bg-cyan-500" onClick={handleSave}>
             <Save className="h-3.5 w-3.5 mr-1.5" />

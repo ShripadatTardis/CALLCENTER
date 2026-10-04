@@ -171,7 +171,7 @@ const AgentDetail: React.FC = () => {
   if (!agent) {
     return (
       <Layout>
-        <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+        <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to {returnTo.label}
@@ -228,7 +228,9 @@ const AgentDetail: React.FC = () => {
 
   return (
     <Layout>
-      <div className="bg-background min-h-full text-foreground p-4 space-y-2.5">
+      {/* App-wide viewport-framing correction (follow-up to Session 15) —
+          Pattern B: root is the single scroll region. */}
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-2.5">
         <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
           Back to {returnTo.label}

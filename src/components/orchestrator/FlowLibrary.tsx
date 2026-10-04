@@ -53,7 +53,8 @@ export const FlowLibrary: React.FC = () => {
   // Flows are now imported from shared data file
 
   return (
-    <div className="p-4 space-y-3">
+    // App-wide viewport-framing correction (follow-up to Session 15) — Pattern B.
+    <div className="h-full min-h-0 overflow-y-auto p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Workflow className="h-4 w-4 text-primary shrink-0" />

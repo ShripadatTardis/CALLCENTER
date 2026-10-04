@@ -186,7 +186,8 @@ const NPSCampaigns: React.FC = () => {
   return (
     <Layout>
       <TooltipProvider>
-        <div className="bg-background min-h-full text-foreground p-4 space-y-3">
+        {/* App-wide viewport-framing correction (follow-up to Session 15) — Pattern B. */}
+        <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
           <div className="rounded-md border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
             Demo data — NPS Campaigns has no real backend/execution engine yet (Session 5/9 audits). Shown for illustration only; actions below do not persist or place real calls.
           </div>

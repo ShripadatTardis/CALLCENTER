@@ -30,7 +30,7 @@ const CampaignDetailPage: React.FC = () => {
   if (detailQuery.isLoading || targetsQuery.isLoading) {
     return (
       <Layout>
-        <div className="min-h-full bg-background p-4 flex items-center gap-2 text-muted-foreground text-sm">
+        <div className="h-full min-h-0 overflow-y-auto bg-background p-4 flex items-center gap-2 text-muted-foreground text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading campaign…
         </div>
@@ -41,7 +41,7 @@ const CampaignDetailPage: React.FC = () => {
   if (detailQuery.isError || !detailQuery.data) {
     return (
       <Layout>
-        <div className="min-h-full bg-background p-4 space-y-4">
+        <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-4">
           <Button variant="outline" onClick={() => navigate(returnTo.path)}>
             ← Back to {returnTo.label}
           </Button>

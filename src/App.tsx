@@ -7,6 +7,7 @@ import { queryClient } from "@/lib/queryClient";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import InitiateCall from "./pages/InitiateCall";
 import CallLogs from "./pages/CallLogs";
@@ -47,6 +48,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/whatsapp-authenticate" element={<WhatsAppAuthenticate />} />
           <Route path="/dashboard" element={<ProtectedRoute permission="dashboard.view"><Dashboard /></ProtectedRoute>} />
           <Route path="/initiate-call" element={<ProtectedRoute permission="calls.initiate"><InitiateCall /></ProtectedRoute>} />

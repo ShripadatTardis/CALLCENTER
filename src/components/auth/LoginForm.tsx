@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIndustry } from '@/contexts/IndustryContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
 import { HeroSection } from './HeroSection';
 import { LoginFormFields } from './LoginFormFields';
+import { ForgotPasswordForm } from './ForgotPasswordForm';
 import { IndustrySelector } from './IndustrySelector';
 import { Industry } from '@/types/industry';
 
@@ -15,6 +17,7 @@ export const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'signin' | 'forgot'>('signin');
   const { login } = useAuth();
   const { selectedIndustry, setIndustry } = useIndustry();
   const navigate = useNavigate();
@@ -61,30 +64,37 @@ export const LoginForm: React.FC = () => {
                     className="h-12 w-auto mb-3"
                   />
                 </div>
-                <CardTitle className="text-2xl font-bold text-slate-900">Welcome back</CardTitle>
+                <CardTitle className="text-2xl font-bold text-slate-900">{mode === 'signin' ? 'Welcome back' : 'Reset your password'}</CardTitle>
                 <CardDescription className="text-slate-600">
-                  Sign in to access your AI-powered call center dashboard
+                  {mode === 'signin' ? 'Sign in to access your AI-powered call center dashboard' : "We'll email you a link to set a new password"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-5">
-                  {/* Industry Selection */}
-                  <IndustrySelector
-                    selectedIndustry={selectedIndustry}
-                    onIndustryChange={setIndustry}
-                  />
+                {mode === 'signin' ? (
+                  <div className="space-y-5">
+                    {/* Industry Selection */}
+                    <IndustrySelector
+                      selectedIndustry={selectedIndustry}
+                      onIndustryChange={setIndustry}
+                    />
 
-                  {/* Login Form */}
-                  <LoginFormFields
-                    email={email}
-                    password={password}
-                    error={error}
-                    isLoading={isLoading}
-                    onEmailChange={setEmail}
-                    onPasswordChange={setPassword}
-                    onSubmit={handleSubmit}
-                  />
-                </div>
+                    {/* Login Form */}
+                    <LoginFormFields
+                      email={email}
+                      password={password}
+                      error={error}
+                      isLoading={isLoading}
+                      onEmailChange={setEmail}
+                      onPasswordChange={setPassword}
+                      onSubmit={handleSubmit}
+                    />
+                    <Button type="button" variant="link" className="w-full h-auto p-0 text-sm" onClick={() => setMode('forgot')}>
+                      Forgot password?
+                    </Button>
+                  </div>
+                ) : (
+                  <ForgotPasswordForm onBackToSignIn={() => setMode('signin')} />
+                )}
               </CardContent>
             </Card>
           </div>

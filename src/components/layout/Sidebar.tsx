@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { UserProfile } from './UserProfile';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { PILLARS, findPillarForPath, type Pillar } from './pillarNav';
 import {
   LayoutGrid,
@@ -136,43 +137,57 @@ export const Sidebar: React.FC = () => {
                 <X size={16} aria-hidden="true" />
               </button>
             </div>
+            {/* Session 15 — collapsible pillar sections (Radix Accordion, the
+                same primitive already wrapped for this project in
+                components/ui/accordion.tsx). Before this, all 7 pillar
+                headings + every item rendered flat, so adding a single new
+                item (Action Required) was enough to push later pillars below
+                the fold, requiring a scroll just to see the Govern heading.
+                Now every pillar heading is visible without scrolling; only
+                the current page's pillar opens by default, others collapse
+                until clicked — "see all sections, then drill in" per the
+                explicit request. */}
             <nav className="flex-1 overflow-y-auto py-1" aria-label="Product navigation, expanded">
-              {visiblePillars.map((pillar) => {
-                const isPillarActive = activePillar?.key === pillar.key;
-                return (
-                  <div key={pillar.key} className="px-3 py-1.5">
-                    <div
-                      className={cn(
-                        'text-[11px] font-semibold uppercase tracking-wide mb-0.5',
-                        isPillarActive ? 'text-cyan-500 dark:text-cyan-400' : 'text-sidebar-foreground/60'
-                      )}
-                    >
-                      {pillar.label}
-                    </div>
-                    {pillar.items.map((item) => {
-                      const isActive =
-                        location.pathname === item.href ||
-                        (item.matchPrefix ? location.pathname.startsWith(item.matchPrefix) : false);
-                      return (
-                        <Link
-                          key={item.name}
-                          to={item.href}
-                          onClick={closeNav}
-                          className={cn(
-                            'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
-                            isActive
-                              ? 'bg-sidebar-accent text-cyan-600 dark:text-cyan-300 font-medium'
-                              : 'text-sidebar-foreground/90'
-                          )}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                          {item.name}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+              <Accordion type="single" collapsible defaultValue={activePillar?.key} className="w-full">
+                {visiblePillars.map((pillar) => {
+                  const isPillarActive = activePillar?.key === pillar.key;
+                  return (
+                    <AccordionItem key={pillar.key} value={pillar.key} className="px-3 border-b-0">
+                      <AccordionTrigger
+                        className={cn(
+                          'py-1.5 text-[11px] font-semibold uppercase tracking-wide hover:no-underline hover:text-sidebar-foreground',
+                          isPillarActive ? 'text-cyan-500 dark:text-cyan-400' : 'text-sidebar-foreground/60'
+                        )}
+                      >
+                        {pillar.label}
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-1 pt-0">
+                        {pillar.items.map((item) => {
+                          const isActive =
+                            location.pathname === item.href ||
+                            (item.matchPrefix ? location.pathname.startsWith(item.matchPrefix) : false);
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              onClick={closeNav}
+                              className={cn(
+                                'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
+                                isActive
+                                  ? 'bg-sidebar-accent text-cyan-600 dark:text-cyan-300 font-medium'
+                                  : 'text-sidebar-foreground/90'
+                              )}
+                            >
+                              <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                              {item.name}
+                            </Link>
+                          );
+                        })}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             </nav>
           </div>
         </>

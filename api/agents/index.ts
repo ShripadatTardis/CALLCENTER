@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, methodNotAllowed, noStore, proxyRequest, withErrorBoundary } from '../_voicebot.js';
-import { repo, resolveAccessForRequest } from '../_customer360.js';
+import { repo } from '../_customer360.js';
+import { resolveAccessForAuthenticatedUser } from '../_auth.js';
 
 /**
  * GET /api/agents -> GET {VOICEBOT_BASE_URL}/api/v1/agents
@@ -14,7 +15,7 @@ import { repo, resolveAccessForRequest } from '../_customer360.js';
  * the exact same category/role primitives Customer 360 already proved
  * (customer360_categories / customer360_category_agents /
  * role_customer360_categories / role_customer360_access via
- * resolveAccessForRequest) — no new authorization model, no new tables.
+ * resolveAccessForAuthenticatedUser, Session 14.3) — no new authorization model, no new tables.
  * Consolidated onto this existing route rather than a new file to keep
  * the Vercel function count unchanged (plan §19).
  *
@@ -40,7 +41,8 @@ export interface ClassificationResponseDto {
 
 async function handleClassification(req: VercelRequest, res: VercelResponse): Promise<void> {
   noStore(res);
-  const access = await resolveAccessForRequest(req);
+  // Session 14.3 — Agent Scope, from the verified authenticated user.
+  const access = await resolveAccessForAuthenticatedUser(req, 'agent');
   const [allCategories, categoryAgentMap] = await Promise.all([repo.listCategories(), repo.getCategoryAgentMap()]);
 
   const agentIdsByCategory = new Map<string, string[]>();

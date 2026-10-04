@@ -37,8 +37,27 @@ async function getAuthenticatedUser(req) {
     displayName: identity.displayName,
     status: identity.status,
     roles: identity.roles,
-    permissions: identity.permissions
+    permissions: identity.permissions,
+    dataScope: identity.dataScope
   };
+}
+function toAgentAccess(user) {
+  return {
+    role: user.id,
+    allCategories: user.dataScope.allAgents,
+    authorizedAgentIds: user.dataScope.allAgents ? "all" : user.dataScope.agentIds
+  };
+}
+function toCustomerAccess(user) {
+  return {
+    role: user.id,
+    allCategories: user.dataScope.customerAllAgents,
+    authorizedAgentIds: user.dataScope.customerAllAgents ? "all" : user.dataScope.customerAgentIds
+  };
+}
+function isAgentIdInScope(access, agentId) {
+  if (access.allCategories || access.authorizedAgentIds === "all") return true;
+  return !!agentId && access.authorizedAgentIds.includes(agentId);
 }
 function evaluatePermission(user, permissionKey) {
   if (!user || user.status !== "active") return { outcome: "unauthenticated" };
@@ -76,10 +95,19 @@ async function recordAuditEvent(params) {
   } catch {
   }
 }
+async function resolveAccessForAuthenticatedUser(req, scope = "agent") {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return { role: "unauthenticated", allCategories: false, authorizedAgentIds: [] };
+  return scope === "agent" ? toAgentAccess(user) : toCustomerAccess(user);
+}
 export {
   evaluatePermission,
   getAuthenticatedUser,
   getServiceRoleClient,
+  isAgentIdInScope,
   recordAuditEvent,
-  requirePermission
+  requirePermission,
+  resolveAccessForAuthenticatedUser,
+  toAgentAccess,
+  toCustomerAccess
 };

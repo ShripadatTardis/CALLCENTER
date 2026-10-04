@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore } from './_voicebot.js';
-import { requireAdminToken, readIntQuery, resolveAccessForRequest } from './_customer360.js';
-import { requirePermission, recordAuditEvent } from './_auth.js';
+import { requireAdminToken, readIntQuery } from './_customer360.js';
+import { requirePermission, recordAuditEvent, resolveAccessForAuthenticatedUser } from './_auth.js';
 import type { AuthorizedAccess } from '../src/server/customer360/authorizationService.js';
 import { supabaseCampaignRepository } from '../src/server/campaigns/supabaseCampaignRepository.js';
 import { runCampaignBatch, voiceAgentCallBackend } from '../src/server/campaigns/campaignRunner.js';
@@ -38,7 +38,7 @@ import type {
  * Session 9.2: applies the SAME category/role authorization already
  * proven for Call Logs/Chat Logs (Session 6.2) — a campaign's own
  * `agent_id` plays the identical role a call/chat's `agent_id` already
- * plays for `resolveAccessForRequest`. Read actions are filtered/404'd,
+ * plays for `resolveAccessForAuthenticatedUser` (Session 14.3). Read actions are filtered/404'd,
  * management actions are 403/404'd, admin/internal actions (runBatch,
  * reconcile) keep their existing, stronger, separate admin-token gate —
  * unchanged and never weakened by this.
@@ -789,7 +789,8 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   // stronger, separate admin-token gate and never resolve a per-role
   // category access — they operate across every campaign by design,
   // exactly like Customer 360's backfill/reconcile jobs.
-  const access = ADMIN_ACTIONS.has(action) ? null : await resolveAccessForRequest(req);
+  // Session 14.3 — Agent Scope, from the verified authenticated user.
+  const access = ADMIN_ACTIONS.has(action) ? null : await resolveAccessForAuthenticatedUser(req, 'agent');
 
   // Session 14.1 — the real, authoritative gate for every mutating
   // action. Runs BEFORE the existing agent-category check in each

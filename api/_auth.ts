@@ -31,6 +31,27 @@ function getServiceRoleClient(): SupabaseClient {
   return client;
 }
 
+/**
+ * Session 14.3 — Business Data Scope. Two independent, role-level
+ * dimensions, resolved server-side (see
+ * call_center_users_resolve_identity's SQL): Agent Scope (used by
+ * Calls/Chat/Campaigns/Agent-classification) and Customer Category
+ * Scope (used by Customers — resolved down to an effective agent_id set
+ * via the existing customer360_category_agents join, since that's the
+ * only real linkage a customer has to a category today). Agent Scope is
+ * never derived FROM Customer Category Scope; they're configured and
+ * stored independently even though `customerAgentIds` is computed from
+ * category selections.
+ */
+export interface DataScope {
+  allAgents: boolean;
+  agentIds: string[];
+  allCustomerCategories: boolean;
+  customerCategoryIds: string[];
+  customerAllAgents: boolean;
+  customerAgentIds: string[];
+}
+
 export interface AuthenticatedCallCenterUser {
   id: string;
   email: string;
@@ -38,6 +59,7 @@ export interface AuthenticatedCallCenterUser {
   status: 'active' | 'inactive';
   roles: string[];
   permissions: string[];
+  dataScope: DataScope;
 }
 
 function readBearerToken(req: VercelRequest): string | null {
@@ -63,6 +85,7 @@ interface ResolvedIdentity {
   status: 'active' | 'inactive';
   roles: string[];
   permissions: string[];
+  dataScope: DataScope;
 }
 
 export async function getAuthenticatedUser(req: VercelRequest): Promise<AuthenticatedCallCenterUser | null> {
@@ -89,7 +112,55 @@ export async function getAuthenticatedUser(req: VercelRequest): Promise<Authenti
     status: identity.status,
     roles: identity.roles,
     permissions: identity.permissions,
+    dataScope: identity.dataScope,
   };
+}
+
+/**
+ * Session 14.3 — the shape every existing Customer360/Campaign/Calls/
+ * Chat filtering call site already consumes (`AuthorizedAccess` from
+ * src/server/customer360/authorizationService.ts). Two views of the
+ * same authenticated user: `forAgents` (Calls/Chat/Campaigns/Agent
+ * classification) and `forCustomers` (Customer360 — category scope
+ * resolved to an agent_id set). This REPLACES the advisory
+ * `x-user-role` header as the source of truth for every route it's
+ * wired into — the header is retired from authorization decisions on
+ * those routes, not run in parallel with this.
+ */
+export interface ScopedAccess {
+  role: string;
+  allCategories: boolean;
+  authorizedAgentIds: string[] | 'all';
+}
+
+export function toAgentAccess(user: AuthenticatedCallCenterUser): ScopedAccess {
+  return {
+    role: user.id,
+    allCategories: user.dataScope.allAgents,
+    authorizedAgentIds: user.dataScope.allAgents ? 'all' : user.dataScope.agentIds,
+  };
+}
+
+export function toCustomerAccess(user: AuthenticatedCallCenterUser): ScopedAccess {
+  return {
+    role: user.id,
+    allCategories: user.dataScope.customerAllAgents,
+    authorizedAgentIds: user.dataScope.customerAllAgents ? 'all' : user.dataScope.customerAgentIds,
+  };
+}
+
+/**
+ * Pure scope check, exported so individual-resource route handlers can
+ * apply it themselves and choose their own response (404, matching the
+ * existing api/campaigns.ts `isAgentAuthorized` convention of not
+ * revealing a resource's existence to a caller outside its data scope —
+ * 403 is reserved for functional-permission denials via
+ * requirePermission, where confirming the permission's existence isn't
+ * sensitive).
+ */
+export function isAgentIdInScope(access: ScopedAccess, agentId: string | null | undefined): boolean {
+  if (access.allCategories || access.authorizedAgentIds === 'all') return true;
+  return !!agentId && access.authorizedAgentIds.includes(agentId);
 }
 
 export type PermissionEvaluation =
@@ -178,6 +249,26 @@ export async function recordAuditEvent(params: {
   } catch {
     // Best-effort — never let an audit-write failure break the real mutation.
   }
+}
+
+/**
+ * Session 14.3 — drop-in replacement for api/_customer360.ts's
+ * `resolveAccessForRequest`. Produces the identical `AuthorizedAccess`
+ * shape every existing filtering call site already consumes, but
+ * derived from the verified, JWT-authenticated Call Centre user instead
+ * of the unverified `x-user-role` header. An unauthenticated caller
+ * resolves to zero scope (fails closed) rather than throwing, so a read
+ * route can decide for itself whether to require auth or just return an
+ * empty/filtered result — same posture the old advisory resolver had
+ * for a missing/unknown role.
+ */
+export async function resolveAccessForAuthenticatedUser(
+  req: VercelRequest,
+  scope: 'agent' | 'customer' = 'agent',
+): Promise<ScopedAccess> {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return { role: 'unauthenticated', allCategories: false, authorizedAgentIds: [] };
+  return scope === 'agent' ? toAgentAccess(user) : toCustomerAccess(user);
 }
 
 export { getServiceRoleClient };

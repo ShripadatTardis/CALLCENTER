@@ -22,9 +22,18 @@ export interface AdminUserSummary {
   identityStatus: 'pending' | 'confirmed' | 'unknown';
 }
 
+/** Session 14.3 — effective Business Data Scope, shown so an Administrator understands WHICH data a user can see, not just WHAT they can do. */
+export interface UserDataScope {
+  allAgents: boolean;
+  agentIds: string[];
+  allCategories: boolean;
+  categoryIds: string[];
+}
+
 export interface AdminUserDetail extends AdminUserSummary {
   permissions: string[];
   recentAuditEvents: AuditEvent[];
+  dataScope: UserDataScope;
 }
 
 export interface AdminRole {
@@ -33,6 +42,17 @@ export interface AdminRole {
   description: string | null;
   permissionKeys: string[];
   userCount: number;
+  /** Session 14.3 — Agent Scope (Calls/Chat/Campaigns/Agent classification). */
+  allAgents: boolean;
+  agentIds: string[];
+  /** Session 14.3 — Customer Category Scope (Customers). Independent of Agent Scope. */
+  allCategories: boolean;
+  categoryIds: string[];
+}
+
+export interface AdminCustomerCategory {
+  id: string;
+  name: string;
 }
 
 export interface AdminPermission {
@@ -106,6 +126,20 @@ export async function fetchPermissions(): Promise<AdminPermission[]> {
 
 export async function setRolePermissions(roleCode: string, permissionKeys: string[]): Promise<void> {
   await request('/admin', { method: 'POST', query: { resource: 'roles', action: 'setPermissions' }, body: { roleCode, permissionKeys } });
+}
+
+export async function fetchCustomerCategories(): Promise<AdminCustomerCategory[]> {
+  const res = await request<{ data: AdminCustomerCategory[] }>('/admin', { query: { resource: 'customerCategories' } });
+  return res.data;
+}
+
+/** Session 14.3 — Agent Scope is configured independently of Customer Category Scope, even though today's data happens to be 1:1. */
+export async function setRoleAgentScope(roleCode: string, allAgents: boolean, agentIds: string[]): Promise<void> {
+  await request('/admin', { method: 'POST', query: { resource: 'roles', action: 'setAgentScope' }, body: { roleCode, allAgents, agentIds } });
+}
+
+export async function setRoleCustomerCategoryScope(roleCode: string, allCategories: boolean, categoryIds: string[]): Promise<void> {
+  await request('/admin', { method: 'POST', query: { resource: 'roles', action: 'setCustomerCategoryScope' }, body: { roleCode, allCategories, categoryIds } });
 }
 
 export async function fetchAuditEvents(filters: { limit?: number; actorUserId?: string; action?: string; resourceType?: string; result?: string } = {}): Promise<AuditEvent[]> {

@@ -20,8 +20,13 @@ import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAu
  *   POST /api/admin?resource=users&action=setStatus|assignRole|removeRole
  *   GET  /api/admin?resource=roles
  *   GET  /api/admin?resource=permissions
- *   POST /api/admin?resource=roles&action=setPermissions
+ *   GET  /api/admin?resource=customerCategories
+ *   POST /api/admin?resource=roles&action=setPermissions|setAgentScope|setCustomerCategoryScope
  *   GET  /api/admin?resource=audit
+ *
+ * Session 14.3 adds the Business Data Scope actions (setAgentScope,
+ * setCustomerCategoryScope) and the customerCategories read, alongside
+ * the existing Session 14.1 functional-permission actions.
  */
 
 function queryStr(req: VercelRequest, key: string): string | undefined {
@@ -298,13 +303,14 @@ async function handleRolesPost(req: VercelRequest, res: VercelResponse): Promise
   if (!actingUser) return;
 
   const action = queryStr(req, 'action');
+  const supabase = getServiceRoleClient();
+
   if (action === 'setPermissions') {
     const { roleCode, permissionKeys } = req.body ?? {};
     if (typeof roleCode !== 'string' || !Array.isArray(permissionKeys)) {
       res.status(422).json({ detail: 'roleCode and permissionKeys (array) are required' });
       return;
     }
-    const supabase = getServiceRoleClient();
     const { data, error } = await supabase.rpc('call_center_roles_set_permissions', {
       p_role_code: roleCode,
       p_permission_keys: permissionKeys,
@@ -315,7 +321,50 @@ async function handleRolesPost(req: VercelRequest, res: VercelResponse): Promise
     return;
   }
 
+  if (action === 'setAgentScope') {
+    const { roleCode, allAgents, agentIds } = (req.body ?? {}) as { roleCode?: string; allAgents?: boolean; agentIds?: string[] };
+    if (typeof roleCode !== 'string' || typeof allAgents !== 'boolean' || !Array.isArray(agentIds)) {
+      res.status(422).json({ detail: 'roleCode, allAgents (boolean), and agentIds (array) are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_roles_set_agent_scope', {
+      p_role_code: roleCode,
+      p_all_agents: allAgents,
+      p_agent_ids: agentIds,
+      p_actor_user_id: actingUser.id,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'setCustomerCategoryScope') {
+    const { roleCode, allCategories, categoryIds } = (req.body ?? {}) as { roleCode?: string; allCategories?: boolean; categoryIds?: string[] };
+    if (typeof roleCode !== 'string' || typeof allCategories !== 'boolean' || !Array.isArray(categoryIds)) {
+      res.status(422).json({ detail: 'roleCode, allCategories (boolean), and categoryIds (array) are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_roles_set_customer_category_scope', {
+      p_role_code: roleCode,
+      p_all_categories: allCategories,
+      p_category_ids: categoryIds,
+      p_actor_user_id: actingUser.id,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
   res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+
+async function handleCustomerCategoriesGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'roles.view');
+  if (!user) return;
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase.rpc('call_center_customer_categories_list');
+  if (error) { res.status(500).json({ detail: error.message }); return; }
+  res.status(200).json({ data });
 }
 
 async function handleAuditGet(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -363,6 +412,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   if (resource === 'permissions') {
     if (req.method !== 'GET') { methodNotAllowed(res, ['GET']); return; }
     await handlePermissionsGet(req, res);
+    return;
+  }
+
+  if (resource === 'customerCategories') {
+    if (req.method !== 'GET') { methodNotAllowed(res, ['GET']); return; }
+    await handleCustomerCategoriesGet(req, res);
     return;
   }
 

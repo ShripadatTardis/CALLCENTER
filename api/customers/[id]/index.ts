@@ -1,14 +1,32 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { repo, source, resolveAccessForRequest, withErrorBoundary, noStore, readIntQuery } from '../../_customer360.js';
+import { repo, source, withErrorBoundary, noStore, readIntQuery } from '../../_customer360.js';
 import { refreshExistingCustomer } from '../../../src/server/customer360/aggregationService.js';
 import {
   buildAuthorizedCustomerView,
   listAuthorizedInteractions,
+  type AuthorizedAccess,
 } from '../../../src/server/customer360/authorizationService.js';
 import { supabaseCampaignRepository } from '../../../src/server/campaigns/supabaseCampaignRepository.js';
 import { supabaseActivityRepository } from '../../../src/server/customer360/supabaseActivityRepository.js';
 import type { ActivityStatus, ActivityType } from '../../../src/server/customer360/activityRepository.js';
-import { requirePermission, recordAuditEvent } from '../../_auth.js';
+import { requirePermission, recordAuditEvent, resolveAccessForAuthenticatedUser, toCustomerAccess } from '../../_auth.js';
+
+/**
+ * Session 14.3 — closes the direct-ID bypass this route previously had:
+ * customer identity (handleGetView) and activity create/update were
+ * gated only by "does this customer id exist", never by data scope. A
+ * customer is now "visible" to a scoped caller only if they have ≥1
+ * interaction the caller's Customer Category Scope authorizes — the
+ * same existence-style check api/customers/index.ts's phone-search
+ * branch already used for exactly this reason. 404 (not 403), matching
+ * the existing api/campaigns.ts convention of not revealing a resource's
+ * existence to a caller outside its scope.
+ */
+async function isCustomerVisible(customerId: string, access: AuthorizedAccess): Promise<boolean> {
+  if (access.allCategories) return true;
+  const { totalCount } = await repo.listInteractions(customerId, { page: 1, pageSize: 1, authorizedAgentIds: access.authorizedAgentIds });
+  return totalCount > 0;
+}
 
 /**
  * GET /api/customers/{id}                       — authorized Customer 360 view (plan §4, §11, §12, §15)
@@ -29,7 +47,12 @@ import { requirePermission, recordAuditEvent } from '../../_auth.js';
 
 async function handleGetView(req: VercelRequest, res: VercelResponse): Promise<void> {
   const id = req.query.id as string;
-  const access = await resolveAccessForRequest(req);
+  const access = await resolveAccessForAuthenticatedUser(req, 'customer');
+
+  if (!(await isCustomerVisible(id, access))) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
 
   let refresh: { attempted: boolean; failed: boolean; insertedCount: number; error?: string } = {
     attempted: true,
@@ -62,7 +85,7 @@ async function handleInteractions(req: VercelRequest, res: VercelResponse): Prom
   const page = readIntQuery(req, 'page', 1);
   const pageSize = readIntQuery(req, 'pageSize', 25);
 
-  const access = await resolveAccessForRequest(req);
+  const access = await resolveAccessForAuthenticatedUser(req, 'customer');
   const { rows, totalCount } = await listAuthorizedInteractions(repo, id, access, page, pageSize);
 
   res.status(200).json({ data: rows, pagination: { page, pageSize, totalCount } });
@@ -79,8 +102,12 @@ async function handleInteractions(req: VercelRequest, res: VercelResponse): Prom
  */
 async function handleCampaigns(req: VercelRequest, res: VercelResponse): Promise<void> {
   const id = req.query.id as string;
-  const access = await resolveAccessForRequest(req);
+  const access = await resolveAccessForAuthenticatedUser(req, 'customer');
 
+  if (!(await isCustomerVisible(id, access))) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
   const customer = await repo.getCustomer(id);
   if (!customer) {
     res.status(404).json({ detail: 'Customer not found' });
@@ -122,6 +149,11 @@ async function handleListActivities(req: VercelRequest, res: VercelResponse): Pr
   const id = req.query.id as string;
   const activeInstructionsOnly = (Array.isArray(req.query.activeInstructionsOnly) ? req.query.activeInstructionsOnly[0] : req.query.activeInstructionsOnly) === 'true';
 
+  const access = await resolveAccessForAuthenticatedUser(req, 'customer');
+  if (!(await isCustomerVisible(id, access))) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
   const customer = await repo.getCustomer(id);
   if (!customer) {
     res.status(404).json({ detail: 'Customer not found' });
@@ -140,6 +172,10 @@ async function handleCreateActivity(req: VercelRequest, res: VercelResponse): Pr
   const actingUser = await requirePermission(req, res, 'customers.activity.create');
   if (!actingUser) return;
 
+  if (!(await isCustomerVisible(id, toCustomerAccess(actingUser)))) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
   const customer = await repo.getCustomer(id);
   if (!customer) {
     res.status(404).json({ detail: 'Customer not found' });
@@ -217,6 +253,10 @@ async function handleUpdateActivityStatus(req: VercelRequest, res: VercelRespons
   const actingUser = await requirePermission(req, res, 'customers.activity.update');
   if (!actingUser) return;
 
+  if (!(await isCustomerVisible(id, toCustomerAccess(actingUser)))) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
   const customer = await repo.getCustomer(id);
   if (!customer) {
     res.status(404).json({ detail: 'Customer not found' });
@@ -266,7 +306,12 @@ async function handleUpdateActivityStatus(req: VercelRequest, res: VercelRespons
 
 async function handleRefresh(req: VercelRequest, res: VercelResponse): Promise<void> {
   const id = req.query.id as string;
-  const access = await resolveAccessForRequest(req);
+  const access = await resolveAccessForAuthenticatedUser(req, 'customer');
+
+  if (!(await isCustomerVisible(id, access))) {
+    res.status(404).json({ detail: 'Customer not found' });
+    return;
+  }
 
   const result = await refreshExistingCustomer(repo, source, id, { force: true });
   if (result.status === 'not_found') {

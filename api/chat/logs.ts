@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, withErrorBoundary, noStore } from '../_voicebot.js';
-import { readIntQuery, resolveAccessForRequest } from '../_customer360.js';
+import { readIntQuery } from '../_customer360.js';
+import { resolveAccessForAuthenticatedUser } from '../_auth.js';
 import { supabaseChatRepository } from '../../src/server/chat/supabaseChatRepository.js';
 import type { ChatMessageRecord, ChatSessionRecord } from '../../src/server/chat/types.js';
 import type {
@@ -184,7 +185,8 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   // api/calls/data.ts now apply — closes the audited gap where Chat
   // Logs sent an x-user-role header that the server never read. See
   // docs/CALL_CENTRE_SESSION6_2_INTERACTION_CLASSIFICATION_PLAN.md §5.
-  const access = await resolveAccessForRequest(req);
+  // Session 14.3 — Agent Scope, from the verified authenticated user.
+  const access = await resolveAccessForAuthenticatedUser(req, 'agent');
   const authorizedAgentIds = access.allCategories || access.authorizedAgentIds === 'all' ? null : new Set(access.authorizedAgentIds);
   const isAuthorized = (agentId: string | null | undefined) =>
     authorizedAgentIds === null || (!!agentId && authorizedAgentIds.has(agentId));

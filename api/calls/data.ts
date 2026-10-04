@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, methodNotAllowed, proxyRequest, readReqQuery, withErrorBoundary } from '../_voicebot.js';
-import { resolveAccessForRequest } from '../_customer360.js';
+import { resolveAccessForAuthenticatedUser } from '../_auth.js';
 
 /**
  * GET /api/calls/data -> GET {VOICEBOT_BASE_URL}/api/v1/call-data
@@ -11,8 +11,9 @@ import { resolveAccessForRequest } from '../_customer360.js';
  * happens in the frontend mapper (src/services/calls/callsMapper.ts).
  *
  * Session 6.2: applies the SAME category/role authorization already
- * proven in Customer 360 (resolveAccessForRequest, x-user-role header —
- * see api/_customer360.ts for the documented advisory-signal caveat) —
+ * proven in Customer 360, now derived from the verified authenticated
+ * user (resolveAccessForAuthenticatedUser, Session 14.3 — replaces the
+ * advisory x-user-role header this route used before) —
  * rows whose ai_agent_id/agent_id isn't in the caller's authorized set
  * are removed server-side before the response leaves this route. This
  * closes the gap audited in docs/CALL_CENTRE_SESSION6_2_INTERACTION_CLASSIFICATION_PLAN.md
@@ -34,7 +35,8 @@ export default withErrorBoundary(async (req, res) => {
   const search = new URLSearchParams(query).toString();
   const url = `${baseUrl}/api/v1/call-data${search ? `?${search}` : ''}`;
 
-  const access = await resolveAccessForRequest(req);
+  // Session 14.3 — Agent Scope, from the verified authenticated user.
+  const access = await resolveAccessForAuthenticatedUser(req, 'agent');
 
   await proxyRequest(res, url, { method: 'GET' }, (status, body) => {
     if (access.allCategories || access.authorizedAgentIds === 'all' || status !== 200 || typeof body !== 'object' || body === null) {

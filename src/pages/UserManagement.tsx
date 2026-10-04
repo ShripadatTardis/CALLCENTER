@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, UserPlus } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { getRoleDisplayName } from '@/lib/auth';
-import { useAdminUsers, useAdminRoles, useSetUserStatus, useAssignUserRole, useRemoveUserRole } from '@/hooks/admin/useAdmin';
+import { useAdminUsers, useAdminUserDetail, useAdminRoles, useSetUserStatus, useAssignUserRole, useRemoveUserRole } from '@/hooks/admin/useAdmin';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddUserDialog } from '@/components/admin/AddUserDialog';
 
@@ -25,6 +25,7 @@ const UserManagement: React.FC = () => {
 
   const { data: users, isLoading, isError } = useAdminUsers();
   const { data: roles } = useAdminRoles();
+  const { data: expandedUserDetail } = useAdminUserDetail(expandedUserId);
   const setStatus = useSetUserStatus();
   const assignRole = useAssignUserRole();
   const removeRole = useRemoveUserRole();
@@ -184,6 +185,14 @@ const UserManagement: React.FC = () => {
                               </div>
                             )}
                           </div>
+                          {expandedUserDetail && expandedUserDetail.id === u.id && (
+                            <div className="mt-2 text-[11px] text-muted-foreground">
+                              Data Scope (from assigned role{u.roles.length === 1 ? '' : 's'}): Agent Access —{' '}
+                              {expandedUserDetail.dataScope.allAgents ? 'All agents' : `${expandedUserDetail.dataScope.agentIds.length} selected agent${expandedUserDetail.dataScope.agentIds.length === 1 ? '' : 's'}`}
+                              {' · '}Customer Access —{' '}
+                              {expandedUserDetail.dataScope.allCategories ? 'All categories' : `${expandedUserDetail.dataScope.categoryIds.length} selected categor${expandedUserDetail.dataScope.categoryIds.length === 1 ? 'y' : 'ies'}`}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}

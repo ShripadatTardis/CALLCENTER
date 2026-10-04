@@ -9,6 +9,9 @@ import {
   fetchRoles,
   fetchPermissions,
   setRolePermissions,
+  fetchCustomerCategories,
+  setRoleAgentScope,
+  setRoleCustomerCategoryScope,
   fetchAuditEvents,
 } from '@/services/admin/adminService';
 
@@ -17,6 +20,7 @@ export const adminKeys = {
   user: (id: string) => ['admin', 'users', id] as const,
   roles: ['admin', 'roles'] as const,
   permissions: ['admin', 'permissions'] as const,
+  customerCategories: ['admin', 'customerCategories'] as const,
   audit: (filters: Record<string, unknown>) => ['admin', 'audit', filters] as const,
 };
 
@@ -93,6 +97,34 @@ export function useSetRolePermissions() {
     mutationFn: ({ roleCode, permissionKeys }: { roleCode: string; permissionKeys: string[] }) => setRolePermissions(roleCode, permissionKeys),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.roles });
+    },
+  });
+}
+
+export function useAdminCustomerCategories() {
+  return useQuery({ queryKey: adminKeys.customerCategories, queryFn: fetchCustomerCategories });
+}
+
+export function useSetRoleAgentScope() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleCode, allAgents, agentIds }: { roleCode: string; allAgents: boolean; agentIds: string[] }) =>
+      setRoleAgentScope(roleCode, allAgents, agentIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.roles });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users });
+    },
+  });
+}
+
+export function useSetRoleCustomerCategoryScope() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleCode, allCategories, categoryIds }: { roleCode: string; allCategories: boolean; categoryIds: string[] }) =>
+      setRoleCustomerCategoryScope(roleCode, allCategories, categoryIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.roles });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users });
     },
   });
 }

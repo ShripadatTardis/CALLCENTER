@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { repo, source, resolveAccessForRequest, withErrorBoundary, noStore, readIntQuery } from '../_customer360.js';
+import { repo, source, withErrorBoundary, noStore, readIntQuery } from '../_customer360.js';
+import { resolveAccessForAuthenticatedUser } from '../_auth.js';
 import { refreshCustomerByContactPoint } from '../../src/server/customer360/aggregationService.js';
 import { normalizePhoneNumber } from '../../src/lib/phoneIdentity.js';
 
@@ -28,7 +29,10 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   const page = readIntQuery(req, 'page', 1);
   const pageSize = readIntQuery(req, 'pageSize', 25);
 
-  const access = await resolveAccessForRequest(req);
+  // Session 14.3 — Customer visibility is scoped by Customer Category
+  // Scope (resolved server-side to an agent_id set), from the verified
+  // authenticated user. Replaces the advisory x-user-role header.
+  const access = await resolveAccessForAuthenticatedUser(req, 'customer');
 
   let materializationWarning: string | null = null;
   // Phone-search dispatch requires the raw query to be phone-shaped (only

@@ -1,10 +1,24 @@
+/**
+ * Session 14.1 — real identity. `id` is the Call Centre's own
+ * call_center.user_profiles.id (provider-neutral), never the Supabase
+ * Auth subject directly. `role` is a derived, single legacy-compat
+ * string (the highest-priority assigned role code) kept ONLY so the
+ * pre-existing `x-user-role` header-forwarding call sites (Customer360/
+ * Campaign read-filtering) keep working unchanged — it is never used for
+ * any new authorization decision. `roles`/`permissions` are the real,
+ * durable authorization data; `permissions` is the effective union
+ * across every assigned role.
+ */
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'call_center_head' | 'qa_reviewer' | 'product_manager' | 'ai_operations_specialist';
-  avatar?: string;
+  /** Legacy-compatibility only — see doc comment above. Never a new authorization primitive. */
+  role: string;
+  roles: string[];
   permissions: string[];
+  status: 'active' | 'inactive';
+  avatar?: string;
 }
 
 export interface Call {

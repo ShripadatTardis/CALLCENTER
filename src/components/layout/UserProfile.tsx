@@ -2,6 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getRoleDisplayName } from '@/lib/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,8 +43,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => 
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label={`Account menu — ${user.name}, ${user.role}`}
-            title={`${user.name} (${user.role})`}
+            aria-label={`Account menu — ${user.name}, ${getRoleDisplayName(user.role)}`}
+            title={`${user.name} (${getRoleDisplayName(user.role)})`}
             className="w-9 h-9 rounded-full flex items-center justify-center mt-1 mb-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
           >
             <Avatar className="h-8 w-8">
@@ -55,7 +56,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => 
         <DropdownMenuContent align="start" side="right" className="w-56">
           <DropdownMenuLabel>
             {user.name}
-            <span className="block text-xs font-normal text-muted-foreground">{user.role}</span>
+            <span className="block text-xs font-normal text-muted-foreground">{getRoleDisplayName(user.role)}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => navigate('/settings')}>
@@ -90,7 +91,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ compact = false }) => 
               </Avatar>
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-foreground">{user.name}</p>
-                <p className="text-xs text-muted-foreground">{user.role}</p>
+                <p className="text-xs text-muted-foreground">{getRoleDisplayName(user.role)}</p>
               </div>
             </div>
           </Button>

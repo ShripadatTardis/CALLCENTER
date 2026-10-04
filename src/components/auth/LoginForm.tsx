@@ -4,10 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIndustry } from '@/contexts/IndustryContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { sampleUsers } from '@/lib/auth';
 import { Logo } from '@/components/ui/logo';
 import { HeroSection } from './HeroSection';
-import { UserSelectionRadio } from './UserSelectionRadio';
 import { LoginFormFields } from './LoginFormFields';
 import { IndustrySelector } from './IndustrySelector';
 import { Industry } from '@/types/industry';
@@ -17,19 +15,9 @@ export const LoginForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedUser, setSelectedUser] = useState('');
   const { login } = useAuth();
   const { selectedIndustry, setIndustry } = useIndustry();
   const navigate = useNavigate();
-
-  const handleUserSelection = (userId: string) => {
-    setSelectedUser(userId);
-    const user = sampleUsers.find(u => u.id === userId);
-    if (user) {
-      setEmail(user.email);
-      setPassword('password123');
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,12 +74,6 @@ export const LoginForm: React.FC = () => {
                     onIndustryChange={setIndustry}
                   />
 
-                  {/* Demo User Selection */}
-                  <UserSelectionRadio
-                    selectedUser={selectedUser}
-                    onUserSelection={handleUserSelection}
-                  />
-
                   {/* Login Form */}
                   <LoginFormFields
                     email={email}
@@ -102,10 +84,6 @@ export const LoginForm: React.FC = () => {
                     onPasswordChange={setPassword}
                     onSubmit={handleSubmit}
                   />
-
-                  <div className="text-center text-xs text-muted-foreground">
-                    Demo credentials are automatically filled when selecting a user above
-                  </div>
                 </div>
               </CardContent>
             </Card>

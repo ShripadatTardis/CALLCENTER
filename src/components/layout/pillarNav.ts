@@ -17,6 +17,8 @@ import {
   Workflow,
   ShieldCheck,
   Percent,
+  KeyRound,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -51,11 +53,11 @@ export const PILLARS: Pillar[] = [
     label: 'Observe',
     blurb: 'Understand what AI agents are doing',
     items: [
-      { name: 'Dashboard', href: '/dashboard', icon: BarChart3, permission: 'view_all_dashboards' },
-      { name: 'Live View', href: '/live-view', icon: Eye, permission: 'monitor_real_time' },
-      { name: 'Call Logs', href: '/call-logs', icon: PhoneCall, permission: 'view_call_logs' },
-      { name: 'Chat Logs', href: '/chat-logs', icon: History, permission: 'view_call_logs' },
-      { name: 'Customers', href: '/customers', icon: Users, permission: 'view_call_logs', matchPrefix: '/customers' },
+      { name: 'Dashboard', href: '/dashboard', icon: BarChart3, permission: 'dashboard.view' },
+      { name: 'Live View', href: '/live-view', icon: Eye, permission: 'live.view' },
+      { name: 'Call Logs', href: '/call-logs', icon: PhoneCall, permission: 'calls.view' },
+      { name: 'Chat Logs', href: '/chat-logs', icon: History, permission: 'chat.view' },
+      { name: 'Customers', href: '/customers', icon: Users, permission: 'customers.view', matchPrefix: '/customers' },
     ],
   },
   {
@@ -63,8 +65,13 @@ export const PILLARS: Pillar[] = [
     label: 'Control',
     blurb: 'Intervene in AI operations',
     items: [
-      { name: 'Initiate Call', href: '/initiate-call', icon: Phone, permission: 'test_bound_calls' },
-      { name: 'Chat', href: '/chat', icon: MessagesSquare, permission: 'test_bound_calls' },
+      { name: 'Initiate Call', href: '/initiate-call', icon: Phone, permission: 'calls.initiate' },
+      // Session 14.1 — no dedicated "send chat" permission exists in the
+      // finalized vocabulary (the real capability inventory only
+      // surfaced customers.activity.* and calls.initiate as genuine
+      // Control-pillar mutations); reusing chat.view is a pragmatic,
+      // documented choice rather than inventing a new permission key.
+      { name: 'Chat', href: '/chat', icon: MessagesSquare, permission: 'chat.view' },
     ],
   },
   {
@@ -72,8 +79,11 @@ export const PILLARS: Pillar[] = [
     label: 'Operationalize',
     blurb: 'Turn conversations into business work',
     items: [
-      { name: 'Outbound Campaigns', href: '/outbound-campaigns', icon: MessageSquare, permission: 'manage_outbound_campaigns', matchPrefix: '/outbound-campaigns' },
-      { name: 'NPS Campaigns', href: '/nps-campaigns', icon: Star, permission: 'manage_nps_campaigns' },
+      { name: 'Outbound Campaigns', href: '/outbound-campaigns', icon: MessageSquare, permission: 'campaigns.view', matchPrefix: '/outbound-campaigns' },
+      // NPS Campaigns remains a placeholder (not in the Session 14.1
+      // capability inventory) — intentionally left ungated rather than
+      // fabricating a permission for a non-real capability.
+      { name: 'NPS Campaigns', href: '/nps-campaigns', icon: Star },
     ],
   },
   {
@@ -81,9 +91,13 @@ export const PILLARS: Pillar[] = [
     label: 'Integrate',
     blurb: 'Connect VoiceForce to external systems/channels',
     items: [
-      { name: 'WhatsApp Hub', href: '/whatsapp-hub', icon: MessageCircle, permission: 'manage_whatsapp_messages' },
-      { name: 'Formatting Hub', href: '/formatting-hub', icon: PenTool, permission: 'view_all_dashboards' },
-      { name: 'AI Orchestrator', href: '/orchestrator', icon: Workflow, permission: 'orchestrator_view', matchPrefix: '/orchestrator' },
+      // WhatsApp Hub / Formatting Hub / AI Orchestrator are legacy/
+      // placeholder surfaces outside this session's real capability
+      // inventory — left ungated (visible to any signed-in user) rather
+      // than fabricating permissions for them. See docs/SESSION_14_1_*.md.
+      { name: 'WhatsApp Hub', href: '/whatsapp-hub', icon: MessageCircle },
+      { name: 'Formatting Hub', href: '/formatting-hub', icon: PenTool },
+      { name: 'AI Orchestrator', href: '/orchestrator', icon: Workflow, matchPrefix: '/orchestrator' },
     ],
   },
   {
@@ -91,8 +105,10 @@ export const PILLARS: Pillar[] = [
     label: 'Improve',
     blurb: 'Improve agents from interaction evidence',
     items: [
-      { name: 'AI Agents', href: '/ai-agents', icon: Bot, permission: 'view_all_dashboards', matchPrefix: '/ai-agents' },
-      { name: 'Interaction Quality', href: '/qa-review', icon: ClipboardCheck, permission: 'review_transcripts' },
+      { name: 'AI Agents', href: '/ai-agents', icon: Bot, permission: 'agents.view', matchPrefix: '/ai-agents' },
+      // Interaction Quality (QA Review) is outside this session's
+      // inventory — left ungated, same reasoning as above.
+      { name: 'Interaction Quality', href: '/qa-review', icon: ClipboardCheck },
     ],
   },
   {
@@ -100,8 +116,8 @@ export const PILLARS: Pillar[] = [
     label: 'Measure',
     blurb: 'Operational and economic performance',
     items: [
-      { name: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'view_analytics' },
-      { name: 'Ratios', href: '/ratios', icon: Percent, permission: 'view_analytics', matchPrefix: '/ratios' },
+      { name: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'analytics.view' },
+      { name: 'Ratios', href: '/ratios', icon: Percent, permission: 'ratios.view', matchPrefix: '/ratios' },
     ],
   },
   {
@@ -109,8 +125,11 @@ export const PILLARS: Pillar[] = [
     label: 'Govern',
     blurb: 'Identity, security, audit and resilience',
     items: [
-      { name: 'User Mgmt', href: '/user-management', icon: Users, permission: 'manage_users' },
-      { name: 'Settings', href: '/settings', icon: Settings, permission: 'manage_settings' },
+      { name: 'User Mgmt', href: '/user-management', icon: Users, permission: 'users.view' },
+      { name: 'Role Mgmt', href: '/role-management', icon: KeyRound, permission: 'roles.view' },
+      { name: 'Audit Trail', href: '/audit-trail', icon: ScrollText, permission: 'audit.view' },
+      // Settings remains a placeholder — left ungated, same reasoning as above.
+      { name: 'Settings', href: '/settings', icon: Settings },
     ],
   },
 ];

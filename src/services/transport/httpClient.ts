@@ -1,4 +1,5 @@
 import { normalizeApiError, type ApiError } from './errors';
+import { getAccessToken } from '@/lib/authToken';
 
 /**
  * Base path for our own same-origin proxy. The frontend never
@@ -45,12 +46,19 @@ async function parseBody(res: Response): Promise<unknown> {
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', query, body, signal, headers } = options;
 
+  const accessToken = getAccessToken();
+
   let res: Response;
   try {
     res = await fetch(buildUrl(path, query), {
       method,
       headers: {
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        // Session 14.1 — the real, server-verifiable identity. Additive:
+        // the x-user-role header (set via `headers` by individual
+        // services) stays for the legacy Customer360/Campaign
+        // read-filtering seam, which remains advisory-only.
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,

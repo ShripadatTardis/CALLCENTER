@@ -1,12 +1,15 @@
 
 import { User } from '@/types/auth';
 
+/** Session 14.1 role codes — see supabase/migrations/..._user_management_rbac_audit_foundation.sql. */
 export const getRoleDisplayName = (role: string): string => {
   const roleMap: Record<string, string> = {
-    'call_center_head': 'Call Center Head',
-    'qa_reviewer': 'QA Reviewer',
-    'product_manager': 'Product Manager',
-    'ai_operations_specialist': 'AI Operations Specialist'
+    administrator: 'Administrator',
+    supervisor: 'Supervisor',
+    operator: 'Operator',
+    analyst: 'Analyst',
+    qa_reviewer: 'QA Reviewer',
+    read_only: 'Read Only',
   };
   return roleMap[role] || role;
 };
@@ -17,7 +20,6 @@ export const hasPermission = (user: User | null, permission: string): boolean =>
 
 // Re-export types and data for backward compatibility
 export type { User, Call, AIAgent, CallLog } from '@/types/auth';
-export { sampleUsers } from '@/data/sampleUsers';
 export { sampleCalls } from '@/data/sampleCalls';
 export { sampleAIAgents } from '@/data/sampleAIAgents';
 export { sampleCallLogs } from '@/data/sampleCallLogs';

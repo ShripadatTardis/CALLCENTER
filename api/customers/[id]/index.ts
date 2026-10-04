@@ -8,6 +8,7 @@ import {
 import { supabaseCampaignRepository } from '../../../src/server/campaigns/supabaseCampaignRepository.js';
 import { supabaseActivityRepository } from '../../../src/server/customer360/supabaseActivityRepository.js';
 import type { ActivityStatus, ActivityType } from '../../../src/server/customer360/activityRepository.js';
+import { requirePermission, recordAuditEvent } from '../../_auth.js';
 
 /**
  * GET /api/customers/{id}                       — authorized Customer 360 view (plan §4, §11, §12, §15)
@@ -136,6 +137,9 @@ const ACTIVITY_TYPES: ActivityType[] = ['note', 'instruction', 'task', 'reminder
 async function handleCreateActivity(req: VercelRequest, res: VercelResponse): Promise<void> {
   const id = req.query.id as string;
 
+  const actingUser = await requirePermission(req, res, 'customers.activity.create');
+  if (!actingUser) return;
+
   const customer = await repo.getCustomer(id);
   if (!customer) {
     res.status(404).json({ detail: 'Customer not found' });
@@ -164,14 +168,27 @@ async function handleCreateActivity(req: VercelRequest, res: VercelResponse): Pr
       campaignId: (body.campaignId as string | null) ?? null,
       campaignTargetId: (body.campaignTargetId as string | null) ?? null,
       interactionId: (body.interactionId as string | null) ?? null,
-      // Client-claimed only — same honesty class as Campaign.createdBy
-      // (api/campaigns.ts) and role (api/_customer360.ts §0.1).
-      createdBy: (body.createdBy as string | null) ?? null,
+      // Session 14.1 — now the real, verified actor's display name/email,
+      // not a client-claimed string. Still a display label, not a FK;
+      // customer_activities.created_by stays plain text (Session 11.5A
+      // schema, untouched this session).
+      createdBy: actingUser.displayName ?? actingUser.email,
       effectiveFrom: (body.effectiveFrom as string | null) ?? null,
       effectiveUntil: (body.effectiveUntil as string | null) ?? null,
     },
     new Date().toISOString(),
   );
+
+  await recordAuditEvent({
+    actorType: 'user',
+    actorUserId: actingUser.id,
+    action: 'customer.activity_created',
+    resourceType: 'customer',
+    resourceId: id,
+    result: 'success',
+    metadata: { activityType },
+    source: 'api/customers/[id]',
+  });
 
   res.status(201).json(created);
 }
@@ -196,6 +213,9 @@ const ACTIVITY_STATUSES_BY_TYPE: Record<ActivityType, ActivityStatus[]> = {
 
 async function handleUpdateActivityStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
   const id = req.query.id as string;
+
+  const actingUser = await requirePermission(req, res, 'customers.activity.update');
+  if (!actingUser) return;
 
   const customer = await repo.getCustomer(id);
   if (!customer) {
@@ -226,9 +246,20 @@ async function handleUpdateActivityStatus(req: VercelRequest, res: VercelRespons
   const updated = await supabaseActivityRepository.updateActivityStatus(
     activityId,
     status,
-    (body.updatedBy as string | null) ?? null,
+    actingUser.displayName ?? actingUser.email,
     new Date().toISOString(),
   );
+
+  await recordAuditEvent({
+    actorType: 'user',
+    actorUserId: actingUser.id,
+    action: 'customer.activity_status_changed',
+    resourceType: 'customer',
+    resourceId: id,
+    result: 'success',
+    metadata: { activityId, status },
+    source: 'api/customers/[id]',
+  });
 
   res.status(200).json(updated);
 }

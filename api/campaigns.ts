@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore } from './_voicebot.js';
 import { requireAdminToken, readIntQuery, resolveAccessForRequest } from './_customer360.js';
+import { requirePermission, recordAuditEvent } from './_auth.js';
 import type { AuthorizedAccess } from '../src/server/customer360/authorizationService.js';
 import { supabaseCampaignRepository } from '../src/server/campaigns/supabaseCampaignRepository.js';
 import { runCampaignBatch, voiceAgentCallBackend } from '../src/server/campaigns/campaignRunner.js';
@@ -709,7 +710,7 @@ function isAuthorizedCronRequest(req: VercelRequest): boolean {
   return req.headers.authorization === `Bearer ${secret}`;
 }
 
-const GET_ACTIONS = new Set([
+export const GET_ACTIONS = new Set([
   'list',
   'get',
   'listTargets',
@@ -718,7 +719,34 @@ const GET_ACTIONS = new Set([
   'listConfigurationVersions',
   'listAuditEvents',
 ]);
-const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile', 'enrichActualOutcomes']);
+export const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile', 'enrichActualOutcomes']);
+
+/**
+ * Session 14.1 — the real, server-enforced permission required for each
+ * mutating action (every action NOT in this map is either a read, GET
+ * actions aside, or an admin/cron action with its own separate
+ * CRON_SECRET/admin-token gate above, both untouched). Checked centrally
+ * in the dispatcher below rather than per-handler, so every mutating
+ * campaign action is covered with one gate, not eight.
+ */
+export const ACTION_PERMISSIONS: Record<string, string> = {
+  create: 'campaigns.create',
+  importTargets: 'campaigns.targets.manage',
+  setInputMappings: 'campaigns.edit',
+  start: 'campaigns.start',
+  pause: 'campaigns.pause',
+  resume: 'campaigns.resume',
+  stop: 'campaigns.stop',
+  retryTarget: 'campaigns.targets.manage',
+  scheduleFollowup: 'campaigns.targets.manage',
+  createConfigurationVersion: 'campaigns.edit',
+  updateDraftConfiguration: 'campaigns.edit',
+  skipTarget: 'campaigns.targets.manage',
+  holdTarget: 'campaigns.targets.manage',
+  releaseHold: 'campaigns.targets.manage',
+  amendTarget: 'campaigns.targets.manage',
+  addTargets: 'campaigns.targets.manage',
+};
 
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
@@ -763,6 +791,40 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
   // exactly like Customer 360's backfill/reconcile jobs.
   const access = ADMIN_ACTIONS.has(action) ? null : await resolveAccessForRequest(req);
 
+  // Session 14.1 — the real, authoritative gate for every mutating
+  // action. Runs BEFORE the existing agent-category check in each
+  // handler (that check is real filtering, documented as such, not
+  // real access control — see api/_customer360.ts) so an unauthorized
+  // caller never even reaches the category-authorization branch.
+  const requiredPermission = ACTION_PERMISSIONS[action];
+  let actingUser: Awaited<ReturnType<typeof requirePermission>> = null;
+  if (requiredPermission) {
+    actingUser = await requirePermission(req, res, requiredPermission);
+    if (!actingUser) return;
+
+    // The real, verified actor now takes priority over whatever the
+    // client body claims for the existing campaign_audit_events
+    // (domain history) `actor` text column — still a display label,
+    // not a FK, but finally backed by a verified identity rather than
+    // an unverified client-supplied string.
+    req.body = { ...(req.body ?? {}), actor: actingUser.displayName ?? actingUser.email };
+  }
+
+  const resourceId = queryStr(req, 'id') ?? queryStr(req, 'targetId') ?? (req.body?.id as string | undefined) ?? null;
+  const auditIfMutating = async () => {
+    if (!requiredPermission || !actingUser) return;
+    await recordAuditEvent({
+      actorType: 'user',
+      actorUserId: actingUser.id,
+      action: `campaign.${action}`,
+      resourceType: 'campaign',
+      resourceId,
+      result: res.statusCode >= 200 && res.statusCode < 300 ? 'success' : 'error',
+      metadata: { action },
+      source: 'api/campaigns',
+    });
+  };
+
   switch (action) {
     case 'list':
       await handleList(req, res, access as AuthorizedAccess);
@@ -778,30 +840,39 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
       return;
     case 'create':
       await handleCreate(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'importTargets':
       await handleImportTargets(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'setInputMappings':
       await handleSetInputMappings(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'start':
       await handleStatusTransition(req, res, access as AuthorizedAccess, 'running');
+      await auditIfMutating();
       return;
     case 'pause':
       await handleStatusTransition(req, res, access as AuthorizedAccess, 'paused');
+      await auditIfMutating();
       return;
     case 'resume':
       await handleStatusTransition(req, res, access as AuthorizedAccess, 'running');
+      await auditIfMutating();
       return;
     case 'stop':
       await handleStatusTransition(req, res, access as AuthorizedAccess, 'stopped');
+      await auditIfMutating();
       return;
     case 'retryTarget':
       await handleRetryTarget(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'scheduleFollowup':
       await handleScheduleFollowup(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'runBatch':
       await handleRunBatch(req, res);
@@ -823,24 +894,31 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
       return;
     case 'createConfigurationVersion':
       await handleCreateConfigurationVersion(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'updateDraftConfiguration':
       await handleUpdateDraftConfiguration(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'skipTarget':
       await handleSkipTarget(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'holdTarget':
       await handleHoldTarget(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'releaseHold':
       await handleReleaseHold(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'amendTarget':
       await handleAmendTarget(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     case 'addTargets':
       await handleAddTargets(req, res, access as AuthorizedAccess);
+      await auditIfMutating();
       return;
     default:
       res.status(400).json({

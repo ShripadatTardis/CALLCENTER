@@ -29,6 +29,8 @@ import Ratios from "./pages/Ratios";
 import RatioExplorer from "./pages/RatioExplorer";
 import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
+import RoleManagement from "./pages/RoleManagement";
+import AuditTrail from "./pages/AuditTrail";
 import Settings from "./pages/Settings";
 import WhatsAppAuthenticate from "./pages/WhatsAppAuthenticate";
 import Orchestrator from "./pages/Orchestrator";
@@ -46,32 +48,34 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/whatsapp-authenticate" element={<WhatsAppAuthenticate />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/initiate-call" element={<ProtectedRoute><InitiateCall /></ProtectedRoute>} />
-          <Route path="/call-logs" element={<ProtectedRoute><CallLogs /></ProtectedRoute>} />
-          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-          <Route path="/customers/:customerId" element={<ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
-          <Route path="/chat" element={<ProtectedRoute><ChatConsole /></ProtectedRoute>} />
-          <Route path="/chat-logs" element={<ProtectedRoute><ChatLogs /></ProtectedRoute>} />
-          <Route path="/outbound-campaigns" element={<ProtectedRoute><OutboundCampaigns /></ProtectedRoute>} />
-          <Route path="/outbound-campaigns/create" element={<ProtectedRoute><CreateCampaign /></ProtectedRoute>} />
-          <Route path="/outbound-campaigns/:campaignId" element={<ProtectedRoute><CampaignDetailPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute permission="dashboard.view"><Dashboard /></ProtectedRoute>} />
+          <Route path="/initiate-call" element={<ProtectedRoute permission="calls.initiate"><InitiateCall /></ProtectedRoute>} />
+          <Route path="/call-logs" element={<ProtectedRoute permission="calls.view"><CallLogs /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute permission="customers.view"><Customers /></ProtectedRoute>} />
+          <Route path="/customers/:customerId" element={<ProtectedRoute permission="customers.view"><CustomerDetail /></ProtectedRoute>} />
+          <Route path="/chat" element={<ProtectedRoute permission="chat.view"><ChatConsole /></ProtectedRoute>} />
+          <Route path="/chat-logs" element={<ProtectedRoute permission="chat.view"><ChatLogs /></ProtectedRoute>} />
+          <Route path="/outbound-campaigns" element={<ProtectedRoute permission="campaigns.view"><OutboundCampaigns /></ProtectedRoute>} />
+          <Route path="/outbound-campaigns/create" element={<ProtectedRoute permission="campaigns.create"><CreateCampaign /></ProtectedRoute>} />
+          <Route path="/outbound-campaigns/:campaignId" element={<ProtectedRoute permission="campaigns.view"><CampaignDetailPage /></ProtectedRoute>} />
           <Route path="/nps-campaigns" element={<ProtectedRoute><NPSCampaigns /></ProtectedRoute>} />
-          <Route path="/live-view" element={<ProtectedRoute><LiveView /></ProtectedRoute>} />
+          <Route path="/live-view" element={<ProtectedRoute permission="live.view"><LiveView /></ProtectedRoute>} />
           <Route path="/qa-review" element={<ProtectedRoute><QAReview /></ProtectedRoute>} />
           <Route path="/whatsapp-hub" element={<ProtectedRoute><WhatsAppHub /></ProtectedRoute>} />
           <Route path="/formatting-hub" element={<ProtectedRoute><FormattingHub /></ProtectedRoute>} />
-          <Route path="/ai-agents" element={<ProtectedRoute><AIAgents /></ProtectedRoute>} />
-          <Route path="/ai-agents/:agentId" element={<ProtectedRoute><AgentDetail /></ProtectedRoute>} />
+          <Route path="/ai-agents" element={<ProtectedRoute permission="agents.view"><AIAgents /></ProtectedRoute>} />
+          <Route path="/ai-agents/:agentId" element={<ProtectedRoute permission="agents.view"><AgentDetail /></ProtectedRoute>} />
           <Route path="/orchestrator" element={<ProtectedRoute><Orchestrator /></ProtectedRoute>} />
           <Route path="/orchestrator/new" element={<ProtectedRoute><OrchestratorNew /></ProtectedRoute>} />
           <Route path="/orchestrator/flow/:flowId" element={<ProtectedRoute><OrchestratorFlow /></ProtectedRoute>} />
           <Route path="/orchestrator/integrations" element={<ProtectedRoute><OrchestratorIntegrations /></ProtectedRoute>} />
-          <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-          <Route path="/ratios" element={<ProtectedRoute><Ratios /></ProtectedRoute>} />
-          <Route path="/ratios/:ratioId" element={<ProtectedRoute><RatioExplorer /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute permission="analytics.view"><Analytics /></ProtectedRoute>} />
+          <Route path="/ratios" element={<ProtectedRoute permission="ratios.view"><Ratios /></ProtectedRoute>} />
+          <Route path="/ratios/:ratioId" element={<ProtectedRoute permission="ratios.view"><RatioExplorer /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/user-management" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+          <Route path="/user-management" element={<ProtectedRoute permission="users.view"><UserManagement /></ProtectedRoute>} />
+          <Route path="/role-management" element={<ProtectedRoute permission="roles.view"><RoleManagement /></ProtectedRoute>} />
+          <Route path="/audit-trail" element={<ProtectedRoute permission="audit.view"><AuditTrail /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
         </Routes>

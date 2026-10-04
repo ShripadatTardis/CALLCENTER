@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
@@ -8,6 +7,7 @@ import { useActionItems } from '@/hooks/actions/useActions';
 import { actionItemReasonText, type ActionItem } from '@/services/actions/actionsService';
 import { formatStaleDurationHuman } from '@/lib/format';
 import { DASHBOARD_ORIGIN_STATE } from '@/lib/dashboardNavigation';
+import { useGuardedNavigate } from '@/hooks/useGuardedNavigate';
 import { ActionItemDetailDialog } from './ActionItemDetailDialog';
 
 const DEFAULT_VISIBLE = 5;
@@ -32,7 +32,7 @@ function statusBadge(status: ActionItem['status']) {
  * Dashboard's own unrelated indicator, unchanged.
  */
 export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ agentRoster }) => {
-  const navigate = useNavigate();
+  const guardedNavigate = useGuardedNavigate();
   const { data, isLoading, isError, refetch } = useActionItems('open');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ 
             <button
               type="button"
               className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
-              onClick={() => navigate('/action-required', { state: DASHBOARD_ORIGIN_STATE })}
+              onClick={() => guardedNavigate('/action-required', { state: DASHBOARD_ORIGIN_STATE }, 'actions.view', 'Action Required')}
             >
               View all &rarr; Action Required
             </button>

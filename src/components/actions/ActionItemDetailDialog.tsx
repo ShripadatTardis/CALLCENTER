@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useGuardedNavigate } from '@/hooks/useGuardedNavigate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ interface ActionItemDetailDialogProps {
  * this component decides to render.
  */
 export const ActionItemDetailDialog: React.FC<ActionItemDetailDialogProps> = ({ id, isOpen, onClose, agentRoster }) => {
-  const navigate = useNavigate();
+  const guardedNavigate = useGuardedNavigate();
   const { user } = useAuth();
   const { data: item, isLoading } = useActionItem(id);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -230,7 +230,7 @@ export const ActionItemDetailDialog: React.FC<ActionItemDetailDialogProps> = ({ 
             )}
 
             <div className="pt-1">
-              <Button size="sm" variant="ghost" onClick={() => navigate('/call-logs')}>
+              <Button size="sm" variant="ghost" onClick={() => guardedNavigate('/call-logs', undefined, 'calls.view', 'Call Logs')}>
                 Open Call Logs
               </Button>
             </div>

@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +23,7 @@ import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
 import { ActionRequiredCard } from '@/components/actions/ActionRequiredCard';
+import { useGuardedNavigate } from '@/hooks/useGuardedNavigate';
 import type { Interaction } from '@/types/interaction';
 import {
   formatDurationExact,
@@ -101,7 +101,7 @@ const LiveOperationsTile: React.FC<{ label: string; value: React.ReactNode; hint
  * service itself returned (the same text Ratio Explorer would show).
  */
 const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
-  const navigate = useNavigate();
+  const guardedNavigate = useGuardedNavigate();
   const definition = getFrontendRatioDefinition(ratioId);
   const { data, isLoading, isError, refetch } = useRatioSummary(ratioId, {});
   const link = buildDashboardRatioLink(ratioId);
@@ -128,7 +128,7 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
   return (
     <button
       type="button"
-      onClick={() => navigate(link.path, { state: link.state })}
+      onClick={() => guardedNavigate(link.path, { state: link.state }, 'ratios.view', 'Ratio Explorer')}
       className="flex-1 min-w-[8.5rem] text-left rounded-md border border-border bg-card/40 px-3 py-2 hover:bg-card hover:border-cyan-600/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
     >
       <div className="text-[11px] text-muted-foreground truncate" title={definition?.name}>
@@ -148,7 +148,7 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
 };
 
 const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
+  const guardedNavigate = useGuardedNavigate();
   const recent = useCallData({ page_size: 5 });
   const agents = useAgents();
   const chat = useChatLogs(1);
@@ -211,13 +211,13 @@ const Dashboard: React.FC = () => {
               label="Active calls"
               value={recent.isLoading ? '…' : activeCalls}
               hint="Currently in progress — opens Live View"
-              onClick={() => navigate(liveViewLink.path, { state: liveViewLink.state })}
+              onClick={() => guardedNavigate(liveViewLink.path, { state: liveViewLink.state }, 'live.view', 'Live View')}
             />
             <LiveOperationsTile
               label="Active agents"
               value={agents.isLoading || recent.isLoading ? '…' : `${activeAgentCount}/${agentRoster.length}`}
               hint="On a call / total roster — opens AI Agents"
-              onClick={() => navigate('/ai-agents')}
+              onClick={() => guardedNavigate('/ai-agents', undefined, 'agents.view', 'AI Agents')}
             />
             <LiveOperationsTile
               label="Avg handle time"
@@ -231,7 +231,7 @@ const Dashboard: React.FC = () => {
               hint={ahtSummary.data?.value != null ? formatDurationExact(ahtSummary.data.value) : (ahtSummary.data?.unavailableReason ?? undefined)}
               onClick={() => {
                 const link = buildDashboardRatioLink(DASHBOARD_AHT_RATIO_ID);
-                navigate(link.path, { state: link.state });
+                guardedNavigate(link.path, { state: link.state }, 'ratios.view', 'Ratio Explorer');
               }}
             />
           </div>
@@ -250,7 +250,7 @@ const Dashboard: React.FC = () => {
               isLoading={agents.isLoading || recent.isLoading}
               onAgentClick={(agentId) => {
                 const link = buildDashboardAgentDetailLink(agentId);
-                navigate(link.path, { state: link.state });
+                guardedNavigate(link.path, { state: link.state }, 'agents.view', 'AI Agents');
               }}
               title="Agent Activity"
               variant="compact"
@@ -266,7 +266,7 @@ const Dashboard: React.FC = () => {
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
-                onClick={() => navigate('/call-logs', { state: DASHBOARD_ORIGIN_STATE })}
+                onClick={() => guardedNavigate('/call-logs', { state: DASHBOARD_ORIGIN_STATE }, 'calls.view', 'Call Logs')}
               >
                 View all &rarr; Call Logs
               </button>
@@ -375,7 +375,7 @@ const Dashboard: React.FC = () => {
             <button
               type="button"
               className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
-              onClick={() => navigate('/ratios', { state: DASHBOARD_ORIGIN_STATE })}
+              onClick={() => guardedNavigate('/ratios', { state: DASHBOARD_ORIGIN_STATE }, 'ratios.view', 'Ratio Explorer')}
             >
               Explore all ratios &rarr;
             </button>

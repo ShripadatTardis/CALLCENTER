@@ -131,6 +131,17 @@ Run directly via the Supabase MCP against `dtbaczafdzgctkbqviod`, using the two 
 
 All test `action_items` rows were deleted after verification; the `role.agent_scope_changed` and `action_item.*` audit events from this test remain in the Audit Trail as real evidence, same as 14.3's own live scope-narrowing test.
 
+## Browser-level live E2E (real Operator account, deployed app)
+
+Performed after the SQL-level verification above, using the real Operator account (`shripad@miles.in`) signed into the deployed app:
+
+- **Navigation-guard fix, found live.** Clicking a Performance Ratio card as Operator (who lacks `ratios.view`) navigated to `/ratios/:id` and rendered `ProtectedRoute`'s full-page "Not authorized" takeover — jarring, and not what the brief's "focus should stay on the current page" expectation implies for a click the UI could have prevented. Added `useGuardedNavigate()` (`src/hooks/useGuardedNavigate.ts`): checks the destination's permission before navigating; on denial, stays on the page and shows a toast ("You don't have permission to view Ratio Explorer.") instead. Applied to every outbound navigation on Dashboard and the Action Required card/dialog. `ProtectedRoute`'s full-page denial is unchanged and remains the real backstop for direct URL entry/bookmarks — this only improves the in-app click path. Verified live: the same click now shows the toast and stays on Dashboard.
+- **Manual "Check for new escalations" trigger added** to the full Action Required page (`POST ?resource=actions&action=generate`, `actions.view` is sufficient) so verification didn't have to wait for the next daily cron run.
+- **Real generation run, real data**: clicking it surfaced **170 new** Action Required items from real escalated calls in the live backend (0 already-tracked, confirming this was the very first run) — every one correctly shows **"Reason unavailable from source"** (the live data's `escalation_trigger` is null on every one of these real rows), confirming the honest-reason-fallback path is exercised by real data, not just synthetic test cases.
+- **Full ownership-aware lifecycle, live, as Operator** (who holds `actions.resolve` but not `actions.assign`): opened an unassigned item → saw only a "Take ownership" control (no assign-to-other picker, correctly absent since Operator lacks `actions.assign`) → took ownership → "Move to In Progress" became enabled and the resolution form appeared (both gated on `isOwnItem`, now true) → moved to In Progress (status badge updated live) → selected a resolution code, entered a note, resolved → dialog closed automatically → item disappeared from the Open tab and correctly appeared in the Resolved tab with the real owner's name.
+- **Live transcript inspection**: "View transcript" on an Action Required item's underlying call loaded the real conversation via the existing scope-enforced `api/calls/session/[id]` endpoint — genuine live data, searchable, not a fabricated summary.
+- **Dashboard card reflected the real count** ("Action Required (169)" after the one resolution above) and "View all → Action Required" correctly appears once the count exceeds the 5 shown.
+
 ## Known limitations (explicit, not hidden)
 
 1. **Customer Category Scope is not yet enforceable on Action Required** — `customer_id` is genuinely unpopulated (no reliable call→customer link exists today). Only Agent Scope is checked. The column and the check structure both already exist for when that link lands.

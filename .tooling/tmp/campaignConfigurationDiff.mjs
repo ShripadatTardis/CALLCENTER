@@ -1,4 +1,7 @@
 // src/lib/campaignConfigurationDiff.ts
+function selectCurrentVersionMappings(allMappings, currentVersionId) {
+  return allMappings.filter((m) => m.configurationVersionId === currentVersionId);
+}
 function buildConfigurationVersionViews(versions, allMappings, current) {
   if (versions.length === 0) {
     return [
@@ -10,7 +13,7 @@ function buildConfigurationVersionViews(versions, allMappings, current) {
         agentName: current.agentName,
         agentContractSnapshot: current.agentContractSnapshot,
         outcomePolicySnapshot: current.outcomePolicySnapshot,
-        mappings: allMappings.filter((m) => m.configurationVersionId === null),
+        mappings: selectCurrentVersionMappings(allMappings, null),
         createdAt: current.createdAt,
         createdBy: current.createdBy,
         changeReason: null,
@@ -26,7 +29,7 @@ function buildConfigurationVersionViews(versions, allMappings, current) {
     agentName: v.agentName,
     agentContractSnapshot: v.agentContractSnapshot,
     outcomePolicySnapshot: v.outcomePolicySnapshot,
-    mappings: allMappings.filter((m) => m.configurationVersionId === v.id),
+    mappings: selectCurrentVersionMappings(allMappings, v.id),
     createdAt: v.createdAt,
     createdBy: v.createdBy,
     changeReason: v.changeReason,
@@ -93,5 +96,6 @@ function diffConfigurationVersions(prev, curr) {
 }
 export {
   buildConfigurationVersionViews,
-  diffConfigurationVersions
+  diffConfigurationVersions,
+  selectCurrentVersionMappings
 };

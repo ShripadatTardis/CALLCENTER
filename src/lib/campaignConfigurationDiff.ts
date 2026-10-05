@@ -36,6 +36,29 @@ export interface ConfigurationVersionView {
 }
 
 /**
+ * Session 15.2 (correctness fix) — selects only the mapping rows that
+ * belong to one specific configuration version (or the never-versioned
+ * "current" set when versionId is null) out of the campaign's full
+ * cross-version mapping row history. The one place this MUST be used
+ * before treating a campaign's mapping rows as "the current mapping":
+ * campaign.mappings itself is never pre-filtered — it is every mapping
+ * row ever inserted across every configuration version, intentionally,
+ * so buildConfigurationVersionViews below can reconstruct each
+ * version's own mappings for Configuration History. Any other consumer
+ * that needs "the mappings that currently govern this campaign" (e.g.
+ * CampaignSettingsDialog seeding its edit form) must filter through
+ * this function first, keyed by the same governing version id already
+ * used for optimistic-concurrency (expectedCurrentVersionId) — never
+ * assume the last entry in array order is the current one.
+ */
+export function selectCurrentVersionMappings(
+  allMappings: CampaignAgentInputMapping[],
+  currentVersionId: string | null,
+): CampaignAgentInputMapping[] {
+  return allMappings.filter((m) => m.configurationVersionId === currentVersionId);
+}
+
+/**
  * Groups the campaign's full (unfiltered, cross-version) mapping row
  * set by configurationVersionId and pairs each group with its version
  * row. When the campaign has never been versioned (no rows at all —
@@ -67,7 +90,7 @@ export function buildConfigurationVersionViews(
         agentName: current.agentName,
         agentContractSnapshot: current.agentContractSnapshot,
         outcomePolicySnapshot: current.outcomePolicySnapshot,
-        mappings: allMappings.filter((m) => m.configurationVersionId === null),
+        mappings: selectCurrentVersionMappings(allMappings, null),
         createdAt: current.createdAt,
         createdBy: current.createdBy,
         changeReason: null,
@@ -85,7 +108,7 @@ export function buildConfigurationVersionViews(
       agentName: v.agentName,
       agentContractSnapshot: v.agentContractSnapshot,
       outcomePolicySnapshot: v.outcomePolicySnapshot,
-      mappings: allMappings.filter((m) => m.configurationVersionId === v.id),
+      mappings: selectCurrentVersionMappings(allMappings, v.id),
       createdAt: v.createdAt,
       createdBy: v.createdBy,
       changeReason: v.changeReason,

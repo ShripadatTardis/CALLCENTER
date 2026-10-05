@@ -10,6 +10,7 @@ import { useCampaignClassifications } from '@/hooks/campaigns/useCampaigns';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import { validateMappingSourceUniqueness } from '@/lib/campaignInputMappingUniqueness';
+import { selectCurrentVersionMappings } from '@/lib/campaignConfigurationDiff';
 import type { CampaignDetail, InputMappingSourceType, NewCampaignAgentInputMappingInput } from '@/types/campaign';
 
 interface CampaignSettingsDialogProps {
@@ -54,8 +55,24 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
       : null
     : campaign.agentContractSnapshot;
 
+  // Session 15.2 correctness fix — campaign.mappings is the campaign's
+  // FULL cross-version mapping row history (every row ever inserted
+  // across every configuration version; CampaignConfigurationHistory
+  // relies on exactly this full set to reconstruct each version's own
+  // mappings). It must be filtered to the rows belonging to the
+  // version that actually governs this edit (expectedCurrentVersionId,
+  // already the same id passed to createConfigurationVersion for its
+  // optimistic-concurrency check) before seeding this dialog's state —
+  // otherwise a field mapped differently across versions could silently
+  // seed a superseded version's value, keyed by array order rather than
+  // governing version. Mirrors the filter already established and
+  // tested in campaignConfigurationDiff.ts's buildConfigurationVersionViews.
+  const currentVersionMappings = useMemo(
+    () => selectCurrentVersionMappings(campaign.mappings, expectedCurrentVersionId),
+    [campaign.mappings, expectedCurrentVersionId],
+  );
   const [fieldMappings, setFieldMappings] = useState<Record<string, { sourceType: InputMappingSourceType; sourceField: string }>>(() =>
-    Object.fromEntries(campaign.mappings.map((m) => [m.agentInputFieldCode, { sourceType: m.sourceType, sourceField: m.sourceField }])),
+    Object.fromEntries(currentVersionMappings.map((m) => [m.agentInputFieldCode, { sourceType: m.sourceType, sourceField: m.sourceField }])),
   );
   const [outcomeMappings, setOutcomeMappings] = useState<Record<string, string>>(() => {
     const snapshot = campaign.outcomePolicySnapshot;

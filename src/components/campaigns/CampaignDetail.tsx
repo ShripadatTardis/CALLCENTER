@@ -11,6 +11,7 @@ import { AddTargetsDialog } from './AddTargetsDialog';
 import { CampaignHistory } from './CampaignHistory';
 import { CampaignConfigurationHistory } from './CampaignConfigurationHistory';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog';
+import { CampaignConfigurationSummary } from './CampaignConfigurationSummary';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { useCampaignClassifications, useCampaignConfigurationVersions } from '@/hooks/campaigns/useCampaigns';
@@ -436,6 +437,12 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           available, but no Campaign Classification is derived from it.
         </p>
       )}
+
+      <CampaignConfigurationSummary
+        campaign={campaign}
+        activeConfigurationVersionId={activeConfigurationVersion?.id ?? null}
+        classifications={classifications}
+      />
 
       <div>
         <div className="flex items-center justify-between mb-1.5 px-0.5">

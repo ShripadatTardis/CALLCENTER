@@ -5,6 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useCampaignConfigurationVersions } from '@/hooks/campaigns/useCampaigns';
 import { formatTimestamp } from '@/lib/format';
 import { buildConfigurationVersionViews, diffConfigurationVersions, type ConfigurationVersionView } from '@/lib/campaignConfigurationDiff';
+import { typography } from '@/lib/typography';
 import type { CampaignDetail as CampaignDetailType } from '@/types/campaign';
 
 /**
@@ -58,8 +59,8 @@ export const CampaignConfigurationHistory: React.FC<{ campaign: CampaignDetailTy
 
       {campaign.rules.length > 0 && (
         <div className="space-y-1.5 pt-2 border-t border-border/60">
-          <h3 className="text-[12px] font-semibold text-foreground">Legacy Result Rules</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className={typography.subsectionTitle}>Legacy Result Rules</h3>
+          <p className={typography.bodySecondary}>
             Generic/operational rules — not versioned by Configuration History, and distinct from Outcome Mapping
             above. These still govern this campaign's generic Current Result (call status/outcome match), separately
             from the Agent Outcome / Campaign Classification layers.
@@ -109,12 +110,12 @@ const VersionRow: React.FC<{
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+            className="w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
             aria-expanded={expanded}
             aria-controls={contentId}
           >
             <span className="flex items-center gap-2 flex-wrap text-[12px]">
-              {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+              {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />}
               <span className="font-semibold text-foreground">v{view.versionNumber}</span>
               {view.status === 'active' ? (
                 <Badge className="text-[9px] py-0 px-1.5 bg-cyan-700 text-white hover:bg-cyan-700">Current</Badge>
@@ -163,7 +164,7 @@ const VersionRow: React.FC<{
 
             {view.mappings.length > 0 && (
               <div className="space-y-0.5">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Input Mapping</div>
+                <div className={typography.subsectionTitle}>Input Mapping</div>
                 <div className="border border-border rounded divide-y divide-border/60">
                   {view.mappings.map((m) => (
                     <div key={m.agentInputFieldCode} className="px-2 py-1 flex items-center justify-between gap-2">
@@ -179,7 +180,7 @@ const VersionRow: React.FC<{
 
             {(view.outcomePolicySnapshot?.mappings.length ?? 0) > 0 && (
               <div className="space-y-0.5">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Outcome Mapping</div>
+                <div className={typography.subsectionTitle}>Outcome Mapping</div>
                 <div className="border border-border rounded divide-y divide-border/60">
                   {view.outcomePolicySnapshot!.mappings.map((m) => (
                     <div key={m.agentOutcomeCode} className="px-2 py-1 flex items-center justify-between gap-2">

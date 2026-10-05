@@ -1,7 +1,8 @@
-import React from 'react';
-import { Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useCampaignAuditEvents } from '@/hooks/campaigns/useCampaigns';
 import { formatTimestamp } from '@/lib/format';
+import { typography } from '@/lib/typography';
 import type { CampaignAuditEvent } from '@/types/campaign';
 
 const EVENT_LABELS: Record<string, string> = {
@@ -66,19 +67,48 @@ function detailSummary(event: CampaignAuditEvent): string | null {
   return null;
 }
 
+/**
+ * Session 15.2 Part C — detailSummary() only ever surfaces a derived,
+ * human-readable line for the detail shapes it recognizes; any other
+ * field already present in `detail` (or an unrecognized shape
+ * entirely) would otherwise be silently dropped. The raw payload is
+ * always available here, behind an explicit expand — never the
+ * default/normal presentation, but never discarded either.
+ */
 const HistoryRow: React.FC<{ event: CampaignAuditEvent }> = ({ event }) => {
   const summary = detailSummary(event);
+  const [expanded, setExpanded] = useState(false);
+  const hasRawDetail = event.detail && Object.keys(event.detail).length > 0;
   return (
-    <div className="px-3 py-2 text-[13px]">
+    <div className="px-3 py-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="font-medium text-foreground">{eventLabel(event.eventType)}</span>
-        <span className="text-muted-foreground text-xs">· {formatTimestamp(event.occurredAt)}</span>
-        {event.actor && <span className="text-muted-foreground text-xs">· {event.actor}</span>}
+        <span className={`font-medium ${typography.body}`}>{eventLabel(event.eventType)}</span>
+        <span className={typography.metadata}>· {formatTimestamp(event.occurredAt)}</span>
+        {event.actor && <span className={typography.metadata}>· {event.actor}</span>}
       </div>
       {(event.reason || event.comment || summary) && (
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className={`${typography.bodySecondary} mt-0.5`}>
           {[event.reason, event.comment, summary].filter(Boolean).join(' — ')}
         </p>
+      )}
+      {hasRawDetail && (
+        <>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-1 -ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-1 text-[11px] text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
+            aria-expanded={expanded}
+            aria-controls={`campaign-history-detail-${event.id}`}
+          >
+            {expanded ? <ChevronDown className="h-3 w-3" aria-hidden="true" /> : <ChevronRight className="h-3 w-3" aria-hidden="true" />}
+            Technical details
+          </button>
+          {expanded && (
+            <pre id={`campaign-history-detail-${event.id}`} className="mt-1 p-2 rounded bg-background/60 border border-border/60 text-[10px] text-muted-foreground overflow-x-auto">
+              {JSON.stringify(event.detail, null, 2)}
+            </pre>
+          )}
+        </>
       )}
     </div>
   );

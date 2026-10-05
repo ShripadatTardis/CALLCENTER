@@ -826,12 +826,12 @@ export const supabaseCampaignRepository: CampaignRepository = {
     return (rows ?? []).map(mapAuditEvent);
   },
 
-  async getExecutionByInteractionId(campaignId, interactionId) {
-    const row = await rpc<ExecutionRow | null>('call_center_campaign_get_execution_by_interaction', {
-      p_campaign_id: campaignId,
-      p_interaction_id: interactionId,
-    });
-    return row ? mapExecution(row) : null;
+  async getExecutionByInteractionId(interactionId) {
+    const result = await rpc<{ execution: ExecutionRow; agentId: string } | null>(
+      'call_center_campaign_get_execution_by_interaction',
+      { p_interaction_id: interactionId },
+    );
+    return result ? { execution: mapExecution(result.execution), agentId: result.agentId } : null;
   },
 
   async createConfigurationVersion({

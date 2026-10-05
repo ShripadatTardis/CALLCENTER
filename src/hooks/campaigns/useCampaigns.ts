@@ -20,8 +20,8 @@ export const campaignsKeys = {
   skipReasons: () => [...campaignsKeys.all, 'skipReasons'] as const,
   configurationVersions: (id: string) => [...campaignsKeys.all, 'configurationVersions', id] as const,
   auditEvents: (id: string) => [...campaignsKeys.all, 'auditEvents', id] as const,
-  executionByInteraction: (campaignId: string, interactionId: string) =>
-    [...campaignsKeys.all, 'executionByInteraction', campaignId, interactionId] as const,
+  executionByInteraction: (interactionId: string) =>
+    [...campaignsKeys.all, 'executionByInteraction', interactionId] as const,
 };
 
 /**
@@ -75,17 +75,18 @@ export function useCampaignConfigurationVersions(campaignId: string | undefined)
 /**
  * Session 15.3 — the real input values sent for one campaign-triggered
  * interaction (Call Logs' "what was actually sent to the agent"
- * follow-up to Agent Contract). Disabled entirely when the interaction
- * has no campaignId — most calls/chats are not campaign-triggered, and
- * this lookup only ever makes sense for the ones that are.
+ * follow-up to Agent Contract). No campaignId is needed or available —
+ * the Voice/Calls API never carries a stable one on a call record; the
+ * server resolves and authorizes the matching execution by interaction
+ * id alone. Disabled only when there's no interactionId at all.
  */
-export function useCampaignExecutionByInteraction(campaignId: string | undefined, interactionId: string | undefined) {
+export function useCampaignExecutionByInteraction(interactionId: string | undefined) {
   const { user } = useAuth();
   const role = user?.role ?? 'unauthenticated';
   return useQuery({
-    queryKey: [...campaignsKeys.executionByInteraction(campaignId ?? '', interactionId ?? ''), role],
-    queryFn: () => fetchCampaignExecutionByInteraction(campaignId as string, interactionId as string, role),
-    enabled: Boolean(campaignId) && Boolean(interactionId),
+    queryKey: [...campaignsKeys.executionByInteraction(interactionId ?? ''), role],
+    queryFn: () => fetchCampaignExecutionByInteraction(interactionId as string, role),
+    enabled: Boolean(interactionId),
   });
 }
 

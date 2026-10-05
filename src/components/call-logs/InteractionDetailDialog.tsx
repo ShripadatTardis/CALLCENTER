@@ -92,14 +92,12 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
   // Session 15.3 — the real input VALUES sent for this interaction
   // (distinct from Agent Contract above, which is only the field
-  // DEFINITIONS). Only ever applicable to a campaign-triggered
-  // interaction; disabled (never fetched) for any interaction with no
-  // campaignId. Honest either way: no execution row at all means this
-  // was never campaign-triggered, not that the data was lost.
-  const { data: execution, isLoading: isExecutionLoading } = useCampaignExecutionByInteraction(
-    interaction?.campaignId,
-    interaction?.interactionId,
-  );
+  // DEFINITIONS). Resolved by interactionId alone — the Voice/Calls API
+  // never carries a stable campaignId on a call record, so this cannot
+  // be gated on interaction.campaignId. Honest either way: no execution
+  // row at all means this was never campaign-triggered (or is outside
+  // this user's Agent Scope), not that the data was lost.
+  const { data: execution, isLoading: isExecutionLoading } = useCampaignExecutionByInteraction(interaction?.interactionId);
 
   const isActive = interaction?.status === 'active';
   const needsLiveFetch = isActive || (interaction?.transcript?.length ?? 0) === 0;
@@ -272,25 +270,21 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
         <AgentContractSection contract={agentContract} />
 
-        {/* Session 15.3 — only meaningful for a campaign-triggered
-            interaction (interaction.campaignId set); an ad hoc/inbound
-            call or any chat session was never dispatched from a
-            campaign execution, so there is honestly no record to show
-            and this section renders nothing for them, same as Agent
-            Outcome above renders nothing when there's genuinely no data. */}
-        {interaction.campaignId && (() => {
-          const agentInputs = (execution?.requestPayloadSnapshot?.agent_inputs ?? null) as Record<string, unknown> | null;
+        {/* Session 15.3 — only rendered once a matching execution is
+            actually confirmed to exist, same as Agent Outcome above
+            renders nothing when there's genuinely no data; most
+            calls/chats are not campaign-triggered at all (no stable
+            campaignId is even available upstream to gate on — see the
+            hook's own comment), so showing a permanent empty "not
+            applicable" row on every interaction would be worse noise
+            than the brief loading gap while this single-row lookup
+            resolves. */}
+        {!isExecutionLoading && execution && (() => {
+          const agentInputs = (execution.requestPayloadSnapshot?.agent_inputs ?? null) as Record<string, unknown> | null;
           const declaredFields = agentContract?.expectedInputFields ?? [];
           return (
             <CollapsibleSectionCard title="Input Values Sent">
-              {isExecutionLoading ? (
-                <p className="text-xs text-muted-foreground">Loading…</p>
-              ) : !execution ? (
-                <p className="text-xs text-muted-foreground">
-                  No execution record matches this interaction — it may not have been campaign-triggered, or predates
-                  this capture.
-                </p>
-              ) : !agentInputs || Object.keys(agentInputs).length === 0 ? (
+              {!agentInputs || Object.keys(agentInputs).length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No declared input-field values were captured for this execution (legacy/partial contract at the
                   time it ran, or the agent declares no input fields).

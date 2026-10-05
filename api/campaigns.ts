@@ -404,15 +404,17 @@ async function handleListAuditEvents(req: VercelRequest, res: VercelResponse, ac
 }
 
 async function handleGetExecutionByInteraction(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
-  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
-  if (!id) return;
   const interactionId = queryStr(req, 'interactionId');
   if (!interactionId) {
     res.status(400).json({ detail: 'interactionId is required' });
     return;
   }
-  const execution = await repo.getExecutionByInteractionId(id, interactionId);
-  res.status(200).json({ data: execution });
+  const result = await repo.getExecutionByInteractionId(interactionId);
+  if (!result || !isAgentAuthorized(access, result.agentId)) {
+    res.status(200).json({ data: null });
+    return;
+  }
+  res.status(200).json({ data: result.execution });
 }
 
 interface CreateConfigurationVersionBody {

@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { formatTimestamp } from '@/lib/format';
+import { typography } from '@/lib/typography';
 import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
 import type { CampaignClassification, CampaignConfigurationVersion, CampaignDetail as CampaignDetailType, CampaignTargetRow } from '@/types/campaign';
 import type { Interaction } from '@/types/interaction';
@@ -82,29 +83,38 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; phone: string; 
     queryFn: () => findCallByPhoneAndId(phone, interactionId, role),
   });
 
+  // VoiceForce design system (Phase 2B) — these two transient states
+  // previously hand-rolled their own `fixed inset-0 bg-black/30` overlay
+  // instead of the shared Dialog primitive, so they had no focus trap
+  // and no Escape-to-close. Migrated to the real Dialog — same visual
+  // footprint (a small centered panel), real keyboard/focus behavior.
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-        <div className="bg-card rounded-lg p-6 flex items-center gap-2">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Loading interaction…
-        </div>
-      </div>
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading interaction…
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   if (isError || !interaction) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-        <div className="bg-card rounded-lg p-6 max-w-sm text-sm text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-          Could not load full interaction detail for {interactionId} right now.
-          <div className="mt-3">
+      <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-sm">
+          <p className="text-sm text-muted-foreground">
+            Could not load full interaction detail for {interactionId} right now.
+          </p>
+          <div className="flex justify-end">
             <Button size="sm" variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={onClose}>
               Close
             </Button>
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -137,11 +147,12 @@ const AgentResultDialog: React.FC<{
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div
-        className="bg-card border border-border rounded-lg p-4 max-w-md w-full text-[13px] text-foreground space-y-3"
-        onClick={(e) => e.stopPropagation()}
-      >
+    // VoiceForce design system (Phase 2B) — migrated from a hand-rolled
+    // `fixed inset-0` overlay to the real Dialog primitive (same reason
+    // as InteractionLookupDialog above): real focus trap/Escape-to-close,
+    // same visual footprint otherwise.
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md text-[13px] text-foreground space-y-3">
         <h3 className="text-sm font-semibold">Agent result</h3>
 
         <div className="space-y-0.5">
@@ -248,8 +259,8 @@ const AgentResultDialog: React.FC<{
             Close
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -308,14 +319,23 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
     // App-wide viewport-framing correction (follow-up to Session 15) —
     // Pattern B: root is the single scroll region.
     <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-3 text-foreground">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* VoiceForce design system (Phase 2C) — this header carries the
+          campaign's primary identity AND the live lifecycle controls
+          (Start/Pause/Resume/Stop) — the single most operationally
+          important row on the page. It previously had zero container
+          weight while the secondary stats strip below it was fully
+          boxed (flagged as a real hierarchy inversion in the Phase 1
+          addendum). Now it gets real container weight; the stats strip
+          keeps its lighter bg-card/40 treatment so the two read as
+          primary/secondary, not two unrelated boxes. */}
+      <div className="flex items-center justify-between flex-wrap gap-3 rounded-md border border-border bg-card p-3">
         <div className="flex items-center gap-3">
           <Button variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" size="sm" onClick={onBack}>
             ← Campaigns
           </Button>
           <div>
-            <h1 className="text-base font-semibold text-foreground">{campaign.name}</h1>
-            {campaign.description && <p className="text-[12px] text-muted-foreground">{campaign.description}</p>}
+            <h1 className={typography.pageTitle}>{campaign.name}</h1>
+            {campaign.description && <p className={typography.pageDescription}>{campaign.description}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -417,7 +437,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
 
       <div>
         <div className="flex items-center justify-between mb-1.5 px-0.5">
-          <h2 className="text-[13px] font-semibold text-foreground">
+          <h2 className={typography.sectionTitle}>
             Targets ({campaign.stats.targetCount})
           </h2>
           <Button size="sm" variant="outline" className="h-7 text-[11px] border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setAddTargetsOpen(true)}>

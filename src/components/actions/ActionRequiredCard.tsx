@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import type { AgentSummary } from '@/services/agents/agentsMapper';
@@ -8,6 +7,7 @@ import { actionItemReasonText, type ActionItem } from '@/services/actions/action
 import { formatStaleDurationHuman } from '@/lib/format';
 import { DASHBOARD_ORIGIN_STATE } from '@/lib/dashboardNavigation';
 import { useGuardedNavigate } from '@/hooks/useGuardedNavigate';
+import { typography } from '@/lib/typography';
 import { ActionItemDetailDialog } from './ActionItemDetailDialog';
 
 const DEFAULT_VISIBLE = 5;
@@ -46,11 +46,19 @@ export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ 
 
   return (
     <>
-      <Card className="bg-card border-border">
-        <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm font-semibold text-foreground">
+      {/* VoiceForce design system (Phase 2C) — a plain div matching
+          AgentActivityPanel/Dashboard's Recent Interactions box recipe
+          (rounded-md border border-border bg-card p-3), not the shadcn
+          Card's rounded-lg/shadow-sm — same single operational-card
+          treatment used by the full Action Required queue page's own
+          item list, so the two surfaces feel like one consistent
+          containment convention instead of two different container
+          styles for the same data. */}
+      <div className="rounded-md border border-border bg-card p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className={typography.cardTitle}>
             Action Required{items.length > 0 ? ` (${items.length})` : ''}
-          </CardTitle>
+          </div>
           {items.length > DEFAULT_VISIBLE && (
             <button
               type="button"
@@ -60,8 +68,8 @@ export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ 
               View all &rarr; Action Required
             </button>
           )}
-        </CardHeader>
-        <CardContent className="px-3 pb-2">
+        </div>
+        <div>
           {isLoading ? (
             <div className="flex justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -91,7 +99,7 @@ export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ 
                   >
                     <div className="min-w-0 flex flex-col gap-0.5">
                       <span className="font-medium text-foreground truncate text-sm">{agentLabel(item.agentId)}</span>
-                      <span className="text-[11px] text-muted-foreground truncate">Reason: {actionItemReasonText(item)}</span>
+                      <span className="text-xs text-muted-foreground truncate">Reason: {actionItemReasonText(item)}</span>
                     </div>
                     <div className="hidden sm:block min-w-0 text-xs text-muted-foreground truncate">
                       {item.assignedDisplayName ?? item.assignedEmail ?? 'Unassigned'}
@@ -107,8 +115,8 @@ export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ 
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
       <ActionItemDetailDialog
         id={selectedId}
         isOpen={Boolean(selectedId)}

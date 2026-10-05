@@ -2,13 +2,27 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+export interface InputProps extends React.ComponentProps<"input"> {
+  /**
+   * VoiceForce design system (Phase 2B) — `sm` formalizes the dense
+   * operational control height that was already in de facto use as a
+   * bespoke `h-8` className override across every table toolbar/filter
+   * (Call Logs, Action Required, etc.). Default (`h-10`) is unchanged —
+   * existing call sites with no `uiSize` prop render exactly as before.
+   * Named `uiSize`, not `size` — `size` is already a native numeric
+   * `<input>` HTML attribute (character width), not a styling prop.
+   */
+  uiSize?: "default" | "sm"
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, uiSize = "default", ...props }, ref) => {
     return (
       <input
         type={type}
         className={cn(
-          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          uiSize === "sm" ? "h-8 text-xs md:text-xs" : "h-10",
           className
         )}
         ref={ref}

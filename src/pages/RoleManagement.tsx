@@ -5,6 +5,7 @@ import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAdminRoles, useAdminPermissions, useSetRolePermissions, useAdminCustomerCategories } from '@/hooks/admin/useAdmin';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { RoleDataScopeEditor } from '@/components/admin/RoleDataScopeEditor';
+import { typography } from '@/lib/typography';
 
 /**
  * Session 14.1 — Role Management: role -> permission matrix, grouped by
@@ -53,8 +54,8 @@ const RoleManagement: React.FC = () => {
           the permission matrix alone is flex-1 min-h-0 overflow-auto. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
         <div className="flex-shrink-0">
-          <h1 className="text-base font-semibold text-foreground">Role Management</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <h1 className={typography.pageTitle}>Role Management</h1>
+          <p className={`${typography.pageDescription} mt-0.5`}>
             {canManage
               ? 'Click a cell to grant or revoke a permission for a role.'
               : "View-only — your role doesn't include Manage Roles."}
@@ -80,10 +81,10 @@ const RoleManagement: React.FC = () => {
                     >
                       <div className="flex items-center gap-1">
                         {isExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
-                        <span className="text-sm font-medium text-foreground">{r.label}</span>
+                        <span className={typography.cardTitle}>{r.label}</span>
                       </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 pl-4">{r.userCount} user{r.userCount === 1 ? '' : 's'} · Data Scope</div>
-                      {r.description && <div className="text-[11px] text-muted-foreground mt-1 leading-snug pl-4">{r.description}</div>}
+                      <div className={`${typography.metadata} mt-0.5 pl-4`}>{r.userCount} user{r.userCount === 1 ? '' : 's'} · Data Scope</div>
+                      {r.description && <div className={`${typography.metadata} mt-1 leading-snug pl-4`}>{r.description}</div>}
                     </button>
                   );
                 })}
@@ -102,13 +103,17 @@ const RoleManagement: React.FC = () => {
               })()}
             </div>
 
-            <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
+            {/* VoiceForce design system (Phase 2C) — bg-card/40 tint
+                matches the role cards above, so the matrix and the role
+                cards read as one administration family rather than two
+                differently-treated containers. */}
+            <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border bg-card/40">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="text-left px-3 py-2 font-medium sticky left-0 bg-background">Permission</th>
+                  <tr className={`border-b border-border ${typography.tableHeader}`}>
+                    <th className="text-left px-3 py-2 sticky left-0 bg-background">Permission</th>
                     {(roles ?? []).map((r) => (
-                      <th key={r.code} className="text-center px-3 py-2 font-medium whitespace-nowrap">{r.label}</th>
+                      <th key={r.code} className="text-center px-3 py-2 whitespace-nowrap">{r.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -116,7 +121,7 @@ const RoleManagement: React.FC = () => {
                   {pillars.map((pillar) => (
                     <React.Fragment key={pillar}>
                       <tr className="bg-card/60">
-                        <td colSpan={(roles?.length ?? 0) + 1} className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sticky left-0 bg-card/60">
+                        <td colSpan={(roles?.length ?? 0) + 1} className={`px-3 py-1 ${typography.subsectionTitle} sticky left-0 bg-card/60`}>
                           {pillar}
                         </td>
                       </tr>

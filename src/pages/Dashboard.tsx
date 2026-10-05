@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { typography } from '@/lib/typography';
 import { Loader2 } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -69,7 +69,7 @@ const LiveOperationsTile: React.FC<{ label: string; value: React.ReactNode; hint
 }) => {
   const inner = (
     <>
-      <span className="text-base font-semibold tabular-nums text-foreground">{value}</span>
+      <span className={typography.metricValue}>{value}</span>
       <span className="text-xs text-muted-foreground whitespace-nowrap" title={hint}>{label}</span>
     </>
   );
@@ -109,7 +109,7 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
 
   if (isError) {
     return (
-      <div className="flex-1 min-w-[8.5rem] rounded-md border border-border bg-card/40 px-3 py-2">
+      <div className="flex-1 min-w-[8.5rem] px-3 py-2">
         <div className="text-[11px] text-muted-foreground truncate" title={definition?.name}>
           {definition?.shortLabel ?? ratioId}
         </div>
@@ -129,15 +129,15 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
     <button
       type="button"
       onClick={() => guardedNavigate(link.path, { state: link.state }, 'ratios.view', 'Ratio Explorer')}
-      className="flex-1 min-w-[8.5rem] text-left rounded-md border border-border bg-card/40 px-3 py-2 hover:bg-card hover:border-cyan-600/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+      className="flex-1 min-w-[8.5rem] text-left px-3 py-2 hover:bg-muted/40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:-outline-offset-2"
     >
       <div className="text-[11px] text-muted-foreground truncate" title={definition?.name}>
         {definition?.shortLabel ?? ratioId}
       </div>
       {isLoading ? (
-        <div className="text-lg font-semibold text-muted-foreground">…</div>
+        <div className={`${typography.metricValue} text-muted-foreground`}>…</div>
       ) : value !== null ? (
-        <div className="text-lg font-semibold tabular-nums text-foreground">{value}</div>
+        <div className={typography.metricValue}>{value}</div>
       ) : (
         <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title={data?.unavailableReason ?? undefined}>
           {data?.unavailableReason ?? 'No eligible population'}
@@ -189,7 +189,7 @@ const Dashboard: React.FC = () => {
       {/* App-wide viewport-framing correction (follow-up to Session 15) —
           Pattern B: root is the single scroll region (Sidebar/ContextBar
           chrome stays pinned via Layout's own h-full min-h-0 main). */}
-      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-3 space-y-2">
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
         {(recent.isError || agents.isError) && (
           <QueryErrorBanner
             error={recent.error ?? agents.error}
@@ -207,7 +207,7 @@ const Dashboard: React.FC = () => {
             twice, §22); AHT here is the SAME `aht` ratio Ratio Explorer
             computes, not a second Dashboard-local calculation. */}
         <div>
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-1">Live Operations</div>
+          <div className={`${typography.sectionTitle} px-1 mb-1`}>Live Operations</div>
           <div className="flex flex-wrap items-stretch gap-x-2 gap-y-2 rounded-md border border-border bg-card px-4 py-2.5 text-sm">
             <LiveOperationsTile
               first
@@ -262,10 +262,15 @@ const Dashboard: React.FC = () => {
 
           {/* Recent Interactions — Voice + Chat merged (see hook-level
               comment above for why this is a genuine merge, not a new
-              aggregation). */}
-          <Card className="bg-card border-border">
-            <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-semibold text-foreground">Recent Interactions</CardTitle>
+              aggregation). VoiceForce design system (Phase 2C): a plain
+              div matching AgentActivityPanel's exact box recipe
+              (rounded-md border border-border bg-card p-3), not the
+              shadcn Card's rounded-lg/shadow-sm — these two panels sit
+              side by side as equal-weight peers and should read as one
+              coherent family, not two different container styles. */}
+          <div className="rounded-md border border-border bg-card p-3 space-y-2 flex flex-col">
+            <div className="flex items-center justify-between flex-shrink-0">
+              <div className={typography.cardTitle}>Recent Interactions</div>
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
@@ -273,8 +278,8 @@ const Dashboard: React.FC = () => {
               >
                 View all &rarr; Call Logs
               </button>
-            </CardHeader>
-            <CardContent className="px-3 pb-2 max-h-[220px] overflow-y-auto">
+            </div>
+            <div className="max-h-[220px] overflow-y-auto">
               {recent.isLoading || chat.isLoading ? (
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -365,16 +370,22 @@ const Dashboard: React.FC = () => {
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
         {/* C. Performance Ratios — one semantic source (useRatioSummary),
             same as Ratio Explorer. Each card is a stable-ratio-ID deep
-            link, never a generic /ratios navigation. */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Performance Ratios</div>
+            link, never a generic /ratios navigation. VoiceForce design
+            system (Phase 2C): previously 5 independently-boxed
+            equal-weight mini-cards with no unifying frame — the only
+            section on the page without one. Now one outer strip (same
+            recipe as Live Operations above it) with internal dividers,
+            so it reads as one coherent section rather than five
+            disconnected boxes. */}
+        <div>
+          <div className="flex items-center justify-between px-1 mb-1">
+            <div className={typography.sectionTitle}>Performance Ratios</div>
             <button
               type="button"
               className="inline-flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:underline min-h-6 p-1 -m-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
@@ -383,7 +394,7 @@ const Dashboard: React.FC = () => {
               Explore all ratios &rarr;
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap rounded-md border border-border bg-card divide-x divide-border">
             {DASHBOARD_PERFORMANCE_RATIO_IDS.map((ratioId) => (
               <PerformanceRatioCard key={ratioId} ratioId={ratioId} />
             ))}

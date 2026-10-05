@@ -23,6 +23,7 @@ import {
   formatStatusLabel,
   formatTimestamp,
 } from '@/lib/format';
+import { typography } from '@/lib/typography';
 
 const FALLBACK = '—';
 const RECENT_INTERACTIONS_PAGE_SIZES = [10, 25, 50] as const;
@@ -230,7 +231,7 @@ const AgentDetail: React.FC = () => {
     <Layout>
       {/* App-wide viewport-framing correction (follow-up to Session 15) —
           Pattern B: root is the single scroll region. */}
-      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-2.5">
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
         <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
           Back to {returnTo.label}
@@ -242,7 +243,7 @@ const AgentDetail: React.FC = () => {
             <Bot className="h-5 w-5 text-cyan-400 shrink-0" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold text-foreground truncate">{agent.displayName}</h1>
+                <h1 className={`${typography.pageTitle} truncate`}>{agent.displayName}</h1>
                 {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
               </div>
               <p className="text-[11px] text-muted-foreground font-mono leading-tight">{agent.agentId}</p>
@@ -296,30 +297,32 @@ const AgentDetail: React.FC = () => {
         {/* B. Operational Performance — one compact grid instead of three large cards. */}
         <div className="rounded-md border border-border bg-card p-2.5 space-y-1.5">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Operational Performance</div>
+            <div className={typography.sectionTitle}>Operational Performance</div>
             <DataNotes notes={performanceNotes} />
           </div>
-          {/* Session (Agent Detail UX restructure) HIG fix — the previous
-              flat 9-cell grid dropped the Business/Conversational/Technical
-              grouping the old 3-card layout gave for free. Restored as 3
-              sub-clusters with a tiny uppercase sub-header each, still one
-              compact container (no card-per-group chrome). */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-2">
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Business Outcomes</div>
+          {/* VoiceForce design system (Phase 2C) — the 3 sub-clusters were
+              previously distinguished ONLY by a text-[10px] label and grid
+              column position, no visual separation (flagged in the Phase 1
+              addendum's hierarchy audit). Now each gets a light background
+              tint — real grouping, not just a smaller label — matching the
+              nested-tile recipe already used elsewhere on this page
+              (bg-background/40, see the per-agent tiles pattern). */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+            <div className="space-y-1 bg-background/40 rounded p-2">
+              <div className={typography.subsectionTitle}>Business Outcomes</div>
               <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
               <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
               <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
             </div>
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Conversational Quality</div>
+            <div className="space-y-1 bg-background/40 rounded p-2">
+              <div className={typography.subsectionTitle}>Conversational Quality</div>
               <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
               <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
               <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
               <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
             </div>
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Technical Performance</div>
+            <div className="space-y-1 bg-background/40 rounded p-2">
+              <div className={typography.subsectionTitle}>Technical Performance</div>
               <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
               <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
             </div>
@@ -338,7 +341,7 @@ const AgentDetail: React.FC = () => {
               >
                 <span className="flex items-center gap-2 min-w-0">
                   {contractOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agent Contract</span>
+                  <span className={typography.sectionTitle}>Agent Contract</span>
                   <span className="text-sm text-foreground truncate">{contractSummary}</span>
                 </span>
                 <span className="text-[11px] text-muted-foreground flex-shrink-0">Source: {contract.contractSource}</span>
@@ -413,38 +416,28 @@ const AgentDetail: React.FC = () => {
           </div>
         </Collapsible>
 
-        {/* D. Campaign Usage — unchanged data/semantics (Session 11.5A "latest attempt wins" policy), compact. */}
-        {agent.direction === 'outbound' && agentCampaigns.length > 0 && (
-          <div className="space-y-1">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1" title="Reflects each target's current effective result (latest reconciled attempt) — see Session 11.5A">
-              Campaign Usage
-            </div>
-            <MetricStrip
-              items={[
-                { label: 'Campaigns', value: campaignOutcomes.campaignCount },
-                { label: 'Targets', value: campaignOutcomes.targetCount },
-                { label: 'Classified', value: campaignOutcomes.classifiedCount },
-                { label: 'Success rate', value: campaignOutcomes.successRate === null ? FALLBACK : formatFractionAsPercent(campaignOutcomes.successRate) },
-              ]}
-            />
-          </div>
-        )}
-
-        {/* E. Recent interactions — drill-down into existing detail mechanisms only.
-            Session (Agent Detail density pass) — dense rows (~40-44px, matching
-            the "G1 dense operational grid" convention already established on
-            Call Logs/Live View: h-9 head, py-1.5 cells, not shadcn's default
-            p-4/h-12), full pagination over the complete already-loaded merged
-            population (never an arbitrary 20-row slice-and-discard), and a
-            truthful scope disclosure for the Voice/Chat cap asymmetry traced
-            in recentInteractionsNotes above. */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-1">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recent Interactions</div>
+        {/* D. Recent interactions — drill-down into existing detail mechanisms
+            only. Session (Agent Detail density pass) — dense rows (~40-44px,
+            matching the "G1 dense operational grid" convention already
+            established on Call Logs/Live View: h-9 head, py-1.5 cells, not
+            shadcn's default p-4/h-12), full pagination over the complete
+            already-loaded merged population (never an arbitrary 20-row
+            slice-and-discard), and a truthful scope disclosure for the
+            Voice/Chat cap asymmetry traced in recentInteractionsNotes above.
+            VoiceForce design system (Phase 2C) — previously three stacked
+            flat pieces (free-floating heading, separately-boxed table, bare
+            pagination row); now one cohesive card matching Operational
+            Performance's own container recipe, so heading + table +
+            pagination read as one section. Reordered ahead of Campaign Usage
+            per the approved pilot spec — large-contract and small-contract
+            agents retain the same section order either way. */}
+        <div className="rounded-md border border-border bg-card p-2.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div className={typography.sectionTitle}>Recent Interactions</div>
             {allRecentInteractions.length > 0 && <DataNotes title="Interaction scope" ariaLabel="Interaction scope — what this list represents" notes={recentInteractionsNotes} />}
           </div>
           {allRecentInteractions.length === 0 ? (
-            <p className="text-sm text-muted-foreground px-1">No recent interactions for this agent.</p>
+            <p className="text-sm text-muted-foreground">No recent interactions for this agent.</p>
           ) : (
             <>
               <div className="rounded-md border border-border overflow-x-auto">
@@ -491,7 +484,7 @@ const AgentDetail: React.FC = () => {
                   second internal scrollbar). Always shown once there is at
                   least one row, so the page-size selector stays reachable
                   even on a single page. */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span role="status" aria-live="polite">
                   Showing {interactionsStart + 1}–{Math.min(interactionsStart + interactionsPageSize, allRecentInteractions.length)} of {allRecentInteractions.length} · Page {interactionsCurrentPage} of {interactionsTotalPages}
                 </span>
@@ -544,6 +537,23 @@ const AgentDetail: React.FC = () => {
             </>
           )}
         </div>
+
+        {/* E. Campaign Usage — unchanged data/semantics (Session 11.5A "latest attempt wins" policy), compact. Follows Recent Interactions per the approved pilot ordering. */}
+        {agent.direction === 'outbound' && agentCampaigns.length > 0 && (
+          <div className="space-y-1">
+            <div className={`${typography.sectionTitle} px-1`} title="Reflects each target's current effective result (latest reconciled attempt) — see Session 11.5A">
+              Campaign Usage
+            </div>
+            <MetricStrip
+              items={[
+                { label: 'Campaigns', value: campaignOutcomes.campaignCount },
+                { label: 'Targets', value: campaignOutcomes.targetCount },
+                { label: 'Classified', value: campaignOutcomes.classifiedCount },
+                { label: 'Success rate', value: campaignOutcomes.successRate === null ? FALLBACK : formatFractionAsPercent(campaignOutcomes.successRate) },
+              ]}
+            />
+          </div>
+        )}
 
         <InteractionDetailDialog
           isOpen={Boolean(selectedInteraction)}

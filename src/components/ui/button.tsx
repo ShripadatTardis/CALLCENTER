@@ -22,6 +22,12 @@ const buttonVariants = cva(
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
+        // VoiceForce design system (Phase 2B) — formalizes the dense
+        // operational button height that was already in de facto use as a
+        // bespoke `h-7`/`className` override on ~10+ pages (pagination,
+        // row actions, compact toolbars). One named size instead of each
+        // page re-typing the same override.
+        xs: "h-7 rounded-md px-2 text-xs",
         lg: "h-11 rounded-md px-8",
         icon: "h-10 w-10",
       },

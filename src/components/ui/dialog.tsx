@@ -33,6 +33,15 @@ const DialogContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
+    {/* VoiceForce design system (Phase 2B) — two genuine dialog tiers are
+        in real use, not accidental drift: this default (max-w-lg, p-6)
+        for standard form/confirmation dialogs, and a "detail dialog"
+        override (max-w-xl to max-w-3xl, p-5, often with a height cap +
+        overflow-y-auto for long interaction/record content) for
+        record-inspection dialogs like InteractionDetailDialog and
+        ActionItemDetailDialog. Both are applied via `className` override
+        at the call site, same as before — formalized as a documented
+        convention, not a new component/behavior. */}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(

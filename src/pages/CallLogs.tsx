@@ -18,6 +18,7 @@ import { FilterPopover } from '@/components/common/FilterPopover';
 import { MetricStrip } from '@/components/common/MetricStrip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { typography } from '@/lib/typography';
 
 function toCsv(interactions: Interaction[]): string {
   const headers = [
@@ -305,20 +306,22 @@ const CallLogs: React.FC = () => {
             {hasActiveFilters ? 'No calls match the current filters. Try widening or clearing them.' : 'No completed calls yet.'}
           </p>
         ) : (
-            <table className="w-full text-sm">
-              {/* G1 dense operational grid (docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md
-                  §G1): ~32-36px header, ~38-42px rows — not the old py-2/
-                  px-4 card-like spacing. */}
+            <table className={`w-full ${typography.tableBody}`}>
+              {/* VoiceForce design system (Phase 2B) — dense operational
+                  grid geometry (h-9 header, py-1.5 rows) is unchanged;
+                  text treatment now comes from the shared
+                  src/lib/typography.ts roles (tableHeader/tableBody)
+                  instead of a page-local text-sm/text-xs mix. */}
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="h-9 px-3 font-medium whitespace-nowrap">Timestamp</th>
-                  <th className="h-9 px-3 font-medium">Caller / Context</th>
-                  <th className="h-9 px-3 font-medium">Agent</th>
-                  <th className="h-9 px-3 font-medium text-right">Duration</th>
-                  <th className="h-9 px-3 font-medium">Outcome</th>
-                  <th className="h-9 px-3 font-medium">FCR</th>
-                  <th className="h-9 px-3 font-medium">Intent accuracy</th>
-                  <th className="h-9 px-3 font-medium text-right">Action</th>
+                <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                  <th className="h-9 px-3 whitespace-nowrap">Timestamp</th>
+                  <th className="h-9 px-3">Caller / Context</th>
+                  <th className="h-9 px-3">Agent</th>
+                  <th className="h-9 px-3 text-right">Duration</th>
+                  <th className="h-9 px-3">Outcome</th>
+                  <th className="h-9 px-3">FCR</th>
+                  <th className="h-9 px-3">Intent accuracy</th>
+                  <th className="h-9 px-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,15 +343,20 @@ const CallLogs: React.FC = () => {
                         intent truncate together rather than each getting
                         their own row. */}
                     <td className="py-1.5 px-3 max-w-[260px]">
+                      {/* VoiceForce design system (Phase 2B) — identifying
+                          fields stay prominent at the dense 12px table-body
+                          size via font-weight, not a larger font-size (per
+                          the approved Phase 2 decision), so the row doesn't
+                          need two competing text sizes. */}
                       <span
-                        className="text-sm text-foreground truncate block"
+                        className="font-medium text-foreground truncate block"
                         title={`${call.callerName || formatPhoneNumber(call.phoneNumber)} · ${call.intent || 'General'}`}
                       >
                         {call.callerName || formatPhoneNumber(call.phoneNumber)}
                         {call.callerName && (
-                          <span className="text-muted-foreground"> · {formatPhoneNumber(call.phoneNumber)}</span>
+                          <span className="text-muted-foreground font-normal"> · {formatPhoneNumber(call.phoneNumber)}</span>
                         )}
-                        <span className="text-muted-foreground"> · {call.intent || 'General'}</span>
+                        <span className="text-muted-foreground font-normal"> · {call.intent || 'General'}</span>
                       </span>
                     </td>
                     {/* C1 adaptive sizing — bounded-but-generous min/max so
@@ -356,7 +364,7 @@ const CallLogs: React.FC = () => {
                         truncate at normal widths (see LiveView's identical
                         pattern, the reference G1/C1 implementation). */}
                     <td className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
-                      <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
+                      <span className="font-medium text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
                     </td>
                     <td className="py-1.5 px-3 text-right whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
                       <span className="font-mono tabular-nums text-foreground text-xs">{formatDurationLong(call.durationSeconds)}</span>

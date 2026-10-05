@@ -13,6 +13,7 @@ import { formatStaleDurationHuman, formatTimestamp } from '@/lib/format';
 import { resolveDetailOrigin, type DetailNavigationState } from '@/lib/detailOrigin';
 import { useNavigate } from 'react-router-dom';
 import { ActionItemDetailDialog } from '@/components/actions/ActionItemDetailDialog';
+import { typography } from '@/lib/typography';
 
 function statusBadge(status: ActionItem['status']) {
   if (status === 'in_progress') return <Badge variant="secondary" className="text-xs">In Progress</Badge>;
@@ -59,8 +60,8 @@ const ActionRequired: React.FC = () => {
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between flex-shrink-0">
           <div>
-            <h1 className="text-base font-semibold text-foreground">Action Required</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Human follow-up work items generated from escalated calls, within your Business Data Scope.</p>
+            <h1 className={typography.pageTitle}>Action Required</h1>
+            <p className={`${typography.pageDescription} mt-0.5`}>Human follow-up work items generated from escalated calls, within your Business Data Scope.</p>
           </div>
           <div className="flex items-center gap-3">
             <Button

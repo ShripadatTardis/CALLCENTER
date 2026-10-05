@@ -73,7 +73,18 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      // VoiceForce design system (Phase 2B) — the dense operational
+      // header/cell geometry (h-9/px-3, py-1.5/px-3) was already the de
+      // facto standard, hand-typed as a per-page override on every table
+      // screen (Call Logs, Agent Detail, Live View, AI Agents, Campaign
+      // Detail). Formalized as the shared default here; per-page
+      // overrides for these exact values are now redundant (harmless,
+      // not required) rather than necessary. Text-transform/tracking is
+      // deliberately NOT baked in here — that's a per-screen typography
+      // choice (see src/lib/typography.ts `tableHeader`), applied only
+      // where a screen opts in, so this shared default never silently
+      // changes the look of every existing table-header consumer.
+      "h-9 px-3 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -87,7 +98,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
+    className={cn("py-1.5 px-3 align-middle [&:has([role=checkbox])]:pr-0", className)}
     {...props}
   />
 ))

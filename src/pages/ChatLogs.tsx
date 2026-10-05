@@ -13,6 +13,7 @@ import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { typography } from '@/lib/typography';
 
 /**
  * Session 11.4 — rebuilt on the Session 11.3/11.3A Call Logs pattern
@@ -203,17 +204,17 @@ const ChatLogs: React.FC = () => {
               {hasActiveFilters ? 'No chat sessions match the current filters. Try widening or clearing them.' : 'No chat sessions yet.'}
             </p>
           ) : (
-            <table className="w-full text-sm" aria-label="Chat sessions">
+            <table className={`w-full ${typography.tableBody}`} aria-label="Chat sessions">
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th scope="col" className="h-9 px-3 font-medium whitespace-nowrap">Timestamp</th>
-                  <th scope="col" className="h-9 px-3 font-medium">Customer / Context</th>
-                  <th scope="col" className="h-9 px-3 font-medium">Agent</th>
-                  <th scope="col" className="h-9 px-3 font-medium text-right">Msgs</th>
-                  <th scope="col" className="h-9 px-3 font-medium">Status</th>
-                  <th scope="col" className="h-9 px-3 font-medium">Intent</th>
-                  <th scope="col" className="h-9 px-3 font-medium">Auth</th>
-                  <th scope="col" className="h-9 px-3 font-medium text-right">Action</th>
+                <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                  <th scope="col" className="h-9 px-3 whitespace-nowrap">Timestamp</th>
+                  <th scope="col" className="h-9 px-3">Customer / Context</th>
+                  <th scope="col" className="h-9 px-3">Agent</th>
+                  <th scope="col" className="h-9 px-3 text-right">Msgs</th>
+                  <th scope="col" className="h-9 px-3">Status</th>
+                  <th scope="col" className="h-9 px-3">Intent</th>
+                  <th scope="col" className="h-9 px-3">Auth</th>
+                  <th scope="col" className="h-9 px-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,12 +233,14 @@ const ChatLogs: React.FC = () => {
                         {formatTimestamp(s.startedAt)}
                       </td>
                       <td className="py-1.5 px-3 max-w-[260px]">
+                        {/* VoiceForce design system — identifying fields stay prominent at the
+                            dense table-body size via font-weight, not a larger font-size. */}
                         <span
-                          className="text-sm text-foreground truncate block"
+                          className="font-medium text-foreground truncate block"
                           title={`${contextLabel} · ${s.latestIntent || 'General'}`}
                         >
                           {contextLabel}
-                          <span className="text-muted-foreground"> · {s.latestIntent || 'General'}</span>
+                          <span className="text-muted-foreground font-normal"> · {s.latestIntent || 'General'}</span>
                         </span>
                         <div className="flex items-center gap-2 flex-wrap mt-0.5">
                           {/* Session 13.1 (DEC-CUST-03) — only rendered when
@@ -277,7 +280,7 @@ const ChatLogs: React.FC = () => {
                         </div>
                       </td>
                       <td className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
-                        <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
+                        <span className="font-medium text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
                       </td>
                       <td className="py-1.5 px-3 text-right whitespace-nowrap">
                         <span className="font-mono tabular-nums text-foreground text-xs">{s.messageCount}</span>
@@ -291,9 +294,9 @@ const ChatLogs: React.FC = () => {
                         <span className="text-foreground">{s.latestIntent ?? '—'}</span>
                       </td>
                       <td className="py-1.5 px-3">
-                        <span className={s.authenticated ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}>
-                          {s.authenticated ? 'Yes' : 'No'}
-                        </span>
+                        {/* VoiceForce design system — neutral data-value rule: Yes/No is an ordinary
+                            field value, not a status/warning state, so it stays plain foreground text. */}
+                        <span className="text-foreground">{s.authenticated ? 'Yes' : 'No'}</span>
                       </td>
                       <td className="py-1.5 px-3 text-right whitespace-nowrap">
                         <Button

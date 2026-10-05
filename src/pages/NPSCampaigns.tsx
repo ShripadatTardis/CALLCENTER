@@ -16,6 +16,7 @@ import { NPSRecordingDialog } from '@/components/nps/NPSRecordingDialog';
 import { NPSCampaign } from '@/types/auth';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { typography } from '@/lib/typography';
 import { 
   Search, 
   Plus, 
@@ -56,13 +57,13 @@ const NPSCampaigns: React.FC = () => {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'running':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300';
       case 'completed':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300';
       case 'scheduled':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300';
       case 'paused':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300';
       case 'draft':
         return 'bg-muted text-foreground';
       default:
@@ -214,10 +215,11 @@ const NPSCampaigns: React.FC = () => {
             <div className="relative w-64">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
               <Input
+                uiSize="sm"
                 placeholder="Search campaigns…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+                className="pl-7 border-border bg-card text-foreground placeholder:text-muted-foreground"
               />
             </div>
             <select
@@ -249,15 +251,15 @@ const NPSCampaigns: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-xs">
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Campaign Name</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Status</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Channel</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">NPS Score</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Participants</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Responses</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Start Date</th>
-                      <th className="text-left py-2 px-3 font-medium text-muted-foreground">Actions</th>
+                    <tr className="border-b border-border">
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Campaign Name</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Status</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Channel</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>NPS Score</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Participants</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Responses</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Start Date</th>
+                      <th className={`text-left py-2 px-3 ${typography.tableHeader}`}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -265,8 +267,8 @@ const NPSCampaigns: React.FC = () => {
                       <tr key={campaign.id} className="border-b border-border/60 last:border-0 hover:bg-card">
                         <td className="py-2 px-3">
                           <div>
-                            <div className="font-medium text-foreground">{campaign.name}</div>
-                            <div className="text-xs text-muted-foreground">{campaign.description}</div>
+                            <div className={`font-medium ${typography.tableBody}`}>{campaign.name}</div>
+                            <div className={typography.metadata}>{campaign.description}</div>
                           </div>
                         </td>
                         <td className="py-2 px-3">
@@ -275,7 +277,7 @@ const NPSCampaigns: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="py-2 px-3">
-                          <div className="flex items-center space-x-2 text-foreground">
+                          <div className={`flex items-center space-x-2 ${typography.tableBody}`}>
                             {getChannelIcon(campaign.targetChannel)}
                             <span className="capitalize">{campaign.targetChannel}</span>
                           </div>
@@ -283,23 +285,23 @@ const NPSCampaigns: React.FC = () => {
                         <td className="py-2 px-3">
                           <NPSBadge score={campaign.npsScore} variant="compact" />
                         </td>
-                        <td className="py-2 px-3 text-foreground">{campaign.totalContacts}</td>
+                        <td className={`py-2 px-3 ${typography.tableBody}`}>{campaign.totalContacts}</td>
                         <td className="py-2 px-3">
-                          <div className="text-foreground">{campaign.responseCount}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className={typography.tableBody}>{campaign.responseCount}</div>
+                          <div className={typography.metadata}>
                             {Math.round((campaign.responseCount / campaign.totalContacts) * 100)}% response rate
                           </div>
                         </td>
-                        <td className="py-2 px-3 text-muted-foreground">
+                        <td className={`py-2 px-3 ${typography.metadata}`}>
                           {format(campaign.launchDate, 'MMM dd, yyyy')}
                         </td>
                         <td className="py-3">
                           <div className="flex space-x-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
+                                <Button
+                                  variant="outline"
+                                  size="xs"
                                   onClick={() => handleView(campaign)}
                                 >
                                   <Eye className="h-3 w-3" />
@@ -312,9 +314,9 @@ const NPSCampaigns: React.FC = () => {
 
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
+                                <Button
+                                  variant="outline"
+                                  size="xs"
                                   onClick={() => handleEdit(campaign)}
                                 >
                                   <Edit className="h-3 w-3" />
@@ -328,9 +330,9 @@ const NPSCampaigns: React.FC = () => {
                             {campaign.status === 'running' || campaign.status === 'paused' ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
+                                  <Button
+                                    variant="outline"
+                                    size="xs"
                                     onClick={() => handlePlayPause(campaign)}
                                   >
                                     {campaign.status === 'running' ? (
@@ -350,9 +352,9 @@ const NPSCampaigns: React.FC = () => {
 
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                <Button
+                                  variant="outline"
+                                  size="xs"
                                   className="text-red-600 border-red-600 hover:bg-red-50"
                                   onClick={() => handleDelete(campaign)}
                                 >

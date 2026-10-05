@@ -25,6 +25,7 @@ import {
   formatStatusLabel,
 } from '@/lib/format';
 import type { Interaction } from '@/types/interaction';
+import { typography } from '@/lib/typography';
 
 /**
  * Session 13.5 (DEC-LIVE-01) — the shared InteractionDetailDialog resolved
@@ -156,13 +157,6 @@ const LiveView: React.FC = () => {
 
   const uniqueIntents = [...new Set(calls.map((c) => c.intent).filter((v): v is string => Boolean(v)))];
 
-  const getSentimentColor = (score?: number) => {
-    if (score === undefined) return 'text-muted-foreground';
-    if (score >= 0.7) return 'text-green-600';
-    if (score >= 0.4) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
   return (
     <Layout>
       {/* Session 11.2: bounded operational console. The page root fills
@@ -176,7 +170,7 @@ const LiveView: React.FC = () => {
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground flex-shrink-0">
           {fromDashboard ? (
-            <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/dashboard')}>
+            <Button variant="ghost" size="xs" className="-ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/dashboard')}>
               ← Back to Dashboard
             </Button>
           ) : (
@@ -221,7 +215,7 @@ const LiveView: React.FC = () => {
             agents={agentRoster}
             activeInteractions={calls}
             isLoading={agents.isLoading}
-            title="Agent Load"
+            title="Agent Activity"
             variant="compact"
             onAgentClick={(agentId) => navigate(`/ai-agents/${agentId}`, { state: { origin: 'live-view' } })}
           />
@@ -280,9 +274,9 @@ const LiveView: React.FC = () => {
               <TableHeader>
                 {/* G1 dense operational grid (docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md
                     §G1): ~32-36px header, not the shadcn default h-12/px-4. */}
-                <TableRow className="border-border hover:bg-transparent">
+                <TableRow className={`border-border hover:bg-transparent ${typography.tableHeader}`}>
                   {['Caller', 'Intent', 'Agent', 'Duration', 'Sentiment', 'Status', 'Actions'].map((h) => (
-                    <TableHead key={h} className={`h-9 px-3 text-muted-foreground text-xs ${h === 'Duration' ? 'text-right' : ''}`}>{h}</TableHead>
+                    <TableHead key={h} className={`h-9 px-3 ${h === 'Duration' ? 'text-right' : ''}`}>{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -301,14 +295,14 @@ const LiveView: React.FC = () => {
                         phone remains available in full via View Details. */}
                     <TableCell className="py-1.5 px-3 max-w-[220px]">
                       <span
-                        className="text-sm text-foreground truncate block"
+                        className="font-medium text-foreground truncate block"
                         title={`${call.callerName || '—'} · ${formatPhoneNumber(call.phoneNumber)}`}
                       >
-                        {call.callerName || '—'} <span className="text-muted-foreground">· {formatPhoneNumber(call.phoneNumber)}</span>
+                        {call.callerName || '—'} <span className="text-muted-foreground font-normal">· {formatPhoneNumber(call.phoneNumber)}</span>
                       </span>
                     </TableCell>
                     <TableCell className="py-1.5 px-3">
-                      <Badge variant="outline" className="whitespace-nowrap text-xs border-slate-600 text-foreground">{call.intent || '—'}</Badge>
+                      <Badge variant="outline" className="whitespace-nowrap text-xs border-border text-foreground">{call.intent || '—'}</Badge>
                     </TableCell>
                     {/* Session 11.1 XYZ-A / C1 adaptive sizing (see docs/
                         VOICEFORCE_OPERATIONAL_GRID_STANDARD.md): a bounded-
@@ -316,7 +310,7 @@ const LiveView: React.FC = () => {
                         that truncated normal agent names ("Inbound Banking
                         Assistant") even with unused row width elsewhere. */}
                     <TableCell className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
-                      <span className="text-sm text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
+                      <span className="font-medium text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
                     </TableCell>
                     <TableCell className="py-1.5 px-3 text-right">
                       <span className="font-mono tabular-nums text-foreground whitespace-nowrap text-xs" title={formatDurationExact(call.durationSeconds)}>
@@ -324,14 +318,18 @@ const LiveView: React.FC = () => {
                       </span>
                     </TableCell>
                     <TableCell className="py-1.5 px-3">
+                      {/* VoiceForce design system — neutral data-value rule: sentiment is an
+                          ordinary metric, not a status/warning state, so it no longer shifts
+                          hue by magnitude (text or meter fill) — same treatment as every other
+                          plain percentage value on this page. */}
                       <div className="flex items-center space-x-2">
-                        <span className={`font-medium whitespace-nowrap text-xs ${getSentimentColor(call.sentimentScore)}`}>
+                        <span className="font-medium whitespace-nowrap text-xs text-foreground">
                           {formatFractionAsPercent(call.sentimentScore)}
                         </span>
                         {call.sentimentScore !== undefined && (
                           <div className="w-10 bg-muted rounded-full h-1.5">
                             <div
-                              className="bg-gradient-to-r from-red-500 via-amber-500 to-emerald-500 h-1.5 rounded-full"
+                              className="bg-foreground/50 h-1.5 rounded-full"
                               style={{ width: `${call.sentimentScore * 100}%` }}
                             />
                           </div>
@@ -352,8 +350,8 @@ const LiveView: React.FC = () => {
                     <TableCell className="py-1.5 px-3">
                       <Button
                         variant="outline"
-                        size="sm"
-                        className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+                        size="xs"
+                        className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
                         onClick={() => setSelected({ callId: call.interactionId, phone: call.phoneNumber })}
                       >
                         <FileText className="h-3.5 w-3.5 mr-1" />

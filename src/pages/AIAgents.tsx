@@ -9,6 +9,7 @@ import { useAgents } from '@/hooks/agents/useAgents';
 import { useCampaigns } from '@/hooks/campaigns/useCampaigns';
 import { countCampaignsByAgent } from '@/services/agents/agentPerformanceAggregator';
 import { formatStatusLabel } from '@/lib/format';
+import { typography } from '@/lib/typography';
 
 /**
  * Real /api/v1/agents roster — replaces the previous entirely-mock page
@@ -45,7 +46,7 @@ const AIAgents: React.FC = () => {
   return (
     <Layout>
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
-        <div className="text-xs text-muted-foreground px-1 flex-shrink-0">
+        <div className={`${typography.pageDescription} px-1 flex-shrink-0`}>
           Live agent roster — used across Voice, Chat, Customer 360 and Campaigns.
         </div>
 
@@ -54,20 +55,20 @@ const AIAgents: React.FC = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : isError ? (
-          <p className="text-sm text-red-400 px-1">Could not load the agent roster.</p>
+          <p className="text-sm text-red-700 dark:text-red-400 px-1">Could not load the agent roster.</p>
         ) : agents.length === 0 ? (
           <p className="text-sm text-muted-foreground px-1">No agents available.</p>
         ) : (
           <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
-            <Table>
+            <Table className={typography.tableBody}>
               <TableHeader>
                 {/* G1 dense operational grid (docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md
                     §G1): ~32-36px header, not the shadcn default h-12/px-4. */}
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="h-9 px-3 text-muted-foreground text-xs">Agent</TableHead>
-                  <TableHead className="h-9 px-3 text-muted-foreground text-xs">Direction</TableHead>
-                  <TableHead className="h-9 px-3 text-muted-foreground text-xs">Usage</TableHead>
-                  <TableHead className="h-9 px-3 text-muted-foreground text-xs text-right">Action</TableHead>
+                <TableRow className={`border-border hover:bg-transparent ${typography.tableHeader}`}>
+                  <TableHead className="h-9 px-3">Agent</TableHead>
+                  <TableHead className="h-9 px-3">Direction</TableHead>
+                  <TableHead className="h-9 px-3">Usage</TableHead>
+                  <TableHead className="h-9 px-3 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -87,9 +88,9 @@ const AIAgents: React.FC = () => {
                           grid's identity-cell convention. */}
                       <TableCell className="py-1.5 px-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{agent.displayName}</span>
+                          <span className="font-medium text-foreground">{agent.displayName}</span>
                           {agent.isDefault && (
-                            <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>
+                            <Badge variant="outline" className="text-xs border-border text-foreground">Default</Badge>
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground font-mono">{agent.agentId}</span>
@@ -97,7 +98,7 @@ const AIAgents: React.FC = () => {
                       <TableCell className="py-1.5 px-3">
                         <Badge variant="secondary" className="text-xs">{formatStatusLabel(agent.direction)}</Badge>
                       </TableCell>
-                      <TableCell className="py-1.5 px-3 text-sm text-foreground whitespace-nowrap">
+                      <TableCell className="py-1.5 px-3 text-foreground whitespace-nowrap">
                         {campaignsQuery.isLoading ? (
                           <span className="text-muted-foreground">…</span>
                         ) : (
@@ -109,8 +110,8 @@ const AIAgents: React.FC = () => {
                       <TableCell className="py-1.5 px-3 text-right">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 text-cyan-400 hover:text-cyan-300 hover:bg-muted"
+                          size="xs"
+                          className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-muted"
                           onClick={(e) => {
                             e.stopPropagation();
                             openDetail();

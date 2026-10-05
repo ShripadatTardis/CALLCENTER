@@ -31,6 +31,7 @@ import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 import { resolveDetailOrigin, type DetailNavigationState } from '@/lib/detailOrigin';
+import { typography } from '@/lib/typography';
 
 const MAX_LOOKUP_PAGES = 3;
 const LOOKUP_PAGE_SIZE = 100;
@@ -269,7 +270,7 @@ const CustomerDetail: React.FC = () => {
   return (
     <Layout>
       <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-2">
-        <Button variant="ghost" size="sm" className="h-7 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
+        <Button variant="ghost" size="xs" className="-ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back to {returnTo.label}
         </Button>
@@ -310,11 +311,11 @@ const CustomerDetail: React.FC = () => {
                 establishes that context. */}
             <div className="rounded-md border border-border bg-card px-3 py-2 space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <h1 className="text-lg font-semibold text-foreground leading-tight min-w-0 truncate" title={displayLabel}>{displayLabel}</h1>
+                <h1 className={`${typography.pageTitle} leading-tight min-w-0 truncate`} title={displayLabel}>{displayLabel}</h1>
                 <Button
                   variant="outline"
-                  size="sm"
-                  className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground flex-shrink-0"
+                  size="xs"
+                  className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground flex-shrink-0"
                   onClick={() => refreshMutation.mutate()}
                   disabled={refreshMutation.isPending}
                 >
@@ -378,7 +379,10 @@ const CustomerDetail: React.FC = () => {
                 <span><span className="text-muted-foreground">Latest outcome</span> <span className="text-foreground">{aggregate?.latestOutcome ? formatStatusLabel(aggregate.latestOutcome) : '—'}</span></span>
                 <span>
                   <span className="text-muted-foreground">Escalations</span>{' '}
-                  <span className={`font-medium tabular-nums ${(aggregate?.escalationCount ?? 0) > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>
+                  {/* VoiceForce design system — neutral data-value rule: an
+                      ordinary count is not a status badge/warning, so it
+                      stays plain foreground regardless of value. */}
+                  <span className="font-medium tabular-nums text-foreground">
                     {aggregate?.escalationCount ?? 0}
                   </span>
                 </span>
@@ -408,7 +412,7 @@ const CustomerDetail: React.FC = () => {
                 and GroupedInteractionTree component are unchanged. */}
             <div className="space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Interaction History</div>
+                <div className={`${typography.sectionTitle} px-1`}>Interaction History</div>
                 {allInteractions.length > 0 && (
                   <FilterPopover
                     title="Group by Category / Agent / Channel"
@@ -449,20 +453,20 @@ const CustomerDetail: React.FC = () => {
                 <div className="rounded-md border border-border overflow-x-auto overflow-y-auto max-h-[18rem]">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-background z-10">
-                      <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                        <th className="h-9 px-3 font-medium whitespace-nowrap">Time</th>
-                        <th className="h-9 px-3 font-medium">Channel</th>
-                        <th className="h-9 px-3 font-medium min-w-[7rem] max-w-[14rem]">Agent</th>
-                        <th className="h-9 px-3 font-medium">Intent</th>
-                        <th className="h-9 px-3 font-medium text-right">Duration</th>
-                        <th className="h-9 px-3 font-medium min-w-[6rem] max-w-[10rem]">Outcome</th>
-                        <th className="h-9 px-3 font-medium text-right">Sentiment</th>
-                        <th className="h-9 px-3 font-medium text-center" title="Recording available">Rec</th>
-                        <th className="h-9 px-3 font-medium">Escalation</th>
-                        <th className="h-9 px-3 font-medium text-right">Action</th>
+                      <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                        <th className="h-9 px-3 whitespace-nowrap">Time</th>
+                        <th className="h-9 px-3">Channel</th>
+                        <th className="h-9 px-3 min-w-[7rem] max-w-[14rem]">Agent</th>
+                        <th className="h-9 px-3">Intent</th>
+                        <th className="h-9 px-3 text-right">Duration</th>
+                        <th className="h-9 px-3 min-w-[6rem] max-w-[10rem]">Outcome</th>
+                        <th className="h-9 px-3 text-right">Sentiment</th>
+                        <th className="h-9 px-3 text-center" title="Recording available">Rec</th>
+                        <th className="h-9 px-3">Escalation</th>
+                        <th className="h-9 px-3 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className={typography.tableBody}>
                       {pagedInteractions.map((row) => {
                         const outcomeVariant =
                           row.outcome === 'escalated' ? 'escalated' : row.outcome === 'resolved' ? 'positive' : 'secondary';
@@ -564,8 +568,8 @@ const CustomerDetail: React.FC = () => {
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      size="xs"
+                      className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                       onClick={() => setInteractionHistoryPage((p) => Math.max(1, p - 1))}
                       disabled={interactionHistoryCurrentPage <= 1}
                     >
@@ -574,8 +578,8 @@ const CustomerDetail: React.FC = () => {
                     </Button>
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      size="xs"
+                      className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                       onClick={() => setInteractionHistoryPage((p) => Math.min(interactionHistoryTotalPages, p + 1))}
                       disabled={interactionHistoryCurrentPage >= interactionHistoryTotalPages}
                     >
@@ -600,7 +604,7 @@ const CustomerDetail: React.FC = () => {
                 fields don't exist on today's live contract, and no
                 placeholder/speculative column is shown for them. */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">Campaign Participation</div>
+              <div className={`${typography.sectionTitle} px-1`}>Campaign Participation</div>
               {campaignsQuery.isLoading ? (
                 <div className="flex justify-center py-8" role="status" aria-live="polite">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -614,18 +618,18 @@ const CustomerDetail: React.FC = () => {
                 <div className="rounded-md border border-border overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                        <th className="h-9 px-3 font-medium">Campaign</th>
-                        <th className="h-9 px-3 font-medium min-w-[7rem] max-w-[14rem]">Call Agent</th>
-                        <th className="h-9 px-3 font-medium min-w-[6rem] max-w-[9rem]">Target Status</th>
-                        <th className="h-9 px-3 font-medium text-right">Attempts</th>
-                        <th className="h-9 px-3 font-medium min-w-[6rem] max-w-[10rem]">Latest Execution</th>
-                        <th className="h-9 px-3 font-medium min-w-[7rem] max-w-[14rem]">Current Result</th>
-                        <th className="h-9 px-3 font-medium whitespace-nowrap">Follow-up</th>
-                        <th className="h-9 px-3 font-medium text-right">Action</th>
+                      <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                        <th className="h-9 px-3">Campaign</th>
+                        <th className="h-9 px-3 min-w-[7rem] max-w-[14rem]">Call Agent</th>
+                        <th className="h-9 px-3 min-w-[6rem] max-w-[9rem]">Target Status</th>
+                        <th className="h-9 px-3 text-right">Attempts</th>
+                        <th className="h-9 px-3 min-w-[6rem] max-w-[10rem]">Latest Execution</th>
+                        <th className="h-9 px-3 min-w-[7rem] max-w-[14rem]">Current Result</th>
+                        <th className="h-9 px-3 whitespace-nowrap">Follow-up</th>
+                        <th className="h-9 px-3 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className={typography.tableBody}>
                       {campaigns.map((target) => (
                         <tr key={target.id} className="border-b border-border/60 last:border-0">
                           <td className="py-1.5 px-3 text-foreground">{target.campaignName}</td>
@@ -651,8 +655,8 @@ const CustomerDetail: React.FC = () => {
                             {target.latestReconciledInteractionId ? (
                               <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-cyan-600 dark:text-cyan-400 hover:bg-muted"
+                                size="xs"
+                                className="text-cyan-600 dark:text-cyan-400 hover:bg-muted"
                                 onClick={() => setSelectedInteraction({ id: target.latestReconciledInteractionId as string, channel: 'voice' })}
                               >
                                 View call

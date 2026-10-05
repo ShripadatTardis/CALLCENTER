@@ -42,7 +42,7 @@ const CampaignDetailPage: React.FC = () => {
     return (
       <Layout>
         <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-4">
-          <Button variant="outline" onClick={() => navigate(returnTo.path)}>
+          <Button variant="outline" size="xs" onClick={() => navigate(returnTo.path)}>
             ← Back to {returnTo.label}
           </Button>
           <QueryErrorBanner error={detailQuery.error} onRetry={() => void detailQuery.refetch()} isFetching={detailQuery.isFetching} />

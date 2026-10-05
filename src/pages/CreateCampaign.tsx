@@ -24,6 +24,7 @@ import type {
   NewResultRuleInput,
   OutcomePolicySnapshot,
 } from '@/types/campaign';
+import { typography } from '@/lib/typography';
 
 /**
  * Session 10.1 production workflow — 7 stages, no Scheduling step (it
@@ -294,8 +295,8 @@ const CreateCampaign: React.FC = () => {
       <div className="h-full min-h-0 overflow-y-auto bg-background text-foreground">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
           <div>
-            <h1 className="text-base font-semibold text-foreground">Create Campaign</h1>
-            <p className="text-[12px] text-muted-foreground">Set up a new outbound call campaign.</p>
+            <h1 className={typography.pageTitle}>Create Campaign</h1>
+            <p className={typography.pageDescription}>Set up a new outbound call campaign.</p>
           </div>
           <Button variant="outline" className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" size="sm" onClick={() => navigate('/outbound-campaigns')}>
             Cancel
@@ -362,7 +363,7 @@ const CreateCampaign: React.FC = () => {
 
           {/* Current-stage workspace — one bounded surface, not nested cards. */}
           <div className="flex-1 min-w-0 w-full border border-border rounded-md bg-card/40 p-3 md:p-4">
-            <h2 className="text-[13px] font-semibold text-foreground mb-3">{STAGES[step]}</h2>
+            <h2 className={`${typography.cardTitle} mb-3`}>{STAGES[step]}</h2>
 
             {step === 0 && (
               <div className="space-y-3 max-w-md">
@@ -415,7 +416,7 @@ const CreateCampaign: React.FC = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[12px] text-muted-foreground">Required — every campaign target is called with this agent.</p>
+                <p className={typography.bodySecondary}>Required — every campaign target is called with this agent.</p>
               </div>
             )}
 
@@ -446,7 +447,7 @@ const CreateCampaign: React.FC = () => {
                             Expected inputs ({agentContract.expectedInputFields.length})
                           </p>
                           {agentContract.expectedInputFields.length === 0 ? (
-                            <p className="text-[12px] text-muted-foreground">None — this agent takes no campaign-driven inputs.</p>
+                            <p className={typography.bodySecondary}>None — this agent takes no campaign-driven inputs.</p>
                           ) : (
                             <ul className="text-[12px] space-y-0.5">
                               {agentContract.expectedInputFields.map((f) => (
@@ -469,7 +470,7 @@ const CreateCampaign: React.FC = () => {
                             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
                               Advertised outcomes ({agentContract.expectedOutcomes.length})
                             </p>
-                            <p className="text-[12px] text-muted-foreground">
+                            <p className={typography.bodySecondary}>
                               {agentContract.expectedOutcomes.map((o) => o.displayName).join(', ')}
                             </p>
                           </div>
@@ -500,7 +501,7 @@ const CreateCampaign: React.FC = () => {
                   </p>
                 </div>
                 {csvErrors.length > 0 && (
-                  <div className="text-[12px] text-red-400 bg-red-950/40 border border-red-900 rounded p-2">
+                  <div className="text-[12px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 rounded p-2">
                     {csvErrors.map((e, i) => (
                       <div key={i}>{e}</div>
                     ))}
@@ -540,7 +541,7 @@ const CreateCampaign: React.FC = () => {
                   Maps the selected Call Agent's expected input fields to Customer 360 or CSV data. Campaign start
                   is blocked, deterministically, if a required field is left unmapped — never guessed by an AI.
                 </p>
-                {!agentContract && <p className="text-[12px] text-muted-foreground">Select a Call Agent first.</p>}
+                {!agentContract && <p className={typography.bodySecondary}>Select a Call Agent first.</p>}
                 {agentContract && agentContract.expectedInputFields.length === 0 && (
                   <p className="text-[12px] text-muted-foreground border border-border rounded p-2.5 bg-background/60">
                     This agent declares no expected input fields — there is nothing to map. The campaign will call
@@ -656,7 +657,7 @@ const CreateCampaign: React.FC = () => {
                       </p>
                     )}
                     {!mappingDuplicates.valid && (
-                      <p className="text-[11px] text-red-400 bg-red-950/40 border border-red-900 rounded p-2">
+                      <p className="text-[11px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 rounded p-2">
                         Duplicate source mapping{mappingDuplicates.duplicateSourceKeys.length === 1 ? '' : 's'}: {mappingDuplicates.duplicateSourceKeys.join(', ')} — each source field may
                         back only one agent input.
                       </p>
@@ -767,7 +768,7 @@ const CreateCampaign: React.FC = () => {
                 {rules.map((rule, i) => (
                   <div key={i} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end border border-border rounded p-2.5">
                     <div>
-                      <Label className="text-[11px] text-muted-foreground">Match field</Label>
+                      <Label className={typography.label}>Match field</Label>
                       <Input
                         value={rule.matchField}
                         onChange={(e) => setRules((prev) => prev.map((r, j) => (j === i ? { ...r, matchField: e.target.value } : r)))}
@@ -775,7 +776,7 @@ const CreateCampaign: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-muted-foreground">Match value</Label>
+                      <Label className={typography.label}>Match value</Label>
                       <Input
                         value={rule.matchValue}
                         onChange={(e) => setRules((prev) => prev.map((r, j) => (j === i ? { ...r, matchValue: e.target.value } : r)))}
@@ -783,7 +784,7 @@ const CreateCampaign: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-muted-foreground">Result label</Label>
+                      <Label className={typography.label}>Result label</Label>
                       <Input
                         value={rule.resultLabel}
                         onChange={(e) =>
@@ -795,7 +796,7 @@ const CreateCampaign: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-muted-foreground">Is success</Label>
+                      <Label className={typography.label}>Is success</Label>
                       <Select
                         value={rule.isSuccess === null ? 'null' : String(rule.isSuccess)}
                         onValueChange={(v) =>
@@ -875,7 +876,7 @@ const CreateCampaign: React.FC = () => {
                 )}
 
                 {!isReady && (
-                  <div className="border border-red-900 bg-red-950/40 rounded p-2.5 text-red-300 space-y-1">
+                  <div className="border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 rounded p-2.5 text-red-700 dark:text-red-300 space-y-1">
                     {blockers.map((b) => (
                       <div key={b} className="flex items-center gap-1.5">
                         <AlertTriangle size={12} aria-hidden="true" />
@@ -884,7 +885,7 @@ const CreateCampaign: React.FC = () => {
                     ))}
                   </div>
                 )}
-                {submitError && <p className="text-red-300 bg-red-950/40 border border-red-900 rounded p-2">{submitError}</p>}
+                {submitError && <p className="text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 rounded p-2">{submitError}</p>}
 
                 <div className="flex gap-2 pt-3">
                   <Button

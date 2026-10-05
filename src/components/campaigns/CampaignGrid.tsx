@@ -2,6 +2,7 @@ import React from 'react';
 import { CampaignStatusBadge } from './CampaignStatusBadge';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import type { CampaignWithStats } from '@/types/campaign';
+import { typography } from '@/lib/typography';
 
 interface CampaignGridProps {
   campaigns: CampaignWithStats[];
@@ -28,15 +29,15 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
     <div className="overflow-x-auto border border-border rounded-md bg-card/40">
       <table className="w-full text-[13px] text-foreground">
         <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
-            <th className="text-left py-2 px-3 font-medium">Campaign</th>
-            <th className="text-left py-2 px-3 font-medium">Status</th>
-            <th className="text-left py-2 px-3 font-medium">Call Agent</th>
-            <th className="text-right py-2 px-3 font-medium">Targets</th>
-            <th className="text-right py-2 px-3 font-medium">Attempted</th>
-            <th className="text-right py-2 px-3 font-medium">Classified</th>
-            <th className="text-right py-2 px-3 font-medium">Unclassified</th>
-            <th className="text-right py-2 px-3 font-medium">Success rate</th>
+          <tr className={`${typography.tableHeader} border-b border-border`}>
+            <th className="text-left py-2 px-3">Campaign</th>
+            <th className="text-left py-2 px-3">Status</th>
+            <th className="text-left py-2 px-3">Call Agent</th>
+            <th className="text-right py-2 px-3">Targets</th>
+            <th className="text-right py-2 px-3">Attempted</th>
+            <th className="text-right py-2 px-3">Classified</th>
+            <th className="text-right py-2 px-3">Unclassified</th>
+            <th className="text-right py-2 px-3">Success rate</th>
             <th className="py-2 px-3" />
           </tr>
         </thead>

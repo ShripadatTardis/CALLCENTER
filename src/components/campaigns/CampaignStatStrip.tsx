@@ -26,9 +26,13 @@ export const CampaignStatStrip: React.FC<CampaignStatStripProps> = ({ campaigns 
   const totalUnclassified = totalTargets - totalClassified;
   const successRate = totalClassified > 0 ? (totalSuccess / totalClassified) * 100 : null;
 
-  const items: Array<{ label: string; value: string; tone?: string }> = [
+  // VoiceForce design system — neutral data-value rule: these are
+  // ordinary counts, not status badges, so none carry a tone color
+  // (Running previously rendered green merely because it's a count of
+  // "good" campaigns, not because it communicates alert/warning state).
+  const items: Array<{ label: string; value: string }> = [
     { label: 'Campaigns', value: String(totalCampaigns) },
-    { label: 'Running', value: String(activeCampaigns), tone: 'text-green-400' },
+    { label: 'Running', value: String(activeCampaigns) },
     { label: 'Targets', value: totalTargets.toLocaleString() },
     { label: 'Calls triggered', value: totalTriggered.toLocaleString() },
   ];
@@ -38,7 +42,7 @@ export const CampaignStatStrip: React.FC<CampaignStatStripProps> = ({ campaigns 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-border rounded-md bg-card/40 text-[13px]">
         {items.map((item) => (
           <div key={item.label} className="flex items-baseline gap-1.5">
-            <span className={`font-semibold tabular-nums ${item.tone ?? 'text-foreground'}`}>{item.value}</span>
+            <span className="font-semibold tabular-nums text-foreground">{item.value}</span>
             <span className="text-muted-foreground text-[11px]">{item.label}</span>
           </div>
         ))}
@@ -61,7 +65,7 @@ export const CampaignStatStrip: React.FC<CampaignStatStripProps> = ({ campaigns 
         </div>
         {totalUnclassified > 0 && (
           <div className="flex items-baseline gap-1.5">
-            <span className="font-semibold tabular-nums text-amber-400">{totalUnclassified.toLocaleString()}</span>
+            <span className="font-semibold tabular-nums text-foreground">{totalUnclassified.toLocaleString()}</span>
             <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
           </div>
         )}

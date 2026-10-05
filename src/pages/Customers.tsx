@@ -9,6 +9,7 @@ import { useCustomers } from '@/hooks/customers/useCustomers';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { formatFractionAsPercent, formatStatusLabel, formatTimestamp } from '@/lib/format';
 import { getCustomerDisplayLabel } from '@/lib/customerDisplayLabel';
+import { typography } from '@/lib/typography';
 
 const PAGE_SIZE = 25;
 
@@ -111,14 +112,14 @@ const Customers: React.FC = () => {
                column gets the residual width (min-w-0/flex growth via
                table layout), descriptive/status columns get a bounded
                min/max rather than an arbitrary fixed width. */
-            <table className="w-full text-sm">
+            <table className={`w-full ${typography.tableBody}`}>
               <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="h-9 px-3 font-medium">Customer</th>
-                  <th className="h-9 px-3 font-medium text-right">Interactions</th>
-                  <th className="h-9 px-3 font-medium whitespace-nowrap">Last seen</th>
-                  <th className="h-9 px-3 font-medium min-w-[6rem] max-w-[10rem]">Latest outcome</th>
-                  <th className="h-9 px-3 font-medium text-right">Sentiment</th>
+                <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                  <th className="h-9 px-3">Customer</th>
+                  <th className="h-9 px-3 text-right">Interactions</th>
+                  <th className="h-9 px-3 whitespace-nowrap">Last seen</th>
+                  <th className="h-9 px-3 min-w-[6rem] max-w-[10rem]">Latest outcome</th>
+                  <th className="h-9 px-3 text-right">Sentiment</th>
                 </tr>
               </thead>
               <tbody>

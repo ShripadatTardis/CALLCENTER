@@ -9,6 +9,7 @@ import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { ChatIdentitySelector } from '@/components/chat/ChatIdentitySelector';
 import type { SendChatMessageOptions } from '@/services/chat/chatService';
+import { typography } from '@/lib/typography';
 
 const ChatConsole: React.FC = () => {
   const {
@@ -72,8 +73,8 @@ const ChatConsole: React.FC = () => {
           </div>
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 shrink-0 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+            size="xs"
+            className="shrink-0 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
             onClick={handleNewChat}
             disabled={messages.length === 0}
           >
@@ -84,7 +85,7 @@ const ChatConsole: React.FC = () => {
 
         <Card className="flex-1 min-h-0 flex flex-col bg-card border-border">
           <CardHeader className="py-2 border-b border-border">
-            <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+            <CardTitle className={`flex flex-wrap items-center gap-2 ${typography.cardTitle}`}>
               <MessageCircle className="h-3.5 w-3.5" />
               Conversation {hasActiveSession && <span className="text-xs text-muted-foreground font-normal">(active session)</span>}
               {isTrialSession && (

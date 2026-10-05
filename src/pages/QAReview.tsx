@@ -25,6 +25,7 @@ import { groupInteractions } from '@/lib/interactionGrouping';
 import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
+import { typography } from '@/lib/typography';
 
 type QARow = {
   key: string;
@@ -198,7 +199,7 @@ const QAReview: React.FC = () => {
           height and is a flex column; everything above the table is
           flex-shrink-0; the table alone is flex-1 min-h-0 overflow-auto. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
-        <p className="text-xs text-muted-foreground max-w-3xl flex-shrink-0">
+        <p className={`${typography.pageDescription} max-w-3xl flex-shrink-0`}>
           Read-only review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
           Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
           (duration, latency where available). No composite quality score — see AI Agents for the agent-level
@@ -223,11 +224,12 @@ const QAReview: React.FC = () => {
               placeholder="Search intent…"
               value={intentSearch}
               onChange={(e) => setIntentSearch(e.target.value)}
-              className="h-8 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+              uiSize="sm"
+              className="border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Select value={channelFilter} onValueChange={setChannelFilter}>
-            <SelectTrigger className="h-8 w-32 text-xs border-border bg-card text-foreground"><SelectValue placeholder="Channel" /></SelectTrigger>
+            <SelectTrigger uiSize="sm" className="w-32 border-border bg-card text-foreground"><SelectValue placeholder="Channel" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All channels</SelectItem>
               <SelectItem value="voice">Voice</SelectItem>
@@ -307,8 +309,8 @@ const QAReview: React.FC = () => {
           <div className="flex-1" />
           <Button
             variant={view === 'grouped' ? 'default' : 'outline'}
-            size="sm"
-            className={view === 'grouped' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
+            size="xs"
+            className={view === 'grouped' ? '' : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
             onClick={() => setView('grouped')}
           >
             <Network className="h-3.5 w-3.5 mr-1.5" />
@@ -316,8 +318,8 @@ const QAReview: React.FC = () => {
           </Button>
           <Button
             variant={view === 'table' ? 'default' : 'outline'}
-            size="sm"
-            className={view === 'table' ? 'h-8' : 'h-8 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
+            size="xs"
+            className={view === 'table' ? '' : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
             onClick={() => { setView('table'); setSelectedGroup(null); }}
           >
             <LayoutList className="h-3.5 w-3.5 mr-1.5" />
@@ -375,7 +377,7 @@ const QAReview: React.FC = () => {
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   {['Time', 'Channel', 'Agent', 'Outcome', 'FCR', 'Escalation', 'Intent', 'Accuracy/Confidence', 'Sentiment', 'Auth', 'Duration/Latency', 'Campaign'].map((h) => (
-                    <TableHead key={h} className="text-muted-foreground text-xs">{h}</TableHead>
+                    <TableHead key={h} className={typography.tableHeader}>{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -394,43 +396,43 @@ const QAReview: React.FC = () => {
                       }
                     }}
                   >
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatTimestamp(row.startTime)}</TableCell>
+                    <TableCell className={`whitespace-nowrap ${typography.metadata}`}>{formatTimestamp(row.startTime)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs border-slate-600 text-foreground">
                         {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
                         {row.channel}
                       </Badge>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-foreground">{row.agentName}</TableCell>
-                    <TableCell className="text-foreground">{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
-                    <TableCell className="text-foreground">{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                    <TableCell className={`whitespace-nowrap ${typography.tableBody}`}>{row.agentName}</TableCell>
+                    <TableCell className={typography.tableBody}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                    <TableCell className={typography.tableBody}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
                     <TableCell>
                       {row.escalationTrigger ? (
                         <Badge variant="destructive" className="text-xs">{row.escalationTrigger}</Badge>
                       ) : (
-                        <span className="text-muted-foreground">{row.channel === 'voice' ? 'No' : '—'}</span>
+                        <span className="text-xs text-muted-foreground">{row.channel === 'voice' ? 'No' : '—'}</span>
                       )}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-foreground">{row.intent ?? '—'}</TableCell>
-                    <TableCell className="text-foreground">
+                    <TableCell className={`whitespace-nowrap ${typography.tableBody}`}>{row.intent ?? '—'}</TableCell>
+                    <TableCell className={typography.tableBody}>
                       {row.channel === 'voice'
                         ? formatPercent(row.intentAccuracyPct, 0)
                         : row.chatConfidenceFraction != null
                           ? formatFractionAsPercent(row.chatConfidenceFraction)
                           : '—'}
                     </TableCell>
-                    <TableCell className="text-foreground">{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
-                    <TableCell className="text-foreground">
+                    <TableCell className={typography.tableBody}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                    <TableCell className={typography.tableBody}>
                       {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-foreground">
+                    <TableCell className={`whitespace-nowrap ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatDurationLong(row.durationSeconds)
                         : row.latencyMs != null
                           ? `${row.latencyMs}ms`
                           : '—'}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">{row.campaignName ?? '—'}</TableCell>
+                    <TableCell className={`whitespace-nowrap ${typography.metadata}`}>{row.campaignName ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

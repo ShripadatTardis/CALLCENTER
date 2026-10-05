@@ -4,6 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { RatioCatalogue } from '@/components/ratios/RatioCatalogue';
 import type { DetailNavigationState } from '@/lib/detailOrigin';
+import { typography } from '@/lib/typography';
 
 /**
  * /ratios — Ratio catalogue (Session R1). Additive page under the
@@ -24,8 +25,8 @@ const Ratios: React.FC = () => {
       <div className="h-full min-h-0 overflow-y-auto bg-background p-4 space-y-3 text-foreground">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-base font-semibold text-foreground">Ratios</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <h1 className={typography.pageTitle}>Ratios</h1>
+            <p className={`${typography.pageDescription} mt-0.5`}>
               Investigate a KPI from its current value down to the interactions behind it.
             </p>
           </div>

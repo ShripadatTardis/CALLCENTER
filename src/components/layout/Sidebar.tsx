@@ -5,6 +5,7 @@ import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { UserProfile } from './UserProfile';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { PILLARS, findPillarForPath, type Pillar } from './pillarNav';
+import { typography } from '@/lib/typography';
 import {
   LayoutGrid,
   Phone,
@@ -155,7 +156,8 @@ export const Sidebar: React.FC = () => {
                     <AccordionItem key={pillar.key} value={pillar.key} className="px-3 border-b-0">
                       <AccordionTrigger
                         className={cn(
-                          'py-1.5 text-[11px] font-semibold uppercase tracking-wide hover:no-underline hover:text-sidebar-foreground',
+                          typography.subsectionTitle,
+                          'py-1.5 hover:no-underline hover:text-sidebar-foreground',
                           isPillarActive ? 'text-cyan-500 dark:text-cyan-400' : 'text-sidebar-foreground/60'
                         )}
                       >

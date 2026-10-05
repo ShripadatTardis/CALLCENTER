@@ -9,6 +9,7 @@ import { getRoleDisplayName } from '@/lib/auth';
 import { useAdminUsers, useAdminUserDetail, useAdminRoles, useSetUserStatus, useAssignUserRole, useRemoveUserRole } from '@/hooks/admin/useAdmin';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddUserDialog } from '@/components/admin/AddUserDialog';
+import { typography } from '@/lib/typography';
 
 /**
  * Session 14.1 — real User Management, replacing the sampleUsers
@@ -47,16 +48,17 @@ const UserManagement: React.FC = () => {
               placeholder="Search by name or email…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+              uiSize="sm"
+              className="pl-7 border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
           {canManage ? (
-            <Button size="sm" className="h-8" onClick={() => setAddUserOpen(true)}>
+            <Button size="xs" onClick={() => setAddUserOpen(true)}>
               <UserPlus className="h-3.5 w-3.5 mr-1.5" />
               Add User
             </Button>
           ) : (
-            <p className="text-xs text-muted-foreground">View-only — your role doesn't include Manage Users.</p>
+            <p className={typography.pageDescription}>View-only — your role doesn't include Manage Users.</p>
           )}
         </div>
 
@@ -67,11 +69,11 @@ const UserManagement: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">User</th>
-                <th className="px-3 py-2 font-medium">Role(s)</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium text-right">Actions</th>
+              <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                <th className="px-3 py-2">User</th>
+                <th className="px-3 py-2">Role(s)</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -108,7 +110,7 @@ const UserManagement: React.FC = () => {
                             <span className="text-xs text-muted-foreground">No roles assigned</span>
                           ) : (
                             u.roles.map((r) => (
-                              <Badge key={r} variant="outline" className="text-xs whitespace-nowrap border-slate-600 text-foreground">
+                              <Badge key={r} variant="outline" className="text-xs whitespace-nowrap border-border text-foreground">
                                 {getRoleDisplayName(r)}
                               </Badge>
                             ))
@@ -129,8 +131,8 @@ const UserManagement: React.FC = () => {
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          size="xs"
+                          className="text-muted-foreground hover:text-foreground"
                           onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
                         >
                           {expandedUserId === u.id ? 'Close' : 'Manage'}
@@ -145,8 +147,7 @@ const UserManagement: React.FC = () => {
                               <span className="text-xs text-muted-foreground">Status:</span>
                               <Button
                                 variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
+                                size="xs"
                                 disabled={!canManage || setStatus.isPending}
                                 onClick={() => setStatus.mutate({ userId: u.id, status: u.status === 'active' ? 'inactive' : 'active' })}
                               >
@@ -160,7 +161,7 @@ const UserManagement: React.FC = () => {
                                 onValueChange={(roleCode) => assignRole.mutate({ userId: u.id, roleCode })}
                                 value=""
                               >
-                                <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="Add a role…" /></SelectTrigger>
+                                <SelectTrigger uiSize="sm" className="w-40"><SelectValue placeholder="Add a role…" /></SelectTrigger>
                                 <SelectContent>
                                   {(roles ?? [])
                                     .filter((r) => !u.roles.includes(r.code))

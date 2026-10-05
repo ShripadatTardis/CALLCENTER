@@ -54,7 +54,7 @@ export const RatioHero: React.FC<{
         <div className="flex items-end gap-4 flex-wrap">
           <div className="text-3xl font-semibold tabular-nums text-foreground">{formatValue(summary.value, summary.unit)}</div>
           {summary.comparison?.delta != null && (
-            <div className={`text-sm tabular-nums pb-1 ${summary.comparison.delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+            <div className="text-sm tabular-nums pb-1 text-foreground">
               {summary.comparison.delta >= 0 ? '+' : ''}
               {summary.comparison.delta.toFixed(1)}
               {summary.comparison.isPercentagePoints ? ' pp' : ''} vs previous

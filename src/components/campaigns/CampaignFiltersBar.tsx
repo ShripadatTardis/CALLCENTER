@@ -29,14 +29,15 @@ export const CampaignFiltersBar: React.FC<CampaignFiltersBarProps> = ({
           placeholder="Search campaigns…"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-8 h-8 text-[13px] bg-card border-border text-foreground placeholder:text-muted-foreground"
+          uiSize="sm"
+          className="pl-8 bg-card border-border text-foreground placeholder:text-muted-foreground"
         />
       </div>
       <select
         aria-label="Filter by status"
         value={selectedStatus}
         onChange={(e) => setSelectedStatus(e.target.value)}
-        className="border border-border bg-card text-foreground rounded-md px-2 h-8 text-[13px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+        className="border border-border bg-card text-foreground rounded-md px-2 h-8 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
       >
         <option value="all">All statuses</option>
         <option value="draft">Draft</option>

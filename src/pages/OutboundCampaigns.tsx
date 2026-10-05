@@ -9,6 +9,7 @@ import { CampaignStatStrip } from '@/components/campaigns/CampaignStatStrip';
 import { CampaignFiltersBar } from '@/components/campaigns/CampaignFiltersBar';
 import { CampaignGrid } from '@/components/campaigns/CampaignGrid';
 import type { CampaignWithStats } from '@/types/campaign';
+import { typography } from '@/lib/typography';
 
 const PAGE_SIZE = 25;
 
@@ -61,12 +62,12 @@ const OutboundCampaigns: React.FC = () => {
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between flex-shrink-0">
           <div>
-            <h1 className="text-base font-semibold text-foreground">Outbound Campaigns</h1>
+            <h1 className={typography.pageTitle}>Outbound Campaigns</h1>
             {data?.scoped && (
-              <p className="text-[11px] text-muted-foreground mt-0.5">Showing campaigns for your authorized categories only.</p>
+              <p className={`${typography.metadata} mt-0.5`}>Showing campaigns for your authorized categories only.</p>
             )}
           </div>
-          <Button size="sm" onClick={() => navigate('/outbound-campaigns/create')}>
+          <Button size="xs" onClick={() => navigate('/outbound-campaigns/create')}>
             <Plus className="h-4 w-4 mr-1" />
             New Campaign
           </Button>
@@ -113,8 +114,8 @@ const OutboundCampaigns: React.FC = () => {
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                size="xs"
+                className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1 || isFetching}
               >
@@ -123,8 +124,8 @@ const OutboundCampaigns: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                size="xs"
+                className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages || isFetching}
               >

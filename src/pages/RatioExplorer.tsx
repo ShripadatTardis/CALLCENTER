@@ -14,6 +14,7 @@ import { BreakdownTable } from '@/components/ratios/BreakdownTable';
 import { DriverPanel } from '@/components/ratios/DriverPanel';
 import { InteractionTable } from '@/components/ratios/InteractionTable';
 import type { DetailNavigationState } from '@/lib/detailOrigin';
+import { typography } from '@/lib/typography';
 
 const INTERACTIONS_PAGE_SIZE = 25;
 
@@ -130,7 +131,7 @@ const RatioExplorer: React.FC = () => {
 
         <section className="space-y-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-[13px] font-semibold text-foreground px-0.5">Breakdown</h2>
+            <h2 className={`${typography.cardTitle} px-0.5`}>Breakdown</h2>
             <BreakdownSelector
               dimensions={definition.declaredDrillDimensions}
               selected={filters.breakdown}

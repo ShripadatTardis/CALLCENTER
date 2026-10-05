@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAdminAuditEvents } from '@/hooks/admin/useAdmin';
 import { formatTimestamp } from '@/lib/format';
+import { typography } from '@/lib/typography';
 
 const RESULT_BADGE: Record<string, { variant: 'positive' | 'escalated' | 'warning'; label: string }> = {
   success: { variant: 'positive', label: 'Success' },
@@ -38,8 +39,8 @@ const AuditTrail: React.FC = () => {
           Pattern A, same recipe as CallLogs.tsx. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
         <div className="flex-shrink-0">
-          <h1 className="text-base font-semibold text-foreground">Audit Trail</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Security and operationally significant actions — who did what, when, and whether it succeeded.</p>
+          <h1 className={typography.pageTitle}>Audit Trail</h1>
+          <p className={`${typography.pageDescription} mt-0.5`}>Security and operationally significant actions — who did what, when, and whether it succeeded.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
@@ -47,10 +48,11 @@ const AuditTrail: React.FC = () => {
             placeholder="Filter by action…"
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            className="h-8 w-56 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+            uiSize="sm"
+            className="w-56 border-border bg-card text-foreground placeholder:text-muted-foreground"
           />
           <Select value={resourceType} onValueChange={setResourceType}>
-            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger uiSize="sm" className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All resource types</SelectItem>
               <SelectItem value="user">User</SelectItem>
@@ -62,7 +64,7 @@ const AuditTrail: React.FC = () => {
             </SelectContent>
           </Select>
           <Select value={result} onValueChange={setResult}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger uiSize="sm" className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All results</SelectItem>
               <SelectItem value="success">Success</SelectItem>
@@ -77,12 +79,12 @@ const AuditTrail: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Time</th>
-                <th className="px-3 py-2 font-medium">Actor</th>
-                <th className="px-3 py-2 font-medium">Action</th>
-                <th className="px-3 py-2 font-medium">Resource</th>
-                <th className="px-3 py-2 font-medium">Result</th>
+              <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
+                <th className="px-3 py-2">Time</th>
+                <th className="px-3 py-2">Actor</th>
+                <th className="px-3 py-2">Action</th>
+                <th className="px-3 py-2">Resource</th>
+                <th className="px-3 py-2">Result</th>
               </tr>
             </thead>
             <tbody>
@@ -101,12 +103,12 @@ const AuditTrail: React.FC = () => {
                   const badge = RESULT_BADGE[e.result] ?? { variant: 'warning' as const, label: e.result };
                   return (
                     <tr key={e.id} className="border-b border-border/60 last:border-0 hover:bg-card">
-                      <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{formatTimestamp(e.occurred_at)}</td>
-                      <td className="px-3 py-2 text-xs text-foreground whitespace-nowrap">
+                      <td className={`px-3 py-2 whitespace-nowrap ${typography.metadata}`}>{formatTimestamp(e.occurred_at)}</td>
+                      <td className={`px-3 py-2 whitespace-nowrap ${typography.tableBody}`}>
                         {e.actor_type === 'user' ? (e.actor_label ?? e.actor_user_id ?? 'User') : e.actor_type === 'cron' ? 'Scheduled job' : 'System'}
                       </td>
-                      <td className="px-3 py-2 text-xs text-foreground">{e.action}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <td className={`px-3 py-2 ${typography.tableBody}`}>{e.action}</td>
+                      <td className={`px-3 py-2 ${typography.metadata}`}>
                         {e.resource_type ? `${e.resource_type}${e.resource_id ? ` · ${e.resource_id.slice(0, 8)}` : ''}` : '—'}
                       </td>
                       <td className="px-3 py-2">

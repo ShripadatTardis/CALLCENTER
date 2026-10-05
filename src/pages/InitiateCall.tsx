@@ -8,11 +8,11 @@ import { CallConfigurationForm } from '@/components/initiate-call/CallConfigurat
 import { CallHistoryList } from '@/components/initiate-call/CallHistoryList';
 import { PostTriggerStatusCard } from '@/components/initiate-call/PostTriggerStatusCard';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInitiateCall } from '@/hooks/useInitiateCall';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import { typography } from '@/lib/typography';
 
 const MAX_LOOKUP_PAGES = 3;
 const LOOKUP_PAGE_SIZE = 100;
@@ -129,40 +129,32 @@ const InitiateCall: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Card className="bg-card border-border">
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm font-semibold text-foreground">Call Configuration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CallConfigurationForm
-                config={config}
-                contract={contract}
-                onPhoneNumberChange={updatePhoneNumber}
-                onAgentChange={updateSelectedAgent}
-                onAgentInputChange={updateAgentInput}
-                showValidation={showValidation}
-                onInitiateCall={initiateCall}
-                isLoading={isLoading}
-                isDisabled={isInitiateCallDisabled}
-              />
-            </CardContent>
-          </Card>
+          <div className="rounded-md border border-border bg-card p-3 space-y-3">
+            <div className={typography.cardTitle}>Call Configuration</div>
+            <CallConfigurationForm
+              config={config}
+              contract={contract}
+              onPhoneNumberChange={updatePhoneNumber}
+              onAgentChange={updateSelectedAgent}
+              onAgentInputChange={updateAgentInput}
+              showValidation={showValidation}
+              onInitiateCall={initiateCall}
+              isLoading={isLoading}
+              isDisabled={isInitiateCallDisabled}
+            />
+          </div>
 
-          <Card className="bg-card border-border">
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm font-semibold text-foreground">Recent Calls</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {callHistoryError && (
-                <QueryErrorBanner
-                  error={callHistoryError}
-                  onRetry={() => refetchCallHistory()}
-                  hasStaleData={callHistory.length > 0}
-                />
-              )}
-              <CallHistoryList callHistory={callHistory} isLoading={isCallHistoryLoading} />
-            </CardContent>
-          </Card>
+          <div className="rounded-md border border-border bg-card p-3 space-y-3">
+            <div className={typography.cardTitle}>Recent Calls ({callHistory.length})</div>
+            {callHistoryError && (
+              <QueryErrorBanner
+                error={callHistoryError}
+                onRetry={() => refetchCallHistory()}
+                hasStaleData={callHistory.length > 0}
+              />
+            )}
+            <CallHistoryList callHistory={callHistory} isLoading={isCallHistoryLoading} />
+          </div>
         </div>
       </div>
     </Layout>

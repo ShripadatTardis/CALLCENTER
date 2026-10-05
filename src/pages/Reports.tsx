@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useIndustryData, useIndustryTerminology } from '@/hooks/useIndustryData';
+import { typography } from '@/lib/typography';
 import { 
   Search, 
   Filter, 
@@ -148,15 +149,15 @@ const Reports: React.FC = () => {
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      executive: 'bg-purple-100 text-purple-800 border-purple-200',
-      campaign_performance: 'bg-blue-100 text-blue-800 border-blue-200',
-      customer_experience: 'bg-green-100 text-green-800 border-green-200',
-      ai_performance: 'bg-orange-100 text-orange-800 border-orange-200',
-      operational: 'bg-slate-100 text-slate-800 border-border',
-      qa_compliance: 'bg-red-100 text-red-800 border-red-200',
-      financial: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      technical: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-      custom: 'bg-pink-100 text-pink-800 border-pink-200'
+      executive: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900',
+      campaign_performance: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900',
+      customer_experience: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900',
+      ai_performance: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900',
+      operational: 'bg-slate-100 text-slate-800 border-border dark:bg-slate-900/40 dark:text-slate-300',
+      qa_compliance: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900',
+      financial: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900',
+      technical: 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-900',
+      custom: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-950/40 dark:text-pink-300 dark:border-pink-900'
     };
     return colors[category as keyof typeof colors] || colors.operational;
   };
@@ -167,8 +168,8 @@ const Reports: React.FC = () => {
       <div className="h-full min-h-0 overflow-y-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">{industryName} Reports</h1>
-            <p className="text-slate-600">Comprehensive analytics and business intelligence reports for {industryName}</p>
+            <h1 className={typography.pageTitle}>{industryName} Reports</h1>
+            <p className={`${typography.pageDescription} mt-0.5`}>Comprehensive analytics and business intelligence reports for {industryName}</p>
           </div>
           <div className="flex space-x-3">
             <Button variant="outline" className="flex items-center space-x-2">
@@ -199,7 +200,7 @@ const Reports: React.FC = () => {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="border border-slate-300 rounded-md px-3 py-2 text-sm min-w-[180px]"
+                  className="border border-border rounded-md px-3 py-2 text-sm min-w-[180px] bg-background text-foreground"
                 >
                   <option value="all">All Categories</option>
                   {[
@@ -228,8 +229,8 @@ const Reports: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <BarChart3 className="h-8 w-8 text-blue-500" />
                 <div>
-                  <div className="text-2xl font-bold">{filteredReports.length}</div>
-                  <div className="text-sm text-slate-600">Available Reports</div>
+                  <div className={typography.metricValue}>{filteredReports.length}</div>
+                  <div className={typography.metricLabel}>Available Reports</div>
                 </div>
               </div>
             </CardContent>
@@ -239,8 +240,8 @@ const Reports: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Star className="h-8 w-8 text-yellow-500" />
                 <div>
-                  <div className="text-2xl font-bold">{favorites.length}</div>
-                  <div className="text-sm text-slate-600">Favorite Reports</div>
+                  <div className={typography.metricValue}>{favorites.length}</div>
+                  <div className={typography.metricLabel}>Favorite Reports</div>
                 </div>
               </div>
             </CardContent>
@@ -250,8 +251,8 @@ const Reports: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Calendar className="h-8 w-8 text-green-500" />
                 <div>
-                  <div className="text-2xl font-bold">12</div>
-                  <div className="text-sm text-slate-600">Scheduled Reports</div>
+                  <div className={typography.metricValue}>12</div>
+                  <div className={typography.metricLabel}>Scheduled Reports</div>
                 </div>
               </div>
             </CardContent>
@@ -261,8 +262,8 @@ const Reports: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Download className="h-8 w-8 text-purple-500" />
                 <div>
-                  <div className="text-2xl font-bold">156</div>
-                  <div className="text-sm text-slate-600">Downloads This Month</div>
+                  <div className={typography.metricValue}>156</div>
+                  <div className={typography.metricLabel}>Downloads This Month</div>
                 </div>
               </div>
             </CardContent>
@@ -283,8 +284,8 @@ const Reports: React.FC = () => {
           return (
             <div key={category.id}>
               <div className="flex items-center space-x-3 mb-4">
-                <CategoryIcon className="h-6 w-6 text-slate-700" />
-                <h2 className="text-xl font-semibold text-slate-900">{category.name}</h2>
+                <CategoryIcon className="h-6 w-6 text-foreground" />
+                <h2 className={typography.sectionTitle}>{category.name}</h2>
                 <Badge variant="outline" className="text-xs">
                   {categoryReports.length} report{categoryReports.length !== 1 ? 's' : ''}
                 </Badge>
@@ -300,11 +301,11 @@ const Reports: React.FC = () => {
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-blue-100 transition-colors">
-                              <ReportIcon className="h-5 w-5 text-slate-600 group-hover:text-blue-600" />
+                            <div className="p-2 bg-muted rounded-lg group-hover:bg-accent transition-colors">
+                              <ReportIcon className="h-5 w-5 text-muted-foreground group-hover:text-accent-foreground" />
                             </div>
                             <div className="flex-1">
-                              <CardTitle className="text-base font-semibold">{report.name}</CardTitle>
+                              <CardTitle className={typography.cardTitle}>{report.name}</CardTitle>
                               <Badge className={`text-xs mt-1 ${getCategoryColor(report.category)}`}>
                                 {report.type.replace('_', ' ')}
                               </Badge>
@@ -318,13 +319,15 @@ const Reports: React.FC = () => {
                               toggleFavorite(report.id);
                             }}
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                            aria-pressed={isFavorite}
                           >
                             <Star className={`h-4 w-4 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
                           </Button>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <p className="text-sm text-slate-600 line-clamp-2">{report.description}</p>
+                        <p className={`${typography.bodySecondary} line-clamp-2`}>{report.description}</p>
                         
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
                           <div className="flex items-center space-x-1">
@@ -350,13 +353,13 @@ const Reports: React.FC = () => {
                             )}
                           </div>
                           <div className="flex space-x-1">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="View report">
                               <Eye className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Download report">
                               <Download className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="Report settings">
                               <Settings className="h-3 w-3" />
                             </Button>
                           </div>
@@ -375,8 +378,8 @@ const Reports: React.FC = () => {
             <CardContent className="pt-6">
               <div className="text-center py-12">
                 <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">No reports found</h3>
-                <p className="text-slate-600 mb-4">
+                <h3 className={`${typography.cardTitle} mb-2`}>No reports found</h3>
+                <p className={`${typography.bodySecondary} mb-4`}>
                   Try adjusting your search terms or category filter.
                 </p>
                 <Button variant="outline">

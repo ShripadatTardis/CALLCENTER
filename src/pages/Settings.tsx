@@ -10,6 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Save, Bell, Shield, Database, SlidersHorizontal, Sun, Moon, Monitor } from 'lucide-react';
 import { type AppearancePreference } from '@/contexts/ThemeContext';
 import { useTheme } from '@/hooks/useTheme';
+import { typography } from '@/lib/typography';
 
 const Settings: React.FC = () => {
   const [notifications, setNotifications] = useState(true);
@@ -60,7 +61,7 @@ const Settings: React.FC = () => {
             <div className="rounded-md border border-border bg-card p-4 space-y-3 max-w-md">
               <div>
                 <Label className="text-xs text-foreground">Appearance</Label>
-                <p className="text-xs text-muted-foreground">Choose how VoiceForce looks on this device.</p>
+                <p className={typography.bodySecondary}>Choose how VoiceForce looks on this device.</p>
               </div>
               <ToggleGroup
                 type="single"
@@ -91,7 +92,7 @@ const Settings: React.FC = () => {
                   <Monitor className="h-3.5 w-3.5" />System
                 </ToggleGroupItem>
               </ToggleGroup>
-              <p className="text-[11px] text-muted-foreground">
+              <p className={typography.metadata}>
                 {preference === 'system'
                   ? 'Use your device appearance — VoiceForce switches automatically if your device changes.'
                   : `VoiceForce always displays in ${preference} mode on this device.`}
@@ -102,11 +103,11 @@ const Settings: React.FC = () => {
           <TabsContent value="general" className="mt-3">
             <div className="rounded-md border border-border bg-card p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="company-name" className="text-xs text-muted-foreground">Company Name</Label>
+                <Label htmlFor="company-name" className={typography.bodySecondary}>Company Name</Label>
                 <Input id="company-name" defaultValue="TARDIS AI Corporation" className="h-8 text-xs border-border bg-card text-foreground" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="time-zone" className="text-xs text-muted-foreground">Time Zone</Label>
+                <Label htmlFor="time-zone" className={typography.bodySecondary}>Time Zone</Label>
                 <select className="w-full h-8 border border-border bg-card text-foreground rounded-md px-2 text-xs">
                   <option>UTC-05:00 (Eastern Time)</option>
                   <option>UTC-08:00 (Pacific Time)</option>
@@ -121,14 +122,14 @@ const Settings: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="email-notifications" className="text-xs text-foreground">Email Notifications</Label>
-                  <p className="text-xs text-muted-foreground">Receive email alerts for escalations and system events</p>
+                  <p className={typography.bodySecondary}>Receive email alerts for escalations and system events</p>
                 </div>
                 <Switch id="email-notifications" checked={notifications} onCheckedChange={setNotifications} />
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-border">
                 <div>
                   <Label htmlFor="auto-escalation" className="text-xs text-foreground">Auto Escalation Alerts</Label>
-                  <p className="text-xs text-muted-foreground">Automatically notify supervisors when calls are escalated</p>
+                  <p className={typography.bodySecondary}>Automatically notify supervisors when calls are escalated</p>
                 </div>
                 <Switch id="auto-escalation" checked={autoEscalation} onCheckedChange={setAutoEscalation} />
               </div>
@@ -138,11 +139,11 @@ const Settings: React.FC = () => {
           <TabsContent value="security" className="mt-3">
             <div className="rounded-md border border-border bg-card p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="session-timeout" className="text-xs text-muted-foreground">Session Timeout (minutes)</Label>
+                <Label htmlFor="session-timeout" className={typography.bodySecondary}>Session Timeout (minutes)</Label>
                 <Input id="session-timeout" type="number" defaultValue="30" className="h-8 text-xs border-border bg-card text-foreground" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="data-retention" className="text-xs text-muted-foreground">Data Retention Period (days)</Label>
+                <Label htmlFor="data-retention" className={typography.bodySecondary}>Data Retention Period (days)</Label>
                 <Input
                   id="data-retention"
                   type="number"
@@ -157,12 +158,12 @@ const Settings: React.FC = () => {
           <TabsContent value="ai" className="mt-3">
             <div className="rounded-md border border-border bg-card p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="escalation-threshold" className="text-xs text-muted-foreground">Escalation Threshold (%)</Label>
+                <Label htmlFor="escalation-threshold" className={typography.bodySecondary}>Escalation Threshold (%)</Label>
                 <Input id="escalation-threshold" type="number" defaultValue="85" className="h-8 text-xs border-border bg-card text-foreground" />
-                <p className="text-[11px] text-muted-foreground">Confidence threshold for automatic escalation</p>
+                <p className={typography.metadata}>Confidence threshold for automatic escalation</p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="max-call-duration" className="text-xs text-muted-foreground">Max Call Duration (minutes)</Label>
+                <Label htmlFor="max-call-duration" className={typography.bodySecondary}>Max Call Duration (minutes)</Label>
                 <Input id="max-call-duration" type="number" defaultValue="15" className="h-8 text-xs border-border bg-card text-foreground" />
               </div>
             </div>

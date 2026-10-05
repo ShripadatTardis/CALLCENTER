@@ -3,11 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
+import { CollapsibleSectionCard } from '@/components/interaction-detail/CollapsibleSectionCard';
 import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
 import { useAgents } from '@/hooks/agents/useAgents';
+import { useCampaignExecutionByInteraction } from '@/hooks/campaigns/useCampaigns';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import {
   formatDurationExact,
@@ -87,6 +89,17 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
   const { data: agentsData } = useAgents();
   const resolvedAgent = agentsData?.agents.find((a) => a.agentId === interaction?.agentId);
   const agentContract = resolvedAgent ? buildAgentContractFromRoster(resolvedAgent) : null;
+
+  // Session 15.3 — the real input VALUES sent for this interaction
+  // (distinct from Agent Contract above, which is only the field
+  // DEFINITIONS). Only ever applicable to a campaign-triggered
+  // interaction; disabled (never fetched) for any interaction with no
+  // campaignId. Honest either way: no execution row at all means this
+  // was never campaign-triggered, not that the data was lost.
+  const { data: execution, isLoading: isExecutionLoading } = useCampaignExecutionByInteraction(
+    interaction?.campaignId,
+    interaction?.interactionId,
+  );
 
   const isActive = interaction?.status === 'active';
   const needsLiveFetch = isActive || (interaction?.transcript?.length ?? 0) === 0;
@@ -171,7 +184,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl h-[85vh] max-h-[85vh] overflow-hidden flex flex-col gap-3 p-5">
+      <DialogContent className="max-w-4xl h-[92vh] max-h-[92vh] overflow-hidden flex flex-col gap-2.5 p-5">
         <DialogHeader className="space-y-1 flex-shrink-0">
           <div className="flex items-start justify-between gap-3 pr-6">
             <div className="min-w-0">
@@ -204,7 +217,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         </div>
 
         {(interaction.summary || (interaction.tags && interaction.tags.length > 0)) && (
-          <SectionCard title="Call Summary">
+          <CollapsibleSectionCard title="Call Summary">
             {interaction.summary && <p className="text-sm text-foreground leading-relaxed">{interaction.summary}</p>}
             {interaction.tags && interaction.tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -215,7 +228,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
                 ))}
               </div>
             )}
-          </SectionCard>
+          </CollapsibleSectionCard>
         )}
 
         {/* Session 13.2 (DEC-CALL-01, §20) — "candidate for user-facing
@@ -237,7 +250,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
           const outputFields = classifyStructuredOutputs(agentContract, interaction.structuredOutputs ?? null);
           if (actualOutcome.availability === 'unavailable' && outputFields.length === 0) return null;
           return (
-            <SectionCard title="Agent Outcome">
+            <CollapsibleSectionCard title="Agent Outcome">
               {actualOutcome.availability !== 'unavailable' && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-foreground">{actualOutcome.displayName ?? actualOutcome.code}</span>
@@ -253,11 +266,51 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
                   ))}
                 </div>
               )}
-            </SectionCard>
+            </CollapsibleSectionCard>
           );
         })()}
 
         <AgentContractSection contract={agentContract} />
+
+        {/* Session 15.3 — only meaningful for a campaign-triggered
+            interaction (interaction.campaignId set); an ad hoc/inbound
+            call or any chat session was never dispatched from a
+            campaign execution, so there is honestly no record to show
+            and this section renders nothing for them, same as Agent
+            Outcome above renders nothing when there's genuinely no data. */}
+        {interaction.campaignId && (() => {
+          const agentInputs = (execution?.requestPayloadSnapshot?.agent_inputs ?? null) as Record<string, unknown> | null;
+          const declaredFields = agentContract?.expectedInputFields ?? [];
+          return (
+            <CollapsibleSectionCard title="Input Values Sent">
+              {isExecutionLoading ? (
+                <p className="text-xs text-muted-foreground">Loading…</p>
+              ) : !execution ? (
+                <p className="text-xs text-muted-foreground">
+                  No execution record matches this interaction — it may not have been campaign-triggered, or predates
+                  this capture.
+                </p>
+              ) : !agentInputs || Object.keys(agentInputs).length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No declared input-field values were captured for this execution (legacy/partial contract at the
+                  time it ran, or the agent declares no input fields).
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  {Object.entries(agentInputs).map(([fieldCode, value]) => {
+                    const field = declaredFields.find((f) => f.fieldCode === fieldCode);
+                    return (
+                      <div key={fieldCode} className="text-xs">
+                        <span className="text-muted-foreground">{field?.displayName ?? fieldCode}:</span>{' '}
+                        <span className="text-foreground break-words">{formatOutputValue(value)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CollapsibleSectionCard>
+          );
+        })()}
 
         <SectionCard title="Recording">
           {interaction.recording?.url ? (

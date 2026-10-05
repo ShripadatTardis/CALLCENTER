@@ -403,6 +403,18 @@ async function handleListAuditEvents(req: VercelRequest, res: VercelResponse, ac
   res.status(200).json({ data: events });
 }
 
+async function handleGetExecutionByInteraction(req: VercelRequest, res: VercelResponse, access: AuthorizedAccess): Promise<void> {
+  const id = await requireAuthorizedCampaign(queryStr(req, 'id'), res, access);
+  if (!id) return;
+  const interactionId = queryStr(req, 'interactionId');
+  if (!interactionId) {
+    res.status(400).json({ detail: 'interactionId is required' });
+    return;
+  }
+  const execution = await repo.getExecutionByInteractionId(id, interactionId);
+  res.status(200).json({ data: execution });
+}
+
 interface CreateConfigurationVersionBody {
   expectedCurrentVersionId: string | null;
   reason: string;
@@ -718,6 +730,7 @@ export const GET_ACTIONS = new Set([
   'listSkipReasons',
   'listConfigurationVersions',
   'listAuditEvents',
+  'getExecutionByInteraction',
 ]);
 export const ADMIN_ACTIONS = new Set(['runBatch', 'reconcile', 'enrichActualOutcomes']);
 
@@ -892,6 +905,9 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
       return;
     case 'listAuditEvents':
       await handleListAuditEvents(req, res, access as AuthorizedAccess);
+      return;
+    case 'getExecutionByInteraction':
+      await handleGetExecutionByInteraction(req, res, access as AuthorizedAccess);
       return;
     case 'createConfigurationVersion':
       await handleCreateConfigurationVersion(req, res, access as AuthorizedAccess);

@@ -180,6 +180,19 @@ export interface CampaignRepository {
   listAuditEvents(campaignId: string, limit?: number): Promise<CampaignAuditEvent[]>;
 
   /**
+   * Session 15.3 — resolves the campaign execution (if any) whose own
+   * callSid or reconciledInteractionId matches a given interaction id,
+   * scoped to one campaign (authorization boundary — never a free
+   * cross-campaign call_sid search). Exposes requestPayloadSnapshot,
+   * the real deterministic Trigger Call payload (including agent_inputs,
+   * the actual resolved field values) sent for that execution — an
+   * honest, possibly-null record: ad hoc/inbound calls were never
+   * campaign-triggered and have no execution row at all; some older
+   * executions predate agent_inputs capture. Never fabricated either way.
+   */
+  getExecutionByInteractionId(campaignId: string, interactionId: string): Promise<CampaignExecution | null>;
+
+  /**
    * The ONLY path for a prospective configuration change on a
    * launched/paused/running campaign (§5/§20). `expectedCurrentVersionId`
    * is the optimistic-concurrency token (null means "I believe this

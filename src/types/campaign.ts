@@ -312,6 +312,30 @@ export interface CampaignConfigurationVersion {
   previousVersionId: string | null;
 }
 
+/**
+ * Session 15.3 — frontend-facing mirror of server/campaigns/types.ts's
+ * CampaignExecution, for the one read path that needs it client-side
+ * (the interaction-detail "input values sent" lookup). requestPayloadSnapshot
+ * is the real deterministic Trigger Call payload actually sent, including
+ * agent_inputs — the actual resolved field values, not just their
+ * declared shape — an audit/stability snapshot, never re-derived.
+ */
+export interface CampaignExecution {
+  id: string;
+  campaignTargetId: string;
+  sequence: number;
+  status: 'queued' | 'triggering' | 'triggered' | 'failed';
+  callSid: string | null;
+  reconciliationStatus: 'pending' | 'reconciled' | 'unresolved' | 'error';
+  reconciledInteractionId: string | null;
+  reconciledAt: string | null;
+  triggeredAt: string | null;
+  errorDetail: string | null;
+  createdAt: string;
+  requestPayloadSnapshot: Record<string, unknown> | null;
+  configurationVersionId: string | null;
+}
+
 export interface CampaignAuditEvent {
   id: string;
   campaignId: string;

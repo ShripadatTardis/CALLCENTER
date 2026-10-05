@@ -6,6 +6,7 @@ import type {
   CampaignClassification,
   CampaignConfigurationVersion,
   CampaignDetail,
+  CampaignExecution,
   CampaignListResponse,
   CampaignSkipReason,
   CampaignTargetMutationResult,
@@ -204,6 +205,27 @@ export async function fetchCampaignAuditEvents(
   const { data } = await request<{ data: CampaignAuditEvent[] }>('/campaigns', {
     method: 'GET',
     query: { action: 'listAuditEvents', id, limit },
+    headers: roleHeaders(role),
+  });
+  return data;
+}
+
+/**
+ * Session 15.3 — the real input VALUES (not just the contract's field
+ * definitions) sent for this one interaction, when it was campaign-
+ * triggered. Returns null, never a fabricated placeholder, when the
+ * interaction has no matching execution (not campaign-triggered, e.g.
+ * an inbound or ad hoc call, or any chat session) or when the matching
+ * execution predates request_payload_snapshot capture.
+ */
+export async function fetchCampaignExecutionByInteraction(
+  campaignId: string,
+  interactionId: string,
+  role = 'unauthenticated',
+): Promise<CampaignExecution | null> {
+  const { data } = await request<{ data: CampaignExecution | null }>('/campaigns', {
+    method: 'GET',
+    query: { action: 'getExecutionByInteraction', id: campaignId, interactionId },
     headers: roleHeaders(role),
   });
   return data;

@@ -4,6 +4,7 @@ import {
   fetchCampaignAuditEvents,
   fetchCampaignClassifications,
   fetchCampaignConfigurationVersions,
+  fetchCampaignExecutionByInteraction,
   fetchCampaignSkipReasons,
   fetchCampaigns,
 } from '@/services/campaigns/campaignsService';
@@ -19,6 +20,8 @@ export const campaignsKeys = {
   skipReasons: () => [...campaignsKeys.all, 'skipReasons'] as const,
   configurationVersions: (id: string) => [...campaignsKeys.all, 'configurationVersions', id] as const,
   auditEvents: (id: string) => [...campaignsKeys.all, 'auditEvents', id] as const,
+  executionByInteraction: (campaignId: string, interactionId: string) =>
+    [...campaignsKeys.all, 'executionByInteraction', campaignId, interactionId] as const,
 };
 
 /**
@@ -66,6 +69,23 @@ export function useCampaignConfigurationVersions(campaignId: string | undefined)
     queryKey: [...campaignsKeys.configurationVersions(campaignId ?? ''), role],
     queryFn: () => fetchCampaignConfigurationVersions(campaignId as string, role),
     enabled: Boolean(campaignId),
+  });
+}
+
+/**
+ * Session 15.3 — the real input values sent for one campaign-triggered
+ * interaction (Call Logs' "what was actually sent to the agent"
+ * follow-up to Agent Contract). Disabled entirely when the interaction
+ * has no campaignId — most calls/chats are not campaign-triggered, and
+ * this lookup only ever makes sense for the ones that are.
+ */
+export function useCampaignExecutionByInteraction(campaignId: string | undefined, interactionId: string | undefined) {
+  const { user } = useAuth();
+  const role = user?.role ?? 'unauthenticated';
+  return useQuery({
+    queryKey: [...campaignsKeys.executionByInteraction(campaignId ?? '', interactionId ?? ''), role],
+    queryFn: () => fetchCampaignExecutionByInteraction(campaignId as string, interactionId as string, role),
+    enabled: Boolean(campaignId) && Boolean(interactionId),
   });
 }
 

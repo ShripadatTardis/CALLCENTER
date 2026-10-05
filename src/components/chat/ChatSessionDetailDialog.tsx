@@ -170,7 +170,7 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl h-[85vh] max-h-[85vh] overflow-hidden flex flex-col gap-3 p-5">
+      <DialogContent className="max-w-4xl h-[92vh] max-h-[92vh] overflow-hidden flex flex-col gap-2.5 p-5">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

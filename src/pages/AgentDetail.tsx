@@ -26,8 +26,8 @@ import {
 import { typography } from '@/lib/typography';
 
 const FALLBACK = '—';
-const RECENT_INTERACTIONS_PAGE_SIZES = [10, 25, 50] as const;
-const DEFAULT_RECENT_INTERACTIONS_PAGE_SIZE = 10;
+const RECENT_INTERACTIONS_PAGE_SIZES = [5, 10, 25, 50] as const;
+const DEFAULT_RECENT_INTERACTIONS_PAGE_SIZE = 5;
 
 /**
  * Small, keyboard-accessible "Data notes" disclosure (Radix Popover —
@@ -231,26 +231,27 @@ const AgentDetail: React.FC = () => {
     <Layout>
       {/* App-wide viewport-framing correction (follow-up to Session 15) —
           Pattern B: root is the single scroll region. */}
-      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
+      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-2">
         <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
           Back to {returnTo.label}
         </Button>
 
-        {/* A. Compact Agent Header — identity + counters, one bar instead of four stacked blocks. */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5">
+        {/* A. Compact Agent Header — identity + counters, ONE bordered
+            composition (vertical-density refinement, follow-up to the
+            Phase 2 pilot review) instead of a bare identity row sitting
+            above a separately-boxed metadata strip. Name/id share one
+            line; direction/persona/language/category/counters sit below
+            a thin divider within the same box. */}
+        <div className="rounded-md border border-border bg-card/40 px-3 py-2 space-y-1">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <Bot className="h-5 w-5 text-cyan-400 shrink-0" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className={`${typography.pageTitle} truncate`}>{agent.displayName}</h1>
-                {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
-              </div>
-              <p className="text-[11px] text-muted-foreground font-mono leading-tight">{agent.agentId}</p>
-            </div>
+            <h1 className={typography.pageTitle}>{agent.displayName}</h1>
+            {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
+            <span className="text-[11px] text-muted-foreground font-mono">{agent.agentId}</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-3 py-2 border border-border rounded-md bg-card/40 text-[13px]">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border/50 pt-1 text-[13px]">
             <span><span className="text-muted-foreground">Direction</span> <span className="text-foreground">{formatStatusLabel(agent.direction)}</span></span>
             <span><span className="text-muted-foreground">Persona</span> <span className="text-foreground">{agent.personaName || FALLBACK}</span></span>
             <span><span className="text-muted-foreground">Language</span> <span className="text-foreground">{agent.language || FALLBACK}</span></span>
@@ -294,8 +295,10 @@ const AgentDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* B. Operational Performance — one compact grid instead of three large cards. */}
-        <div className="rounded-md border border-border bg-card p-2.5 space-y-1.5">
+        {/* B. Operational Performance — one compact grid instead of three
+            large cards. Internal padding/gaps tightened (vertical-density
+            refinement) without changing the approved typography scale. */}
+        <div className="rounded-md border border-border bg-card p-2 space-y-1">
           <div className="flex items-center justify-between">
             <div className={typography.sectionTitle}>Operational Performance</div>
             <DataNotes notes={performanceNotes} />
@@ -307,21 +310,21 @@ const AgentDetail: React.FC = () => {
               tint — real grouping, not just a smaller label — matching the
               nested-tile recipe already used elsewhere on this page
               (bg-background/40, see the per-agent tiles pattern). */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-            <div className="space-y-1 bg-background/40 rounded p-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5">
+            <div className="space-y-0.5 bg-background/40 rounded p-1.5">
               <div className={typography.subsectionTitle}>Business Outcomes</div>
               <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
               <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
               <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
             </div>
-            <div className="space-y-1 bg-background/40 rounded p-2">
+            <div className="space-y-0.5 bg-background/40 rounded p-1.5">
               <div className={typography.subsectionTitle}>Conversational Quality</div>
               <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
               <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
               <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
               <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
             </div>
-            <div className="space-y-1 bg-background/40 rounded p-2">
+            <div className="space-y-0.5 bg-background/40 rounded p-1.5">
               <div className={typography.subsectionTitle}>Technical Performance</div>
               <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
               <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
@@ -431,7 +434,7 @@ const AgentDetail: React.FC = () => {
             pagination read as one section. Reordered ahead of Campaign Usage
             per the approved pilot spec — large-contract and small-contract
             agents retain the same section order either way. */}
-        <div className="rounded-md border border-border bg-card p-2.5 space-y-1.5">
+        <div className="rounded-md border border-border bg-card p-2 space-y-1">
           <div className="flex items-center justify-between">
             <div className={typography.sectionTitle}>Recent Interactions</div>
             {allRecentInteractions.length > 0 && <DataNotes title="Interaction scope" ariaLabel="Interaction scope — what this list represents" notes={recentInteractionsNotes} />}

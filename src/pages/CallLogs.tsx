@@ -374,21 +374,19 @@ const CallLogs: React.FC = () => {
                         {call.outcome ?? 'Unknown'}
                       </Badge>
                     </td>
+                    {/* VoiceForce design system — neutral data-value rule:
+                        FCR and intent accuracy are ordinary data values,
+                        not status badges, so they no longer get
+                        semantic green/amber/red coloring merely because
+                        the value is higher or lower. */}
                     <td className="py-1.5 px-3">
-                      <span className={call.fcr ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                      <span className="text-foreground">
                         {call.fcr === undefined ? '—' : call.fcr ? 'Yes' : 'No'}
                       </span>
                     </td>
                     <td className="py-1.5 px-3">
-                      <span className="flex items-center gap-1.5 text-foreground">
+                      <span className="text-foreground">
                         {formatPercent(call.intentAccuracy, 0)}
-                        {call.intentAccuracy !== undefined && (
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              call.intentAccuracy >= 90 ? 'bg-emerald-500' : call.intentAccuracy >= 80 ? 'bg-amber-500' : 'bg-red-500'
-                            }`}
-                          />
-                        )}
                       </span>
                     </td>
                     {/* Session 11.3 — consolidated the former Play+FileText

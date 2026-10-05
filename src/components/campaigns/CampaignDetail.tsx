@@ -387,7 +387,9 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
         {unclassified > 0 && (
           <div className="flex items-baseline gap-1.5">
-            <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">{unclassified}</span>
+            {/* VoiceForce design system — neutral data-value rule: an
+                ordinary summary count is not a warning badge. */}
+            <span className="font-semibold tabular-nums text-foreground">{unclassified}</span>
             <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
           </div>
         )}
@@ -513,15 +515,11 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                   </td>
                   <td className="py-2 px-3">
                     {target.effectiveResultId ? (
-                      <span
-                        className={
-                          target.resultIsSuccess === true
-                            ? 'text-green-700 dark:text-green-400'
-                            : target.resultIsSuccess === false
-                              ? 'text-red-700 dark:text-red-400'
-                              : 'text-muted-foreground'
-                        }
-                      >
+                      // VoiceForce design system — neutral data-value rule:
+                      // an ordinary outcome column is not a status badge,
+                      // so it doesn't get semantic success/failure color
+                      // merely because the value is positive/negative.
+                      <span className="text-foreground">
                         {reconciliationLabel(target)}
                       </span>
                     ) : (

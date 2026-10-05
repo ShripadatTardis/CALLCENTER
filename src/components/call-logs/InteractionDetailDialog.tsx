@@ -3,9 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
+import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
+import { useAgents } from '@/hooks/agents/useAgents';
+import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import {
   formatDurationExact,
   formatDurationLong,
@@ -73,6 +76,17 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
   interaction,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Real, live agent contract resolved from the roster by this
+  // interaction's own agentId — never campaign-specific, never
+  // fabricated (buildAgentContractFromRoster only ever reflects fields
+  // the /agents API actually returned). Null when the agent can't be
+  // resolved (e.g. a historical interaction whose agent id no longer
+  // exists in the live roster) — the Agent Contract section and the
+  // Agent Outcome classification below both render honestly either way.
+  const { data: agentsData } = useAgents();
+  const resolvedAgent = agentsData?.agents.find((a) => a.agentId === interaction?.agentId);
+  const agentContract = resolvedAgent ? buildAgentContractFromRoster(resolvedAgent) : null;
 
   const isActive = interaction?.status === 'active';
   const needsLiveFetch = isActive || (interaction?.transcript?.length ?? 0) === 0;
@@ -208,17 +222,19 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             exposure" when genuinely populated; historical/Chat-sourced
             interactions correctly render nothing here (no empty section,
             per §21). Reuses the exact Session 12.5/12.6 classification
-            helpers Campaign's own Agent Result dialog uses, with a null
-            contract — this dialog has no campaign-contract context, so
-            classifyActualOutcome falls back to the backend's own
-            actualOutcomeName (not fabricated) and classifyStructuredOutputs
-            renders every real key generically (never an agent-specific
-            assumption). This does not duplicate Campaign Detail's Agent
-            Result dialog, which additionally shows Campaign Classification
-            against the captured outcome policy — out of scope here. */}
+            helpers Campaign's own Agent Result dialog uses. Session 15.2
+            follow-up — now passes the interaction's own live agent
+            contract (resolved above by agentId) instead of null, so
+            field display names/required-ness resolve to the agent's
+            real declared contract rather than a generic fallback; this
+            still does not duplicate Campaign Detail's Agent Result
+            dialog, which additionally shows Campaign Classification
+            against the campaign's captured (possibly historical) outcome
+            policy snapshot — out of scope here, this is always the
+            agent's CURRENT live contract. */}
         {(() => {
-          const actualOutcome = classifyActualOutcome(null, interaction.actualOutcomeCode ?? null, interaction.actualOutcomeName ?? null);
-          const outputFields = classifyStructuredOutputs(null, interaction.structuredOutputs ?? null);
+          const actualOutcome = classifyActualOutcome(agentContract, interaction.actualOutcomeCode ?? null, interaction.actualOutcomeName ?? null);
+          const outputFields = classifyStructuredOutputs(agentContract, interaction.structuredOutputs ?? null);
           if (actualOutcome.availability === 'unavailable' && outputFields.length === 0) return null;
           return (
             <SectionCard title="Agent Outcome">
@@ -240,6 +256,8 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             </SectionCard>
           );
         })()}
+
+        <AgentContractSection contract={agentContract} />
 
         <SectionCard title="Recording">
           {interaction.recording?.url ? (

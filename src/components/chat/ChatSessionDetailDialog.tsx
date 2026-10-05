@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Copy, Check, UserRound } from 'lucide-react';
 import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
+import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
 import { useChatSessionDetail } from '@/hooks/chat/useChatSessionDetail';
+import { useAgents } from '@/hooks/agents/useAgents';
+import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import { formatDurationLong, formatFractionAsPercent, formatStatusLabel, formatTimestamp } from '@/lib/format';
 
 interface ChatSessionDetailDialogProps {
@@ -62,6 +65,12 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const { data, isLoading, isError } = useChatSessionDetail(sessionId ?? undefined);
+  // Real, live agent contract resolved from the roster by this
+  // session's own agentId — same resolution InteractionDetailDialog
+  // (Call Logs) now uses, never fabricated, never campaign-specific.
+  const { data: agentsData } = useAgents();
+  const resolvedAgent = agentsData?.agents.find((a) => a.agentId === data?.session?.agentId);
+  const agentContract = resolvedAgent ? buildAgentContractFromRoster(resolvedAgent) : null;
 
   const conversationEntries: ConversationEntry[] = useMemo(() => {
     if (!data) return [];
@@ -235,6 +244,8 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
                 ))}
               </div>
             </SectionCard>
+
+            <AgentContractSection contract={agentContract} />
 
             <ConversationTranscript
               entries={conversationEntries}

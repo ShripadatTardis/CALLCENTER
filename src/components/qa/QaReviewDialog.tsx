@@ -120,7 +120,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
   }, [review]);
 
   const remainingCount = reviewableTurns.filter((t) => (turnReviewByTurnId.get(t.turnId)?.status ?? 'not_reviewed') === 'not_reviewed').length;
-  const findingsCount = review?.findings.length ?? 0;
+  const findingsCount = review?.findings?.length ?? 0;
   const isReadOnly = review?.status === 'submitted';
 
   function advance() {

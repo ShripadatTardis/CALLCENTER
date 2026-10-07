@@ -63,7 +63,7 @@ const ALL = '__all__';
  * page scroll — only the table's own internal scroll region (if any)
  * absorbs overflow, and that overflow is now rare at this row count.
  */
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 8;
 
 /**
  * Interaction Quality — Session 6.1. Replaces the former QAReview/

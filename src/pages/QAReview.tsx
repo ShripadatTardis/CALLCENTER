@@ -26,6 +26,9 @@ import { GroupedInteractionTree, type SelectedGroup } from '@/components/classif
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
 import { typography } from '@/lib/typography';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { QaReviewDialog } from '@/components/qa/QaReviewDialog';
+import { ClipboardCheck } from 'lucide-react';
 
 type QARow = {
   key: string;
@@ -68,8 +71,12 @@ const QAReview: React.FC = () => {
   const { data: chatData, isLoading: chatLoading, isError: chatIsError, error: chatErr, refetch: refetchChat, isFetching: chatFetching } =
     useChatLogs(1);
 
+  const { user } = useAuth();
+  const canReview = hasPermission(user, 'qa.review');
+
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
+  const [qaReviewTarget, setQaReviewTarget] = useState<{ channel: 'voice' | 'chat'; interactionId: string; agentId: string } | null>(null);
 
   const [channelFilter, setChannelFilter] = useState(ALL);
   const [agentFilter, setAgentFilter] = useState(ALL);
@@ -376,7 +383,7 @@ const QAReview: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  {['Time', 'Channel', 'Agent', 'Outcome', 'FCR', 'Escalation', 'Intent', 'Accuracy/Confidence', 'Sentiment', 'Auth', 'Duration/Latency', 'Campaign'].map((h) => (
+                  {['Time', 'Channel', 'Agent', 'Outcome', 'FCR', 'Escalation', 'Intent', 'Accuracy/Confidence', 'Sentiment', 'Auth', 'Duration/Latency', 'Campaign', ...(canReview ? ['Human QA'] : [])].map((h) => (
                     <TableHead key={h} className={typography.tableHeader}>{h}</TableHead>
                   ))}
                 </TableRow>
@@ -433,6 +440,27 @@ const QAReview: React.FC = () => {
                           : '—'}
                     </TableCell>
                     <TableCell className={`whitespace-nowrap ${typography.metadata}`}>{row.campaignName ?? '—'}</TableCell>
+                    {canReview && (
+                      <TableCell>
+                        {row.agentId ? (
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
+                              if (interactionId) setQaReviewTarget({ channel: row.channel, interactionId, agentId: row.agentId as string });
+                            }}
+                          >
+                            <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
+                            Review
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -450,6 +478,13 @@ const QAReview: React.FC = () => {
         isOpen={Boolean(selectedChatSessionId)}
         onClose={() => setSelectedChatSessionId(null)}
         sessionId={selectedChatSessionId}
+      />
+      <QaReviewDialog
+        isOpen={Boolean(qaReviewTarget)}
+        onClose={() => setQaReviewTarget(null)}
+        channel={qaReviewTarget?.channel ?? 'voice'}
+        interactionId={qaReviewTarget?.interactionId ?? null}
+        agentId={qaReviewTarget?.agentId ?? null}
       />
     </Layout>
   );

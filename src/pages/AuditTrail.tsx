@@ -61,6 +61,7 @@ const AuditTrail: React.FC = () => {
               <SelectItem value="customer">Customer</SelectItem>
               <SelectItem value="call">Call</SelectItem>
               <SelectItem value="action_item">Action Item</SelectItem>
+              <SelectItem value="qa_review">QA Review</SelectItem>
             </SelectContent>
           </Select>
           <Select value={result} onValueChange={setResult}>

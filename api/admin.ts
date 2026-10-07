@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore, methodNotAllowed } from './_voicebot.js';
-import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent, toAgentAccess } from './_auth.js';
+import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent, toAgentAccess, isAgentIdInScope, type AuthenticatedCallCenterUser } from './_auth.js';
 import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulationFetcher.js';
 
 /**
@@ -37,6 +37,17 @@ import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulat
  *   GET  /api/admin?resource=actions&action=eligibleAssignees&id=...
  *   GET  /api/admin?resource=actions&action=generate   (scheduler only — CRON_SECRET bearer)
  *   POST /api/admin?resource=actions&action=assign|takeOwnership|setStatus|resolve|generate
+ *
+ * Session 16.1 adds Manual QA Review (same 12-function-ceiling reason):
+ *
+ *   POST /api/admin?resource=qa&action=start           body {interactionId, channel, agentId}
+ *   GET  /api/admin?resource=qa&action=review&reviewId=...
+ *   GET  /api/admin?resource=qa&action=listForInteraction&interactionId=&channel=
+ *   POST /api/admin?resource=qa&action=initTurns        body {reviewId, turns}
+ *   POST /api/admin?resource=qa&action=submitTurn       body {reviewId, turnId, role, status, findings}
+ *   POST /api/admin?resource=qa&action=setConclusions   body {reviewId, requestCompletion, fcr, humanAssistanceRequired, businessOutcome, reviewerNote}
+ *   POST /api/admin?resource=qa&action=submit           body {reviewId}
+ *   GET  /api/admin?resource=qa&action=findings        (Agent-Scope-filtered, submitted reviews only — feeds src/lib/qaRatios.ts)
  */
 
 function queryStr(req: VercelRequest, key: string): string | undefined {
@@ -605,6 +616,220 @@ async function handleActionsPost(req: VercelRequest, res: VercelResponse): Promi
   res.status(400).json({ detail: `Unknown action: ${action}` });
 }
 
+/**
+ * Session 16.1's QA RPCs return `to_jsonb(row)` directly (snake_case
+ * columns) rather than hand-building a camelCase `jsonb_build_object`
+ * the way call_center_action_items_* does — the QA review payload is
+ * wide and nests two child arrays (turnReviews, findings), so building
+ * it by hand in SQL would be error-prone to keep in sync as fields are
+ * added. This is the one, isolated bridge back to the frontend's
+ * camelCase convention, applied only to this resource's responses.
+ */
+function toCamelCaseDeep<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => toCamelCaseDeep(v)) as unknown as T;
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      const camelKey = key.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+      out[camelKey] = toCamelCaseDeep(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/**
+ * Session 16.1 — Manual QA Review. Maps the RPCs' `raise exception`
+ * codes to the right HTTP status, same convention as
+ * mapActionItemError above.
+ */
+function mapQaError(message: string): number {
+  if (/qa_review_not_found/.test(message)) return 404;
+  if (/qa_review_already_submitted/.test(message)) return 409;
+  if (/qa_review_incomplete/.test(message)) return 422;
+  return 500;
+}
+
+interface QaReviewRow {
+  id: string;
+  interactionId: string;
+  channel: 'voice' | 'chat';
+  agentId: string;
+  reviewerUserId: string;
+  status: 'in_progress' | 'submitted';
+  [key: string]: unknown;
+}
+
+/**
+ * Every QA mutation re-validates BOTH (a) the caller is the review's own
+ * reviewer — Human QA is a personal, non-shared workspace while
+ * in_progress, there is no "supervisor edits someone else's draft"
+ * concept in v1 — and (b) the review's stamped agentId is still within
+ * the caller's current Agent Scope, re-checked on every call rather than
+ * trusted from the original `start`. Returns null (and has already
+ * written the response) on any failure.
+ */
+async function loadOwnedReviewOrRespond(
+  res: VercelResponse,
+  supabase: ReturnType<typeof getServiceRoleClient>,
+  user: AuthenticatedCallCenterUser,
+  reviewId: string,
+): Promise<QaReviewRow | null> {
+  const { data, error } = await supabase.rpc('call_center_qa_review_get', { p_review_id: reviewId });
+  if (error) { res.status(500).json({ detail: error.message }); return null; }
+  const review = data ? (toCamelCaseDeep(data) as QaReviewRow) : null;
+  if (!review) { res.status(404).json({ detail: 'QA review not found' }); return null; }
+  if (review.reviewerUserId !== user.id) { res.status(404).json({ detail: 'QA review not found' }); return null; }
+  if (!isAgentIdInScope(toAgentAccess(user), review.agentId)) { res.status(404).json({ detail: 'QA review not found' }); return null; }
+  return review;
+}
+
+async function handleQaGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'qa.review');
+  if (!user) return;
+  const action = queryStr(req, 'action');
+  const supabase = getServiceRoleClient();
+
+  if (action === 'review') {
+    const reviewId = queryStr(req, 'reviewId');
+    if (!reviewId) { res.status(422).json({ detail: 'reviewId is required' }); return; }
+    const review = await loadOwnedReviewOrRespond(res, supabase, user, reviewId);
+    if (!review) return;
+    res.status(200).json({ data: review });
+    return;
+  }
+
+  if (action === 'listForInteraction') {
+    const interactionId = queryStr(req, 'interactionId');
+    const channel = queryStr(req, 'channel');
+    if (!interactionId || (channel !== 'voice' && channel !== 'chat')) {
+      res.status(422).json({ detail: 'interactionId and channel ("voice"|"chat") are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_qa_review_list_for_interaction', {
+      p_interaction_id: interactionId, p_channel: channel,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    const access = toAgentAccess(user);
+    const rows = (toCamelCaseDeep(data ?? []) as QaReviewRow[]).filter((r) => isAgentIdInScope(access, r.agentId));
+    res.status(200).json({ data: rows });
+    return;
+  }
+
+  if (action === 'findings') {
+    const access = toAgentAccess(user);
+    const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+    const { data, error } = await supabase.rpc('call_center_qa_findings_list', {
+      p_authorized_agent_ids: allAgents ? [] : access.authorizedAgentIds,
+      p_all_agents: allAgents,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+
+async function handleQaPost(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'qa.review');
+  if (!user) return;
+  const action = queryStr(req, 'action');
+  const supabase = getServiceRoleClient();
+  const now = new Date().toISOString();
+
+  if (action === 'start') {
+    const { interactionId, channel, agentId } = (req.body ?? {}) as { interactionId?: string; channel?: string; agentId?: string };
+    if (typeof interactionId !== 'string' || (channel !== 'voice' && channel !== 'chat') || typeof agentId !== 'string') {
+      res.status(422).json({ detail: 'interactionId, channel ("voice"|"chat"), and agentId are required' });
+      return;
+    }
+    if (!isAgentIdInScope(toAgentAccess(user), agentId)) {
+      res.status(404).json({ detail: 'Interaction not found' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_qa_review_start', {
+      p_interaction_id: interactionId, p_channel: channel, p_agent_id: agentId, p_reviewer_user_id: user.id, p_now: now,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    const started = toCamelCaseDeep(data) as { id?: string } | null;
+    await recordAuditEvent({
+      actorType: 'user', actorUserId: user.id, action: 'qa_review.started',
+      resourceType: 'qa_review', resourceId: started?.id ?? null, result: 'success',
+      metadata: { interactionId, channel, agentId }, source: 'api/admin',
+    });
+    res.status(200).json({ data: started });
+    return;
+  }
+
+  // Every other action operates on an existing review this reviewer owns.
+  const { reviewId } = (req.body ?? {}) as { reviewId?: string };
+  if (typeof reviewId !== 'string') { res.status(422).json({ detail: 'reviewId is required' }); return; }
+  const review = await loadOwnedReviewOrRespond(res, supabase, user, reviewId);
+  if (!review) return;
+
+  if (action === 'initTurns') {
+    const { turns } = (req.body ?? {}) as { turns?: Array<{ turnId: string; role: string }> };
+    if (!Array.isArray(turns)) { res.status(422).json({ detail: 'turns (array) is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_qa_review_init_turns', {
+      p_review_id: reviewId, p_turns: turns, p_now: now,
+    });
+    if (error) { res.status(mapQaError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+
+  if (action === 'submitTurn') {
+    const { turnId, role, status, findings } = (req.body ?? {}) as {
+      turnId?: string; role?: string; status?: string; findings?: unknown[];
+    };
+    if (typeof turnId !== 'string' || (role !== 'agent' && role !== 'customer') || typeof status !== 'string') {
+      res.status(422).json({ detail: 'turnId, role ("agent"|"customer"), and status are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_qa_turn_submit', {
+      p_review_id: reviewId, p_turn_id: turnId, p_role: role, p_status: status,
+      p_findings: Array.isArray(findings) ? findings : null, p_now: now,
+    });
+    if (error) { res.status(mapQaError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+
+  if (action === 'setConclusions') {
+    const { requestCompletion, fcr, humanAssistanceRequired, businessOutcome, reviewerNote } = (req.body ?? {}) as {
+      requestCompletion?: string | null; fcr?: string | null; humanAssistanceRequired?: string | null;
+      businessOutcome?: string | null; reviewerNote?: string | null;
+    };
+    const { data, error } = await supabase.rpc('call_center_qa_review_set_conclusions', {
+      p_review_id: reviewId,
+      p_request_completion: requestCompletion ?? null,
+      p_fcr: fcr ?? null,
+      p_human_assistance_required: humanAssistanceRequired ?? null,
+      p_business_outcome: businessOutcome ?? null,
+      p_reviewer_note: reviewerNote?.trim() || null,
+      p_now: now,
+    });
+    if (error) { res.status(mapQaError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+
+  if (action === 'submit') {
+    const { data, error } = await supabase.rpc('call_center_qa_review_submit', { p_review_id: reviewId, p_now: now });
+    if (error) { res.status(mapQaError(error.message)).json({ detail: error.message }); return; }
+    await recordAuditEvent({
+      actorType: 'user', actorUserId: user.id, action: 'qa_review.submitted',
+      resourceType: 'qa_review', resourceId: reviewId, result: 'success',
+      metadata: { interactionId: review.interactionId, channel: review.channel, agentId: review.agentId }, source: 'api/admin',
+    });
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -654,5 +879,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, or actions' });
+  if (resource === 'qa') {
+    if (req.method === 'GET') { await handleQaGet(req, res); return; }
+    if (req.method === 'POST') { await handleQaPost(req, res); return; }
+    methodNotAllowed(res, ['GET', 'POST']);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, or qa' });
 });

@@ -1,6 +1,7 @@
 import type { Interaction } from '@/types/interaction';
 import type { ChatSessionSummary } from '@/types/chat';
 import type { CampaignWithStats } from '@/types/campaign';
+import type { CallTechnicalPerformance } from '@/lib/callMetricsFormat';
 import { isStaleDuration } from '@/lib/format';
 
 /**
@@ -92,6 +93,56 @@ export function computeAgentCallMetrics(interactions: Interaction[]): AgentCallM
     avgIntentAccuracy: average(interactions.map((i) => i.intentAccuracy).filter((v): v is number => v != null)),
     avgSentimentScore: average(interactions.map((i) => i.sentimentScore).filter((v): v is number => v != null)),
     authenticatedCount: interactions.filter((i) => i.wasAuthenticated === true).length,
+  };
+}
+
+export interface AgentCallTechnicalPerformance {
+  /** How many of this agent's voice interactions had a correlated Call Metrics row at all. */
+  matchedCallCount: number;
+  avgTurnMs: number | null;
+  avgSttMs: number | null;
+  avgLlmTtftMs: number | null;
+  avgLlmMs: number | null;
+  avgTtsTtfbMs: number | null;
+  avgOrchestratorMs: number | null;
+  /** Averaged only over matched calls where a tool call genuinely occurred — never diluted by calls with no tool use. */
+  avgToolMs: number | null;
+  /** Averaged only over matched calls where a KB lookup genuinely occurred — never diluted by calls with no lookup. */
+  avgRagMs: number | null;
+}
+
+/**
+ * Session 15.4 — real per-agent Voice technical-performance, derived by
+ * correlating this agent's own already-authorized voice interactions
+ * (callInteractions, filtered by agentId upstream) against the matching
+ * Call Metrics rows via the proven call_sid === interactionId join
+ * (buildCallMetricsByInteractionId). Every average excludes nulls —
+ * tool_ms/rag_ms specifically average only over calls that actually ran
+ * a tool/lookup, per the documented semantics, never diluted by calls
+ * that never invoked one. Chat latency is never blended in here — see
+ * computeAgentChatMetrics for the separate, Chat-only figure.
+ */
+export function computeAgentCallTechnicalPerformance(
+  interactions: Interaction[],
+  metricsByInteractionId: Map<string, CallTechnicalPerformance>,
+): AgentCallTechnicalPerformance {
+  const matched = interactions
+    .map((i) => metricsByInteractionId.get(i.interactionId))
+    .filter((m): m is CallTechnicalPerformance => m !== undefined);
+
+  const field = (pick: (m: CallTechnicalPerformance) => number | null) =>
+    average(matched.map(pick).filter((v): v is number => v !== null));
+
+  return {
+    matchedCallCount: matched.length,
+    avgTurnMs: field((m) => m.turnMs),
+    avgSttMs: field((m) => m.sttMs),
+    avgLlmTtftMs: field((m) => m.llmTtftMs),
+    avgLlmMs: field((m) => m.llmMs),
+    avgTtsTtfbMs: field((m) => m.ttsTtfbMs),
+    avgOrchestratorMs: field((m) => m.orchestratorMs),
+    avgToolMs: field((m) => m.toolMs),
+    avgRagMs: field((m) => m.ragMs),
   };
 }
 

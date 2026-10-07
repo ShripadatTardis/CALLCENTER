@@ -184,7 +184,12 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
         <Tile label="FCR" value={scoped.fcrRate === null ? '—' : `${(scoped.fcrRate * 100).toFixed(1)}%`} source="derived from authorized call-data sample" origin="page-scoped" />
         <Tile label="Avg AHT" value={scoped.avgAhtSeconds === null ? '—' : `${Math.round(scoped.avgAhtSeconds)}s`} source="derived from authorized call-data sample" origin="page-scoped" />
         <Tile label="Avg Intent Accuracy" value={scoped.avgIntentAccuracy === null ? '—' : `${scoped.avgIntentAccuracy.toFixed(1)}%`} source="derived from authorized call-data sample" origin="page-scoped" />
-        <Tile label="Avg Turn Latency" value="Unavailable for scoped historical view" source="no per-row latency field" origin="unavailable" />
+        <Tile
+          label="Avg Turn Latency"
+          value={scoped.avgTurnLatencyMs === null ? '—' : `${Math.round(scoped.avgTurnLatencyMs)}ms`}
+          source="derived from authorized call-data sample, correlated with Call Metrics"
+          origin="page-scoped"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

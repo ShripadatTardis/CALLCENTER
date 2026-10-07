@@ -1,4 +1,5 @@
 import type { CallDataQueryDto } from '@/types/api/calls';
+import type { CallMetricsQueryDto } from '@/types/api/callMetrics';
 
 /**
  * Centralized TanStack Query key builders for the calls domain. Keep key
@@ -13,4 +14,6 @@ export const callsKeys = {
   list: (filters: CallDataQueryDto) => [...callsKeys.lists(), filters] as const,
   sessions: () => [...callsKeys.all, 'session'] as const,
   session: (sessionId: string) => [...callsKeys.sessions(), sessionId] as const,
+  metrics: () => [...callsKeys.all, 'metrics'] as const,
+  metricsList: (filters: CallMetricsQueryDto) => [...callsKeys.metrics(), filters] as const,
 };

@@ -26,6 +26,8 @@ import {
 import { typography } from '@/lib/typography';
 
 const FALLBACK = '—';
+/** Session 15.4 — null here means "no eligible calls in this agent's sample", a real aggregate state distinct from a single call's "not available yet"/"not used" — see src/lib/callMetricsFormat.ts for the single-call formatter. */
+const fmtMs = (ms: number | null): string => (ms === null ? FALLBACK : `${Math.round(ms)} ms`);
 const RECENT_INTERACTIONS_PAGE_SIZES = [5, 10, 25, 50] as const;
 const DEFAULT_RECENT_INTERACTIONS_PAGE_SIZE = 5;
 
@@ -120,6 +122,7 @@ const AgentDetail: React.FC = () => {
     callMetrics,
     chatMetrics,
     campaignOutcomes,
+    technicalPerformance,
     isLoading,
   } = useAgentDetail(agentId);
 
@@ -327,6 +330,19 @@ const AgentDetail: React.FC = () => {
             <div className="space-y-0.5 bg-background/40 rounded p-1.5">
               <div className={typography.subsectionTitle}>Technical Performance</div>
               <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
+              {/* Session 15.4 — real per-agent Voice turn latency, from
+                  the Call Metrics API correlated against this agent's own
+                  call population (useAgentDetail.ts) — previously had no
+                  source at all (see docs/CALL_CENTRE_SESSION6_AGENTS_QUALITY_PLAN.md
+                  and the prior "no per-row latency field" gap). Averages
+                  exclude calls with no matching Call Metrics row or a
+                  still-null value — never fabricated, never 0ms. */}
+              <MetricRow label="Avg turn latency (voice)" value={fmtMs(technicalPerformance.avgTurnMs)} />
+              <MetricRow label="Avg STT (voice)" value={fmtMs(technicalPerformance.avgSttMs)} />
+              <MetricRow label="Avg LLM first token (voice)" value={fmtMs(technicalPerformance.avgLlmTtftMs)} />
+              <MetricRow label="Avg LLM generation (voice)" value={fmtMs(technicalPerformance.avgLlmMs)} />
+              <MetricRow label="Avg TTS first byte (voice)" value={fmtMs(technicalPerformance.avgTtsTtfbMs)} />
+              <MetricRow label="Avg orchestrator (voice)" value={fmtMs(technicalPerformance.avgOrchestratorMs)} />
               <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
             </div>
           </div>

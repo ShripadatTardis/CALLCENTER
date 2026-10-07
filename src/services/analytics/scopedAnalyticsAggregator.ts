@@ -1,6 +1,7 @@
 import type { Interaction } from '@/types/interaction';
 import type { ChatSessionSummary } from '@/types/chat';
-import { computeAgentCallMetrics, groupInteractionsByAgent } from '@/services/agents/agentPerformanceAggregator';
+import type { CallTechnicalPerformance } from '@/lib/callMetricsFormat';
+import { computeAgentCallMetrics, computeAgentCallTechnicalPerformance, groupInteractionsByAgent } from '@/services/agents/agentPerformanceAggregator';
 
 /**
  * Session 7 §5 — the scoped-role alternative to /analytics/metrics'
@@ -27,6 +28,8 @@ export interface ScopedVoiceMetrics {
   fcrRate: number | null;
   avgAhtSeconds: number | null;
   avgIntentAccuracy: number | null;
+  /** Session 15.4 — real, correlated from the Call Metrics API over this same sample; null means no matching Call Metrics row for any call in the sample, not "unavailable by design" anymore. */
+  avgTurnLatencyMs: number | null;
   outcomes: Array<{ name: string; value: number }>;
   ahtDistribution: Array<{ bucket: string; count: number }>;
   callsByAgent: Array<{ agent: string; count: number }>;
@@ -53,8 +56,10 @@ function bucketAht(durations: number[]): Array<{ bucket: string; count: number }
 export function computeScopedVoiceMetrics(
   interactions: Interaction[],
   agentsById: Map<string, { agentId: string; displayName: string }>,
+  metricsByInteractionId: Map<string, CallTechnicalPerformance> = new Map(),
 ): ScopedVoiceMetrics {
   const base = computeAgentCallMetrics(interactions);
+  const technicalPerformance = computeAgentCallTechnicalPerformance(interactions, metricsByInteractionId);
   const otherCount = interactions.length - base.resolvedCount - base.escalatedCount;
   const durations = interactions.map((i) => i.durationSeconds).filter((v): v is number => v != null);
 
@@ -70,6 +75,7 @@ export function computeScopedVoiceMetrics(
     fcrRate: base.fcrRate,
     avgAhtSeconds: base.avgAhtSeconds,
     avgIntentAccuracy: base.avgIntentAccuracy,
+    avgTurnLatencyMs: technicalPerformance.avgTurnMs,
     outcomes: [
       { name: 'Resolved', value: base.resolvedCount },
       { name: 'Escalated', value: base.escalatedCount },

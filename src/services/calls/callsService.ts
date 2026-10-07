@@ -6,6 +6,7 @@ import type {
   TriggerCallRequestDto,
   TriggerCallResponseDto,
 } from '@/types/api/calls';
+import type { CallMetricsQueryDto, CallMetricsResponseDto } from '@/types/api/callMetrics';
 import type { Interaction } from '@/types/interaction';
 import {
   mapCallDataEntryToInteraction,
@@ -13,6 +14,7 @@ import {
   mapSessionTranscriptToInteraction,
   mapTriggerCallResponse,
 } from './callsMapper';
+import { mapCallMetricsRow, type CallTechnicalPerformance } from '@/lib/callMetricsFormat';
 
 /**
  * Calls domain service — the only place that talks to the /api/calls/*
@@ -51,6 +53,37 @@ export async function fetchCallData(query: CallDataQueryDto = {}, role = 'unauth
     interactions: dto.data.calls.map(mapCallDataEntryToInteraction),
     pagination: dto.data.pagination,
     scoped: Boolean(dto.data.summary.scoped),
+  };
+}
+
+export interface CallMetricsResult {
+  rows: CallTechnicalPerformance[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+/**
+ * Session 15.4 — GET /api/calls/data?resource=metrics (dispatched from
+ * the same route file as fetchCallData, not a separate endpoint — see
+ * api/calls/data.ts's header comment for why). Server-side authorization
+ * (correlation against call-data's real agent_id) is applied before this
+ * ever reaches the browser; this function does no additional filtering.
+ */
+export async function fetchCallMetrics(query: CallMetricsQueryDto = {}, role = 'unauthenticated'): Promise<CallMetricsResult> {
+  const dto = await request<CallMetricsResponseDto>('/calls/data', {
+    method: 'GET',
+    query: { ...query, resource: 'metrics' } as Record<string, string | number | boolean | undefined>,
+    headers: { 'x-user-role': role },
+  });
+
+  return {
+    rows: dto.data.rows.map(mapCallMetricsRow),
+    page: dto.data.page,
+    pageSize: dto.data.page_size,
+    total: dto.data.total,
+    totalPages: dto.data.total_pages,
   };
 }
 

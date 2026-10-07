@@ -5,11 +5,13 @@ import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStr
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
 import { CollapsibleSectionCard } from '@/components/interaction-detail/CollapsibleSectionCard';
 import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
+import { CallTechnicalPerformanceSection } from '@/components/interaction-detail/CallTechnicalPerformanceSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { useCampaignExecutionByInteraction } from '@/hooks/campaigns/useCampaigns';
+import { useCallMetricsForInteraction } from '@/hooks/calls/useCallMetrics';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import {
   formatDurationExact,
@@ -98,6 +100,11 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
   // row at all means this was never campaign-triggered (or is outside
   // this user's Agent Scope), not that the data was lost.
   const { data: execution, isLoading: isExecutionLoading } = useCampaignExecutionByInteraction(interaction?.interactionId);
+
+  // Session 15.4 — Technical Performance (brief §5), the real per-call
+  // Voice pipeline latency breakdown. Voice-only; the hook itself is
+  // disabled for a chat interaction.
+  const { data: technicalPerformance, isLoading: isTechnicalPerformanceLoading } = useCallMetricsForInteraction(interaction);
 
   const isActive = interaction?.status === 'active';
   const needsLiveFetch = isActive || (interaction?.transcript?.length ?? 0) === 0;
@@ -305,6 +312,8 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             </CollapsibleSectionCard>
           );
         })()}
+
+        <CallTechnicalPerformanceSection metrics={technicalPerformance} isLoading={isTechnicalPerformanceLoading} />
 
         <SectionCard title="Recording">
           {interaction.recording?.url ? (

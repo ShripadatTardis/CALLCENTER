@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ListChecks, Phone, MessageCircle, LayoutList, Network } from 'lucide-react';
+import { Loader2, ListChecks, Phone, MessageCircle, LayoutList, Network, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { useChatLogs } from '@/hooks/chat/useChatLogs';
@@ -54,16 +54,30 @@ type QARow = {
 const ALL = '__all__';
 
 /**
- * Read-only Interaction Quality review — Session 6.1. Replaces the
- * former QAReview/QualityScoring modules, which showed a fully
- * fabricated review queue, reviewer assignments, and a weighted
- * 0-100 "quality score" computed from a slider with no persistence
- * (see docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md). No manual-review
- * backend exists, so this screen is interaction-centric and factual:
- * it surfaces the same real signals Call Logs/Chat Logs/Agent Detail
- * already source, grouped as Operational / Conversation / Technical
- * signals, with no composite score — that stays Session 6's explicit,
- * separate design decision.
+ * Client-side pagination (follow-up fix, 2026-10-07) — this screen
+ * merges two already-fetched, already-paginated sources (Calls + Chat
+ * Logs) into one filterable list, so there is no single server page to
+ * request further pages from; the page is sliced from the already-
+ * loaded, filtered set instead. 10 rows is chosen so a full page plus
+ * the toolbar/filter chrome above it fits one viewport without an outer
+ * page scroll — only the table's own internal scroll region (if any)
+ * absorbs overflow, and that overflow is now rare at this row count.
+ */
+const PAGE_SIZE = 10;
+
+/**
+ * Interaction Quality — Session 6.1. Replaces the former QAReview/
+ * QualityScoring modules, which showed a fully fabricated review queue,
+ * reviewer assignments, and a weighted 0-100 "quality score" computed
+ * from a slider with no persistence (see
+ * docs/CALL_CENTRE_SESSION6_1_QA_REVIEW_AUDIT.md). This list itself
+ * remains interaction-centric and factual: it surfaces the same real
+ * signals Call Logs/Chat Logs/Agent Detail already source, grouped as
+ * Operational / Conversation / Technical signals, with no composite
+ * score — that stays Session 6's explicit, separate design decision.
+ * Session 16.1 adds the real, persisted manual review workflow as a
+ * per-row entry point ("Human QA" column, Table view only) — see
+ * src/components/qa/QaReviewDialog.tsx.
  */
 const QAReview: React.FC = () => {
   const { data: callData, isLoading: callsLoading, isError: callsError, error: callsErr, refetch: refetchCalls, isFetching: callsFetching } =
@@ -90,6 +104,8 @@ const QAReview: React.FC = () => {
   const [view, setView] = useState<'grouped' | 'table'>('grouped');
   const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
   const classification = useClassification();
+
+  const [page, setPage] = useState(1);
 
   const isLoading = callsLoading || chatLoading;
   const isError = callsError || chatIsError;
@@ -176,6 +192,19 @@ const QAReview: React.FC = () => {
     return true;
   });
 
+  // Reset to page 1 whenever the filtered set could change out from
+  // under the current page (never leaves the user stranded on a page
+  // past the new end).
+  useEffect(() => {
+    setPage(1);
+  }, [channelFilter, agentFilter, outcomeFilter, escalationFilter, fcrFilter, sentimentFilter, intentSearch, campaignOnly, selectedGroup, view]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageStart = filteredRows.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredRows.length);
+
   const handleRowClick = (row: QARow) => {
     if (row.channel === 'voice' && row.voiceInteraction) {
       setSelectedInteraction(row.voiceInteraction);
@@ -207,10 +236,11 @@ const QAReview: React.FC = () => {
           flex-shrink-0; the table alone is flex-1 min-h-0 overflow-auto. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
         <p className={`${typography.pageDescription} max-w-3xl flex-shrink-0`}>
-          Read-only review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
+          Review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
           Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
           (duration, latency where available). No composite quality score — see AI Agents for the agent-level
-          breakdown. No manual review/approval workflow exists yet.
+          breakdown. In Table view, use Human QA → Review to start or resume a manual quality review of an
+          interaction.
         </p>
 
         {isError && (
@@ -369,7 +399,9 @@ const QAReview: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground px-1 flex-shrink-0">
           <ListChecks className="h-3.5 w-3.5" />
-          Interactions — {filteredRows.length} shown
+          {filteredRows.length === 0
+            ? 'Interactions — 0 shown'
+            : `Interactions — ${pageStart}–${pageEnd} of ${filteredRows.length}`}
         </div>
 
         {isLoading ? (
@@ -383,13 +415,27 @@ const QAReview: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  {['Time', 'Channel', 'Agent', 'Outcome', 'FCR', 'Escalation', 'Intent', 'Accuracy/Confidence', 'Sentiment', 'Auth', 'Duration/Latency', 'Campaign', ...(canReview ? ['Human QA'] : [])].map((h) => (
-                    <TableHead key={h} className={typography.tableHeader}>{h}</TableHead>
+                  {[
+                    { label: 'Time', className: 'w-24' },
+                    { label: 'Channel', className: 'w-20' },
+                    { label: 'Agent', className: 'w-36' },
+                    { label: 'Outcome', className: 'w-24' },
+                    { label: 'FCR', className: 'w-12' },
+                    { label: 'Escalation', className: 'w-24' },
+                    { label: 'Intent', className: 'w-28' },
+                    { label: 'Acc/Conf', className: 'w-16' },
+                    { label: 'Sentiment', className: 'w-20' },
+                    { label: 'Auth', className: 'w-12' },
+                    { label: 'Dur/Latency', className: 'w-20' },
+                    { label: 'Campaign', className: 'w-28' },
+                    ...(canReview ? [{ label: 'Human QA', className: 'w-24' }] : []),
+                  ].map((h) => (
+                    <TableHead key={h.label} className={`${typography.tableHeader} ${h.className}`}>{h.label}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((row) => (
+                {pagedRows.map((row) => (
                   <TableRow
                     key={row.key}
                     className="cursor-pointer border-border/60 hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
@@ -403,45 +449,45 @@ const QAReview: React.FC = () => {
                       }
                     }}
                   >
-                    <TableCell className={`whitespace-nowrap ${typography.metadata}`}>{formatTimestamp(row.startTime)}</TableCell>
-                    <TableCell>
+                    <TableCell className={`w-24 whitespace-nowrap ${typography.metadata}`}>{formatTimestamp(row.startTime)}</TableCell>
+                    <TableCell className="w-20">
                       <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs border-slate-600 text-foreground">
                         {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
                         {row.channel}
                       </Badge>
                     </TableCell>
-                    <TableCell className={`whitespace-nowrap ${typography.tableBody}`}>{row.agentName}</TableCell>
-                    <TableCell className={typography.tableBody}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
-                    <TableCell className={typography.tableBody}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
-                    <TableCell>
+                    <TableCell className={`w-36 truncate ${typography.tableBody}`} title={row.agentName}>{row.agentName}</TableCell>
+                    <TableCell className={`w-24 truncate ${typography.tableBody}`}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                    <TableCell className={`w-12 ${typography.tableBody}`}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                    <TableCell className="w-24">
                       {row.escalationTrigger ? (
-                        <Badge variant="destructive" className="text-xs">{row.escalationTrigger}</Badge>
+                        <Badge variant="destructive" className="text-xs truncate max-w-full" title={row.escalationTrigger}>{row.escalationTrigger}</Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">{row.channel === 'voice' ? 'No' : '—'}</span>
                       )}
                     </TableCell>
-                    <TableCell className={`whitespace-nowrap ${typography.tableBody}`}>{row.intent ?? '—'}</TableCell>
-                    <TableCell className={typography.tableBody}>
+                    <TableCell className={`w-28 truncate ${typography.tableBody}`} title={row.intent ?? undefined}>{row.intent ?? '—'}</TableCell>
+                    <TableCell className={`w-16 ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatPercent(row.intentAccuracyPct, 0)
                         : row.chatConfidenceFraction != null
                           ? formatFractionAsPercent(row.chatConfidenceFraction)
                           : '—'}
                     </TableCell>
-                    <TableCell className={typography.tableBody}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
-                    <TableCell className={typography.tableBody}>
+                    <TableCell className={`w-20 truncate ${typography.tableBody}`}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                    <TableCell className={`w-12 ${typography.tableBody}`}>
                       {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
                     </TableCell>
-                    <TableCell className={`whitespace-nowrap ${typography.tableBody}`}>
+                    <TableCell className={`w-20 whitespace-nowrap ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatDurationLong(row.durationSeconds)
                         : row.latencyMs != null
                           ? `${row.latencyMs}ms`
                           : '—'}
                     </TableCell>
-                    <TableCell className={`whitespace-nowrap ${typography.metadata}`}>{row.campaignName ?? '—'}</TableCell>
+                    <TableCell className={`w-28 truncate ${typography.metadata}`} title={row.campaignName}>{row.campaignName ?? '—'}</TableCell>
                     {canReview && (
-                      <TableCell>
+                      <TableCell className="w-24">
                         {row.agentId ? (
                           <Button
                             variant="outline"
@@ -465,6 +511,34 @@ const QAReview: React.FC = () => {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        )}
+
+        {!isLoading && filteredRows.length > 0 && (
+          <div className="flex items-center justify-between flex-shrink-0 text-xs text-muted-foreground px-1">
+            <span>Page {currentPage} of {totalPages}</span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </div>
           </div>
         )}
       </div>

@@ -67,6 +67,31 @@ const DataNotes: React.FC<{ notes: string[]; title?: string; ariaLabel?: string 
 );
 
 /**
+ * A collapsible Operational Performance subsection (Business Outcomes /
+ * Conversational Quality / Technical Performance) — user-requested
+ * (2026-10-09), same chevron+title trigger convention as the page's
+ * existing Agent Contract collapsible, just nested one level deeper.
+ * Defaults open (these are the primary metrics on this page, unlike
+ * Agent Contract which defaults closed as supplementary detail).
+ */
+const CollapsibleSubsection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
+  const [open, setOpen] = useState(true);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="bg-background/40 rounded">
+      <CollapsibleTrigger asChild>
+        <button type="button" className="w-full flex items-center gap-1.5 px-1.5 pt-1.5 pb-0.5 text-left" aria-expanded={open}>
+          {open ? <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+          <span className={typography.subsectionTitle}>{title}</span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-1.5 pb-1.5 max-h-40 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+/**
  * A compact label/value pair for the Operational Performance grid.
  * Deliberately NOT `justify-between` across the full sub-column width —
  * on a wide screen that stretched "Resolved" and "13" to opposite edges
@@ -139,6 +164,7 @@ const AgentDetail: React.FC = () => {
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
   const [contractOpen, setContractOpen] = useState(false);
+  const [operationalOpen, setOperationalOpen] = useState(true);
   const [interactionsPage, setInteractionsPage] = useState(1);
   const [interactionsPageSize, setInteractionsPageSize] = useState<number>(DEFAULT_RECENT_INTERACTIONS_PAGE_SIZE);
 
@@ -251,11 +277,6 @@ const AgentDetail: React.FC = () => {
           (its own table wrapper is flex-1 min-h-0 overflow-auto, with
           pagination pinned below the scroll region, not inside it). */}
       <div className="bg-background h-full min-h-0 flex flex-col text-foreground p-4 gap-2">
-        <Button variant="ghost" size="sm" className="h-6 -ml-2 flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
-          <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-          Back to {returnTo.label}
-        </Button>
-
         {/* A. Compact Agent Header — identity + counters, ONE bordered
             composition (vertical-density refinement, follow-up to the
             Phase 2 pilot review) instead of a bare identity row sitting
@@ -263,6 +284,19 @@ const AgentDetail: React.FC = () => {
             line; direction/persona/language/category/counters sit below
             a thin divider within the same box. */}
         <div className="rounded-md border border-border bg-card/40 px-3 py-2 space-y-1 flex-shrink-0">
+          {/* User-requested (2026-10-09): moved in from a standalone row
+              above this panel, so the header panel is the single
+              composition for "where am I / how do I leave" + identity,
+              rather than a bare back-link floating above a box. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 -ml-2 -mt-0.5 text-muted-foreground hover:text-foreground hover:bg-card"
+            onClick={() => navigate(returnTo.path)}
+          >
+            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+            Back to {returnTo.label}
+          </Button>
           <div className="flex items-center gap-2.5 flex-wrap">
             <Bot className="h-5 w-5 text-cyan-400 shrink-0" />
             <h1 className={typography.pageTitle}>{agent.displayName}</h1>
@@ -314,71 +348,64 @@ const AgentDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* B. Operational Performance — one compact grid instead of three
-            large cards. Internal padding/gaps tightened (vertical-density
-            refinement) without changing the approved typography scale. */}
-        <div className="rounded-md border border-border bg-card p-2 space-y-1 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className={typography.sectionTitle}>Operational Performance</div>
-            <DataNotes notes={performanceNotes} />
+        {/* B. Operational Performance — user-requested (2026-10-09): the
+            whole section is now collapsible (default open — this is the
+            primary content on this page, unlike Agent Contract below
+            which defaults closed), and each of its three sub-clusters
+            (Business Outcomes / Conversational Quality / Technical
+            Performance) collapses independently via CollapsibleSubsection
+            above. VoiceForce design system (Phase 2C) — the 3 sub-clusters
+            get a light background tint for real grouping, not just a
+            smaller label (bg-background/40, the per-agent tiles pattern).
+            Each subsection's metrics sit 2-per-row (user-reported,
+            2026-10-09 — justify-between previously stretched label/value
+            across a full ~450px column, leaving a wall of empty space). */}
+        <Collapsible open={operationalOpen} onOpenChange={setOperationalOpen} className="flex-shrink-0">
+          <div className="rounded-md border border-border bg-card">
+            <div className="flex items-center justify-between px-2 pt-2">
+              <CollapsibleTrigger asChild>
+                <button type="button" className="flex items-center gap-1.5" aria-expanded={operationalOpen}>
+                  {operationalOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
+                  <span className={typography.sectionTitle}>Operational Performance</span>
+                </button>
+              </CollapsibleTrigger>
+              <DataNotes notes={performanceNotes} />
+            </div>
+            <CollapsibleContent className="p-2 pt-1">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5">
+                <CollapsibleSubsection title="Business Outcomes">
+                  <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
+                  <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
+                  <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
+                </CollapsibleSubsection>
+                <CollapsibleSubsection title="Conversational Quality">
+                  <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
+                  <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
+                  <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
+                  <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
+                </CollapsibleSubsection>
+                {/* Session 15.4 — real per-agent Voice turn latency, from
+                    the Call Metrics API correlated against this agent's
+                    own call population (useAgentDetail.ts) — previously
+                    had no source at all (see
+                    docs/CALL_CENTRE_SESSION6_AGENTS_QUALITY_PLAN.md and
+                    the prior "no per-row latency field" gap). Averages
+                    exclude calls with no matching Call Metrics row or a
+                    still-null value — never fabricated, never 0ms. */}
+                <CollapsibleSubsection title="Technical Performance">
+                  <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
+                  <MetricRow label="Avg turn latency (voice)" value={fmtMs(technicalPerformance.avgTurnMs)} />
+                  <MetricRow label="Avg STT (voice)" value={fmtMs(technicalPerformance.avgSttMs)} />
+                  <MetricRow label="Avg LLM first token (voice)" value={fmtMs(technicalPerformance.avgLlmTtftMs)} />
+                  <MetricRow label="Avg LLM generation (voice)" value={fmtMs(technicalPerformance.avgLlmMs)} />
+                  <MetricRow label="Avg TTS first byte (voice)" value={fmtMs(technicalPerformance.avgTtsTtfbMs)} />
+                  <MetricRow label="Avg orchestrator (voice)" value={fmtMs(technicalPerformance.avgOrchestratorMs)} />
+                  <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
+                </CollapsibleSubsection>
+              </div>
+            </CollapsibleContent>
           </div>
-          {/* VoiceForce design system (Phase 2C) — the 3 sub-clusters were
-              previously distinguished ONLY by a text-[10px] label and grid
-              column position, no visual separation (flagged in the Phase 1
-              addendum's hierarchy audit). Now each gets a light background
-              tint — real grouping, not just a smaller label — matching the
-              nested-tile recipe already used elsewhere on this page
-              (bg-background/40, see the per-agent tiles pattern). */}
-          {/* User-reported (2026-10-09): rows stretched justify-between
-              across a full ~450px column left a wall of empty space
-              between label and value. Each subsection's metrics now sit
-              in a 2-column grid instead of one column, so the reclaimed
-              width holds a second metric per row instead of dead space —
-              this also roughly halves each subsection's height, which is
-              most of why the whole page previously needed a browser-level
-              scroll to reach Recent Interactions. A max-height + internal
-              scroll is kept as the explicit fallback for a future
-              subsection with enough rows to still overflow. */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5">
-            <div className="bg-background/40 rounded p-1.5 max-h-40 overflow-y-auto">
-              <div className={typography.subsectionTitle}>Business Outcomes</div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
-                <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
-                <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
-                <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
-              </div>
-            </div>
-            <div className="bg-background/40 rounded p-1.5 max-h-40 overflow-y-auto">
-              <div className={typography.subsectionTitle}>Conversational Quality</div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
-                <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
-                <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
-                <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
-                <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
-              </div>
-            </div>
-            <div className="bg-background/40 rounded p-1.5 max-h-40 overflow-y-auto">
-              <div className={typography.subsectionTitle}>Technical Performance</div>
-              {/* Session 15.4 — real per-agent Voice turn latency, from
-                  the Call Metrics API correlated against this agent's own
-                  call population (useAgentDetail.ts) — previously had no
-                  source at all (see docs/CALL_CENTRE_SESSION6_AGENTS_QUALITY_PLAN.md
-                  and the prior "no per-row latency field" gap). Averages
-                  exclude calls with no matching Call Metrics row or a
-                  still-null value — never fabricated, never 0ms. */}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
-                <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
-                <MetricRow label="Avg turn latency (voice)" value={fmtMs(technicalPerformance.avgTurnMs)} />
-                <MetricRow label="Avg STT (voice)" value={fmtMs(technicalPerformance.avgSttMs)} />
-                <MetricRow label="Avg LLM first token (voice)" value={fmtMs(technicalPerformance.avgLlmTtftMs)} />
-                <MetricRow label="Avg LLM generation (voice)" value={fmtMs(technicalPerformance.avgLlmMs)} />
-                <MetricRow label="Avg TTS first byte (voice)" value={fmtMs(technicalPerformance.avgTtsTtfbMs)} />
-                <MetricRow label="Avg orchestrator (voice)" value={fmtMs(technicalPerformance.avgOrchestratorMs)} />
-                <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
-              </div>
-            </div>
-          </div>
-        </div>
+        </Collapsible>
 
         {/* C. Agent Contract — collapsible, collapsed by default; same Session 13.3 content, just not dominating the page. */}
         <Collapsible open={contractOpen} onOpenChange={setContractOpen} className="flex-shrink-0">

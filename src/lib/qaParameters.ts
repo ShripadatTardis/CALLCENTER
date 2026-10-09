@@ -44,6 +44,14 @@ export interface QaParameterDefinition {
   appliesTo: 'agent' | 'customer' | 'interaction';
   reasonCodes: string[];
   directionality: 'higher_better' | 'lower_better';
+  /**
+   * Session 16.1.1 — one-sentence reviewer-facing help, shown as a
+   * tooltip on the parameter's chip in the exception editor rather than
+   * occupying permanent screen space. Distinguishes parameters a
+   * reviewer might otherwise conflate (e.g. Context Continuity vs.
+   * Follow-up Understanding vs. Reference Resolution).
+   */
+  shortHelp: string;
 }
 
 export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
@@ -58,6 +66,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['PREVIOUS_INFORMATION_IGNORED', 'PREVIOUS_INFORMATION_CONTRADICTED', 'WRONG_CONTEXT_CARRIED_FORWARD', 'CONTEXT_LOST_AFTER_TRANSITION', 'OTHER'],
     directionality: 'higher_better',
+    shortHelp: 'Did the agent correctly carry forward information already established earlier in the conversation?',
   },
   followup_understanding_rate: {
     code: 'followup_understanding_rate',
@@ -70,6 +79,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['FOLLOW_UP_MISUNDERSTOOD', 'WRONG_INTERPRETATION', 'RELATION_TO_PRIOR_TURN_MISSED', 'OTHER'],
     directionality: 'higher_better',
+    shortHelp: 'Did the agent correctly understand this turn as a follow-up to what the customer just said?',
   },
   reference_resolution_accuracy: {
     code: 'reference_resolution_accuracy',
@@ -82,6 +92,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['WRONG_ENTITY', 'REFERENCE_NOT_RESOLVED', 'AMBIGUITY_HANDLED_INCORRECTLY', 'OTHER'],
     directionality: 'higher_better',
+    shortHelp: 'Did the agent correctly resolve a pronoun or implicit reference ("it", "that one") to the right entity?',
   },
   task_progression_rate: {
     code: 'task_progression_rate',
@@ -94,6 +105,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['RESPONSE_DID_NOT_ADVANCE_TASK', 'IRRELEVANT_RESPONSE', 'CONVERSATION_STALLED', 'WRONG_NEXT_STEP', 'OTHER'],
     directionality: 'higher_better',
+    shortHelp: 'Did this response move the customer\'s request forward, rather than stalling or going off-track?',
   },
   unnecessary_clarification_rate: {
     code: 'unnecessary_clarification_rate',
@@ -106,6 +118,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['INFORMATION_ALREADY_AVAILABLE', 'DUPLICATE_QUESTION', 'QUESTION_NOT_REQUIRED', 'OTHER'],
     directionality: 'lower_better',
+    shortHelp: 'Did the agent ask the customer for something it should already have known or didn\'t actually need?',
   },
   repetition_loop_rate: {
     code: 'repetition_loop_rate',
@@ -118,6 +131,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'interaction',
     reasonCodes: ['AGENT_REPEATED_QUESTION', 'AGENT_REPEATED_ANSWER', 'CUSTOMER_FORCED_TO_REPEAT', 'CONVERSATION_LOOP', 'OTHER'],
     directionality: 'lower_better',
+    shortHelp: 'Did the conversation get stuck repeating the same question, answer or exchange instead of progressing? Assessed once per interaction, not per turn — a loop is a property of a span of turns.',
   },
   customer_correction_rate: {
     code: 'customer_correction_rate',
@@ -130,6 +144,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'customer',
     reasonCodes: ['INTENT_CORRECTION', 'FACTUAL_CORRECTION', 'CONTEXT_CORRECTION', 'ENTITY_CORRECTION', 'OTHER'],
     directionality: 'lower_better',
+    shortHelp: 'Did the customer have to correct something the agent got wrong (intent, a fact, context, or an entity)? Assessed on the customer\'s correcting turn, usable as evidence linked to the agent turn it responds to.',
   },
   conversation_recovery_rate: {
     code: 'conversation_recovery_rate',
@@ -142,6 +157,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['CORRECTION_NOT_ACCEPTED', 'ERROR_REPEATED', 'WRONG_RECOVERY', 'RECOVERY_STALLED', 'OTHER'],
     directionality: 'higher_better',
+    shortHelp: 'After an error or correction occurred, did the agent recover gracefully from it?',
   },
   response_grounding_rate: {
     code: 'response_grounding_rate',
@@ -154,6 +170,7 @@ export const QA_PARAMETERS: Record<QaParameterCode, QaParameterDefinition> = {
     appliesTo: 'agent',
     reasonCodes: ['UNSUPPORTED_RESPONSE', 'CONTRADICTS_AVAILABLE_EVIDENCE', 'WRONG_SOURCE_OR_CONTEXT', 'CANNOT_VERIFY_SOURCE', 'OTHER'],
     directionality: 'higher_better',
+    shortHelp: 'Is the agent\'s answer actually supported by the book/source it should be grounded in? If you cannot check the source either way, record "Cannot verify" — that\'s a data gap, not a quality failure.',
   },
 };
 

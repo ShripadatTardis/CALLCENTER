@@ -120,27 +120,41 @@ var QA_PARAMETERS = {
 };
 var QA_PARAMETER_CODES = Object.keys(QA_PARAMETERS);
 var QA_TIER_1_PARAMETERS = QA_PARAMETER_CODES.filter((code) => QA_PARAMETERS[code].tier === 1);
-function requiresReasonCode(code, value) {
+
+// src/lib/qaExceptionEditor.ts
+function inferredExceptionValue(code) {
+  const problemValues = QA_PARAMETERS[code].problemValues;
+  return problemValues.length === 1 ? problemValues[0] : null;
+}
+function isAdverseValue(code, value) {
+  if (code === "response_grounding_rate" && value === "CANNOT_VERIFY") return false;
   return QA_PARAMETERS[code].problemValues.includes(value);
 }
-function isValidReasonCode(code, reasonCode) {
-  return QA_PARAMETERS[code].reasonCodes.includes(reasonCode);
+function isExceptionFinding(code, value) {
+  return value !== QA_PARAMETERS[code].cleanValue;
 }
-function isValidResultValue(code, value) {
-  return QA_PARAMETERS[code].allowedValues.includes(value);
+function evidenceChoices(allTurns, primaryTurnId) {
+  return allTurns.filter((t) => t.turnId !== primaryTurnId);
 }
-var INTERACTION_LEVEL_VALUES = {
-  requestCompletion: ["YES", "PARTIAL", "NO", "CANNOT_DETERMINE"],
-  fcr: ["YES", "NO", "CANNOT_DETERMINE"],
-  humanAssistanceRequired: ["YES", "NO", "CANNOT_DETERMINE"],
-  businessOutcome: ["RESOLVED", "PARTIALLY_RESOLVED", "HUMAN_ASSISTANCE_REQUIRED", "NOT_RESOLVED", "CUSTOMER_ABANDONED"]
-};
+function mergeFlagFindings(explicit, tier1Auto) {
+  const explicitCodes = new Set(explicit.map((f) => f.parameterCode));
+  const autoFindings = tier1Auto.filter((f) => !explicitCodes.has(f.parameterCode)).map((f) => ({ parameterCode: f.parameterCode, value: f.value, reasonCode: null, evidenceTurnIds: [], note: null }));
+  return [...explicit, ...autoFindings];
+}
+function turnStatusForExplicitFindings(explicit) {
+  return explicit.some((f) => isAdverseValue(f.parameterCode, f.value)) ? "flagged" : "good";
+}
+function humanizeReasonCode(code) {
+  if (code === "OTHER") return "Other";
+  const words = code.toLowerCase().split("_");
+  return words[0].charAt(0).toUpperCase() + words[0].slice(1) + " " + words.slice(1).join(" ");
+}
 export {
-  INTERACTION_LEVEL_VALUES,
-  QA_PARAMETERS,
-  QA_PARAMETER_CODES,
-  QA_TIER_1_PARAMETERS,
-  isValidReasonCode,
-  isValidResultValue,
-  requiresReasonCode
+  evidenceChoices,
+  humanizeReasonCode,
+  inferredExceptionValue,
+  isAdverseValue,
+  isExceptionFinding,
+  mergeFlagFindings,
+  turnStatusForExplicitFindings
 };

@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Check, Flag, MinusCircle, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Loader2, Check, Flag, MinusCircle, ChevronUp, ChevronDown, X, Pencil } from 'lucide-react';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
 import { useChatSessionDetail } from '@/hooks/chat/useChatSessionDetail';
 import { useStartQaReview, useInitQaReviewTurns, useSubmitQaTurn, useSetQaReviewConclusions, useSubmitQaReview, useQaReview } from '@/hooks/qa/useQa';
@@ -14,7 +15,11 @@ import {
   QA_PARAMETER_CODES, QA_PARAMETERS, requiresReasonCode, type QaParameterCode, type QaResultValue,
   INTERACTION_LEVEL_VALUES, type RequestCompletion, type QaFcr, type HumanAssistanceRequired,
 } from '@/lib/qaParameters';
-import type { QaFindingInput, QaChannel } from '@/services/qa/qaService';
+import {
+  inferredExceptionValue, isAdverseValue, isExceptionFinding, evidenceChoices,
+  mergeFlagFindings, turnStatusForExplicitFindings, humanizeReasonCode, type QaExceptionFinding,
+} from '@/lib/qaExceptionEditor';
+import type { QaFindingInput, QaChannel, QaFinding } from '@/services/qa/qaService';
 import { formatTimestamp } from '@/lib/format';
 
 interface QaReviewDialogProps {
@@ -43,6 +48,18 @@ function isTypingTarget(el: EventTarget | null): boolean {
  * turns are shown for context/evidence but never advanced through
  * independently — qa_turn_reviews rows exist only for agent turns (see
  * call_center_qa_review_init_turns).
+ *
+ * Session 16.1.1 — UX refinement (callCprompt 96 16.1.1): "Flag Issue"
+ * previously pre-populated PASS forms for every Tier-1 parameter,
+ * turning the exception path into a mini questionnaire. It now opens to
+ * a bare "what is wrong with this turn?" chip picker with NOTHING
+ * pre-selected — selecting a chip expands only that parameter's compact
+ * form, and the problem value is inferred (not re-asked) wherever it's
+ * unambiguous. "Unreviewed ≠ PASS" is preserved underneath: on save, any
+ * Tier-1 parameter the reviewer didn't touch still gets its structural
+ * auto-clean finding merged in server-side (mergeFlagFindings), exactly
+ * as Good+Next already does — the UX hides the complexity, the
+ * persisted measurement data does not get thinner.
  */
 export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose, channel, interactionId, agentId }) => {
   const voiceQuery = useInteractionTranscript(channel === 'voice' ? interactionId ?? undefined : undefined, { enabled: isOpen && channel === 'voice' });
@@ -57,6 +74,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
   const transcriptLoading = channel === 'voice' ? voiceQuery.isLoading : chatQuery.isLoading;
   const reviewableTurns = useMemo(() => qaReviewableTurns(allTurns), [allTurns]);
   const tier1Map = useMemo(() => computeTier1Applicability(allTurns.map((t) => ({ turnId: t.turnId, role: t.role }))), [allTurns]);
+  const turnIndexById = useMemo(() => new Map(allTurns.map((t, i) => [t.turnId, i])), [allTurns]);
 
   const [reviewId, setReviewId] = useState<string | null>(null);
   const startedKeyRef = useRef<string | null>(null);
@@ -110,7 +128,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
     return map;
   }, [review]);
   const findingsByTurnId = useMemo(() => {
-    const map = new Map<string, NonNullable<typeof review>['findings']>();
+    const map = new Map<string, QaFinding[]>();
     for (const f of review?.findings ?? []) {
       const list = map.get(f.primaryTurnId) ?? [];
       list.push(f);
@@ -143,23 +161,20 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
     submitTurnMutation.mutate({ reviewId: review.id, turnId: currentTurn.turnId, role: 'agent', status: 'na', findings: [] }, { onSuccess: advance });
   }
 
+  /**
+   * §13 — reopening a previously-flagged turn must only pre-select the
+   * parameters that were genuine EXCEPTIONS (value !== clean), never the
+   * Tier-1 auto-clean findings mergeFlagFindings silently added on the
+   * prior save — otherwise editing a turn would reintroduce exactly the
+   * "full questionnaire" problem this session fixes.
+   */
   function openException() {
     if (!currentTurn) return;
-    const applicability = tier1Map.get(currentTurn.turnId);
-    const initial: Draft = {};
     const existing = findingsByTurnId.get(currentTurn.turnId) ?? [];
-    for (const code of QA_PARAMETER_CODES) {
-      const def = QA_PARAMETERS[code];
-      const prior = existing.find((f) => f.parameterCode === code);
-      if (prior) {
-        initial[code] = { value: prior.value, reasonCode: prior.reasonCode, evidenceTurnIds: prior.evidenceTurnIds, note: prior.note ?? '' };
-        continue;
-      }
-      if (def.tier === 1) {
-        if (code === 'context_continuity_rate' && applicability?.isFirstAgentTurn) continue;
-        if (code === 'followup_understanding_rate' && applicability?.respondingToFirstCustomerTurn) continue;
-        initial[code] = { value: def.cleanValue, reasonCode: null, evidenceTurnIds: [], note: '' };
-      }
+    const initial: Draft = {};
+    for (const f of existing) {
+      if (!isExceptionFinding(f.parameterCode, f.value)) continue;
+      initial[f.parameterCode] = { value: f.value, reasonCode: f.reasonCode, evidenceTurnIds: f.evidenceTurnIds, note: f.note ?? '' };
     }
     setDraft(initial);
     setDraftError(null);
@@ -169,8 +184,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
   function toggleDraftParameter(code: QaParameterCode) {
     setDraft((prev) => {
       if (prev[code]) { const next = { ...prev }; delete next[code]; return next; }
-      const def = QA_PARAMETERS[code];
-      return { ...prev, [code]: { value: def.problemValues[0] ?? null, reasonCode: null, evidenceTurnIds: [], note: '' } };
+      return { ...prev, [code]: { value: inferredExceptionValue(code), reasonCode: null, evidenceTurnIds: [], note: '' } };
     });
   }
 
@@ -180,19 +194,30 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
 
   function saveException() {
     if (!review || !currentTurn) return;
-    const findings: QaFindingInput[] = [];
-    for (const code of Object.keys(draft) as QaParameterCode[]) {
+    const codes = Object.keys(draft) as QaParameterCode[];
+    if (codes.length === 0) {
+      setDraftError('Select at least one parameter that was wrong with this turn.');
+      return;
+    }
+    const explicit: QaExceptionFinding[] = [];
+    for (const code of codes) {
       const row = draft[code] as DraftRow;
-      if (!row.value) continue;
-      if (requiresReasonCode(code, row.value) && !row.reasonCode) {
-        setDraftError(`${QA_PARAMETERS[code].displayName} requires a reason code.`);
+      if (!row.value) {
+        setDraftError(`${QA_PARAMETERS[code].displayName}: choose what happened.`);
         return;
       }
-      findings.push({ parameterCode: code, value: row.value, evidenceTurnIds: row.evidenceTurnIds, reasonCode: row.reasonCode, note: row.note?.trim() || null });
+      if (requiresReasonCode(code, row.value) && !row.reasonCode) {
+        setDraftError(`${QA_PARAMETERS[code].displayName} requires a reason.`);
+        return;
+      }
+      explicit.push({ parameterCode: code, value: row.value, reasonCode: row.reasonCode, evidenceTurnIds: row.evidenceTurnIds, note: row.note?.trim() || null });
     }
-    const hasProblem = findings.some((f) => QA_PARAMETERS[f.parameterCode].problemValues.includes(f.value));
+    const applicability = tier1Map.get(currentTurn.turnId);
+    const tier1Auto = applicability ? goodNextAutoFindings(applicability) : [];
+    const findings: QaFindingInput[] = mergeFlagFindings(explicit, tier1Auto);
+    const status = turnStatusForExplicitFindings(explicit);
     submitTurnMutation.mutate(
-      { reviewId: review.id, turnId: currentTurn.turnId, role: 'agent', status: hasProblem ? 'flagged' : 'good', findings },
+      { reviewId: review.id, turnId: currentTurn.turnId, role: 'agent', status, findings },
       { onSuccess: () => { setExceptionOpen(false); advance(); } },
     );
   }
@@ -204,6 +229,9 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
       if (isTypingTarget(e.target)) return;
       if (exceptionOpen) {
         if (e.key === 'Escape') { setExceptionOpen(false); }
+        // Save+Next's displayed "Enter" shortcut must actually work, not
+        // just be a decorative hint — HIG review finding, 2026-10-09.
+        else if (e.key === 'Enter') { e.preventDefault(); saveException(); }
         return;
       }
       if (isReadOnly) return;
@@ -216,9 +244,13 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, phase, exceptionOpen, isReadOnly, currentTurn, review]);
+  }, [isOpen, phase, exceptionOpen, isReadOnly, currentTurn, review, draft]);
 
   if (!interactionId) return null;
+
+  const currentTurnReview = currentTurn ? turnReviewByTurnId.get(currentTurn.turnId) : null;
+  const currentTurnExceptions = currentTurn ? (findingsByTurnId.get(currentTurn.turnId) ?? []).filter((f) => isExceptionFinding(f.parameterCode, f.value)) : [];
+  const currentTurnIndexInAll = currentTurn ? turnIndexById.get(currentTurn.turnId) ?? 0 : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -263,6 +295,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
                   return (
                     <div
                       key={turn.turnId}
+                      aria-current={isCurrent ? 'true' : undefined}
                       className={`rounded-md p-2 text-sm ${isCurrent ? 'bg-cyan-50 dark:bg-cyan-950/30 ring-1 ring-cyan-400' : ''}`}
                     >
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
@@ -284,7 +317,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
               </div>
             </div>
 
-            <div className="w-[38%] min-w-0 flex flex-col border border-border rounded-md p-3 gap-3">
+            <div className="w-[38%] min-w-0 flex flex-col border border-border rounded-md p-3 gap-2">
               <div className="text-xs text-muted-foreground flex-shrink-0">
                 {reviewableTurns.length - remainingCount}/{reviewableTurns.length} reviewable turns · {findingsCount} finding{findingsCount === 1 ? '' : 's'}
               </div>
@@ -296,6 +329,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
                   draft={draft}
                   draftError={draftError}
                   allTurns={allTurns}
+                  primaryTurnId={currentTurn.turnId}
                   onToggleParameter={toggleDraftParameter}
                   onUpdateRow={updateDraftRow}
                   onSave={saveException}
@@ -303,12 +337,43 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
                 />
               ) : (
                 <>
-                  <div className="flex-shrink-0">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Current turn</p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap break-words border border-border rounded-md p-2 max-h-32 overflow-y-auto">
-                      {currentTurn.text}
-                    </p>
+                  {/* Session 16.1.1 §15 — the full transcript text is
+                      already visible and highlighted in the left panel;
+                      duplicating it here cost vertical space (tight at
+                      1366×768) without adding information. A compact
+                      identifier replaces it. */}
+                  <div className="flex-shrink-0 text-xs text-muted-foreground truncate">
+                    <span className="font-medium text-foreground">T{currentTurnIndexInAll + 1}</span> · {currentTurn.speakerLabel} response
+                    {currentTurn.text && <span> — {currentTurn.text.length > 70 ? `${currentTurn.text.slice(0, 70)}…` : currentTurn.text}</span>}
                   </div>
+
+                  {/* §13 — a turn already reviewed in this session shows
+                      what was recorded, not a blank slate, so revisiting
+                      it never looks like "nothing happened here yet". */}
+                  {currentTurnReview && currentTurnReview.status !== 'not_reviewed' && (
+                    <div className="flex-shrink-0 rounded-md border border-border bg-background/40 p-1.5 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                          {currentTurnReview.status === 'na' ? 'Marked N/A' : currentTurnExceptions.length === 0 ? 'Good' : 'Flagged'}
+                        </span>
+                        {!isReadOnly && currentTurnReview.status !== 'na' && (
+                          <button type="button" onClick={openException} className="text-[11px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1">
+                            <Pencil className="h-3 w-3" /> Edit
+                          </button>
+                        )}
+                      </div>
+                      {currentTurnExceptions.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {currentTurnExceptions.map((f) => (
+                            <Badge key={f.id} variant={isAdverseValue(f.parameterCode, f.value) ? 'destructive' : 'outline'} className="text-[10px] py-0 px-1.5">
+                              {QA_PARAMETERS[f.parameterCode].displayName}{f.reasonCode ? ` · ${humanizeReasonCode(f.reasonCode)}` : ''}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {!isReadOnly && (
                     <div className="flex flex-col gap-1.5 flex-shrink-0">
                       <Button size="sm" onClick={handleGood} disabled={submitTurnMutation.isPending}>
@@ -343,19 +408,30 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
   );
 };
 
+/**
+ * §4/§14 — "What is wrong with this turn?" chip picker. Progressive
+ * disclosure: selecting a chip expands ONLY that parameter's compact
+ * form below; nothing is pre-expanded, and a parameter never shown here
+ * is never silently touched (mergeFlagFindings handles Tier-1 coverage
+ * server-side, invisibly, on save).
+ */
 const ExceptionEditor: React.FC<{
   draft: Draft;
   draftError: string | null;
   allTurns: QaTurn[];
+  primaryTurnId: string;
   onToggleParameter: (code: QaParameterCode) => void;
   onUpdateRow: (code: QaParameterCode, patch: Partial<DraftRow>) => void;
   onSave: () => void;
   onCancel: () => void;
-}> = ({ draft, draftError, allTurns, onToggleParameter, onUpdateRow, onSave, onCancel }) => {
+}> = ({ draft, draftError, allTurns, primaryTurnId, onToggleParameter, onUpdateRow, onSave, onCancel }) => {
+  const evidenceCandidates = useMemo(() => evidenceChoices(allTurns, primaryTurnId), [allTurns, primaryTurnId]);
+  const turnIndexById = useMemo(() => new Map(allTurns.map((t, i) => [t.turnId, i])), [allTurns]);
+
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
       <div className="flex items-center justify-between flex-shrink-0">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Record findings</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">What is wrong with this turn?</p>
         <Button variant="ghost" size="xs" onClick={onCancel} aria-label="Close exception editor"><X className="h-3.5 w-3.5" /></Button>
       </div>
       <div className="flex flex-wrap gap-1.5 flex-shrink-0">
@@ -365,6 +441,7 @@ const ExceptionEditor: React.FC<{
             type="button"
             onClick={() => onToggleParameter(code)}
             aria-pressed={Boolean(draft[code])}
+            title={QA_PARAMETERS[code].shortHelp}
             className={`text-[11px] px-2 py-1.5 rounded-full border ${draft[code] ? 'bg-cyan-700 text-white border-cyan-700' : 'border-border text-muted-foreground'}`}
           >
             {QA_PARAMETERS[code].displayName}
@@ -372,53 +449,105 @@ const ExceptionEditor: React.FC<{
         ))}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
+      {/* Only selected parameters render a form — this is the whole
+          point of the redesign (callCprompt 96 16.1.1 §4: "Do not
+          automatically open forms for multiple parameters"). */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
         {(Object.keys(draft) as QaParameterCode[]).map((code) => {
           const def = QA_PARAMETERS[code];
           const row = draft[code] as DraftRow;
+          const isGrounding = code === 'response_grounding_rate';
           return (
             <div key={code} className="border border-border rounded-md p-2 space-y-1.5">
               <p className="text-xs font-semibold">{def.displayName}</p>
-              <Select value={row.value ?? ''} onValueChange={(v) => onUpdateRow(code, { value: v as QaResultValue })}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Value" /></SelectTrigger>
-                <SelectContent>
-                  {def.allowedValues.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {row.value && requiresReasonCode(code, row.value) && (
-                <Select value={row.reasonCode ?? ''} onValueChange={(v) => onUpdateRow(code, { reasonCode: v })}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Reason code" /></SelectTrigger>
-                  <SelectContent>
-                    {def.reasonCodes.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+
+              {isGrounding ? (
+                // §7 — a genuine two-way choice, shown as two compact
+                // buttons rather than a generic allowedValues dropdown.
+                // CANNOT_VERIFY is deliberately NOT styled destructive —
+                // it is a data gap, not a quality failure — and uses the
+                // app's own tinted "warning" badge token, not a raw
+                // solid-amber fill (which fails AA contrast for white
+                // text at this size).
+                <div role="radiogroup" aria-label="Response Grounding value" className="flex gap-1.5">
+                  <button
+                    type="button"
+                    role="radio"
+                    onClick={() => onUpdateRow(code, { value: 'NOT_GROUNDED' })}
+                    aria-checked={row.value === 'NOT_GROUNDED'}
+                    className={`flex-1 text-[11px] py-1.5 rounded-full border ${row.value === 'NOT_GROUNDED' ? 'bg-destructive text-destructive-foreground border-destructive' : 'border-border text-muted-foreground'}`}
+                  >
+                    Not grounded
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    onClick={() => onUpdateRow(code, { value: 'CANNOT_VERIFY' })}
+                    aria-checked={row.value === 'CANNOT_VERIFY'}
+                    className={`flex-1 text-[11px] py-1.5 rounded-full border ${row.value === 'CANNOT_VERIFY' ? 'border-amber-600/50 bg-amber-500/10 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400' : 'border-border text-muted-foreground'}`}
+                  >
+                    Cannot verify
+                  </button>
+                </div>
+              ) : (
+                // §6 — the problem value is implied by selecting this
+                // parameter at all; shown read-only for confidence, never
+                // asked as a redundant choice.
+                row.value && <p className="text-[11px] text-muted-foreground">Will record as <span className="font-medium text-foreground">{row.value}</span></p>
               )}
-              <div className="max-h-20 overflow-y-auto border border-border/60 rounded-sm p-1 space-y-0.5">
-                {allTurns.map((t, i) => (
-                  <label key={t.turnId} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={row.evidenceTurnIds.includes(t.turnId)}
-                      onChange={(e) => {
-                        const next = e.target.checked
-                          ? [...row.evidenceTurnIds, t.turnId]
-                          : row.evidenceTurnIds.filter((id) => id !== t.turnId);
-                        onUpdateRow(code, { evidenceTurnIds: next });
-                      }}
-                    />
-                    T{i + 1} {t.speakerLabel}: {t.text.slice(0, 40)}
-                  </label>
-                ))}
+
+              {row.value && requiresReasonCode(code, row.value) && (
+                <div role="radiogroup" aria-label={`Reason — ${def.displayName}`}>
+                  <p className="text-[10px] text-muted-foreground mb-1">What happened?</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {def.reasonCodes.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        role="radio"
+                        onClick={() => onUpdateRow(code, { reasonCode: r })}
+                        aria-checked={row.reasonCode === r}
+                        className={`text-[11px] px-2 py-1 rounded-full border ${row.reasonCode === r ? 'bg-cyan-700 text-white border-cyan-700' : 'border-border text-muted-foreground'}`}
+                      >
+                        {humanizeReasonCode(r)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[10px] text-muted-foreground mb-1">Supporting evidence (optional)</p>
+                <div className="max-h-20 overflow-y-auto border border-border/60 rounded-sm p-1 space-y-0.5">
+                  {evidenceCandidates.map((t) => (
+                    <label key={t.turnId} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Checkbox
+                        checked={row.evidenceTurnIds.includes(t.turnId)}
+                        onCheckedChange={(checked) => {
+                          const next = checked
+                            ? [...row.evidenceTurnIds, t.turnId]
+                            : row.evidenceTurnIds.filter((id) => id !== t.turnId);
+                          onUpdateRow(code, { evidenceTurnIds: next });
+                        }}
+                      />
+                      T{(turnIndexById.get(t.turnId) ?? 0) + 1} · {t.speakerLabel} · {t.text.length > 50 ? `${t.text.slice(0, 50)}…` : t.text}
+                    </label>
+                  ))}
+                </div>
               </div>
+
               <Textarea
                 placeholder="Optional note"
                 value={row.note}
                 onChange={(e) => onUpdateRow(code, { note: e.target.value })}
-                className="h-14 text-xs"
+                className="h-12 text-xs"
               />
             </div>
           );
         })}
+        {Object.keys(draft).length === 0 && (
+          <p className="text-xs text-muted-foreground">Select one or more parameters above.</p>
+        )}
       </div>
 
       {draftError && <p role="alert" className="text-xs text-destructive flex-shrink-0">{draftError}</p>}
@@ -454,11 +583,15 @@ const QaSummaryPanel: React.FC<{
   const [reviewerNote, setReviewerNote] = useState(review.reviewerNote ?? '');
 
   const turnIndexById = useMemo(() => new Map(allTurns.map((t, i) => [t.turnId, i])), [allTurns]);
+  // §13/§4 — the summary's "findings by parameter" should reflect what
+  // reviewers actually flagged, not the invisible Tier-1 auto-clean
+  // findings merged in on every Good+Next/Flag save.
+  const exceptionFindings = useMemo(() => review.findings.filter((f) => isExceptionFinding(f.parameterCode, f.value)), [review.findings]);
   const byParameter = useMemo(() => {
     const map = new Map<QaParameterCode, number>();
-    for (const f of review.findings) map.set(f.parameterCode, (map.get(f.parameterCode) ?? 0) + 1);
+    for (const f of exceptionFindings) map.set(f.parameterCode, (map.get(f.parameterCode) ?? 0) + 1);
     return map;
-  }, [review.findings]);
+  }, [exceptionFindings]);
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
@@ -473,7 +606,7 @@ const QaSummaryPanel: React.FC<{
 
       <div className="border border-border rounded-md p-2">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Findings by parameter</p>
-        {review.findings.length === 0 ? (
+        {exceptionFindings.length === 0 ? (
           <p className="text-xs text-muted-foreground">No findings recorded.</p>
         ) : (
           <div className="space-y-1">
@@ -486,11 +619,11 @@ const QaSummaryPanel: React.FC<{
 
       <div className="border border-border rounded-md p-2">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Findings — jump to evidence</p>
-        {review.findings.length === 0 ? (
+        {exceptionFindings.length === 0 ? (
           <p className="text-xs text-muted-foreground">—</p>
         ) : (
           <div className="space-y-1 max-h-32 overflow-y-auto">
-            {review.findings.map((f) => (
+            {exceptionFindings.map((f) => (
               <button
                 key={f.id}
                 type="button"

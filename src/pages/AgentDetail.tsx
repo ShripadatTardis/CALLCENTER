@@ -66,11 +66,19 @@ const DataNotes: React.FC<{ notes: string[]; title?: string; ariaLabel?: string 
   </Popover>
 );
 
-/** A compact label/value pair for the Operational Performance grid — replaces one `flex justify-between` row per card, now in a responsive grid instead of three stacked full-width cards. */
+/**
+ * A compact label/value pair for the Operational Performance grid.
+ * Deliberately NOT `justify-between` across the full sub-column width —
+ * on a wide screen that stretched "Resolved" and "13" to opposite edges
+ * of a ~450px column, all empty space in between (user-reported, 2026-10-09).
+ * Label and value now sit close together; two of these render per row
+ * (see the `grid-cols-2` wrapper below), so the reclaimed width is used
+ * for a second metric instead of dead space.
+ */
 const MetricRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="flex items-baseline justify-between gap-2 border-b border-border/40 pb-0.5">
-    <span className="text-muted-foreground text-xs">{label}</span>
-    <span className="text-foreground text-sm tabular-nums">{value}</span>
+  <div className="flex items-baseline gap-2 border-b border-border/40 pb-0.5 min-w-0">
+    <span className="text-muted-foreground text-xs truncate" title={label}>{label}</span>
+    <span className="text-foreground text-sm tabular-nums ml-auto flex-shrink-0">{value}</span>
   </div>
 );
 
@@ -232,10 +240,18 @@ const AgentDetail: React.FC = () => {
 
   return (
     <Layout>
-      {/* App-wide viewport-framing correction (follow-up to Session 15) —
-          Pattern B: root is the single scroll region. */}
-      <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-2">
-        <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
+      {/* User-reported (2026-10-09): Pattern B (whole page scrolls) forced
+          a browser-level scroll just to reach Recent Interactions even
+          though every panel's content was individually reasonable. Switched
+          to Pattern A: the root is a fixed-height flex column — every
+          panel above Recent Interactions keeps its natural (now much
+          shorter, see the 2-col metric grids below) height, and Recent
+          Interactions alone is the flex-1 region that absorbs the
+          remaining space and scrolls internally if its own rows exceed it
+          (its own table wrapper is flex-1 min-h-0 overflow-auto, with
+          pagination pinned below the scroll region, not inside it). */}
+      <div className="bg-background h-full min-h-0 flex flex-col text-foreground p-4 gap-2">
+        <Button variant="ghost" size="sm" className="h-6 -ml-2 flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate(returnTo.path)}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
           Back to {returnTo.label}
         </Button>
@@ -246,7 +262,7 @@ const AgentDetail: React.FC = () => {
             above a separately-boxed metadata strip. Name/id share one
             line; direction/persona/language/category/counters sit below
             a thin divider within the same box. */}
-        <div className="rounded-md border border-border bg-card/40 px-3 py-2 space-y-1">
+        <div className="rounded-md border border-border bg-card/40 px-3 py-2 space-y-1 flex-shrink-0">
           <div className="flex items-center gap-2.5 flex-wrap">
             <Bot className="h-5 w-5 text-cyan-400 shrink-0" />
             <h1 className={typography.pageTitle}>{agent.displayName}</h1>
@@ -301,7 +317,7 @@ const AgentDetail: React.FC = () => {
         {/* B. Operational Performance — one compact grid instead of three
             large cards. Internal padding/gaps tightened (vertical-density
             refinement) without changing the approved typography scale. */}
-        <div className="rounded-md border border-border bg-card p-2 space-y-1">
+        <div className="rounded-md border border-border bg-card p-2 space-y-1 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className={typography.sectionTitle}>Operational Performance</div>
             <DataNotes notes={performanceNotes} />
@@ -313,23 +329,36 @@ const AgentDetail: React.FC = () => {
               tint — real grouping, not just a smaller label — matching the
               nested-tile recipe already used elsewhere on this page
               (bg-background/40, see the per-agent tiles pattern). */}
+          {/* User-reported (2026-10-09): rows stretched justify-between
+              across a full ~450px column left a wall of empty space
+              between label and value. Each subsection's metrics now sit
+              in a 2-column grid instead of one column, so the reclaimed
+              width holds a second metric per row instead of dead space —
+              this also roughly halves each subsection's height, which is
+              most of why the whole page previously needed a browser-level
+              scroll to reach Recent Interactions. A max-height + internal
+              scroll is kept as the explicit fallback for a future
+              subsection with enough rows to still overflow. */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5">
-            <div className="space-y-0.5 bg-background/40 rounded p-1.5">
+            <div className="bg-background/40 rounded p-1.5 max-h-40 overflow-y-auto">
               <div className={typography.subsectionTitle}>Business Outcomes</div>
-              <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
-              <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
-              <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
+                <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
+                <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
+                <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
+              </div>
             </div>
-            <div className="space-y-0.5 bg-background/40 rounded p-1.5">
+            <div className="bg-background/40 rounded p-1.5 max-h-40 overflow-y-auto">
               <div className={typography.subsectionTitle}>Conversational Quality</div>
-              <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
-              <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
-              <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
-              <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
+                <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
+                <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
+                <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
+                <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
+              </div>
             </div>
-            <div className="space-y-0.5 bg-background/40 rounded p-1.5">
+            <div className="bg-background/40 rounded p-1.5 max-h-40 overflow-y-auto">
               <div className={typography.subsectionTitle}>Technical Performance</div>
-              <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
               {/* Session 15.4 — real per-agent Voice turn latency, from
                   the Call Metrics API correlated against this agent's own
                   call population (useAgentDetail.ts) — previously had no
@@ -337,19 +366,22 @@ const AgentDetail: React.FC = () => {
                   and the prior "no per-row latency field" gap). Averages
                   exclude calls with no matching Call Metrics row or a
                   still-null value — never fabricated, never 0ms. */}
-              <MetricRow label="Avg turn latency (voice)" value={fmtMs(technicalPerformance.avgTurnMs)} />
-              <MetricRow label="Avg STT (voice)" value={fmtMs(technicalPerformance.avgSttMs)} />
-              <MetricRow label="Avg LLM first token (voice)" value={fmtMs(technicalPerformance.avgLlmTtftMs)} />
-              <MetricRow label="Avg LLM generation (voice)" value={fmtMs(technicalPerformance.avgLlmMs)} />
-              <MetricRow label="Avg TTS first byte (voice)" value={fmtMs(technicalPerformance.avgTtsTtfbMs)} />
-              <MetricRow label="Avg orchestrator (voice)" value={fmtMs(technicalPerformance.avgOrchestratorMs)} />
-              <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-0.5">
+                <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
+                <MetricRow label="Avg turn latency (voice)" value={fmtMs(technicalPerformance.avgTurnMs)} />
+                <MetricRow label="Avg STT (voice)" value={fmtMs(technicalPerformance.avgSttMs)} />
+                <MetricRow label="Avg LLM first token (voice)" value={fmtMs(technicalPerformance.avgLlmTtftMs)} />
+                <MetricRow label="Avg LLM generation (voice)" value={fmtMs(technicalPerformance.avgLlmMs)} />
+                <MetricRow label="Avg TTS first byte (voice)" value={fmtMs(technicalPerformance.avgTtsTtfbMs)} />
+                <MetricRow label="Avg orchestrator (voice)" value={fmtMs(technicalPerformance.avgOrchestratorMs)} />
+                <MetricRow label="Avg turn latency (chat)" value={chatMetrics.avgLatencyMs === null ? FALLBACK : `${Math.round(chatMetrics.avgLatencyMs)} ms`} />
+              </div>
             </div>
           </div>
         </div>
 
         {/* C. Agent Contract — collapsible, collapsed by default; same Session 13.3 content, just not dominating the page. */}
-        <Collapsible open={contractOpen} onOpenChange={setContractOpen}>
+        <Collapsible open={contractOpen} onOpenChange={setContractOpen} className="flex-shrink-0">
           <div className="rounded-md border border-border bg-card">
             <CollapsibleTrigger asChild>
               <button
@@ -450,8 +482,17 @@ const AgentDetail: React.FC = () => {
             pagination read as one section. Reordered ahead of Campaign Usage
             per the approved pilot spec — large-contract and small-contract
             agents retain the same section order either way. */}
-        <div className="rounded-md border border-border bg-card p-2 space-y-1">
-          <div className="flex items-center justify-between">
+        {/* User-reported (2026-10-09): this is now the one panel allowed
+            to grow — flex-1 absorbs whatever space the shorter panels
+            above leave, and its own table wrapper (not this whole card)
+            is the internal scroll region, so a large "Rows per page"
+            selection scrolls just the rows, never pushes the pagination
+            footer off-screen or the page itself. Column widths follow
+            the same narrow-fixed-column convention as Call Logs/Chat
+            Logs/Interaction Quality instead of stretching Channel/When
+            to fill the panel's full width. */}
+        <div className="rounded-md border border-border bg-card p-2 flex flex-col flex-1 min-h-[200px] gap-1">
+          <div className="flex items-center justify-between flex-shrink-0">
             <div className={typography.sectionTitle}>Recent Interactions</div>
             {allRecentInteractions.length > 0 && <DataNotes title="Interaction scope" ariaLabel="Interaction scope — what this list represents" notes={recentInteractionsNotes} />}
           </div>
@@ -459,23 +500,24 @@ const AgentDetail: React.FC = () => {
             <p className="text-sm text-muted-foreground">No recent interactions for this agent.</p>
           ) : (
             <>
-              <div className="rounded-md border border-border overflow-x-auto">
+              <div className="rounded-md border border-border flex-1 min-h-0 overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
-                      {['Channel', 'When', 'Outcome / Status', ''].map((h) => (
-                        <TableHead key={h} className="h-9 px-3 text-muted-foreground text-xs">{h}</TableHead>
-                      ))}
+                      <TableHead className="h-9 px-3 w-24 text-muted-foreground text-xs">Channel</TableHead>
+                      <TableHead className="h-9 px-3 w-32 text-muted-foreground text-xs">When</TableHead>
+                      <TableHead className="h-9 px-3 text-muted-foreground text-xs">Outcome / Status</TableHead>
+                      <TableHead className="h-9 px-3 w-20 text-muted-foreground text-xs text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {recentInteractions.map((row) =>
                       row.kind === 'call' ? (
                         <TableRow key={`call-${row.call.interactionId}`} className="border-border/60 hover:bg-card">
-                          <TableCell className="py-1.5 px-3"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Voice</Badge></TableCell>
-                          <TableCell className="py-1.5 px-3 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
+                          <TableCell className="py-1.5 px-3 w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Voice</Badge></TableCell>
+                          <TableCell className="py-1.5 px-3 w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
                           <TableCell className="py-1.5 px-3 text-foreground text-xs">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
-                          <TableCell className="py-1.5 px-3 text-right">
+                          <TableCell className="py-1.5 px-3 w-20 text-right">
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedInteraction(row.call)}>
                               View
                             </Button>
@@ -483,10 +525,10 @@ const AgentDetail: React.FC = () => {
                         </TableRow>
                       ) : (
                         <TableRow key={`chat-${row.chat.sessionId}`} className="border-border/60 hover:bg-card">
-                          <TableCell className="py-1.5 px-3"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Chat</Badge></TableCell>
-                          <TableCell className="py-1.5 px-3 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
+                          <TableCell className="py-1.5 px-3 w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Chat</Badge></TableCell>
+                          <TableCell className="py-1.5 px-3 w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
                           <TableCell className="py-1.5 px-3 text-foreground text-xs">{formatStatusLabel(row.chat.status)}</TableCell>
-                          <TableCell className="py-1.5 px-3 text-right">
+                          <TableCell className="py-1.5 px-3 w-20 text-right">
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
                               View
                             </Button>
@@ -498,12 +540,14 @@ const AgentDetail: React.FC = () => {
                 </Table>
               </div>
 
-              {/* Pagination footer — kept outside the table body (no nested
-                  scroll region; §16 explicitly prefers pagination over a
-                  second internal scrollbar). Always shown once there is at
-                  least one row, so the page-size selector stays reachable
-                  even on a single page. */}
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              {/* Pagination footer — kept outside the table's own scroll
+                  region (flex-shrink-0 here, the table wrapper above is
+                  the only scrollable area) so it always stays visible,
+                  never scrolled out of view by a long rows-per-page
+                  selection. Always shown once there is at least one row,
+                  so the page-size selector stays reachable even on a
+                  single page. */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground flex-shrink-0">
                 <span role="status" aria-live="polite">
                   Showing {interactionsStart + 1}–{Math.min(interactionsStart + interactionsPageSize, allRecentInteractions.length)} of {allRecentInteractions.length} · Page {interactionsCurrentPage} of {interactionsTotalPages}
                 </span>
@@ -559,7 +603,7 @@ const AgentDetail: React.FC = () => {
 
         {/* E. Campaign Usage — unchanged data/semantics (Session 11.5A "latest attempt wins" policy), compact. Follows Recent Interactions per the approved pilot ordering. */}
         {agent.direction === 'outbound' && agentCampaigns.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-1 flex-shrink-0">
             <div className={`${typography.sectionTitle} px-1`} title="Reflects each target's current effective result (latest reconciled attempt) — see Session 11.5A">
               Campaign Usage
             </div>

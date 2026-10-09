@@ -421,58 +421,74 @@ const CreateCampaign: React.FC = () => {
             )}
 
             {step === 2 && (
-              <div className="space-y-3 text-[13px] max-w-lg">
-                <p className="text-muted-foreground text-[12px]">
+              <div className="space-y-4 max-w-2xl">
+                <p className={typography.bodySecondary}>
                   Immutable snapshot of the selected Call Agent's contract, captured now so a later change to the
                   agent's live roster entry never silently rewrites what this campaign was configured against.
                 </p>
                 {agentContract ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-foreground">{agentContract.agentName}</span>
+                      <span className={typography.cardTitle}>{agentContract.agentName}</span>
                       <Badge variant="outline" className="text-[11px] border-border text-foreground">
                         {agentContract.contractCompleteness === 'complete' ? 'Complete contract' : 'Partial contract (legacy)'}
                       </Badge>
                     </div>
                     <div className="text-muted-foreground font-mono text-[11px]">{agentContract.agentId}</div>
                     {agentContract.contractCompleteness === 'partial' ? (
-                      <p className="text-[12px] text-muted-foreground border-t border-border pt-2">
+                      <p className={`${typography.bodySecondary} border-t border-border pt-3`}>
                         Expected inputs and outcomes are not currently exposed by Call Centre for this agent. This
                         campaign uses the existing Trigger Call contract.
                       </p>
                     ) : (
-                      <div className="space-y-2 border-t border-border pt-2">
+                      <div className="space-y-4 border-t border-border pt-3">
                         <div>
-                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                            Expected inputs ({agentContract.expectedInputFields.length})
+                          <p className={`${typography.sectionTitle} mb-2`}>
+                            Expected input fields ({agentContract.expectedInputFields.length})
                           </p>
                           {agentContract.expectedInputFields.length === 0 ? (
                             <p className={typography.bodySecondary}>None — this agent takes no campaign-driven inputs.</p>
                           ) : (
-                            <ul className="text-[12px] space-y-0.5">
+                            <div className="rounded-md border border-border divide-y divide-border overflow-hidden">
                               {agentContract.expectedInputFields.map((f) => (
-                                <li key={f.fieldCode} className="flex items-center gap-1.5">
-                                  <span className="text-foreground">{f.displayName}</span>
-                                  <span className="text-muted-foreground font-mono text-[10px]">{f.fieldCode}</span>
-                                  {f.required && (
-                                    <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400">
-                                      required
-                                    </Badge>
-                                  )}
-                                  {f.dataType && <span className="text-muted-foreground text-[10px]">({f.dataType}{f.format ? `, ${f.format}` : ''})</span>}
-                                </li>
+                                <div key={f.fieldCode} className="flex items-center justify-between gap-3 px-3 py-2 bg-card/50">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`${typography.body} truncate`}>{f.displayName}</span>
+                                    {f.required && (
+                                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 flex-shrink-0 border-amber-700 text-amber-700 dark:border-amber-400 dark:text-amber-400">
+                                        required
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <span className="text-muted-foreground font-mono text-[11px]">{f.fieldCode}</span>
+                                    {f.dataType && (
+                                      <span className={`${typography.metadata} whitespace-nowrap`}>
+                                        {f.dataType}{f.format ? `, ${f.format}` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               ))}
-                            </ul>
+                            </div>
                           )}
                         </div>
                         {agentContract.expectedOutcomes.length > 0 && (
                           <div>
-                            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                            <p className={`${typography.sectionTitle} mb-2`}>
                               Advertised outcomes ({agentContract.expectedOutcomes.length})
                             </p>
-                            <p className={typography.bodySecondary}>
-                              {agentContract.expectedOutcomes.map((o) => o.displayName).join(', ')}
+                            <p className={`${typography.bodySecondary} mb-2`}>
+                              The outcome labels this agent's contract declares it may report back — used to validate
+                              the Outcome Policy mapping in a later step.
                             </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {agentContract.expectedOutcomes.map((o) => (
+                                <Badge key={o.outcomeCode} variant="outline" className="text-[11px] font-normal border-border text-foreground">
+                                  {o.displayName}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -571,7 +587,7 @@ const CreateCampaign: React.FC = () => {
                               <span className="font-medium text-foreground">{field.displayName}</span>
                               <span className="text-muted-foreground font-mono text-[10px]">{field.fieldCode}</span>
                               {field.required ? (
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400">
+                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:border-amber-400 dark:text-amber-400">
                                   required
                                 </Badge>
                               ) : (

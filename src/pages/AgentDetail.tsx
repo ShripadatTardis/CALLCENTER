@@ -372,7 +372,7 @@ const AgentDetail: React.FC = () => {
               <DataNotes notes={performanceNotes} />
             </div>
             <CollapsibleContent className="p-2 pt-1">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-1 gap-1.5">
                 <CollapsibleSubsection title="Business Outcomes">
                   <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
                   <MetricRow label="Escalated" value={callMetrics.escalatedCount} />

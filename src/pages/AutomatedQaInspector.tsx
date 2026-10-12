@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2 } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
 import { computeAutomatedQaRatios } from '@/lib/automatedQaRatios';
@@ -50,13 +50,6 @@ function formatTimeOnly(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
-
-const MetaField: React.FC<{ label: string; value: React.ReactNode; title?: string; className?: string }> = ({ label, value, title, className = '' }) => (
-  <div className={`min-w-0 ${className}`}>
-    <div className="text-[11px] leading-tight text-muted-foreground">{label}</div>
-    <div className="text-xs font-medium leading-tight truncate" title={title}>{value}</div>
-  </div>
-);
 
 const AutomatedQaInspector: React.FC = () => {
   const { evaluationId } = useParams<{ evaluationId: string }>();
@@ -129,43 +122,44 @@ const AutomatedQaInspector: React.FC = () => {
   return (
     <Layout>
       <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
-        {/* Page header */}
-        <div className="space-y-0.5">
+        {/* Session 16.3.4 — merged header + metadata into one compact
+            horizontal bar (was: back link row + title/badge row +
+            description paragraph + a separate metadata card, ~140px
+            total). Interaction id is dropped from permanent horizontal
+            space entirely — it's on the bar's own `title` tooltip and
+            still shown in full in Technical Details. */}
+        <div
+          className="rounded-md border border-border bg-card px-3 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1"
+          title={`Interaction ${evaluation.interactionId}`}
+        >
           <button
             type="button"
             onClick={() => navigate('/qa-review')}
-            className="inline-flex items-center gap-1 min-h-6 -ml-0.5 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+            className="inline-flex items-center justify-center h-6 w-6 -ml-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 flex-shrink-0"
+            aria-label="Back to Interaction Quality"
           >
-            <ArrowLeft className="h-3 w-3" /> Back to Interaction Quality
+            <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[18px] font-semibold leading-tight">Automated QA Inspector</h1>
-            <Badge variant="outline" className={AUTOMATED_QA_STATUS_BADGE[evaluation.status] ?? ''}>{evaluation.status}</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground leading-snug">
-            Independent LLM evaluation — a separate measurement source from Human QA. Read-only.
-          </p>
-        </div>
-
-        {/* Metadata strip — full width */}
-        <div className="rounded-md border border-border bg-card px-3 py-2 flex flex-wrap items-start gap-x-4 gap-y-2">
-          <MetaField label="Interaction" value={`${evaluation.interactionId.slice(0, 8)}…`} title={evaluation.interactionId} className="w-28" />
-          <MetaField label="Channel" value={<span className="capitalize">{evaluation.channel}</span>} className="w-16" />
-          <MetaField label="Agent" value={evaluation.agentId} title={evaluation.agentId} className="w-36" />
-          <MetaField
-            label="Coverage"
-            value={
-              <span className="inline-flex items-center gap-1">
-                {evaluation.evaluatedTurnIds.length}/{coverageDenominator} turns
-                {evaluation.evaluationCompleteness === 'PARTIAL' && (
-                  <Badge variant="outline" className="h-[18px] px-1 text-[10px] border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400">PARTIAL</Badge>
-                )}
-              </span>
-            }
-            className="w-28"
-          />
-          <MetaField label="Model" value={evaluation.modelId ?? '—'} title={evaluation.modelId ?? undefined} className="w-32" />
-          <MetaField label="Evaluated" value={evaluation.completedAt ? formatTimestamp(evaluation.completedAt) : '—'} className="w-28" />
+          <h1 className="text-[16px] font-semibold leading-tight whitespace-nowrap">Automated QA Inspector</h1>
+          <Badge variant="outline" className={`h-5 flex items-center gap-1 ${AUTOMATED_QA_STATUS_BADGE[evaluation.status] ?? ''}`}>
+            {evaluation.status === 'completed' && <CheckCircle2 className="h-3 w-3" aria-hidden="true" />}
+            {evaluation.status}
+          </Badge>
+          <span className="text-border">|</span>
+          <span className="text-[11px] capitalize">{evaluation.channel}</span>
+          <span className="text-border">|</span>
+          <span className="text-[11px] truncate max-w-[160px]" title={evaluation.agentId}>{evaluation.agentId}</span>
+          <span className="text-border">|</span>
+          <span className="text-[11px] whitespace-nowrap inline-flex items-center gap-1">
+            {evaluation.evaluatedTurnIds.length}/{coverageDenominator} turns
+            {evaluation.evaluationCompleteness === 'PARTIAL' && (
+              <Badge variant="outline" className="h-[16px] px-1 text-[9px] border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400">PARTIAL</Badge>
+            )}
+          </span>
+          <span className="text-border">|</span>
+          <span className="text-[11px] truncate max-w-[140px]" title={evaluation.modelId ?? undefined}>{evaluation.modelId ?? '—'}</span>
+          <span className="text-border">|</span>
+          <span className="text-[11px] whitespace-nowrap">{evaluation.completedAt ? formatTimestamp(evaluation.completedAt) : '—'}</span>
         </div>
 
         {evaluation.status === 'failed' && (
@@ -181,30 +175,38 @@ const AutomatedQaInspector: React.FC = () => {
             {evaluation.status !== 'failed' && (
               <div>
                 <h2 className="text-[14px] font-semibold mb-1.5">Quality Measurements</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {/* Session 16.3.4 — ~50% smaller cards (row1: first 5
+                    parameters, row2: remaining 4, per the session brief's
+                    explicit ordering), direction (higher/lower-is-better)
+                    moved from permanent text onto the card's own title
+                    tooltip to save width. */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-1.5">
                   {QA_PARAMETER_CODES.map((code) => {
                     const def = QA_PARAMETERS[code];
                     const r = ratios[code];
                     const unassessable = evaluation.unassessableParameters.find((u) => u.parameterCode === code);
-                    const directionLabel = def.directionality === 'higher_better' ? '↑ Better' : '↓ Better';
+                    const directionLabel = def.directionality === 'higher_better' ? 'Higher is better' : 'Lower is better';
                     return (
-                      <div key={code} className="rounded-md border border-border bg-card px-2.5 py-2 min-h-[66px] flex flex-col justify-center">
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="text-[12px] font-semibold truncate" title={def.displayName}>{def.displayName}</div>
+                      <div
+                        key={code}
+                        className="rounded-md border border-border bg-card px-1.5 py-1 min-h-[38px] flex flex-col justify-center"
+                        title={directionLabel}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="text-[10px] font-semibold leading-[1.15] line-clamp-2" title={def.displayName}>{def.displayName}</div>
                           {r.denominator === 0 && unassessable && (
-                            <Info className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+                            <Info className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
                           )}
                         </div>
                         {r.denominator === 0 ? (
-                          <div className="flex items-baseline justify-between gap-1" title={unassessable?.reason}>
-                            <span className="text-[18px] font-semibold leading-tight text-muted-foreground">—</span>
-                            <span className="text-[11px] text-muted-foreground truncate">No eligible population</span>
+                          <div className="flex items-baseline gap-1" title={unassessable?.reason}>
+                            <span className="text-[14px] font-semibold leading-tight text-muted-foreground">—</span>
+                            <span className="text-[10px] text-muted-foreground truncate">No eligible population</span>
                           </div>
                         ) : (
-                          <div className="flex items-baseline justify-between gap-1">
-                            <span className="text-[18px] font-semibold leading-tight">{formatFractionAsPercent(r.rate ?? undefined)}</span>
-                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{r.numerator}/{r.denominator} eligible</span>
-                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{directionLabel}</span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-[14px] font-semibold leading-tight">{formatFractionAsPercent(r.rate ?? undefined)}</span>
+                            <span className="text-[10px] text-muted-foreground truncate">{r.numerator}/{r.denominator} eligible</span>
                           </div>
                         )}
                       </div>

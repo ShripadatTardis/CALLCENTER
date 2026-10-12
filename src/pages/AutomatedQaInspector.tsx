@@ -261,7 +261,7 @@ const AutomatedQaInspector: React.FC = () => {
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-1.5 rounded-md border border-border bg-card/40 p-2.5 grid grid-cols-2 md:grid-cols-3 gap-2 text-[11px]">
-            <div><span className="text-muted-foreground">Request id(s): </span>{evaluation.requestIds.join(', ') || '—'}</div>
+            <div><span className="text-muted-foreground">Request id(s): </span>{Array.isArray(evaluation.requestIds) ? (evaluation.requestIds.join(', ') || '—') : '—'}</div>
             <div><span className="text-muted-foreground">Model id: </span>{evaluation.modelId ?? '—'}</div>
             <div><span className="text-muted-foreground">Prompt version: </span>{evaluation.promptVersion}</div>
             <div><span className="text-muted-foreground">Contract version: </span>{evaluation.contractVersion}</div>

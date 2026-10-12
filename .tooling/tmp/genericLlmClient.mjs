@@ -89,6 +89,21 @@ async function callGenericLlm(req) {
       errorMessage: `Non-JSON response body (HTTP ${res.status})`
     };
   }
+  const raw = parsed;
+  if (!res.ok && (!raw || typeof raw.error_code !== "string")) {
+    const detail = raw && typeof raw.detail === "string" ? raw.detail : text.slice(0, 200);
+    return {
+      success: false,
+      requestId: req.requestId,
+      output: null,
+      modelId: req.modelId ?? "",
+      finishReason: "error",
+      latencyMs: null,
+      usage: { promptTokens: null, completionTokens: null },
+      errorCode: "http_error",
+      errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ""}`
+    };
+  }
   return toCamelResponse(parsed);
 }
 export {

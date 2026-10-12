@@ -1060,7 +1060,7 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await supabase.rpc('call_center_automated_qa_fail', {
-      p_evaluation_id: created.id, p_error_code: 'internal_error', p_error_message: message, p_request_ids: '[]', p_now: new Date().toISOString(),
+      p_evaluation_id: created.id, p_error_code: 'internal_error', p_error_message: message, p_request_ids: [], p_now: new Date().toISOString(),
     });
     await recordAuditEvent({
       actorType: 'user', actorUserId: user.id, action: 'automated_qa.failed',
@@ -1075,7 +1075,7 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
   if (result.status === 'failed') {
     const { data, error } = await supabase.rpc('call_center_automated_qa_fail', {
       p_evaluation_id: created.id, p_error_code: result.errorCode, p_error_message: result.errorMessage,
-      p_request_ids: JSON.stringify(result.requestIds), p_now: finishedAt,
+      p_request_ids: result.requestIds, p_now: finishedAt,
     });
     if (error) { res.status(500).json({ detail: error.message }); return; }
     await recordAuditEvent({
@@ -1091,7 +1091,7 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
     p_evaluation_id: created.id,
     p_status: result.status,
     p_model_id: result.modelId,
-    p_request_ids: JSON.stringify(result.requestIds),
+    p_request_ids: result.requestIds,
     p_evaluated_turn_ids: result.evaluatedTurnIds,
     p_uncovered_turn_ids: result.uncoveredTurnIds,
     p_unassessable_parameters: result.unassessableParameters.map((u) => ({ parameter_code: u.parameterCode, reason: u.reason })),

@@ -116,5 +116,21 @@ export async function callGenericLlm(req: LlmJsonSchemaRequest): Promise<LlmResp
     };
   }
 
+  // Defensive: a response that doesn't carry the documented contract's
+  // own error_code field (e.g. a platform-level 404/502 from something
+  // other than the LLM endpoint itself — a reverse proxy, a route that
+  // isn't actually deployed yet) must still surface a diagnosable error
+  // rather than silently producing a FAILED evaluation with no error
+  // code/message at all.
+  const raw = parsed as Record<string, unknown> | null;
+  if (!res.ok && (!raw || typeof raw.error_code !== 'string')) {
+    const detail = raw && typeof raw.detail === 'string' ? raw.detail : text.slice(0, 200);
+    return {
+      success: false, requestId: req.requestId, output: null, modelId: req.modelId ?? '',
+      finishReason: 'error', latencyMs: null, usage: { promptTokens: null, completionTokens: null },
+      errorCode: 'http_error', errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ''}`,
+    };
+  }
+
   return toCamelResponse(parsed);
 }

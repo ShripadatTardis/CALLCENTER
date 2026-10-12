@@ -104,6 +104,11 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
       if (res.usage.completionTokens) completionTokens += res.usage.completionTokens;
       if (res.modelId) modelId = res.modelId;
 
+      // TEMP diagnostic (2026-10-12) — tracking a live output_truncated
+      // failure that a direct reproduction of the same transcript could
+      // not reproduce. Remove once root-caused.
+      console.log('[automatedQaEvaluator] window', window.index, 'attempt', attempt, 'maxOutputTokens', windowMaxOutputTokens, 'success', res.success, 'errorCode', res.errorCode, 'completionTokens', res.usage.completionTokens, 'finishReason', res.finishReason, 'turnCount', window.turns.length, 'userPromptLen', userPrompt.length);
+
       if (res.success && res.output && typeof res.output === 'object') {
         const out = res.output as { observations?: unknown; unassessable_parameters?: unknown };
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);

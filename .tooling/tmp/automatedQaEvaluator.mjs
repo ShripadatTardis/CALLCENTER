@@ -488,6 +488,7 @@ async function evaluateInteraction(turns) {
       if (res.usage.promptTokens) promptTokens += res.usage.promptTokens;
       if (res.usage.completionTokens) completionTokens += res.usage.completionTokens;
       if (res.modelId) modelId = res.modelId;
+      console.log("[automatedQaEvaluator] window", window.index, "attempt", attempt, "maxOutputTokens", windowMaxOutputTokens, "success", res.success, "errorCode", res.errorCode, "completionTokens", res.usage.completionTokens, "finishReason", res.finishReason, "turnCount", window.turns.length, "userPromptLen", userPrompt.length);
       if (res.success && res.output && typeof res.output === "object") {
         const out = res.output;
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);

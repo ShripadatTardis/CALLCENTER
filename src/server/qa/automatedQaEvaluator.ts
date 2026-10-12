@@ -86,9 +86,25 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
   let lastErrorMessage: string | null = null;
 
   for (const window of windows) {
-    const windowTurnIds = new Set(window.turns.map((t) => t.turnId));
+    // Alias real turn ids (e.g. "8d4ea4f4-...:2026-10-12T10:46:11.317212
+    // +00:00:customer", ~80 chars) to short "T1"/"T2"/... labels for the
+    // LLM. Real turn ids are reused verbatim from Human QA's own
+    // identity scheme (brief §11 — never a second id scheme) and must
+    // stay that way for persistence/cross-referencing, but a small model
+    // asked to echo an 80-char id back once per observation (primary_turn_id
+    // AND evidence_turn_ids) reliably runs the completion far past any
+    // reasonable output budget — found via live verification 2026-10-12
+    // (a real 8-turn/9-parameter evaluation hit output_truncated even at
+    // a 6144-token cap, and context_length_exceeded beyond that, while an
+    // aliased reproduction of the identical conversation completed
+    // cleanly in ~625 tokens). Aliasing only affects what the model
+    // reads/writes; every observation is mapped back to its real turn id
+    // before validation accepts it.
+    const aliasToReal = new Map(window.turns.map((t, i) => [`T${i + 1}`, t.turnId]));
+    const aliasedTurns = window.turns.map((t, i) => ({ ...t, turnId: `T${i + 1}` }));
+    const windowTurnIds = new Set(aliasToReal.keys());
     const requestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
-    const userPrompt = buildUserPrompt(window.turns, window.index, windows.length);
+    const userPrompt = buildUserPrompt(aliasedTurns, window.index, windows.length);
 
     let attempt = 0;
     let succeeded = false;
@@ -104,15 +120,14 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
       if (res.usage.completionTokens) completionTokens += res.usage.completionTokens;
       if (res.modelId) modelId = res.modelId;
 
-      // TEMP diagnostic (2026-10-12) — tracking a live output_truncated
-      // failure that a direct reproduction of the same transcript could
-      // not reproduce. Remove once root-caused.
-      console.log('[automatedQaEvaluator] window', window.index, 'attempt', attempt, 'maxOutputTokens', windowMaxOutputTokens, 'success', res.success, 'errorCode', res.errorCode, 'completionTokens', res.usage.completionTokens, 'finishReason', res.finishReason, 'turnCount', window.turns.length, 'userPromptLen', userPrompt.length);
-
       if (res.success && res.output && typeof res.output === 'object') {
         const out = res.output as { observations?: unknown; unassessable_parameters?: unknown };
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);
-        observations.push(...validation.accepted);
+        observations.push(...validation.accepted.map((o) => ({
+          ...o,
+          primaryTurnId: aliasToReal.get(o.primaryTurnId) ?? o.primaryTurnId,
+          evidenceTurnIds: o.evidenceTurnIds.map((id) => aliasToReal.get(id) ?? id),
+        })));
         unassessable.push(...validateUnassessableParameters(out.unassessable_parameters));
         evaluatedTurnIds.push(...window.turns.map((t) => t.turnId));
         succeeded = true;

@@ -468,9 +468,11 @@ async function evaluateInteraction(turns) {
   let lastErrorCode = null;
   let lastErrorMessage = null;
   for (const window of windows) {
-    const windowTurnIds = new Set(window.turns.map((t) => t.turnId));
+    const aliasToReal = new Map(window.turns.map((t, i) => [`T${i + 1}`, t.turnId]));
+    const aliasedTurns = window.turns.map((t, i) => ({ ...t, turnId: `T${i + 1}` }));
+    const windowTurnIds = new Set(aliasToReal.keys());
     const requestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
-    const userPrompt = buildUserPrompt(window.turns, window.index, windows.length);
+    const userPrompt = buildUserPrompt(aliasedTurns, window.index, windows.length);
     let attempt = 0;
     let succeeded = false;
     let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
@@ -488,11 +490,14 @@ async function evaluateInteraction(turns) {
       if (res.usage.promptTokens) promptTokens += res.usage.promptTokens;
       if (res.usage.completionTokens) completionTokens += res.usage.completionTokens;
       if (res.modelId) modelId = res.modelId;
-      console.log("[automatedQaEvaluator] window", window.index, "attempt", attempt, "maxOutputTokens", windowMaxOutputTokens, "success", res.success, "errorCode", res.errorCode, "completionTokens", res.usage.completionTokens, "finishReason", res.finishReason, "turnCount", window.turns.length, "userPromptLen", userPrompt.length);
       if (res.success && res.output && typeof res.output === "object") {
         const out = res.output;
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);
-        observations.push(...validation.accepted);
+        observations.push(...validation.accepted.map((o) => ({
+          ...o,
+          primaryTurnId: aliasToReal.get(o.primaryTurnId) ?? o.primaryTurnId,
+          evidenceTurnIds: o.evidenceTurnIds.map((id) => aliasToReal.get(id) ?? id)
+        })));
         unassessable.push(...validateUnassessableParameters(out.unassessable_parameters));
         evaluatedTurnIds.push(...window.turns.map((t) => t.turnId));
         succeeded = true;

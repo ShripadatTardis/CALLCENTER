@@ -58,21 +58,35 @@ async function withStubbedFetch(impl, run) {
 
 async function test() {
   // 1. Short conversation -> single window, clean + exception observations both persisted.
+  // The LLM sees/returns the SHORT alias ("T2"), never the real long turn
+  // id — regression test for the 2026-10-12 live failure where a 7B model
+  // asked to echo a verbose "interactionId:timestamp:speaker" id back per
+  // observation reliably ran past any reasonable output budget. The real
+  // id must still be what's persisted (de-aliased before storage).
   {
-    const turns = [turn('t1', 'customer', 'Is a passport enough for ID?'), turn('t2', 'agent', 'Yes, a passport works.')];
+    const turns = [
+      turn('8d4ea4f4-2433-4475-b1f4-00646cb62c60:2026-10-12T10:46:11.317212+00:00:customer', 'customer', 'Is a passport enough for ID?'),
+      turn('8d4ea4f4-2433-4475-b1f4-00646cb62c60:2026-10-12T10:46:11.317212+00:00:ai', 'agent', 'Yes, a passport works.'),
+    ];
+    let capturedUserPrompt = null;
     const result = await withStubbedFetch(
-      () => llmSuccess({
-        requestId: 'r1',
-        observations: [
-          { parameter_code: 'task_progression_rate', primary_turn_id: 't2', value: 'PASS' },
-          { parameter_code: 'context_continuity_rate', primary_turn_id: 't2', value: 'FAIL', reason_code: 'PREVIOUS_INFORMATION_IGNORED' },
-        ],
-      }),
+      (_n, _url, opts) => {
+        capturedUserPrompt = JSON.parse(opts.body).user_prompt;
+        return llmSuccess({
+          requestId: 'r1',
+          observations: [
+            { parameter_code: 'task_progression_rate', primary_turn_id: 'T2', value: 'PASS' },
+            { parameter_code: 'context_continuity_rate', primary_turn_id: 'T2', value: 'FAIL', reason_code: 'PREVIOUS_INFORMATION_IGNORED' },
+          ],
+        });
+      },
       () => evaluateInteraction(turns),
     );
     assert('short conversation -> exactly 1 window', result.windowCount, 1);
     assert('short conversation -> status completed', result.status, 'completed');
     assert('both a clean and an exception observation are persisted (not exceptions-only)', result.observations.length, 2);
+    assertTrue('the real (long) turn id is what gets persisted, not the alias', result.observations.every((o) => o.primaryTurnId === turns[1].turnId));
+    assertTrue('the prompt shown to the LLM uses the short alias, never the real long turn id', capturedUserPrompt.includes('[T2]') && !capturedUserPrompt.includes(turns[1].turnId));
     assert('evaluationCompleteness is COMPLETE when every window succeeds', result.evaluationCompleteness, 'COMPLETE');
     assertTrue('modelId captured from the response', result.modelId === 'Qwen/Qwen2.5-7B-Instruct-AWQ');
     assert('token usage summed from the response', result.tokenUsage, { promptTokens: 100, completionTokens: 20 });
@@ -83,7 +97,7 @@ async function test() {
     const longText = 'x'.repeat(2000);
     const turns = Array.from({ length: 20 }, (_, i) => turn(`t${i}`, i % 2 === 0 ? 'customer' : 'agent', longText));
     const result = await withStubbedFetch(
-      (n) => llmSuccess({ requestId: `r${n}`, observations: [{ parameter_code: 'task_progression_rate', primary_turn_id: turns[1].turnId, value: 'PASS' }] }),
+      (n) => llmSuccess({ requestId: `r${n}`, observations: [{ parameter_code: 'task_progression_rate', primary_turn_id: 'T1', value: 'PASS' }] }),
       () => evaluateInteraction(turns),
     );
     assertTrue('long conversation splits into multiple windows', result.windowCount > 1);

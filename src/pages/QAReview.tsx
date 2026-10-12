@@ -25,8 +25,8 @@ import { FilterPopover } from '@/components/common/FilterPopover';
 import { typography } from '@/lib/typography';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { QaReviewDialog } from '@/components/qa/QaReviewDialog';
-import { ClipboardCheck, ClipboardList, Bot } from 'lucide-react';
-import { useStartAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
+import { ClipboardCheck, ClipboardList, Bot, CheckCircle2 } from 'lucide-react';
+import { useStartAutomatedQaEvaluation, useAutomatedQaEvaluations } from '@/hooks/qa/useAutomatedQa';
 import { useQaReviewStatuses } from '@/hooks/qa/useQa';
 import type { QaReviewStatus } from '@/services/qa/qaService';
 
@@ -128,6 +128,29 @@ const QAReview: React.FC = () => {
   const [qaReviewTarget, setQaReviewTarget] = useState<{ channel: 'voice' | 'chat'; interactionId: string; agentId: string; viewReviewId?: string } | null>(null);
   const startAutomatedQa = useStartAutomatedQaEvaluation();
   const [runningAutomatedFor, setRunningAutomatedFor] = useState<string | null>(null);
+
+  // Bulk automated-evaluation lookup, same reasoning as the Human QA
+  // status map above: once an interaction has an automated evaluation,
+  // there's no need to run it again by default — the "Run Auto" button
+  // becomes "Auto Run Completed" and opens the existing result instead
+  // (the Interaction Detail dialog's own AutomatedQaPanel still offers
+  // an explicit "Run Again" for anyone who genuinely wants a fresh run).
+  const { data: automatedEvaluations } = useAutomatedQaEvaluations();
+  const automatedStatusByKey = useMemo(() => {
+    const map = new Map<string, { id: string; status: string }>();
+    for (const e of automatedEvaluations ?? []) {
+      const key = `${e.channel}:${e.interactionId}`;
+      const existing = map.get(key);
+      const rank = (s: string) => (s === 'completed' ? 3 : s === 'partial' ? 2 : s === 'running' || s === 'queued' ? 1 : 0);
+      // The list is already newest-first (call_center_automated_qa_list
+      // orders by created_at desc), so only overwrite on a STRICTLY
+      // better status — ties keep the first (newest) one seen.
+      if (!existing || rank(e.status) > rank(existing.status)) {
+        map.set(key, { id: e.id, status: e.status });
+      }
+    }
+    return map;
+  }, [automatedEvaluations]);
 
   const [channelFilter, setChannelFilter] = useState(ALL);
   const [agentFilter, setAgentFilter] = useState(ALL);
@@ -441,7 +464,7 @@ const QAReview: React.FC = () => {
                     { label: 'Dur/Lat', className: 'w-16' },
                     { label: 'Campaign', className: 'w-24' },
                     ...(canReview ? [{ label: 'Human QA', className: 'w-28' }] : []),
-                    ...(canRunAutomated ? [{ label: 'Automated QA', className: 'w-24' }] : []),
+                    ...(canRunAutomated ? [{ label: 'Automated QA', className: 'w-36' }] : []),
                   ].map((h) => (
                     <TableHead key={h.label} className={`${typography.tableHeader} ${h.className} px-2`}>{h.label}</TableHead>
                   ))}
@@ -536,44 +559,63 @@ const QAReview: React.FC = () => {
                         </TableCell>
                       );
                     })()}
-                    {canRunAutomated && (
-                      <TableCell className="w-24 px-2">
-                        {row.agentId ? (
-                          <Button
-                            variant="outline"
-                            size="xs"
-                            disabled={runningAutomatedFor !== null}
-                            title={
-                              runningAutomatedFor !== null && runningAutomatedFor !== (row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId)
-                                ? 'Another evaluation is starting — please wait'
-                                : 'Run Automated QA evaluation'
-                            }
-                            className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
-                              if (!interactionId || !row.agentId) return;
-                              setRunningAutomatedFor(interactionId);
-                              try {
-                                const evaluation = await startAutomatedQa.mutateAsync({ interactionId, channel: row.channel, agentId: row.agentId });
-                                navigate(`/qa-review/automated/${evaluation.id}`);
-                              } finally {
-                                setRunningAutomatedFor(null);
+                    {canRunAutomated && (() => {
+                      const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
+                      const existingAutomated = interactionId ? automatedStatusByKey.get(`${row.channel}:${interactionId}`) : undefined;
+                      const isDone = existingAutomated?.status === 'completed' || existingAutomated?.status === 'partial';
+                      const isRunning = runningAutomatedFor === interactionId;
+                      return (
+                        <TableCell className="w-36 px-2">
+                          {row.agentId && interactionId ? (
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              disabled={runningAutomatedFor !== null && !isRunning}
+                              title={
+                                isDone
+                                  ? 'View the existing Automated QA result'
+                                  : runningAutomatedFor !== null && !isRunning
+                                    ? 'Another evaluation is starting — please wait'
+                                    : 'Run Automated QA evaluation'
                               }
-                            }}
-                          >
-                            {runningAutomatedFor === (row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId) ? (
-                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                            ) : (
-                              <Bot className="h-3.5 w-3.5 mr-1.5" />
-                            )}
-                            Run Auto
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    )}
+                              className={
+                                isDone
+                                  ? 'border-emerald-600 bg-transparent text-emerald-700 hover:bg-emerald-500/10 dark:border-emerald-400 dark:text-emerald-400'
+                                  : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'
+                              }
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                // Already run once — no need to run again by
+                                // default; open the existing result instead.
+                                if (isDone && existingAutomated) {
+                                  navigate(`/qa-review/automated/${existingAutomated.id}`);
+                                  return;
+                                }
+                                if (!row.agentId) return;
+                                setRunningAutomatedFor(interactionId);
+                                try {
+                                  const evaluation = await startAutomatedQa.mutateAsync({ interactionId, channel: row.channel, agentId: row.agentId });
+                                  navigate(`/qa-review/automated/${evaluation.id}`);
+                                } finally {
+                                  setRunningAutomatedFor(null);
+                                }
+                              }}
+                            >
+                              {isRunning ? (
+                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              ) : isDone ? (
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                              ) : (
+                                <Bot className="h-3.5 w-3.5 mr-1.5" />
+                              )}
+                              {isDone ? 'Auto Run Completed' : 'Run Auto'}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      );
+                    })()}
                   </TableRow>
                 ))}
               </TableBody>

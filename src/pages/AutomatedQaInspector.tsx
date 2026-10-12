@@ -127,9 +127,14 @@ const AutomatedQaInspector: React.FC = () => {
             description paragraph + a separate metadata card, ~140px
             total). Interaction id is dropped from permanent horizontal
             space entirely — it's on the bar's own `title` tooltip and
-            still shown in full in Technical Details. */}
+            still shown in full in Technical Details.
+            Session 16.3.5 — `inline-flex` instead of a full-width `flex`:
+            the bar's content doesn't come close to filling 1536px, and a
+            full-width border box around mostly-empty space read as
+            wasted room. Hugs its own content width now; wraps normally
+            on narrow viewports since flex-wrap is preserved. */}
         <div
-          className="rounded-md border border-border bg-card px-3 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1"
+          className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border bg-card px-3 py-1.5 max-w-full"
           title={`Interaction ${evaluation.interactionId}`}
         >
           <button

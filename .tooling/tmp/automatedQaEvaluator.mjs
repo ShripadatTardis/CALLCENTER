@@ -423,7 +423,8 @@ function validateUnassessableParameters(raw) {
 
 // src/server/qa/automatedQaEvaluator.ts
 var CONTEXT_WINDOW_TOKENS = 8192;
-var MAX_OUTPUT_TOKENS = 1536;
+var MAX_OUTPUT_TOKENS = 3072;
+var MAX_OUTPUT_TOKENS_CAP = 6144;
 var SAFETY_MARGIN_TOKENS = 200;
 var MAX_RETRIES_PER_WINDOW = 2;
 var RETRY_BACKOFF_MS = [500, 1500];
@@ -472,6 +473,7 @@ async function evaluateInteraction(turns) {
     const userPrompt = buildUserPrompt(window.turns, window.index, windows.length);
     let attempt = 0;
     let succeeded = false;
+    let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
     while (attempt <= MAX_RETRIES_PER_WINDOW) {
       const res = await callGenericLlm({
         requestId,
@@ -479,7 +481,7 @@ async function evaluateInteraction(turns) {
         userPrompt,
         jsonSchema: schema,
         temperature: 0,
-        maxOutputTokens: MAX_OUTPUT_TOKENS
+        maxOutputTokens: windowMaxOutputTokens
       });
       requestIds.push(requestId);
       if (res.latencyMs) latencyMs += res.latencyMs;
@@ -497,9 +499,13 @@ async function evaluateInteraction(turns) {
       }
       lastErrorCode = res.errorCode;
       lastErrorMessage = res.errorMessage;
-      if (!isRetryableLlmError(res.errorCode) || attempt === MAX_RETRIES_PER_WINDOW) {
-        break;
+      if (attempt === MAX_RETRIES_PER_WINDOW) break;
+      if (res.errorCode === "output_truncated" && windowMaxOutputTokens < MAX_OUTPUT_TOKENS_CAP) {
+        windowMaxOutputTokens = Math.min(windowMaxOutputTokens * 2, MAX_OUTPUT_TOKENS_CAP);
+        attempt += 1;
+        continue;
       }
+      if (!isRetryableLlmError(res.errorCode)) break;
       await sleep(RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)]);
       attempt += 1;
     }

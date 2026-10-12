@@ -102,6 +102,36 @@ async function test() {
     assert('a rate_limited error is retried and the window still succeeds', result.status, 'completed');
   }
 
+  // 3b. output_truncated is deterministic, not transient — the orchestrator
+  // retries with an escalated max_output_tokens (not a generic backoff
+  // retry) rather than giving up immediately, per the API's own error
+  // message ("Increase max_output_tokens"). Regression test for the real
+  // live-verification failure on 2026-10-12.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const sentMaxOutputTokens = [];
+    const result = await withStubbedFetch(
+      (n, _url, opts) => {
+        sentMaxOutputTokens.push(JSON.parse(opts.body).max_output_tokens);
+        return n === 1 ? llmError('output_truncated') : llmSuccess({ requestId: 'r2', observations: [] });
+      },
+      () => evaluateInteraction(turns),
+    );
+    assert('an output_truncated error is retried (not treated as permanent) and the window still succeeds', result.status, 'completed');
+    assertTrue('the retry escalates max_output_tokens above the first attempt', sentMaxOutputTokens[1] > sentMaxOutputTokens[0]);
+  }
+
+  // 3c. output_truncated retried every attempt still fails closed — never silently "completed" with no observations.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const result = await withStubbedFetch(
+      () => llmError('output_truncated'),
+      (getCallCount) => evaluateInteraction(turns).then((r) => ({ r, calls: getCallCount() })),
+    );
+    assert('output_truncated exhausting all retries still reports failed', result.r.status, 'failed');
+    assertTrue('output_truncated retries are bounded, not infinite', result.calls <= 3);
+  }
+
   // 4. Permanent validation error (invalid_request) is never retried — fails immediately.
   {
     const turns = [turn('t1', 'agent', 'hi')];

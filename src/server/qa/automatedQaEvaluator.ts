@@ -22,7 +22,15 @@ import type { QaTurn } from '../../lib/qaConversation.js';
  */
 
 const CONTEXT_WINDOW_TOKENS = 8192;
-const MAX_OUTPUT_TOKENS = 1536;
+// Live verification (2026-10-12) hit `output_truncated` on a real evaluation
+// with 1536 — nine parameters' worth of observations (each with a reason
+// code, evidence turn ids, and up to a 300-char explanation) plus
+// unassessable_parameters can legitimately exceed that. Raised to a safer
+// default; MAX_OUTPUT_TOKENS_CAP is the ceiling the adaptive retry below
+// escalates toward on an actual output_truncated response, per the API's
+// own error message ("Increase max_output_tokens").
+const MAX_OUTPUT_TOKENS = 3072;
+const MAX_OUTPUT_TOKENS_CAP = 6144;
 const SAFETY_MARGIN_TOKENS = 200;
 const MAX_RETRIES_PER_WINDOW = 2;
 const RETRY_BACKOFF_MS = [500, 1500];
@@ -84,10 +92,11 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
 
     let attempt = 0;
     let succeeded = false;
+    let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
     while (attempt <= MAX_RETRIES_PER_WINDOW) {
       const res = await callGenericLlm({
         requestId, systemPrompt, userPrompt, jsonSchema: schema,
-        temperature: 0, maxOutputTokens: MAX_OUTPUT_TOKENS,
+        temperature: 0, maxOutputTokens: windowMaxOutputTokens,
       });
       requestIds.push(requestId);
       if (res.latencyMs) latencyMs += res.latencyMs;
@@ -107,9 +116,19 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
 
       lastErrorCode = res.errorCode;
       lastErrorMessage = res.errorMessage;
-      if (!isRetryableLlmError(res.errorCode) || attempt === MAX_RETRIES_PER_WINDOW) {
-        break;
+      if (attempt === MAX_RETRIES_PER_WINDOW) break;
+
+      // output_truncated is deterministic, not transient — the API's own
+      // error message says exactly what to do ("Increase max_output_tokens").
+      // Escalate the budget and retry immediately (no backoff needed, this
+      // isn't rate limiting), capped at MAX_OUTPUT_TOKENS_CAP.
+      if (res.errorCode === 'output_truncated' && windowMaxOutputTokens < MAX_OUTPUT_TOKENS_CAP) {
+        windowMaxOutputTokens = Math.min(windowMaxOutputTokens * 2, MAX_OUTPUT_TOKENS_CAP);
+        attempt += 1;
+        continue;
       }
+
+      if (!isRetryableLlmError(res.errorCode)) break;
       await sleep(RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)]);
       attempt += 1;
     }

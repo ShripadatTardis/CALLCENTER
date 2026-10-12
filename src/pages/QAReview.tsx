@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ListChecks, Phone, MessageCircle, LayoutList, Network, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
+import { Loader2, ListChecks, Phone, MessageCircle, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useCallData } from '@/hooks/calls/useCallData';
@@ -20,9 +20,6 @@ import {
   formatPercent,
   formatStatusLabel,
 } from '@/lib/format';
-import { useClassification } from '@/hooks/classification/useClassification';
-import { groupInteractions } from '@/lib/interactionGrouping';
-import { GroupedInteractionTree, type SelectedGroup } from '@/components/classification/GroupedInteractionTree';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
 import { typography } from '@/lib/typography';
@@ -141,10 +138,6 @@ const QAReview: React.FC = () => {
   const [intentSearch, setIntentSearch] = useState('');
   const [campaignOnly, setCampaignOnly] = useState(false);
 
-  const [view, setView] = useState<'grouped' | 'table'>('grouped');
-  const [selectedGroup, setSelectedGroup] = useState<SelectedGroup | null>(null);
-  const classification = useClassification();
-
   const [page, setPage] = useState(1);
 
   const isLoading = callsLoading || chatLoading;
@@ -189,14 +182,6 @@ const QAReview: React.FC = () => {
     );
   }, [callData, chatData]);
 
-  // Session 6.2 — the always-visible cross-channel Domain -> Category ->
-  // Agent -> Channel tree (plan §9: Interaction Quality is the natural
-  // combined-channel classified view since it already merges Voice+Chat).
-  const grouped = useMemo(
-    () => groupInteractions(rows.map((r) => ({ agentId: r.agentId, channel: r.channel })), classification.data, classification.agentsById),
-    [rows, classification.data, classification.agentsById],
-  );
-
   // Filter option sets are derived only from real values already present
   // in the fetched data — never a fabricated fixed enum.
   const agentOptions = useMemo(
@@ -213,7 +198,6 @@ const QAReview: React.FC = () => {
   );
 
   const filteredRows = rows.filter((r) => {
-    if (view === 'grouped' && selectedGroup && (r.agentId !== selectedGroup.agentId || r.channel !== selectedGroup.channel)) return false;
     if (channelFilter !== ALL && r.channel !== channelFilter) return false;
     if (agentFilter !== ALL && r.agentName !== agentFilter) return false;
     if (outcomeFilter !== ALL && r.outcome !== outcomeFilter) return false;
@@ -237,7 +221,7 @@ const QAReview: React.FC = () => {
   // past the new end).
   useEffect(() => {
     setPage(1);
-  }, [channelFilter, agentFilter, outcomeFilter, escalationFilter, fcrFilter, sentimentFilter, intentSearch, campaignOnly, selectedGroup, view]);
+  }, [channelFilter, agentFilter, outcomeFilter, escalationFilter, fcrFilter, sentimentFilter, intentSearch, campaignOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -280,8 +264,7 @@ const QAReview: React.FC = () => {
             Review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
             Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
             (duration, latency where available). No composite quality score — see AI Agents for the agent-level
-            breakdown. In Table view, use Human QA → Review to start or resume a manual quality review of an
-            interaction.
+            breakdown. Use Human QA → Review to start or resume a manual quality review of an interaction.
           </p>
           {hasPermission(user, 'qa.analytics.view') && (
             <Button
@@ -399,32 +382,7 @@ const QAReview: React.FC = () => {
               </label>
             </div>
           </FilterPopover>
-          <div className="flex-1" />
-          <Button
-            variant={view === 'grouped' ? 'default' : 'outline'}
-            size="xs"
-            className={view === 'grouped' ? '' : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
-            onClick={() => setView('grouped')}
-          >
-            <Network className="h-3.5 w-3.5 mr-1.5" />
-            Grouped
-          </Button>
-          <Button
-            variant={view === 'table' ? 'default' : 'outline'}
-            size="xs"
-            className={view === 'table' ? '' : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'}
-            onClick={() => { setView('table'); setSelectedGroup(null); }}
-          >
-            <LayoutList className="h-3.5 w-3.5 mr-1.5" />
-            Table
-          </Button>
         </div>
-
-        {view === 'grouped' && !isLoading && rows.length > 0 && (
-          <div className="flex-shrink-0 max-h-[30vh] overflow-y-auto">
-            <GroupedInteractionTree group={grouped} selected={selectedGroup} onSelect={setSelectedGroup} countsAreExhaustive={false} />
-          </div>
-        )}
 
         <div className="flex-shrink-0">
           <ActiveFilterChips
@@ -437,7 +395,6 @@ const QAReview: React.FC = () => {
               ...(sentimentFilter !== ALL ? [{ key: 'sentiment', label: `Sentiment: ${sentimentFilter}`, onRemove: () => setSentimentFilter(ALL) }] : []),
               ...(intentSearch ? [{ key: 'intent', label: `Intent: ${intentSearch}`, onRemove: () => setIntentSearch('') }] : []),
               ...(campaignOnly ? [{ key: 'campaign', label: 'Campaign interactions only', onRemove: () => setCampaignOnly(false) }] : []),
-              ...(selectedGroup ? [{ key: 'group', label: 'Category/Agent group', onRemove: () => setSelectedGroup(null) }] : []),
             ]}
             onClearAll={() => {
               setChannelFilter(ALL);
@@ -448,7 +405,6 @@ const QAReview: React.FC = () => {
               setSentimentFilter(ALL);
               setIntentSearch('');
               setCampaignOnly(false);
-              setSelectedGroup(null);
             }}
           />
         </div>
@@ -487,7 +443,7 @@ const QAReview: React.FC = () => {
                     ...(canReview ? [{ label: 'Human QA', className: 'w-28' }] : []),
                     ...(canRunAutomated ? [{ label: 'Automated QA', className: 'w-24' }] : []),
                   ].map((h) => (
-                    <TableHead key={h.label} className={`${typography.tableHeader} ${h.className}`}>{h.label}</TableHead>
+                    <TableHead key={h.label} className={`${typography.tableHeader} ${h.className} px-2`}>{h.label}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -506,8 +462,8 @@ const QAReview: React.FC = () => {
                       }
                     }}
                   >
-                    <TableCell className={`w-20 whitespace-nowrap ${typography.metadata}`}>{formatCompactTime(row.startTime)}</TableCell>
-                    <TableCell className="w-8" title={row.channel === 'voice' ? 'Voice' : 'Chat'}>
+                    <TableCell className={`w-20 whitespace-nowrap px-2 ${typography.metadata}`}>{formatCompactTime(row.startTime)}</TableCell>
+                    <TableCell className="w-8 px-1" title={row.channel === 'voice' ? 'Voice' : 'Chat'}>
                       {row.channel === 'voice' ? (
                         <Phone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                       ) : (
@@ -515,41 +471,41 @@ const QAReview: React.FC = () => {
                       )}
                       <span className="sr-only">{row.channel === 'voice' ? 'Voice' : 'Chat'}</span>
                     </TableCell>
-                    <TableCell className={`w-24 truncate ${typography.tableBody}`} title={row.agentName}>{row.agentName}</TableCell>
-                    <TableCell className={`w-20 truncate ${typography.tableBody}`}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
-                    <TableCell className={`w-10 ${typography.tableBody}`}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
-                    <TableCell className="w-20">
+                    <TableCell className={`w-24 truncate px-2 ${typography.tableBody}`} title={row.agentName}>{row.agentName}</TableCell>
+                    <TableCell className={`w-20 truncate px-2 ${typography.tableBody}`}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                    <TableCell className={`w-10 px-2 ${typography.tableBody}`}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                    <TableCell className="w-20 px-2">
                       {row.escalationTrigger ? (
                         <Badge variant="destructive" className="text-xs truncate max-w-full" title={row.escalationTrigger}>{row.escalationTrigger}</Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">{row.channel === 'voice' ? 'No' : '—'}</span>
                       )}
                     </TableCell>
-                    <TableCell className={`w-24 truncate ${typography.tableBody}`} title={row.intent ?? undefined}>{row.intent ?? '—'}</TableCell>
-                    <TableCell className={`w-14 ${typography.tableBody}`}>
+                    <TableCell className={`w-24 truncate px-2 ${typography.tableBody}`} title={row.intent ?? undefined}>{row.intent ?? '—'}</TableCell>
+                    <TableCell className={`w-14 px-2 ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatPercent(row.intentAccuracyPct, 0)
                         : row.chatConfidenceFraction != null
                           ? formatFractionAsPercent(row.chatConfidenceFraction)
                           : '—'}
                     </TableCell>
-                    <TableCell className={`w-16 truncate ${typography.tableBody}`}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
-                    <TableCell className={`w-10 ${typography.tableBody}`}>
+                    <TableCell className={`w-16 truncate px-2 ${typography.tableBody}`}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                    <TableCell className={`w-10 px-2 ${typography.tableBody}`}>
                       {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
                     </TableCell>
-                    <TableCell className={`w-16 whitespace-nowrap ${typography.tableBody}`}>
+                    <TableCell className={`w-16 whitespace-nowrap px-2 ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatDurationLong(row.durationSeconds)
                         : row.latencyMs != null
                           ? `${row.latencyMs}ms`
                           : '—'}
                     </TableCell>
-                    <TableCell className={`w-24 truncate ${typography.metadata}`} title={row.campaignName}>{row.campaignName ?? '—'}</TableCell>
+                    <TableCell className={`w-24 truncate px-2 ${typography.metadata}`} title={row.campaignName}>{row.campaignName ?? '—'}</TableCell>
                     {canReview && (() => {
                       const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
                       const existingReview = interactionId ? reviewStatusByKey.get(`${row.channel}:${interactionId}`) : undefined;
                       return (
-                        <TableCell className="w-28">
+                        <TableCell className="w-28 px-2">
                           {row.agentId && interactionId ? (
                             <Button
                               variant="outline"
@@ -581,7 +537,7 @@ const QAReview: React.FC = () => {
                       );
                     })()}
                     {canRunAutomated && (
-                      <TableCell className="w-24">
+                      <TableCell className="w-24 px-2">
                         {row.agentId ? (
                           <Button
                             variant="outline"

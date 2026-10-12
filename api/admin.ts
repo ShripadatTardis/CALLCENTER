@@ -684,22 +684,78 @@ async function loadOwnedReviewOrRespond(
   return review;
 }
 
+/**
+ * Session 16.2 — the read-only counterpart of loadOwnedReviewOrRespond,
+ * used ONLY by the GET 'review' action (never by any mutation). A
+ * submitted review is the shared, immutable reference record this whole
+ * framework is built around (docs/MANUAL_QA_QUALITY_FRAMEWORK.md §4) —
+ * an analyst with qa.analytics.view who is NOT the original reviewer
+ * must still be able to open it for evidence drill-down (brief §16), or
+ * the Explorer's "ratio → failures → interaction → evidence" chain
+ * breaks for every review except the viewer's own. An IN-PROGRESS
+ * review stays strictly owner-only even for an analyst — it is a
+ * private, possibly-incomplete draft, not yet the reference assessment.
+ */
+/**
+ * Pure decision logic, extracted so it's directly unit-testable without
+ * a live Supabase call (same convention as mapActionItemError/
+ * actionItemBootstrapWindow above — bundled via esbuild into
+ * .tooling/tmp/adminRoute.mjs for qa-analysis-authorization-verify.mjs).
+ * An owner can always view their own review, any status. A non-owner
+ * can view it ONLY once it's submitted (the shared, immutable reference
+ * record) AND they hold qa.analytics.view — an in-progress review stays
+ * strictly private to its author even from an analyst.
+ */
+export function qaReviewViewAuthorized(params: { ownerUserId: string; callerUserId: string; status: 'in_progress' | 'submitted'; callerHasAnalyticsPermission: boolean }): boolean {
+  if (params.ownerUserId === params.callerUserId) return true;
+  return params.status === 'submitted' && params.callerHasAnalyticsPermission;
+}
+
+async function loadReviewForViewing(
+  res: VercelResponse,
+  supabase: ReturnType<typeof getServiceRoleClient>,
+  user: AuthenticatedCallCenterUser,
+  reviewId: string,
+): Promise<QaReviewRow | null> {
+  const { data, error } = await supabase.rpc('call_center_qa_review_get', { p_review_id: reviewId });
+  if (error) { res.status(500).json({ detail: error.message }); return null; }
+  const review = data ? (toCamelCaseDeep(data) as QaReviewRow) : null;
+  if (!review) { res.status(404).json({ detail: 'QA review not found' }); return null; }
+  const authorized = qaReviewViewAuthorized({
+    ownerUserId: review.reviewerUserId, callerUserId: user.id, status: review.status,
+    callerHasAnalyticsPermission: user.permissions.includes('qa.analytics.view'),
+  });
+  if (!authorized) { res.status(404).json({ detail: 'QA review not found' }); return null; }
+  if (!isAgentIdInScope(toAgentAccess(user), review.agentId)) { res.status(404).json({ detail: 'QA review not found' }); return null; }
+  return review;
+}
+
 async function handleQaGet(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const user = await requirePermission(req, res, 'qa.review');
-  if (!user) return;
   const action = queryStr(req, 'action');
   const supabase = getServiceRoleClient();
 
   if (action === 'review') {
+    // Either permission can reach this action — ownership/submitted-
+    // status is enforced inside loadReviewForViewing, not here.
+    const user = await getAuthenticatedUser(req);
+    if (!user || (!user.permissions.includes('qa.review') && !user.permissions.includes('qa.analytics.view'))) {
+      res.status(user ? 403 : 401).json({ detail: user ? 'Missing required permission: qa.review or qa.analytics.view' : 'Authentication required' });
+      return;
+    }
     const reviewId = queryStr(req, 'reviewId');
     if (!reviewId) { res.status(422).json({ detail: 'reviewId is required' }); return; }
-    const review = await loadOwnedReviewOrRespond(res, supabase, user, reviewId);
+    const review = await loadReviewForViewing(res, supabase, user, reviewId);
     if (!review) return;
     res.status(200).json({ data: review });
     return;
   }
 
   if (action === 'listForInteraction') {
+    const user = await getAuthenticatedUser(req);
+    if (!user || (!user.permissions.includes('qa.review') && !user.permissions.includes('qa.analytics.view'))) {
+      res.status(user ? 403 : 401).json({ detail: user ? 'Missing required permission: qa.review or qa.analytics.view' : 'Authentication required' });
+      return;
+    }
     const interactionId = queryStr(req, 'interactionId');
     const channel = queryStr(req, 'channel');
     if (!interactionId || (channel !== 'voice' && channel !== 'chat')) {
@@ -716,12 +772,36 @@ async function handleQaGet(req: VercelRequest, res: VercelResponse): Promise<voi
     return;
   }
 
-  if (action === 'findings') {
+  // §21 — aggregate/trend/reason-distribution data is gated on
+  // qa.analytics.view, a materially broader capability than conducting
+  // one review (qa.review), per the brief's explicit instruction not to
+  // grant broad analytical access merely because a user can submit a
+  // review.
+  if (action === 'findings' || action === 'population') {
+    const user = await requirePermission(req, res, 'qa.analytics.view');
+    if (!user) return;
     const access = toAgentAccess(user);
     const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
-    const { data, error } = await supabase.rpc('call_center_qa_findings_list', {
-      p_authorized_agent_ids: allAgents ? [] : access.authorizedAgentIds,
-      p_all_agents: allAgents,
+    const authorizedAgentIds = allAgents ? [] : access.authorizedAgentIds;
+    const channel = queryStr(req, 'channel');
+    const dateFrom = queryStr(req, 'dateFrom');
+    const dateTo = queryStr(req, 'dateTo');
+    const reviewerUserId = queryStr(req, 'reviewerUserId');
+    if (channel && channel !== 'voice' && channel !== 'chat') { res.status(422).json({ detail: 'channel must be "voice" or "chat"' }); return; }
+
+    if (action === 'findings') {
+      const { data, error } = await supabase.rpc('call_center_qa_findings_list', {
+        p_authorized_agent_ids: authorizedAgentIds, p_all_agents: allAgents,
+        p_channel: channel ?? null, p_date_from: dateFrom ?? null, p_date_to: dateTo ?? null, p_reviewer_user_id: reviewerUserId ?? null,
+      });
+      if (error) { res.status(500).json({ detail: error.message }); return; }
+      res.status(200).json({ data: toCamelCaseDeep(data) });
+      return;
+    }
+
+    const { data, error } = await supabase.rpc('call_center_qa_reviews_population', {
+      p_authorized_agent_ids: authorizedAgentIds, p_all_agents: allAgents,
+      p_channel: channel ?? null, p_date_from: dateFrom ?? null, p_date_to: dateTo ?? null, p_reviewer_user_id: reviewerUserId ?? null,
     });
     if (error) { res.status(500).json({ detail: error.message }); return; }
     res.status(200).json({ data: toCamelCaseDeep(data) });

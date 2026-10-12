@@ -28,6 +28,18 @@ interface QaReviewDialogProps {
   channel: QaChannel;
   interactionId: string | null;
   agentId: string | null;
+  /**
+   * Session 16.2 — Quality Explorer evidence drill-down. When set,
+   * opens that EXACT review by id (any authorized analyst's submitted
+   * review, not just the viewer's own — see api/admin.ts's
+   * loadReviewForViewing) instead of start-or-resuming "my" review of
+   * this interaction. The dialog's existing isReadOnly logic already
+   * renders correctly once loaded, since a drill-down target is always
+   * status==='submitted' (enforced server-side).
+   */
+  viewReviewId?: string;
+  /** Session 16.2 — jump straight to this turn once the review loads, so clicking a specific failed observation lands the reviewer on it rather than turn 1. */
+  initialTurnId?: string;
 }
 
 type DraftRow = { value: QaResultValue | null; reasonCode: string | null; evidenceTurnIds: string[]; note: string };
@@ -61,7 +73,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
  * as Good+Next already does — the UX hides the complexity, the
  * persisted measurement data does not get thinner.
  */
-export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose, channel, interactionId, agentId }) => {
+export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose, channel, interactionId, agentId, viewReviewId, initialTurnId }) => {
   const voiceQuery = useInteractionTranscript(channel === 'voice' ? interactionId ?? undefined : undefined, { enabled: isOpen && channel === 'voice' });
   const chatQuery = useChatSessionDetail(channel === 'chat' ? interactionId ?? undefined : undefined);
 
@@ -86,8 +98,11 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
 
   const { data: review } = useQaReview(reviewId);
 
-  // Start-or-resume once per (interaction, channel) while the dialog is open.
+  // Start-or-resume once per (interaction, channel) while the dialog is
+  // open — skipped entirely in drill-down mode, which opens an exact,
+  // already-known reviewId (possibly not "my" review) instead.
   useEffect(() => {
+    if (viewReviewId) { setReviewId(viewReviewId); return; }
     if (!isOpen || !interactionId || !agentId) return;
     const key = `${channel}:${interactionId}`;
     if (startedKeyRef.current === key) return;
@@ -95,7 +110,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
     setReviewId(null);
     startMutation.mutate({ interactionId, channel, agentId }, { onSuccess: (r) => setReviewId(r.id) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, interactionId, channel, agentId]);
+  }, [isOpen, interactionId, channel, agentId, viewReviewId]);
 
   useEffect(() => {
     if (!isOpen) startedKeyRef.current = null;
@@ -119,6 +134,14 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
   const [draftError, setDraftError] = useState<string | null>(null);
 
   useEffect(() => { if (isOpen) { setPhase('review'); setCurrentIndex(0); setExceptionOpen(false); } }, [isOpen, reviewId]);
+
+  // Drill-down: once the target turn exists in the loaded reviewable
+  // list, jump straight to it instead of leaving the reviewer on turn 1.
+  useEffect(() => {
+    if (!isOpen || !initialTurnId || reviewableTurns.length === 0) return;
+    const idx = reviewableTurns.findIndex((t) => t.turnId === initialTurnId);
+    if (idx >= 0) setCurrentIndex(idx);
+  }, [isOpen, initialTurnId, reviewableTurns]);
 
   const currentTurn = reviewableTurns[currentIndex] ?? null;
   const turnReviewByTurnId = useMemo(() => {

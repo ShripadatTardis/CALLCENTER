@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ListChecks, Phone, MessageCircle, LayoutList, Network, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ListChecks, Phone, MessageCircle, LayoutList, Network, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { useChatLogs } from '@/hooks/chat/useChatLogs';
@@ -80,6 +81,7 @@ const PAGE_SIZE = 8;
  * src/components/qa/QaReviewDialog.tsx.
  */
 const QAReview: React.FC = () => {
+  const navigate = useNavigate();
   const { data: callData, isLoading: callsLoading, isError: callsError, error: callsErr, refetch: refetchCalls, isFetching: callsFetching } =
     useCallData({ status: 'inactive', page_size: 50 });
   const { data: chatData, isLoading: chatLoading, isError: chatIsError, error: chatErr, refetch: refetchChat, isFetching: chatFetching } =
@@ -235,13 +237,26 @@ const QAReview: React.FC = () => {
           height and is a flex column; everything above the table is
           flex-shrink-0; the table alone is flex-1 min-h-0 overflow-auto. */}
       <div className="bg-background h-full min-h-0 text-foreground p-4 flex flex-col gap-3">
-        <p className={`${typography.pageDescription} max-w-3xl flex-shrink-0`}>
-          Review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
-          Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
-          (duration, latency where available). No composite quality score — see AI Agents for the agent-level
-          breakdown. In Table view, use Human QA → Review to start or resume a manual quality review of an
-          interaction.
-        </p>
+        <div className="flex items-start justify-between gap-3 flex-shrink-0">
+          <p className={`${typography.pageDescription} max-w-3xl`}>
+            Review of real Voice and Chat interactions — Operational Signals (outcome, FCR, escalation),
+            Conversation Signals (intent, confidence/accuracy, sentiment, authentication), Technical Signals
+            (duration, latency where available). No composite quality score — see AI Agents for the agent-level
+            breakdown. In Table view, use Human QA → Review to start or resume a manual quality review of an
+            interaction.
+          </p>
+          {hasPermission(user, 'qa.analytics.view') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => navigate('/qa-review/explorer')}
+            >
+              <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+              Human QA Quality Explorer
+            </Button>
+          )}
+        </div>
 
         {isError && (
           <QueryErrorBanner

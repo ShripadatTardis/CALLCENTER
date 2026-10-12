@@ -68,6 +68,10 @@ function toAgentAccess(user) {
     authorizedAgentIds: user.dataScope.allAgents ? "all" : user.dataScope.agentIds
   };
 }
+function isAgentIdInScope(access, agentId) {
+  if (access.allCategories || access.authorizedAgentIds === "all") return true;
+  return !!agentId && access.authorizedAgentIds.includes(agentId);
+}
 function evaluatePermission(user, permissionKey) {
   if (!user || user.status !== "active") return { outcome: "unauthenticated" };
   if (!user.permissions.includes(permissionKey)) return { outcome: "forbidden" };
@@ -679,6 +683,293 @@ async function handleActionsPost(req, res) {
   }
   res.status(400).json({ detail: `Unknown action: ${action}` });
 }
+function toCamelCaseDeep(value) {
+  if (Array.isArray(value)) return value.map((v) => toCamelCaseDeep(v));
+  if (value !== null && typeof value === "object") {
+    const out = {};
+    for (const [key, v] of Object.entries(value)) {
+      const camelKey = key.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+      out[camelKey] = toCamelCaseDeep(v);
+    }
+    return out;
+  }
+  return value;
+}
+function mapQaError(message) {
+  if (/qa_review_not_found/.test(message)) return 404;
+  if (/qa_review_already_submitted/.test(message)) return 409;
+  if (/qa_review_incomplete/.test(message)) return 422;
+  return 500;
+}
+async function loadOwnedReviewOrRespond(res, supabase, user, reviewId) {
+  const { data, error } = await supabase.rpc("call_center_qa_review_get", { p_review_id: reviewId });
+  if (error) {
+    res.status(500).json({ detail: error.message });
+    return null;
+  }
+  const review = data ? toCamelCaseDeep(data) : null;
+  if (!review) {
+    res.status(404).json({ detail: "QA review not found" });
+    return null;
+  }
+  if (review.reviewerUserId !== user.id) {
+    res.status(404).json({ detail: "QA review not found" });
+    return null;
+  }
+  if (!isAgentIdInScope(toAgentAccess(user), review.agentId)) {
+    res.status(404).json({ detail: "QA review not found" });
+    return null;
+  }
+  return review;
+}
+function qaReviewViewAuthorized(params) {
+  if (params.ownerUserId === params.callerUserId) return true;
+  return params.status === "submitted" && params.callerHasAnalyticsPermission;
+}
+async function loadReviewForViewing(res, supabase, user, reviewId) {
+  const { data, error } = await supabase.rpc("call_center_qa_review_get", { p_review_id: reviewId });
+  if (error) {
+    res.status(500).json({ detail: error.message });
+    return null;
+  }
+  const review = data ? toCamelCaseDeep(data) : null;
+  if (!review) {
+    res.status(404).json({ detail: "QA review not found" });
+    return null;
+  }
+  const authorized = qaReviewViewAuthorized({
+    ownerUserId: review.reviewerUserId,
+    callerUserId: user.id,
+    status: review.status,
+    callerHasAnalyticsPermission: user.permissions.includes("qa.analytics.view")
+  });
+  if (!authorized) {
+    res.status(404).json({ detail: "QA review not found" });
+    return null;
+  }
+  if (!isAgentIdInScope(toAgentAccess(user), review.agentId)) {
+    res.status(404).json({ detail: "QA review not found" });
+    return null;
+  }
+  return review;
+}
+async function handleQaGet(req, res) {
+  const action = queryStr(req, "action");
+  const supabase = getServiceRoleClient();
+  if (action === "review") {
+    const user = await getAuthenticatedUser(req);
+    if (!user || !user.permissions.includes("qa.review") && !user.permissions.includes("qa.analytics.view")) {
+      res.status(user ? 403 : 401).json({ detail: user ? "Missing required permission: qa.review or qa.analytics.view" : "Authentication required" });
+      return;
+    }
+    const reviewId = queryStr(req, "reviewId");
+    if (!reviewId) {
+      res.status(422).json({ detail: "reviewId is required" });
+      return;
+    }
+    const review = await loadReviewForViewing(res, supabase, user, reviewId);
+    if (!review) return;
+    res.status(200).json({ data: review });
+    return;
+  }
+  if (action === "listForInteraction") {
+    const user = await getAuthenticatedUser(req);
+    if (!user || !user.permissions.includes("qa.review") && !user.permissions.includes("qa.analytics.view")) {
+      res.status(user ? 403 : 401).json({ detail: user ? "Missing required permission: qa.review or qa.analytics.view" : "Authentication required" });
+      return;
+    }
+    const interactionId = queryStr(req, "interactionId");
+    const channel = queryStr(req, "channel");
+    if (!interactionId || channel !== "voice" && channel !== "chat") {
+      res.status(422).json({ detail: 'interactionId and channel ("voice"|"chat") are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_qa_review_list_for_interaction", {
+      p_interaction_id: interactionId,
+      p_channel: channel
+    });
+    if (error) {
+      res.status(500).json({ detail: error.message });
+      return;
+    }
+    const access = toAgentAccess(user);
+    const rows = toCamelCaseDeep(data ?? []).filter((r) => isAgentIdInScope(access, r.agentId));
+    res.status(200).json({ data: rows });
+    return;
+  }
+  if (action === "findings" || action === "population") {
+    const user = await requirePermission(req, res, "qa.analytics.view");
+    if (!user) return;
+    const access = toAgentAccess(user);
+    const allAgents = access.allCategories || access.authorizedAgentIds === "all";
+    const authorizedAgentIds = allAgents ? [] : access.authorizedAgentIds;
+    const channel = queryStr(req, "channel");
+    const dateFrom = queryStr(req, "dateFrom");
+    const dateTo = queryStr(req, "dateTo");
+    const reviewerUserId = queryStr(req, "reviewerUserId");
+    if (channel && channel !== "voice" && channel !== "chat") {
+      res.status(422).json({ detail: 'channel must be "voice" or "chat"' });
+      return;
+    }
+    if (action === "findings") {
+      const { data: data2, error: error2 } = await supabase.rpc("call_center_qa_findings_list", {
+        p_authorized_agent_ids: authorizedAgentIds,
+        p_all_agents: allAgents,
+        p_channel: channel ?? null,
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
+        p_reviewer_user_id: reviewerUserId ?? null
+      });
+      if (error2) {
+        res.status(500).json({ detail: error2.message });
+        return;
+      }
+      res.status(200).json({ data: toCamelCaseDeep(data2) });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_qa_reviews_population", {
+      p_authorized_agent_ids: authorizedAgentIds,
+      p_all_agents: allAgents,
+      p_channel: channel ?? null,
+      p_date_from: dateFrom ?? null,
+      p_date_to: dateTo ?? null,
+      p_reviewer_user_id: reviewerUserId ?? null
+    });
+    if (error) {
+      res.status(500).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+async function handleQaPost(req, res) {
+  const user = await requirePermission(req, res, "qa.review");
+  if (!user) return;
+  const action = queryStr(req, "action");
+  const supabase = getServiceRoleClient();
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  if (action === "start") {
+    const { interactionId, channel, agentId } = req.body ?? {};
+    if (typeof interactionId !== "string" || channel !== "voice" && channel !== "chat" || typeof agentId !== "string") {
+      res.status(422).json({ detail: 'interactionId, channel ("voice"|"chat"), and agentId are required' });
+      return;
+    }
+    if (!isAgentIdInScope(toAgentAccess(user), agentId)) {
+      res.status(404).json({ detail: "Interaction not found" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_qa_review_start", {
+      p_interaction_id: interactionId,
+      p_channel: channel,
+      p_agent_id: agentId,
+      p_reviewer_user_id: user.id,
+      p_now: now
+    });
+    if (error) {
+      res.status(500).json({ detail: error.message });
+      return;
+    }
+    const started = toCamelCaseDeep(data);
+    await recordAuditEvent({
+      actorType: "user",
+      actorUserId: user.id,
+      action: "qa_review.started",
+      resourceType: "qa_review",
+      resourceId: started?.id ?? null,
+      result: "success",
+      metadata: { interactionId, channel, agentId },
+      source: "api/admin"
+    });
+    res.status(200).json({ data: started });
+    return;
+  }
+  const { reviewId } = req.body ?? {};
+  if (typeof reviewId !== "string") {
+    res.status(422).json({ detail: "reviewId is required" });
+    return;
+  }
+  const review = await loadOwnedReviewOrRespond(res, supabase, user, reviewId);
+  if (!review) return;
+  if (action === "initTurns") {
+    const { turns } = req.body ?? {};
+    if (!Array.isArray(turns)) {
+      res.status(422).json({ detail: "turns (array) is required" });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_qa_review_init_turns", {
+      p_review_id: reviewId,
+      p_turns: turns,
+      p_now: now
+    });
+    if (error) {
+      res.status(mapQaError(error.message)).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+  if (action === "submitTurn") {
+    const { turnId, role, status, findings } = req.body ?? {};
+    if (typeof turnId !== "string" || role !== "agent" && role !== "customer" || typeof status !== "string") {
+      res.status(422).json({ detail: 'turnId, role ("agent"|"customer"), and status are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc("call_center_qa_turn_submit", {
+      p_review_id: reviewId,
+      p_turn_id: turnId,
+      p_role: role,
+      p_status: status,
+      p_findings: Array.isArray(findings) ? findings : null,
+      p_now: now
+    });
+    if (error) {
+      res.status(mapQaError(error.message)).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+  if (action === "setConclusions") {
+    const { requestCompletion, fcr, humanAssistanceRequired, businessOutcome, reviewerNote } = req.body ?? {};
+    const { data, error } = await supabase.rpc("call_center_qa_review_set_conclusions", {
+      p_review_id: reviewId,
+      p_request_completion: requestCompletion ?? null,
+      p_fcr: fcr ?? null,
+      p_human_assistance_required: humanAssistanceRequired ?? null,
+      p_business_outcome: businessOutcome ?? null,
+      p_reviewer_note: reviewerNote?.trim() || null,
+      p_now: now
+    });
+    if (error) {
+      res.status(mapQaError(error.message)).json({ detail: error.message });
+      return;
+    }
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+  if (action === "submit") {
+    const { data, error } = await supabase.rpc("call_center_qa_review_submit", { p_review_id: reviewId, p_now: now });
+    if (error) {
+      res.status(mapQaError(error.message)).json({ detail: error.message });
+      return;
+    }
+    await recordAuditEvent({
+      actorType: "user",
+      actorUserId: user.id,
+      action: "qa_review.submitted",
+      resourceType: "qa_review",
+      resourceId: reviewId,
+      result: "success",
+      metadata: { interactionId: review.interactionId, channel: review.channel, agentId: review.agentId },
+      source: "api/admin"
+    });
+    res.status(200).json({ data: toCamelCaseDeep(data) });
+    return;
+  }
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
 var admin_default = withErrorBoundary(async (req, res) => {
   noStore(res);
   const resource = queryStr(req, "resource");
@@ -750,12 +1041,25 @@ var admin_default = withErrorBoundary(async (req, res) => {
     methodNotAllowed(res, ["GET", "POST"]);
     return;
   }
-  res.status(400).json({ detail: "Unknown or missing ?resource= \u2014 use me, users, roles, permissions, audit, or actions" });
+  if (resource === "qa") {
+    if (req.method === "GET") {
+      await handleQaGet(req, res);
+      return;
+    }
+    if (req.method === "POST") {
+      await handleQaPost(req, res);
+      return;
+    }
+    methodNotAllowed(res, ["GET", "POST"]);
+    return;
+  }
+  res.status(400).json({ detail: "Unknown or missing ?resource= \u2014 use me, users, roles, permissions, audit, actions, or qa" });
 });
 export {
   actionItemBootstrapWindow,
   admin_default as default,
   getAppOrigin,
   mapActionItemError,
+  qaReviewViewAuthorized,
   toActionScopeArgs
 };

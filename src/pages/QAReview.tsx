@@ -29,7 +29,8 @@ import { FilterPopover } from '@/components/common/FilterPopover';
 import { typography } from '@/lib/typography';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { QaReviewDialog } from '@/components/qa/QaReviewDialog';
-import { ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck, Bot } from 'lucide-react';
+import { useStartAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
 
 type QARow = {
   key: string;
@@ -89,10 +90,13 @@ const QAReview: React.FC = () => {
 
   const { user } = useAuth();
   const canReview = hasPermission(user, 'qa.review');
+  const canRunAutomated = hasPermission(user, 'qa.automated.run');
 
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
   const [qaReviewTarget, setQaReviewTarget] = useState<{ channel: 'voice' | 'chat'; interactionId: string; agentId: string } | null>(null);
+  const startAutomatedQa = useStartAutomatedQaEvaluation();
+  const [runningAutomatedFor, setRunningAutomatedFor] = useState<string | null>(null);
 
   const [channelFilter, setChannelFilter] = useState(ALL);
   const [agentFilter, setAgentFilter] = useState(ALL);
@@ -444,6 +448,7 @@ const QAReview: React.FC = () => {
                     { label: 'Dur/Latency', className: 'w-20' },
                     { label: 'Campaign', className: 'w-28' },
                     ...(canReview ? [{ label: 'Human QA', className: 'w-24' }] : []),
+                    ...(canRunAutomated ? [{ label: 'Automated QA', className: 'w-28' }] : []),
                   ].map((h) => (
                     <TableHead key={h.label} className={`${typography.tableHeader} ${h.className}`}>{h.label}</TableHead>
                   ))}
@@ -516,6 +521,40 @@ const QAReview: React.FC = () => {
                           >
                             <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
                             Review
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {canRunAutomated && (
+                      <TableCell className="w-28">
+                        {row.agentId ? (
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            disabled={runningAutomatedFor !== null}
+                            title={runningAutomatedFor !== null && runningAutomatedFor !== (row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId) ? 'Another evaluation is starting — please wait' : undefined}
+                            className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
+                              if (!interactionId || !row.agentId) return;
+                              setRunningAutomatedFor(interactionId);
+                              try {
+                                const evaluation = await startAutomatedQa.mutateAsync({ interactionId, channel: row.channel, agentId: row.agentId });
+                                navigate(`/qa-review/automated/${evaluation.id}`);
+                              } finally {
+                                setRunningAutomatedFor(null);
+                              }
+                            }}
+                          >
+                            {runningAutomatedFor === (row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId) ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            ) : (
+                              <Bot className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            Run Automated
                           </Button>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>

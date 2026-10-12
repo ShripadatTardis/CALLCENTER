@@ -1,4 +1,4 @@
-import { computeVoiceTurnId } from './qaTurnIdentity';
+import { computeVoiceTurnId } from './qaTurnIdentity.js';
 import type { TranscriptEntry } from '@/types/interaction';
 
 /**

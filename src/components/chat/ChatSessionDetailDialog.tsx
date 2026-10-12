@@ -8,6 +8,7 @@ import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStr
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
 import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
+import { AutomatedQaPanel } from '@/components/qa/AutomatedQaPanel';
 import { useChatSessionDetail } from '@/hooks/chat/useChatSessionDetail';
 import { useAgents } from '@/hooks/agents/useAgents';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
@@ -246,6 +247,8 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
             </SectionCard>
 
             <AgentContractSection contract={agentContract} />
+
+            <AutomatedQaPanel interactionId={session.sessionId} channel="chat" agentId={session.agentId ?? null} />
 
             <ConversationTranscript
               entries={conversationEntries}

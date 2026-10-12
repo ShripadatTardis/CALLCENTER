@@ -7,6 +7,7 @@ import { CollapsibleSectionCard } from '@/components/interaction-detail/Collapsi
 import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
 import { CallTechnicalPerformanceSection } from '@/components/interaction-detail/CallTechnicalPerformanceSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
+import { AutomatedQaPanel } from '@/components/qa/AutomatedQaPanel';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -314,6 +315,8 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
         })()}
 
         <CallTechnicalPerformanceSection metrics={technicalPerformance} isLoading={isTechnicalPerformanceLoading} />
+
+        <AutomatedQaPanel interactionId={interaction.interactionId} channel="voice" agentId={interaction.agentId} />
 
         <SectionCard title="Recording">
           {interaction.recording?.url ? (

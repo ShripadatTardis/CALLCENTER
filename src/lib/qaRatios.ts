@@ -1,4 +1,4 @@
-import { QA_PARAMETER_CODES, QA_PARAMETERS, type QaParameterCode, type QaResultValue } from './qaParameters';
+import { QA_PARAMETER_CODES, QA_PARAMETERS, type QaParameterCode, type QaResultValue } from './qaParameters.js';
 
 /**
  * Session 16.1 — pure, deterministic Human QA ratio calculation, exactly

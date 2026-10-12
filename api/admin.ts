@@ -2,6 +2,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore, methodNotAllowed } from './_voicebot.js';
 import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent, toAgentAccess, isAgentIdInScope, type AuthenticatedCallCenterUser } from './_auth.js';
 import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulationFetcher.js';
+import { fetchQaTurnsForInteraction } from '../src/server/qa/transcriptFetcher.js';
+import { evaluateInteraction, PROMPT_VERSION } from '../src/server/qa/automatedQaEvaluator.js';
+import crypto from 'node:crypto';
+
+const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
+const AUTOMATED_QA_SCHEMA_VERSION = 'v1';
 
 /**
  * /api/admin — Session 14.1 User Management / Role Management / Audit
@@ -910,6 +916,210 @@ async function handleQaPost(req: VercelRequest, res: VercelResponse): Promise<vo
   res.status(400).json({ detail: `Unknown action: ${action}` });
 }
 
+/**
+ * Session 16.3 — Automated Qualitative Analysis. Independent of Human QA
+ * by construction (brief §5): this handler never reads qa_reviews/
+ * qa_findings, never receives them from the client, and the LLM prompt
+ * (automatedQaPrompt.ts) is built from the raw transcript alone.
+ *
+ * `qa.automated.run` and `qa.automated.view` are deliberately separate
+ * from `qa.review`/`qa.analytics.view` (brief §19 — do not automatically
+ * grant automated-result access to every Human QA reviewer).
+ */
+function toCamelAutomatedQa<T>(value: T): T {
+  return toCamelCaseDeep(value);
+}
+
+async function handleAutomatedQaGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = queryStr(req, 'action');
+  const supabase = getServiceRoleClient();
+
+  if (action === 'get') {
+    const user = await requirePermission(req, res, 'qa.automated.view');
+    if (!user) return;
+    const evaluationId = queryStr(req, 'evaluationId');
+    if (!evaluationId) { res.status(422).json({ detail: 'evaluationId is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_automated_qa_get', { p_evaluation_id: evaluationId });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    const evaluation = data ? (toCamelAutomatedQa(data) as { agentId?: string }) : null;
+    if (!evaluation) { res.status(404).json({ detail: 'Automated QA evaluation not found' }); return; }
+    if (!isAgentIdInScope(toAgentAccess(user), evaluation.agentId)) { res.status(404).json({ detail: 'Automated QA evaluation not found' }); return; }
+    res.status(200).json({ data: evaluation });
+    return;
+  }
+
+  if (action === 'listForInteraction') {
+    const user = await requirePermission(req, res, 'qa.automated.view');
+    if (!user) return;
+    const interactionId = queryStr(req, 'interactionId');
+    const channel = queryStr(req, 'channel');
+    if (!interactionId || (channel !== 'voice' && channel !== 'chat')) {
+      res.status(422).json({ detail: 'interactionId and channel ("voice"|"chat") are required' });
+      return;
+    }
+    const { data, error } = await supabase.rpc('call_center_automated_qa_list_for_interaction', {
+      p_interaction_id: interactionId, p_channel: channel,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    const access = toAgentAccess(user);
+    const rows = (toCamelAutomatedQa(data ?? []) as Array<{ agentId: string }>).filter((r) => isAgentIdInScope(access, r.agentId));
+    res.status(200).json({ data: rows });
+    return;
+  }
+
+  if (action === 'list') {
+    const user = await requirePermission(req, res, 'qa.automated.view');
+    if (!user) return;
+    const access = toAgentAccess(user);
+    const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+    const authorizedAgentIds = allAgents ? [] : access.authorizedAgentIds;
+    const status = queryStr(req, 'status') ?? null;
+    const { data, error } = await supabase.rpc('call_center_automated_qa_list', {
+      p_authorized_agent_ids: authorizedAgentIds, p_all_agents: allAgents, p_status: status,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data: toCamelAutomatedQa(data) });
+    return;
+  }
+
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+
+async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'qa.automated.run');
+  if (!user) return;
+  const action = queryStr(req, 'action');
+  if (action !== 'start') { res.status(400).json({ detail: `Unknown action: ${action}` }); return; }
+
+  const { interactionId, channel, agentId } = (req.body ?? {}) as { interactionId?: string; channel?: string; agentId?: string };
+  if (typeof interactionId !== 'string' || (channel !== 'voice' && channel !== 'chat') || typeof agentId !== 'string') {
+    res.status(422).json({ detail: 'interactionId, channel ("voice"|"chat"), and agentId are required' });
+    return;
+  }
+  if (!isAgentIdInScope(toAgentAccess(user), agentId)) {
+    res.status(404).json({ detail: 'Interaction not found' });
+    return;
+  }
+
+  const supabase = getServiceRoleClient();
+  const now = new Date().toISOString();
+
+  // Independence boundary: the transcript is fetched fresh from the
+  // upstream source here, server-side — never supplied by the client,
+  // never touching qa_reviews/qa_findings (brief §5).
+  let turns;
+  try {
+    turns = await fetchQaTurnsForInteraction(interactionId, channel);
+  } catch (err) {
+    res.status(502).json({ detail: `Transcript fetch failed: ${err instanceof Error ? err.message : String(err)}` });
+    return;
+  }
+  if (turns.length === 0) {
+    res.status(422).json({ detail: 'This interaction has no transcript to evaluate.' });
+    return;
+  }
+
+  const transcriptHash = crypto.createHash('sha256').update(JSON.stringify(turns)).digest('hex');
+
+  const { data: createdRaw, error: createError } = await supabase.rpc('call_center_automated_qa_create', {
+    p_interaction_id: interactionId, p_channel: channel, p_agent_id: agentId, p_upstream_sid: null,
+    p_initiated_by: user.id, p_prompt_version: PROMPT_VERSION, p_contract_version: AUTOMATED_QA_CONTRACT_VERSION,
+    p_schema_version: AUTOMATED_QA_SCHEMA_VERSION, p_transcript_snapshot: turns, p_transcript_hash: transcriptHash, p_now: now,
+  });
+  if (createError) { res.status(500).json({ detail: createError.message }); return; }
+  const created = toCamelAutomatedQa(createdRaw) as { id: string; alreadyInFlight: boolean };
+
+  if (created.alreadyInFlight) {
+    // Idempotent — a concurrent/duplicate request returns the already
+    // in-flight evaluation rather than starting a second one (brief
+    // §13/§20).
+    res.status(200).json({ data: created });
+    return;
+  }
+
+  await supabase.rpc('call_center_automated_qa_set_running', { p_evaluation_id: created.id, p_now: now });
+  await recordAuditEvent({
+    actorType: 'user', actorUserId: user.id, action: 'automated_qa.started',
+    resourceType: 'automated_qa_evaluation', resourceId: created.id, result: 'success',
+    metadata: { interactionId, channel, agentId, turnCount: turns.length }, source: 'api/admin',
+  });
+
+  // Hobby-plan serverless timeout is the practical ceiling here (see
+  // vercel.json's functions.maxDuration for this route) — this is a
+  // development/integration-test deployment per the brief's own §0
+  // framing, and the Generic Local LLM's documented sample latency is
+  // two orders of magnitude below that ceiling, so running synchronously
+  // within the initiating request (rather than building a durable
+  // cron-polled job queue this project has no other precedent for) is
+  // the scale-appropriate choice. A genuinely slow/stuck inference fails
+  // closed as FAILED — retryable by starting a new evaluation — rather
+  // than hanging indefinitely.
+  let result;
+  try {
+    result = await evaluateInteraction(turns);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase.rpc('call_center_automated_qa_fail', {
+      p_evaluation_id: created.id, p_error_code: 'internal_error', p_error_message: message, p_request_ids: '[]', p_now: new Date().toISOString(),
+    });
+    await recordAuditEvent({
+      actorType: 'user', actorUserId: user.id, action: 'automated_qa.failed',
+      resourceType: 'automated_qa_evaluation', resourceId: created.id, result: 'error',
+      metadata: { errorMessage: message }, source: 'api/admin',
+    });
+    res.status(502).json({ detail: `Automated QA evaluation failed: ${message}` });
+    return;
+  }
+
+  const finishedAt = new Date().toISOString();
+  if (result.status === 'failed') {
+    const { data, error } = await supabase.rpc('call_center_automated_qa_fail', {
+      p_evaluation_id: created.id, p_error_code: result.errorCode, p_error_message: result.errorMessage,
+      p_request_ids: JSON.stringify(result.requestIds), p_now: finishedAt,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    await recordAuditEvent({
+      actorType: 'user', actorUserId: user.id, action: 'automated_qa.failed',
+      resourceType: 'automated_qa_evaluation', resourceId: created.id, result: 'error',
+      metadata: { errorCode: result.errorCode, errorMessage: result.errorMessage }, source: 'api/admin',
+    });
+    res.status(200).json({ data: toCamelAutomatedQa(data) });
+    return;
+  }
+
+  const { data, error } = await supabase.rpc('call_center_automated_qa_complete', {
+    p_evaluation_id: created.id,
+    p_status: result.status,
+    p_model_id: result.modelId,
+    p_request_ids: JSON.stringify(result.requestIds),
+    p_evaluated_turn_ids: result.evaluatedTurnIds,
+    p_uncovered_turn_ids: result.uncoveredTurnIds,
+    p_unassessable_parameters: result.unassessableParameters.map((u) => ({ parameter_code: u.parameterCode, reason: u.reason })),
+    p_evaluation_completeness: result.evaluationCompleteness,
+    p_window_count: result.windowCount,
+    p_token_usage: result.tokenUsage,
+    p_latency_ms: result.latencyMs,
+    p_observations: result.observations.map((o) => ({
+      parameterCode: o.parameterCode, value: o.value, primaryTurnId: o.primaryTurnId,
+      evidenceTurnIds: o.evidenceTurnIds, reasonCode: o.reasonCode, explanation: o.explanation,
+    })),
+    p_now: finishedAt,
+  });
+  if (error) { res.status(500).json({ detail: error.message }); return; }
+
+  await recordAuditEvent({
+    actorType: 'user', actorUserId: user.id, action: `automated_qa.${result.status}`,
+    resourceType: 'automated_qa_evaluation', resourceId: created.id, result: 'success',
+    metadata: {
+      interactionId, channel, agentId, observationCount: result.observations.length,
+      windowCount: result.windowCount, evaluationCompleteness: result.evaluationCompleteness,
+    },
+    source: 'api/admin',
+  });
+
+  res.status(200).json({ data: toCamelAutomatedQa(data) });
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -966,5 +1176,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, or qa' });
+  if (resource === 'automatedQa') {
+    if (req.method === 'GET') { await handleAutomatedQaGet(req, res); return; }
+    if (req.method === 'POST') { await handleAutomatedQaPost(req, res); return; }
+    methodNotAllowed(res, ['GET', 'POST']);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, or automatedQa' });
 });

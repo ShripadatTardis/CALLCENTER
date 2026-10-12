@@ -778,6 +778,37 @@ async function handleQaGet(req: VercelRequest, res: VercelResponse): Promise<voi
     return;
   }
 
+  // Bulk review-status lookup for the Interaction Quality table's "Human
+  // QA" column (follow-up fix — the table previously always showed
+  // "Review" even for an already-submitted interaction, with no
+  // indication it had been reviewed, letting a reviewer re-review it).
+  // Reuses the EXACT same scoped RPC as `population` below, but gated on
+  // the lower `qa.review` bar (same pair as `review`/`listForInteraction`
+  // above) rather than `qa.analytics.view` — this endpoint only returns
+  // id/interactionId/channel/status/reviewerUserId, never aggregate
+  // findings/ratios, so it doesn't carry the broader-access concern §21
+  // reserves for `findings`/`population`.
+  if (action === 'statusForInteractions') {
+    const user = await getAuthenticatedUser(req);
+    if (!user || (!user.permissions.includes('qa.review') && !user.permissions.includes('qa.analytics.view'))) {
+      res.status(user ? 403 : 401).json({ detail: user ? 'Missing required permission: qa.review or qa.analytics.view' : 'Authentication required' });
+      return;
+    }
+    const access = toAgentAccess(user);
+    const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+    const authorizedAgentIds = allAgents ? [] : access.authorizedAgentIds;
+    const { data, error } = await supabase.rpc('call_center_qa_reviews_population', {
+      p_authorized_agent_ids: authorizedAgentIds, p_all_agents: allAgents,
+      p_channel: null, p_date_from: null, p_date_to: null, p_reviewer_user_id: null,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    const rows = (toCamelCaseDeep(data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      id: r.id, interactionId: r.interactionId, channel: r.channel, status: r.status, reviewerUserId: r.reviewerUserId,
+    }));
+    res.status(200).json({ data: rows });
+    return;
+  }
+
   // §21 — aggregate/trend/reason-distribution data is gated on
   // qa.analytics.view, a materially broader capability than conducting
   // one review (qa.review), per the brief's explicit instruction not to

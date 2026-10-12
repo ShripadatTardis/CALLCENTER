@@ -3,6 +3,7 @@ import {
   startQaReview,
   fetchQaReview,
   listQaReviewsForInteraction,
+  fetchQaReviewStatuses,
   initQaReviewTurns,
   submitQaTurn,
   setQaReviewConclusions,
@@ -19,7 +20,15 @@ import {
 export const qaKeys = {
   review: (reviewId: string) => ['qa', 'review', reviewId] as const,
   forInteraction: (interactionId: string, channel: QaChannel) => ['qa', 'forInteraction', channel, interactionId] as const,
+  statuses: () => ['qa', 'statuses'] as const,
 };
+
+export function useQaReviewStatuses() {
+  return useQuery({
+    queryKey: qaKeys.statuses(),
+    queryFn: fetchQaReviewStatuses,
+  });
+}
 
 export function useQaReviewsForInteraction(interactionId: string | null, channel: QaChannel) {
   return useQuery({
@@ -46,7 +55,10 @@ export function useStartQaReview() {
   return useMutation({
     mutationFn: ({ interactionId, channel, agentId }: { interactionId: string; channel: QaChannel; agentId: string }) =>
       startQaReview(interactionId, channel, agentId),
-    onSuccess: (review) => putReview(queryClient, review),
+    onSuccess: (review) => {
+      putReview(queryClient, review);
+      queryClient.invalidateQueries({ queryKey: qaKeys.statuses() });
+    },
   });
 }
 
@@ -87,6 +99,9 @@ export function useSubmitQaReview() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (reviewId: string) => submitQaReview(reviewId),
-    onSuccess: (review) => putReview(queryClient, review),
+    onSuccess: (review) => {
+      putReview(queryClient, review);
+      queryClient.invalidateQueries({ queryKey: qaKeys.statuses() });
+    },
   });
 }

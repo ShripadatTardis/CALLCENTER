@@ -131,6 +131,26 @@ export async function setQaReviewConclusions(params: {
   return res.data;
 }
 
+export interface QaReviewStatusRow {
+  id: string;
+  interactionId: string;
+  channel: QaChannel;
+  status: QaReviewStatus;
+  reviewerUserId: string;
+}
+
+/**
+ * Bulk review-status lookup for a list screen (e.g. Interaction Quality's
+ * table) to show "Reviewed"/"In Progress" instead of always "Review" —
+ * one request for every row on the page rather than N.
+ */
+export async function fetchQaReviewStatuses(): Promise<QaReviewStatusRow[]> {
+  const res = await request<{ data: QaReviewStatusRow[] }>('/admin', {
+    query: { resource: 'qa', action: 'statusForInteractions' },
+  });
+  return res.data;
+}
+
 export async function submitQaReview(reviewId: string): Promise<QaReview> {
   const res = await request<{ data: QaReview }>('/admin', {
     method: 'POST',

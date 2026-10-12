@@ -19,7 +19,6 @@ import {
   formatFractionAsPercent,
   formatPercent,
   formatStatusLabel,
-  formatTimestamp,
 } from '@/lib/format';
 import { useClassification } from '@/hooks/classification/useClassification';
 import { groupInteractions } from '@/lib/interactionGrouping';
@@ -29,8 +28,10 @@ import { FilterPopover } from '@/components/common/FilterPopover';
 import { typography } from '@/lib/typography';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { QaReviewDialog } from '@/components/qa/QaReviewDialog';
-import { ClipboardCheck, Bot } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, Bot } from 'lucide-react';
 import { useStartAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
+import { useQaReviewStatuses } from '@/hooks/qa/useQa';
+import type { QaReviewStatus } from '@/services/qa/qaService';
 
 type QARow = {
   key: string;
@@ -54,6 +55,17 @@ type QARow = {
 };
 
 const ALL = '__all__';
+
+/** Compact, 24-hour, QA-table-local time format ("Oct 12, 18:05") — saves
+ * the AM/PM suffix the shared formatTimestamp() always includes, kept
+ * local to this table rather than changed app-wide. */
+function formatCompactTime(iso?: string): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 
 /**
  * Client-side pagination (follow-up fix, 2026-10-07) — this screen
@@ -92,9 +104,31 @@ const QAReview: React.FC = () => {
   const canReview = hasPermission(user, 'qa.review');
   const canRunAutomated = hasPermission(user, 'qa.automated.run');
 
+  // Bulk review-status lookup so the "Human QA" column can show
+  // "Reviewed"/"In Progress" instead of always "Review" — and so
+  // clicking an already-submitted row opens that exact submitted review
+  // read-only (viewReviewId) instead of silently start-or-resuming a
+  // brand new one (the start RPC only ever resumes an IN-PROGRESS review
+  // of the same interaction; a submitted one was previously invisible to
+  // it, so re-clicking "Review" always began a fresh review).
+  const { data: reviewStatuses } = useQaReviewStatuses();
+  const reviewStatusByKey = useMemo(() => {
+    const map = new Map<string, { id: string; status: QaReviewStatus }>();
+    for (const r of reviewStatuses ?? []) {
+      const key = `${r.channel}:${r.interactionId}`;
+      const existing = map.get(key);
+      // Prefer a submitted review over an in-progress one for display —
+      // once any review is submitted, the interaction IS reviewed.
+      if (!existing || (existing.status !== 'submitted' && r.status === 'submitted')) {
+        map.set(key, { id: r.id, status: r.status });
+      }
+    }
+    return map;
+  }, [reviewStatuses]);
+
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
-  const [qaReviewTarget, setQaReviewTarget] = useState<{ channel: 'voice' | 'chat'; interactionId: string; agentId: string } | null>(null);
+  const [qaReviewTarget, setQaReviewTarget] = useState<{ channel: 'voice' | 'chat'; interactionId: string; agentId: string; viewReviewId?: string } | null>(null);
   const startAutomatedQa = useStartAutomatedQaEvaluation();
   const [runningAutomatedFor, setRunningAutomatedFor] = useState<string | null>(null);
 
@@ -284,16 +318,19 @@ const QAReview: React.FC = () => {
               className="border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
-          <Select value={channelFilter} onValueChange={setChannelFilter}>
-            <SelectTrigger uiSize="sm" className="w-32 border-border bg-card text-foreground"><SelectValue placeholder="Channel" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>All channels</SelectItem>
-              <SelectItem value="voice">Voice</SelectItem>
-              <SelectItem value="chat">Chat</SelectItem>
-            </SelectContent>
-          </Select>
           <FilterPopover activeCount={activeFilterCount} onClear={clearAdvanced}>
             <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Channel</label>
+                <Select value={channelFilter} onValueChange={setChannelFilter}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Channel" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>All channels</SelectItem>
+                    <SelectItem value="voice">Voice</SelectItem>
+                    <SelectItem value="chat">Chat</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Agent</label>
                 <Select value={agentFilter} onValueChange={setAgentFilter}>
@@ -435,20 +472,20 @@ const QAReview: React.FC = () => {
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   {[
-                    { label: 'Time', className: 'w-24' },
-                    { label: 'Channel', className: 'w-20' },
-                    { label: 'Agent', className: 'w-36' },
-                    { label: 'Outcome', className: 'w-24' },
-                    { label: 'FCR', className: 'w-12' },
-                    { label: 'Escalation', className: 'w-24' },
-                    { label: 'Intent', className: 'w-28' },
-                    { label: 'Acc/Conf', className: 'w-16' },
-                    { label: 'Sentiment', className: 'w-20' },
-                    { label: 'Auth', className: 'w-12' },
-                    { label: 'Dur/Latency', className: 'w-20' },
-                    { label: 'Campaign', className: 'w-28' },
-                    ...(canReview ? [{ label: 'Human QA', className: 'w-24' }] : []),
-                    ...(canRunAutomated ? [{ label: 'Automated QA', className: 'w-28' }] : []),
+                    { label: 'Time', className: 'w-20' },
+                    { label: '', className: 'w-8' },
+                    { label: 'Agent', className: 'w-24' },
+                    { label: 'Outcome', className: 'w-20' },
+                    { label: 'FCR', className: 'w-10' },
+                    { label: 'Escalation', className: 'w-20' },
+                    { label: 'Intent', className: 'w-24' },
+                    { label: 'Acc/Conf', className: 'w-14' },
+                    { label: 'Sentiment', className: 'w-16' },
+                    { label: 'Auth', className: 'w-10' },
+                    { label: 'Dur/Lat', className: 'w-16' },
+                    { label: 'Campaign', className: 'w-24' },
+                    ...(canReview ? [{ label: 'Human QA', className: 'w-28' }] : []),
+                    ...(canRunAutomated ? [{ label: 'Automated QA', className: 'w-24' }] : []),
                   ].map((h) => (
                     <TableHead key={h.label} className={`${typography.tableHeader} ${h.className}`}>{h.label}</TableHead>
                   ))}
@@ -469,72 +506,92 @@ const QAReview: React.FC = () => {
                       }
                     }}
                   >
-                    <TableCell className={`w-24 whitespace-nowrap ${typography.metadata}`}>{formatTimestamp(row.startTime)}</TableCell>
-                    <TableCell className="w-20">
-                      <Badge variant="outline" className="flex items-center gap-1 w-fit text-xs border-slate-600 text-foreground">
-                        {row.channel === 'voice' ? <Phone className="h-3 w-3" /> : <MessageCircle className="h-3 w-3" />}
-                        {row.channel}
-                      </Badge>
+                    <TableCell className={`w-20 whitespace-nowrap ${typography.metadata}`}>{formatCompactTime(row.startTime)}</TableCell>
+                    <TableCell className="w-8" title={row.channel === 'voice' ? 'Voice' : 'Chat'}>
+                      {row.channel === 'voice' ? (
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      ) : (
+                        <MessageCircle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      )}
+                      <span className="sr-only">{row.channel === 'voice' ? 'Voice' : 'Chat'}</span>
                     </TableCell>
-                    <TableCell className={`w-36 truncate ${typography.tableBody}`} title={row.agentName}>{row.agentName}</TableCell>
-                    <TableCell className={`w-24 truncate ${typography.tableBody}`}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
-                    <TableCell className={`w-12 ${typography.tableBody}`}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
-                    <TableCell className="w-24">
+                    <TableCell className={`w-24 truncate ${typography.tableBody}`} title={row.agentName}>{row.agentName}</TableCell>
+                    <TableCell className={`w-20 truncate ${typography.tableBody}`}>{row.outcome ? formatStatusLabel(row.outcome) : '—'}</TableCell>
+                    <TableCell className={`w-10 ${typography.tableBody}`}>{row.channel === 'voice' ? (row.fcr ? 'Yes' : 'No') : '—'}</TableCell>
+                    <TableCell className="w-20">
                       {row.escalationTrigger ? (
                         <Badge variant="destructive" className="text-xs truncate max-w-full" title={row.escalationTrigger}>{row.escalationTrigger}</Badge>
                       ) : (
                         <span className="text-xs text-muted-foreground">{row.channel === 'voice' ? 'No' : '—'}</span>
                       )}
                     </TableCell>
-                    <TableCell className={`w-28 truncate ${typography.tableBody}`} title={row.intent ?? undefined}>{row.intent ?? '—'}</TableCell>
-                    <TableCell className={`w-16 ${typography.tableBody}`}>
+                    <TableCell className={`w-24 truncate ${typography.tableBody}`} title={row.intent ?? undefined}>{row.intent ?? '—'}</TableCell>
+                    <TableCell className={`w-14 ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatPercent(row.intentAccuracyPct, 0)
                         : row.chatConfidenceFraction != null
                           ? formatFractionAsPercent(row.chatConfidenceFraction)
                           : '—'}
                     </TableCell>
-                    <TableCell className={`w-20 truncate ${typography.tableBody}`}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
-                    <TableCell className={`w-12 ${typography.tableBody}`}>
+                    <TableCell className={`w-16 truncate ${typography.tableBody}`}>{row.channel === 'voice' ? (row.sentiment ?? '—') : '—'}</TableCell>
+                    <TableCell className={`w-10 ${typography.tableBody}`}>
                       {row.authenticated === null || row.authenticated === undefined ? '—' : row.authenticated ? 'Yes' : 'No'}
                     </TableCell>
-                    <TableCell className={`w-20 whitespace-nowrap ${typography.tableBody}`}>
+                    <TableCell className={`w-16 whitespace-nowrap ${typography.tableBody}`}>
                       {row.channel === 'voice'
                         ? formatDurationLong(row.durationSeconds)
                         : row.latencyMs != null
                           ? `${row.latencyMs}ms`
                           : '—'}
                     </TableCell>
-                    <TableCell className={`w-28 truncate ${typography.metadata}`} title={row.campaignName}>{row.campaignName ?? '—'}</TableCell>
-                    {canReview && (
+                    <TableCell className={`w-24 truncate ${typography.metadata}`} title={row.campaignName}>{row.campaignName ?? '—'}</TableCell>
+                    {canReview && (() => {
+                      const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
+                      const existingReview = interactionId ? reviewStatusByKey.get(`${row.channel}:${interactionId}`) : undefined;
+                      return (
+                        <TableCell className="w-28">
+                          {row.agentId && interactionId ? (
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              className={
+                                existingReview?.status === 'submitted'
+                                  ? 'border-emerald-600 bg-transparent text-emerald-700 hover:bg-emerald-500/10 dark:border-emerald-400 dark:text-emerald-400'
+                                  : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setQaReviewTarget({
+                                  channel: row.channel, interactionId, agentId: row.agentId as string,
+                                  viewReviewId: existingReview?.status === 'submitted' ? existingReview.id : undefined,
+                                });
+                              }}
+                            >
+                              {existingReview?.status === 'submitted' ? (
+                                <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
+                              ) : (
+                                <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
+                              )}
+                              {existingReview?.status === 'submitted' ? 'Reviewed' : existingReview?.status === 'in_progress' ? 'Resume' : 'Review'}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      );
+                    })()}
+                    {canRunAutomated && (
                       <TableCell className="w-24">
                         {row.agentId ? (
                           <Button
                             variant="outline"
                             size="xs"
-                            className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
-                              if (interactionId) setQaReviewTarget({ channel: row.channel, interactionId, agentId: row.agentId as string });
-                            }}
-                          >
-                            <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
-                            Review
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    )}
-                    {canRunAutomated && (
-                      <TableCell className="w-28">
-                        {row.agentId ? (
-                          <Button
-                            variant="outline"
-                            size="xs"
                             disabled={runningAutomatedFor !== null}
-                            title={runningAutomatedFor !== null && runningAutomatedFor !== (row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId) ? 'Another evaluation is starting — please wait' : undefined}
+                            title={
+                              runningAutomatedFor !== null && runningAutomatedFor !== (row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId)
+                                ? 'Another evaluation is starting — please wait'
+                                : 'Run Automated QA evaluation'
+                            }
                             className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -554,7 +611,7 @@ const QAReview: React.FC = () => {
                             ) : (
                               <Bot className="h-3.5 w-3.5 mr-1.5" />
                             )}
-                            Run Automated
+                            Run Auto
                           </Button>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -613,6 +670,7 @@ const QAReview: React.FC = () => {
         channel={qaReviewTarget?.channel ?? 'voice'}
         interactionId={qaReviewTarget?.interactionId ?? null}
         agentId={qaReviewTarget?.agentId ?? null}
+        viewReviewId={qaReviewTarget?.viewReviewId}
       />
     </Layout>
   );

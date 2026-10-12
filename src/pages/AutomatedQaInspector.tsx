@@ -204,29 +204,44 @@ const AutomatedQaInspector: React.FC = () => {
             <div className="rounded-md border border-border overflow-hidden">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="h-8 bg-card/60 text-muted-foreground uppercase tracking-wide text-[11px]">
-                    <th className="text-left px-2.5">Parameter</th>
-                    <th className="text-left px-2.5">Value</th>
-                    <th className="text-left px-2.5">Reason</th>
-                    <th className="text-left px-2.5">Turn</th>
-                    <th className="text-left px-2.5">Explanation</th>
+                  <tr className="h-[30px] bg-card/60 text-muted-foreground uppercase tracking-wide text-[11px] font-semibold">
+                    <th className="text-left px-2">Parameter</th>
+                    <th className="text-left px-2">Value</th>
+                    <th className="text-left px-2">Reason</th>
+                    <th className="text-left px-2">Turn</th>
+                    <th className="text-left px-2">Explanation</th>
                   </tr>
                 </thead>
                 <tbody>
                   {observations.map((o) => {
                     const def = QA_PARAMETERS[o.parameterCode];
                     const isClean = o.value === def.cleanValue;
-                    const activate = () => setJumpTurnId(o.primaryTurnId);
                     const turnIdx = turnIndexById.get(o.primaryTurnId);
                     const turnLabel = turnIdx ? `Turn ${turnIdx}` : o.primaryTurnId;
                     const isExpanded = expandedFindingIds.has(o.id);
+                    // One click/Enter both jumps to the evidence turn AND
+                    // expands the row's explanation — no separate "Show
+                    // more" control needed (brief §1), and this keeps the
+                    // expand affordance on the SAME already-keyboard-
+                    // accessible row trigger rather than a second nested
+                    // interactive element. Only jump/scroll/announce on
+                    // the collapsed->expanded transition — collapsing a
+                    // row is a local, non-navigational action and must
+                    // never re-trigger the scroll or claim "Jumped to
+                    // turn X" again (found in HIG review: that announcement
+                    // was previously misleading on collapse).
+                    const activate = () => {
+                      if (!isExpanded) setJumpTurnId(o.primaryTurnId);
+                      toggleExpanded(o.id);
+                    };
                     return (
                       <tr
                         key={o.id}
                         role="button"
                         tabIndex={0}
-                        aria-label={`View turn ${turnLabel} for ${def.displayName}`}
-                        className="h-9 border-t border-border hover:bg-muted/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
+                        aria-expanded={isExpanded}
+                        aria-label={`View turn ${turnLabel} for ${def.displayName}, ${isExpanded ? 'collapse' : 'expand'} explanation`}
+                        className="h-8 border-t border-border hover:bg-muted/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500"
                         onClick={activate}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -235,30 +250,19 @@ const AutomatedQaInspector: React.FC = () => {
                           }
                         }}
                       >
-                        <td className="px-2.5 py-1.5">{def.displayName}</td>
-                        <td className="px-2.5 py-1.5">
-                          <Badge variant="outline" className={`h-[21px] ${isClean ? 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400' : 'border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400'}`}>
+                        <td className="px-2 py-1">{def.displayName}</td>
+                        <td className="px-2 py-1">
+                          <Badge variant="outline" className={`h-5 ${isClean ? 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400' : 'border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400'}`}>
                             {o.value}
                           </Badge>
                         </td>
-                        <td className="px-2.5 py-1.5">{o.reasonCode ? humanizeReasonCode(o.reasonCode) : '—'}</td>
-                        <td className="px-2.5 py-1.5 whitespace-nowrap" title={o.primaryTurnId}>{turnLabel}</td>
-                        <td className="px-2.5 py-1.5 text-muted-foreground max-w-sm align-top">
-                          <span className={isExpanded ? '' : 'line-clamp-2'}>{o.explanation ?? '—'}</span>
-                          {o.explanation && (
-                            <button
-                              type="button"
-                              className="block text-[11px] text-cyan-700 dark:text-cyan-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 mt-0.5"
-                              aria-expanded={isExpanded}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpanded(o.id);
-                              }}
-                              onKeyDown={(e) => e.stopPropagation()}
-                            >
-                              {isExpanded ? 'Show less' : 'Show more'}
-                            </button>
-                          )}
+                        <td className="px-2 py-1">{o.reasonCode ? humanizeReasonCode(o.reasonCode) : '—'}</td>
+                        <td className="px-2 py-1 whitespace-nowrap" title={o.primaryTurnId}>{turnLabel}</td>
+                        <td
+                          className={`px-2 py-1 text-muted-foreground max-w-sm leading-4 ${isExpanded ? '' : 'truncate'}`}
+                          title={isExpanded ? undefined : (o.explanation ?? undefined)}
+                        >
+                          {o.explanation ?? '—'}
                         </td>
                       </tr>
                     );
@@ -273,7 +277,7 @@ const AutomatedQaInspector: React.FC = () => {
         <div className="mt-3">
           <h2 className="text-[14px] font-semibold mb-1.5">Conversation</h2>
           <p className="sr-only" role="status" aria-live="polite">{jumpAnnouncement}</p>
-          <div className="rounded-md border border-border h-[320px] overflow-y-auto p-2.5 space-y-2">
+          <div className="rounded-md border border-border min-h-[72px] max-h-[320px] overflow-y-auto p-2.5 space-y-2">
             {turns.map((t) => {
               const isPrimary = jumpTurnId === t.turnId;
               const isEvidence = observations.some((o) => o.primaryTurnId === jumpTurnId && o.evidenceTurnIds.includes(t.turnId));
@@ -302,12 +306,12 @@ const AutomatedQaInspector: React.FC = () => {
         {/* F. Technical details — collapsed by default */}
         <Collapsible open={techOpen} onOpenChange={setTechOpen} className="mt-2">
           <CollapsibleTrigger asChild>
-            <button type="button" className="flex items-center gap-1 h-8 text-[12px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500">
+            <button type="button" className="flex items-center gap-1 h-7 text-[12px] font-semibold text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500">
               {techOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               Technical details
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-1 rounded-md border border-border bg-card p-2.5 grid grid-cols-2 md:grid-cols-3 gap-2 text-[11px]">
+          <CollapsibleContent className="mt-1 rounded-md border border-border bg-card p-2 grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1 text-[11px] leading-6">
             <div className="truncate"><span className="text-muted-foreground">Interaction id: </span>{evaluation.interactionId}</div>
             <div className="truncate"><span className="text-muted-foreground">Agent id: </span>{evaluation.agentId}</div>
             <div><span className="text-muted-foreground">Transcript version: </span><span title={evaluation.transcriptHash}>{evaluation.transcriptHash.slice(0, 16)}…</span></div>

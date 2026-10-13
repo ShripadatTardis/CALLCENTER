@@ -4,7 +4,8 @@ import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2, HelpCircle } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
 import { computeAutomatedQaRatios } from '@/lib/automatedQaRatios';
@@ -14,6 +15,7 @@ import { formatTimestamp, formatFractionAsPercent } from '@/lib/format';
 import type { QaTurn } from '@/lib/qaConversation';
 import type { AutomatedQaObservation } from '@/services/qa/automatedQaService';
 import { AUTOMATED_QA_STATUS_BADGE } from '@/lib/automatedQaStatusBadge';
+import { QualityMeasurementsHelpDialog } from '@/components/qa/QualityMeasurementsHelpDialog';
 
 /**
  * Session 16.3 — read-only Automated QA Inspector. Deliberately a SEPARATE
@@ -75,6 +77,7 @@ const AutomatedQaInspector: React.FC = () => {
   const { user } = useAuth();
   const [techOpen, setTechOpen] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const conversationContainerRef = useRef<HTMLDivElement | null>(null);
   const turnElementRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -197,7 +200,22 @@ const AutomatedQaInspector: React.FC = () => {
           <div className="min-w-0 space-y-3">
             {evaluation.status !== 'failed' && (
               <div>
-                <h2 className="text-[14px] font-semibold mb-1.5">Quality Measurements</h2>
+                <div className="flex items-center gap-1 mb-1.5">
+                  <h2 className="text-[14px] font-semibold">Quality Measurements</h2>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setHelpOpen(true)}
+                        className="inline-flex items-center justify-center h-7 w-7 -my-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
+                        aria-label="Understanding Quality Measurements"
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Understanding Quality Measurements</TooltipContent>
+                  </Tooltip>
+                </div>
                 {/* Session 16.3.4 — ~50% smaller cards. Session 16.3.6 —
                     three separate 4-column grid rows (see
                     MEASUREMENT_ROW_GROUPS) so each group's unused
@@ -385,6 +403,7 @@ const AutomatedQaInspector: React.FC = () => {
           </div>
         </div>
       </div>
+      <QualityMeasurementsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </Layout>
   );
 };

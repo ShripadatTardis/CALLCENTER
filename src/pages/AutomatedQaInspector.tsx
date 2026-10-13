@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2, HelpCircle } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2, HelpCircle, RefreshCw, History, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
-import { useAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
+import { useAutomatedQaEvaluation, useAutomatedQaEvaluationsForInteraction, useStartAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
 import { computeAutomatedQaRatios } from '@/lib/automatedQaRatios';
 import { QA_PARAMETERS, type QaParameterCode } from '@/lib/qaParameters';
 import { humanizeReasonCode } from '@/lib/qaExceptionEditor';
@@ -82,6 +83,38 @@ const AutomatedQaInspector: React.FC = () => {
   const turnElementRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const { data: evaluation, isLoading } = useAutomatedQaEvaluation(evaluationId ?? null);
+
+  // Session 16.3.8 (B1/B3) — Re-run QA + evaluation history. A re-run is
+  // always a brand-new evaluation row (POST .../automatedQa?action=start
+  // — see api/admin.ts handleAutomatedQaPost), never an update to this
+  // one; history is every prior evaluation of the SAME interaction,
+  // fetched read-only and never triggering an LLM call just by viewing
+  // it. Both already existed server-side (brief §20 of Session 16.3)
+  // — this session adds the Inspector-level UI for them.
+  const canRun = hasPermission(user, 'qa.automated.run');
+  const { data: history } = useAutomatedQaEvaluationsForInteraction(
+    evaluation?.interactionId ?? null,
+    evaluation?.channel ?? 'voice',
+  );
+  const startMutation = useStartAutomatedQaEvaluation();
+  const [rerunError, setRerunError] = useState<string | null>(null);
+  const isRerunning = startMutation.isPending;
+
+  const handleRerun = async () => {
+    if (!evaluation || !canRun) return;
+    setRerunError(null);
+    try {
+      const next = await startMutation.mutateAsync({
+        interactionId: evaluation.interactionId, channel: evaluation.channel, agentId: evaluation.agentId,
+      });
+      navigate(`/qa-review/automated/${next.id}`);
+    } catch (err) {
+      // On failure, the diagnostic is shown inline and the CURRENT
+      // (previous) evaluation stays exactly as it was — a failed re-run
+      // never replaces or hides a prior successful result (brief §B4).
+      setRerunError(err instanceof Error ? err.message : 'Re-run failed to start.');
+    }
+  };
 
   const turns: QaTurn[] = useMemo(() => (Array.isArray(evaluation?.transcriptSnapshot) ? evaluation!.transcriptSnapshot : []), [evaluation]);
   const turnIndexById = useMemo(() => new Map(turns.map((t, i) => [t.turnId, i + 1])), [turns]);
@@ -171,6 +204,70 @@ const AutomatedQaInspector: React.FC = () => {
             {evaluation.status === 'completed' && <CheckCircle2 className="h-3 w-3" aria-hidden="true" />}
             {evaluation.status}
           </Badge>
+
+          {/* Session 16.3.8 (B1) — Re-run QA. A new evaluation row,
+              never an update to this one (see handleRerun above); on
+              success navigates to the new evaluation, on failure shows
+              the diagnostic inline and leaves this evaluation untouched. */}
+          {canRun && (
+            <Button
+              variant="outline"
+              size="xs"
+              disabled={isRerunning}
+              title="Start a new Automated QA evaluation of this interaction using the current evaluation logic — previous results are kept, not overwritten"
+              className="h-6 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground flex-shrink-0"
+              onClick={() => void handleRerun()}
+            >
+              {isRerunning ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+              {isRerunning ? 'Evaluating…' : 'Re-run QA'}
+            </Button>
+          )}
+
+          {/* Session 16.3.8 (B3) — compact evaluation-history selector.
+              Viewing this never triggers a new LLM call (useAutomatedQaEvaluationsForInteraction
+              is a read-only list fetch); selecting an entry opens that
+              specific historical result, never blending or comparing runs. */}
+          {history && history.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  className="h-6 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground flex-shrink-0"
+                  title={`${history.length} evaluations of this interaction`}
+                >
+                  <History className="h-3 w-3 mr-1" />
+                  History ({history.length})
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Evaluation history — selecting opens that result</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {history.map((ev) => {
+                  const denom = ev.evaluatedTurnIds.length + ev.uncoveredTurnIds.length;
+                  const isCurrent = ev.id === evaluation.id;
+                  return (
+                    <DropdownMenuItem
+                      key={ev.id}
+                      disabled={isCurrent}
+                      onClick={() => navigate(`/qa-review/automated/${ev.id}`)}
+                      className={`text-xs flex-col items-start gap-0 ${isCurrent ? 'bg-muted/50' : ''}`}
+                    >
+                      <span className="flex w-full items-center justify-between gap-2">
+                        <span className="font-medium">{ev.completedAt ? formatTimestamp(ev.completedAt) : formatTimestamp(ev.createdAt)}</span>
+                        {isCurrent && <span className="text-[9px] text-muted-foreground">current</span>}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {ev.status} · {ev.promptVersion} · {denom > 0 ? `${ev.evaluatedTurnIds.length}/${denom} turns` : '—'}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <span className="text-border">|</span>
           <span className="text-[11px] capitalize">{evaluation.channel}</span>
           <span className="text-border">|</span>
@@ -191,6 +288,13 @@ const AutomatedQaInspector: React.FC = () => {
         {evaluation.status === 'failed' && (
           <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-400">
             Evaluation failed ({evaluation.errorCode ?? 'unknown_error'}): {evaluation.errorMessage ?? 'No further detail available.'}
+          </div>
+        )}
+
+        {rerunError && (
+          <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-400 flex items-start gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <span>Re-run failed to start: {rerunError}. The evaluation shown below is unchanged.</span>
           </div>
         )}
 

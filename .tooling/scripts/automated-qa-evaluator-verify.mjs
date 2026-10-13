@@ -240,6 +240,134 @@ async function test() {
     assert('the real unassessable entry is persisted too', result.r.unassessableParameters.some((u) => u.parameterCode === 'reference_resolution_accuracy'), true);
   }
 
+  // 9. Session 16.3.8 (A2) — the retry prompt now names the exact
+  // conflicting parameter code(s), not just a generic "you contradicted
+  // yourself" instruction (the 16.3.6 fix target).
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const sentPrompts = [];
+    await withStubbedFetch(
+      (n, _url, opts) => {
+        sentPrompts.push(JSON.parse(opts.body).user_prompt);
+        if (n === 1) {
+          return llmSuccess({
+            requestId: 'r1',
+            observations: [{ parameter_code: 'context_continuity_rate', primary_turn_id: 'T1', value: 'PASS' }],
+            unassessable: [{ parameter_code: 'context_continuity_rate', reason: 'not applicable' }],
+          });
+        }
+        return llmSuccess({ requestId: 'r2', observations: [{ parameter_code: 'task_progression_rate', primary_turn_id: 'T1', value: 'PASS' }] });
+      },
+      () => evaluateInteraction(turns),
+    );
+    assertTrue('the retry prompt names the exact conflicting parameter code', sentPrompts[1].includes('context_continuity_rate'));
+    assertTrue('the retry prompt instructs preserving other, non-conflicting assessments', /unchanged|not part of this conflict/i.test(sentPrompts[1]));
+  }
+
+  // 10. Session 16.3.8 (A4) — a genuine all-N/A response with real,
+  // parameter-specific reasons is accepted as-is on the first attempt.
+  // An all-N/A result is never itself treated as invalid.
+  {
+    const turns = [turn('t1', 'agent', 'Thank you, goodbye.')];
+    const result = await withStubbedFetch(
+      (n) => llmSuccess({
+        requestId: `r${n}`,
+        observations: [],
+        unassessable: [
+          { parameter_code: 'context_continuity_rate', reason: 'This was the agent\'s only turn, a closing remark with nothing established earlier to carry forward.' },
+          { parameter_code: 'task_progression_rate', reason: 'A purely social closing turn — there was no task left to progress.' },
+        ],
+      }),
+      (getCallCount) => evaluateInteraction(turns).then((r) => ({ r, calls: getCallCount() })),
+    );
+    assert('a genuine all-N/A response with meaningful reasons is accepted on the first attempt', result.calls, 1);
+    assert('the evaluation completes, not fails, for a legitimate all-N/A result', result.r.status, 'completed');
+    assert('both meaningful unassessable entries are preserved', result.r.unassessableParameters.length, 2);
+  }
+
+  // 11. Session 16.3.8 (A4) — an all-N/A response with PLACEHOLDER
+  // reasons (the exact shape of evaluation cbaa9075) is rejected and
+  // retried once with a targeted correction; a retry that supplies real
+  // reasons is then accepted.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const sentPrompts = [];
+    const result = await withStubbedFetch(
+      (n, _url, opts) => {
+        sentPrompts.push(JSON.parse(opts.body).user_prompt);
+        if (n === 1) {
+          return llmSuccess({
+            requestId: 'r1',
+            observations: [],
+            unassessable: [
+              { parameter_code: 'context_continuity_rate', reason: 'N_A' },
+              { parameter_code: 'task_progression_rate', reason: 'N_A' },
+            ],
+          });
+        }
+        return llmSuccess({
+          requestId: 'r2',
+          observations: [],
+          unassessable: [
+            { parameter_code: 'context_continuity_rate', reason: 'Agent\'s first and only turn — nothing established earlier to carry forward.' },
+            { parameter_code: 'task_progression_rate', reason: 'Purely a greeting turn, no task was underway yet.' },
+          ],
+        });
+      },
+      () => evaluateInteraction(turns),
+    );
+    assert('placeholder-reason all-N/A response is rejected, then accepted after a corrected retry', result.status, 'completed');
+    assert('the corrected (real-reason) entries are what gets persisted', result.unassessableParameters.every((u) => u.reason !== 'N_A'), true);
+    assertTrue('the retry prompt carries the placeholder-reason correction, naming the codes', sentPrompts[1].includes('CORRECTION REQUIRED') && sentPrompts[1].includes('context_continuity_rate') && sentPrompts[1].includes('task_progression_rate'));
+    assertTrue('the first attempt prompt does not pre-empt with the correction', !sentPrompts[0].includes('CORRECTION REQUIRED'));
+  }
+
+  // 12. Session 16.3.8 (A4) — placeholder reasons that persist even
+  // after the one retry fail the window closed, never silently accepted
+  // and never manufacturing fake observations to compensate.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const result = await withStubbedFetch(
+      () => llmSuccess({ requestId: 'r', observations: [], unassessable: [{ parameter_code: 'context_continuity_rate', reason: 'NA' }] }),
+      (getCallCount) => evaluateInteraction(turns).then((r) => ({ r, calls: getCallCount() })),
+    );
+    assert('persistent placeholder reasons fail the evaluation', result.r.status, 'failed');
+    assert('the error code identifies the uninformative-unassessability defect specifically', result.r.errorCode, 'uninformative_unassessability');
+    assert('no observations are fabricated to compensate for the rejected response', result.r.observations.length, 0);
+    assert('the placeholder-reason retry is bounded — exactly 2 calls, never more', result.calls, 2);
+  }
+
+  // 13. Session 16.3.8 (A5) — a retry response that resolves the
+  // original contradiction but introduces a NEW invalid condition
+  // (placeholder reasons) is still rejected — the evaluator never treats
+  // "the retry changed something" as proof the retry is now trustworthy;
+  // it fully revalidates the retry response from scratch.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const result = await withStubbedFetch(
+      (n) => {
+        if (n === 1) {
+          // First attempt: contradiction.
+          return llmSuccess({
+            requestId: 'r1',
+            observations: [{ parameter_code: 'context_continuity_rate', primary_turn_id: 'T1', value: 'PASS' }],
+            unassessable: [{ parameter_code: 'context_continuity_rate', reason: 'not applicable' }],
+          });
+        }
+        // Retry: contradiction resolved, but now a placeholder reason.
+        return llmSuccess({ requestId: 'r2', observations: [], unassessable: [{ parameter_code: 'context_continuity_rate', reason: '-' }] });
+      },
+      (getCallCount) => evaluateInteraction(turns).then((r) => ({ r, calls: getCallCount() })),
+    );
+    assert('a retry introducing a new invalid condition is still rejected, not blindly trusted', result.r.status, 'failed');
+    assert('the second (placeholder-reason) defect is the one surfaced, since the first was resolved', result.r.errorCode, 'uninformative_unassessability');
+    // Contradiction retry (call 2) + placeholder retry (call 3) each
+    // consume one slot of the SAME shared retry budget — never a second,
+    // independent retry loop — so this caps at 3 calls total, not 2 and
+    // never unbounded.
+    assert('the retry-introduces-a-new-defect case is still bounded to the shared retry budget, not unlimited', result.calls, 3);
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

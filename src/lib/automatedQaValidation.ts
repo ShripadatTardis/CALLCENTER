@@ -172,3 +172,34 @@ export function detectCrossArrayContradiction(
   }
   return Array.from(conflicts);
 }
+
+// Session 16.3.8 (A4) — found via the 16.3.6 investigation into
+// evaluation cbaa9075 (a real 20-turn banking conversation, scored zero
+// observations and nine unassessable_parameters entries, every single
+// one with the literal reason "N_A"). An all-N/A result is not itself
+// invalid — a short conversation can legitimately have no opportunities
+// at all — but a reason that is only a placeholder ("N_A", "NA", "-",
+// empty) gives no evidence the model actually reasoned about that
+// specific parameter rather than discarding it wholesale. Deliberately
+// narrow: only the exact listed placeholder shapes (after stripping
+// punctuation/whitespace and lowercasing) are rejected — a real,
+// if terse, explanation is never second-guessed for brevity.
+const PLACEHOLDER_UNASSESSABILITY_REASONS = new Set(['', 'na', 'n a', 'none', 'unknown', 'notapplicable', 'nil', 'tbd']);
+
+export function isPlaceholderUnassessabilityReason(reason: string): boolean {
+  const normalized = reason.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().replace(/\s+/g, ' ');
+  return PLACEHOLDER_UNASSESSABILITY_REASONS.has(normalized);
+}
+
+/**
+ * Returns the parameter codes whose unassessable_parameters reason is a
+ * placeholder, not a real explanation. Detects only — the orchestrator
+ * decides what to do with it (retry once with a targeted correction,
+ * then fail the window closed), same division of responsibility as
+ * detectCrossArrayContradiction.
+ */
+export function detectPlaceholderUnassessability(
+  unassessableParameters: Pick<UnassessableParameter, 'parameterCode' | 'reason'>[],
+): QaParameterCode[] {
+  return unassessableParameters.filter((u) => isPlaceholderUnassessabilityReason(u.reason)).map((u) => u.parameterCode);
+}

@@ -211,9 +211,19 @@ function detectCrossArrayContradiction(observations, unassessableParameters) {
   }
   return Array.from(conflicts);
 }
+var PLACEHOLDER_UNASSESSABILITY_REASONS = /* @__PURE__ */ new Set(["", "na", "n a", "none", "unknown", "notapplicable", "nil", "tbd"]);
+function isPlaceholderUnassessabilityReason(reason) {
+  const normalized = reason.toLowerCase().replace(/[^a-z0-9]/g, " ").trim().replace(/\s+/g, " ");
+  return PLACEHOLDER_UNASSESSABILITY_REASONS.has(normalized);
+}
+function detectPlaceholderUnassessability(unassessableParameters) {
+  return unassessableParameters.filter((u) => isPlaceholderUnassessabilityReason(u.reason)).map((u) => u.parameterCode);
+}
 export {
   allCanonicalParameterCodesCovered,
   detectCrossArrayContradiction,
+  detectPlaceholderUnassessability,
+  isPlaceholderUnassessabilityReason,
   validateAutomatedObservations,
   validateUnassessableParameters
 };

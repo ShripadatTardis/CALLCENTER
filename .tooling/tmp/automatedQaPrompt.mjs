@@ -122,7 +122,7 @@ var QA_PARAMETER_CODES = Object.keys(QA_PARAMETERS);
 var QA_TIER_1_PARAMETERS = QA_PARAMETER_CODES.filter((code) => QA_PARAMETERS[code].tier === 1);
 
 // src/lib/automatedQaPrompt.ts
-var PROMPT_VERSION = "v1";
+var PROMPT_VERSION = "v2";
 function parameterLine(code) {
   const def = QA_PARAMETERS[code];
   return `- ${code} ("${def.displayName}", ${def.dimension}): allowed values [${def.allowedValues.join(", ")}], clean value "${def.cleanValue}", problem reason codes [${def.reasonCodes.join(", ")}]. ${def.shortHelp}`;
@@ -136,6 +136,20 @@ function buildSystemPrompt() {
     "",
     "For each applicable parameter, decide the value using exactly its own allowed values. Use the clean value when the agent handled it correctly. Use a problem value \u2014 with a reason_code from that parameter's own list \u2014 when there is a genuine issue. For response_grounding_rate specifically: if you cannot verify whether the agent's claim is factually supported because no source/policy evidence is available to you, use CANNOT_VERIFY, which is a data-availability gap, not a quality failure \u2014 never guess GROUNDED or NOT_GROUNDED without a basis.",
     "",
+    // Session 16.3.8 (A3) — N/A and CANNOT_VERIFY are frequently confused
+    // by a small model under pressure to resolve a large parameter list
+    // quickly. Spelled out explicitly, separate from any one parameter's
+    // own line, because the distinction applies to every parameter (N/A)
+    // and specifically to response_grounding_rate (CANNOT_VERIFY).
+    "N/A and CANNOT_VERIFY mean different things \u2014 do not use one for the other. Use N/A (an unassessable_parameters entry) only when this conversation never presented a genuine opportunity to assess that parameter at all \u2014 there is nothing to judge, not even uncertainly. Use CANNOT_VERIFY (response_grounding_rate only) when the agent DID make a factual/evidence-backed claim \u2014 a real opportunity existed \u2014 but you have no way to check that specific claim against evidence. A claim you cannot verify is never, by itself, evidence that the claim was wrong: absence of visible evidence is a data gap, not a finding of NOT_GROUNDED, and it is never silently treated as GROUNDED either.",
+    "",
+    // Session 16.3.8 (A4) — every unassessable_parameters.reason must be
+    // specific to that parameter and this conversation. A generic
+    // placeholder ("N_A", "NA", "-", or similar) will be rejected and the
+    // response retried — write one concrete sentence explaining what
+    // about THIS conversation made the parameter inapplicable.
+    'Every unassessable_parameters entry needs a real, parameter-specific reason \u2014 one sentence saying what about this specific conversation made that parameter inapplicable (e.g. "The agent never asked a clarifying question, so there was nothing to assess for unnecessary clarification."). Never write a placeholder like "N_A", "NA", "-", or leave the reason effectively empty. It is entirely normal, and not a failure on your part, for several or even all nine parameters to genuinely have no opportunity in a short conversation \u2014 just say specifically why for each one.',
+    "",
     "Parameters:",
     paramLines,
     "",
@@ -145,6 +159,18 @@ function buildSystemPrompt() {
     "",
     "Respond only with JSON matching the given schema."
   ].join("\n");
+}
+function buildConsistencyRetryInstruction(conflictingCodes) {
+  const names = conflictingCodes.map((c) => `${c} ("${QA_PARAMETERS[c].displayName}")`).join(", ");
+  return `
+
+CORRECTION REQUIRED: in your previous response, the following parameter(s) appeared in BOTH \`observations\` and \`unassessable_parameters\` at the same time: ${names}. Each parameter must appear in EXACTLY ONE of the two collections. Re-decide ONLY ${conflictingCodes.length === 1 ? "this parameter" : "these parameters"}: look again at whether a genuine assessment opportunity existed for ${conflictingCodes.length === 1 ? "it" : "each of them"}, and place it in exactly one collection accordingly \u2014 do not default to either PASS or N/A, decide based on the actual conversation. Every OTHER parameter in your previous response was NOT part of this conflict \u2014 keep those exact same assessments unchanged; do not re-evaluate, remove, or weaken them.`;
+}
+function buildPlaceholderReasonRetryInstruction(placeholderCodes) {
+  const names = placeholderCodes.map((c) => `${c} ("${QA_PARAMETERS[c].displayName}")`).join(", ");
+  return `
+
+CORRECTION REQUIRED: in your previous response, unassessable_parameters gave a placeholder, non-specific reason (like "N_A", "NA", or "-") for: ${names}. Keep every assessment from your previous response exactly as it was \u2014 observations and the other unassessable_parameters entries are unchanged. Only rewrite the reason text for the parameter(s) named above: write one concrete sentence, specific to this conversation, explaining what made a genuine assessment opportunity absent for that parameter. If, on reflection, a real opportunity actually did exist, move that parameter to \`observations\` with a proper value instead.`;
 }
 function formatTurn(turn) {
   return `[${turn.turnId}] ${turn.speakerLabel}: ${turn.text}`;
@@ -158,6 +184,8 @@ ${body}`;
 }
 export {
   PROMPT_VERSION,
+  buildConsistencyRetryInstruction,
+  buildPlaceholderReasonRetryInstruction,
   buildSystemPrompt,
   buildUserPrompt
 };

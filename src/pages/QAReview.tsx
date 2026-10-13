@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ListChecks, Phone, MessageCircle, ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
+import { Loader2, ListChecks, Phone, MessageCircle, ChevronLeft, ChevronRight, BarChart3, ChevronDown, History } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useCallData } from '@/hooks/calls/useCallData';
@@ -19,6 +20,7 @@ import {
   formatFractionAsPercent,
   formatPercent,
   formatStatusLabel,
+  formatTimestamp,
 } from '@/lib/format';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
@@ -27,6 +29,7 @@ import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { QaReviewDialog } from '@/components/qa/QaReviewDialog';
 import { ClipboardCheck, ClipboardList, Bot, CheckCircle2 } from 'lucide-react';
 import { useStartAutomatedQaEvaluation, useAutomatedQaEvaluations } from '@/hooks/qa/useAutomatedQa';
+import type { AutomatedQaEvaluation } from '@/services/qa/automatedQaService';
 import { useQaReviewStatuses } from '@/hooks/qa/useQa';
 import type { QaReviewStatus } from '@/services/qa/qaService';
 
@@ -148,6 +151,21 @@ const QAReview: React.FC = () => {
       if (!existing || rank(e.status) > rank(existing.status)) {
         map.set(key, { id: e.id, status: e.status });
       }
+    }
+    return map;
+  }, [automatedEvaluations]);
+
+  // Session 16.3.8 (B1/B3) — every evaluation per interaction, newest
+  // first (the source list is already ordered that way), for the
+  // "Previous evaluations" history entry on this listing. Re-run never
+  // deletes or overwrites a prior evaluation (B2) — this is simply every
+  // row that already exists, grouped by interaction.
+  const automatedEvaluationsByKey = useMemo(() => {
+    const map = new Map<string, AutomatedQaEvaluation[]>();
+    for (const e of automatedEvaluations ?? []) {
+      const key = `${e.channel}:${e.interactionId}`;
+      const arr = map.get(key);
+      if (arr) arr.push(e); else map.set(key, [e]);
     }
     return map;
   }, [automatedEvaluations]);
@@ -562,56 +580,95 @@ const QAReview: React.FC = () => {
                     {canRunAutomated && (() => {
                       const interactionId = row.channel === 'voice' ? row.voiceInteraction?.interactionId : row.chatSessionId;
                       const existingAutomated = interactionId ? automatedStatusByKey.get(`${row.channel}:${interactionId}`) : undefined;
+                      const history = interactionId ? automatedEvaluationsByKey.get(`${row.channel}:${interactionId}`) ?? [] : [];
                       const isDone = existingAutomated?.status === 'completed' || existingAutomated?.status === 'partial';
-                      const isRunning = runningAutomatedFor === interactionId;
+                      const isFailed = existingAutomated?.status === 'failed';
+                      const isRunning = runningAutomatedFor === interactionId || existingAutomated?.status === 'running' || existingAutomated?.status === 'queued';
+                      const triggerLabel = isRunning ? 'Evaluating…' : isDone ? 'Auto Run Completed' : isFailed ? 'Evaluation Failed' : 'Auto QA';
+                      const runAgain = async () => {
+                        if (!row.agentId || !interactionId) return;
+                        setRunningAutomatedFor(interactionId);
+                        try {
+                          const evaluation = await startAutomatedQa.mutateAsync({ interactionId, channel: row.channel, agentId: row.agentId });
+                          navigate(`/qa-review/automated/${evaluation.id}`);
+                        } finally {
+                          setRunningAutomatedFor(null);
+                        }
+                      };
                       return (
                         <TableCell className="w-36 px-2">
-                          {row.agentId && interactionId ? (
+                          {!row.agentId || !interactionId ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : history.length === 0 ? (
+                            // Session 16.3.8 — no evaluation exists yet: a
+                            // single action ("Run Auto") that starts the
+                            // first one. The View/Re-run/History split only
+                            // makes sense once there's something to view.
                             <Button
                               variant="outline"
                               size="xs"
                               disabled={runningAutomatedFor !== null && !isRunning}
-                              title={
-                                isDone
-                                  ? 'View the existing Automated QA result'
-                                  : runningAutomatedFor !== null && !isRunning
-                                    ? 'Another evaluation is starting — please wait'
-                                    : 'Run Automated QA evaluation'
-                              }
-                              className={
-                                isDone
-                                  ? 'border-emerald-600 bg-transparent text-emerald-700 hover:bg-emerald-500/10 dark:border-emerald-400 dark:text-emerald-400'
-                                  : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'
-                              }
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                // Already run once — no need to run again by
-                                // default; open the existing result instead.
-                                if (isDone && existingAutomated) {
-                                  navigate(`/qa-review/automated/${existingAutomated.id}`);
-                                  return;
-                                }
-                                if (!row.agentId) return;
-                                setRunningAutomatedFor(interactionId);
-                                try {
-                                  const evaluation = await startAutomatedQa.mutateAsync({ interactionId, channel: row.channel, agentId: row.agentId });
-                                  navigate(`/qa-review/automated/${evaluation.id}`);
-                                } finally {
-                                  setRunningAutomatedFor(null);
-                                }
-                              }}
+                              title={runningAutomatedFor !== null && !isRunning ? 'Another evaluation is starting — please wait' : 'Run Automated QA evaluation'}
+                              className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground"
+                              onClick={(e) => { e.stopPropagation(); void runAgain(); }}
                             >
-                              {isRunning ? (
-                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                              ) : isDone ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                              ) : (
-                                <Bot className="h-3.5 w-3.5 mr-1.5" />
-                              )}
-                              {isDone ? 'Auto Run Completed' : 'Run Auto'}
+                              {isRunning ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Bot className="h-3.5 w-3.5 mr-1.5" />}
+                              Run Auto
                             </Button>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  disabled={runningAutomatedFor !== null && runningAutomatedFor !== interactionId}
+                                  title={isDone ? 'Automated QA — view, re-run, or browse history' : isFailed ? 'Last evaluation failed — view diagnostics or re-run' : 'Automated QA evaluation in progress'}
+                                  className={
+                                    isDone
+                                      ? 'border-emerald-600 bg-transparent text-emerald-700 hover:bg-emerald-500/10 dark:border-emerald-400 dark:text-emerald-400'
+                                      : isFailed
+                                        ? 'border-red-600 bg-transparent text-red-700 hover:bg-red-500/10 dark:border-red-400 dark:text-red-400'
+                                        : 'border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground'
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {isRunning ? (
+                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                  ) : isDone ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                  ) : (
+                                    <Bot className="h-3.5 w-3.5 mr-1.5" />
+                                  )}
+                                  {triggerLabel}
+                                  {!isRunning && <ChevronDown className="h-3 w-3 ml-1" />}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-64" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem
+                                  disabled={!existingAutomated || isRunning}
+                                  onClick={() => existingAutomated && navigate(`/qa-review/automated/${existingAutomated.id}`)}
+                                >
+                                  View latest evaluation
+                                </DropdownMenuItem>
+                                <DropdownMenuItem disabled={isRunning} onClick={() => void runAgain()}>
+                                  Re-run QA
+                                </DropdownMenuItem>
+                                {history.length > 1 && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] font-normal text-muted-foreground">
+                                      <History className="h-3 w-3" /> Previous evaluations
+                                    </DropdownMenuLabel>
+                                    {history.slice(0, 8).map((ev) => (
+                                      <DropdownMenuItem key={ev.id} onClick={() => navigate(`/qa-review/automated/${ev.id}`)} className="text-xs">
+                                        <span className="flex-1 truncate">{ev.completedAt ? formatTimestamp(ev.completedAt) : formatTimestamp(ev.createdAt)}</span>
+                                        <span className="text-[10px] text-muted-foreground ml-2 flex-shrink-0">{ev.status} · {ev.promptVersion}</span>
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </TableCell>
                       );

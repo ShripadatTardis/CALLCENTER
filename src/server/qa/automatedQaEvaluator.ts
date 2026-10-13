@@ -1,8 +1,8 @@
 import { callGenericLlm, isRetryableLlmError } from './genericLlmClient.js';
-import { buildSystemPrompt, buildUserPrompt, PROMPT_VERSION } from '../../lib/automatedQaPrompt.js';
+import { buildSystemPrompt, buildUserPrompt, buildConsistencyRetryInstruction, buildPlaceholderReasonRetryInstruction, PROMPT_VERSION } from '../../lib/automatedQaPrompt.js';
 import { buildAutomatedQaJsonSchema } from '../../lib/automatedQaSchema.js';
 import { planQaTurnWindows, estimateTokens } from '../../lib/automatedQaWindowPlanner.js';
-import { validateAutomatedObservations, validateUnassessableParameters, detectCrossArrayContradiction, type AutomatedQaObservationInput, type UnassessableParameter } from '../../lib/automatedQaValidation.js';
+import { validateAutomatedObservations, validateUnassessableParameters, detectCrossArrayContradiction, detectPlaceholderUnassessability, type AutomatedQaObservationInput, type UnassessableParameter } from '../../lib/automatedQaValidation.js';
 import type { QaTurn } from '../../lib/qaConversation.js';
 
 /**
@@ -34,15 +34,6 @@ const MAX_OUTPUT_TOKENS_CAP = 6144;
 const SAFETY_MARGIN_TOKENS = 200;
 const MAX_RETRIES_PER_WINDOW = 2;
 const RETRY_BACKOFF_MS = [500, 1500];
-
-// Session 16.3.5 — appended verbatim to the user prompt on the ONE
-// contradiction-recovery retry (brief §4: retry once with an explicit
-// instruction that the two collections must be mutually exclusive).
-// Never appended more than once per window — see `contradictionRetried`.
-const CONSISTENCY_RETRY_INSTRUCTION =
-  '\n\nCORRECTION REQUIRED: Your previous response classified the same parameter in BOTH `observations` and `unassessable_parameters`. ' +
-  'Each parameter must appear in EXACTLY ONE of the two collections, never both. If a parameter has no genuine assessment opportunity, ' +
-  'list it ONLY in `unassessable_parameters` and do not also add an `observations` entry for it.';
 
 export interface EvaluateInteractionResult {
   status: 'completed' | 'partial' | 'failed';
@@ -120,6 +111,7 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
     let succeeded = false;
     let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
     let contradictionRetried = false;
+    let placeholderReasonRetried = false;
     while (attempt <= MAX_RETRIES_PER_WINDOW) {
       const res = await callGenericLlm({
         requestId, systemPrompt, userPrompt, jsonSchema: schema,
@@ -149,8 +141,36 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
           lastErrorCode = 'contradictory_applicability';
           lastErrorMessage = `The model classified the same parameter(s) as both assessed and unassessable in one response: ${conflicts.join(', ')}.`;
           if (!contradictionRetried && attempt < MAX_RETRIES_PER_WINDOW) {
+            // Session 16.3.8 (A2) — names the exact conflicting
+            // parameter(s) and instructs the model to leave every other
+            // parameter's assessment untouched, replacing the earlier
+            // generic "you contradicted yourself" instruction that the
+            // 16.3.6 investigation found likely caused an unrelated
+            // over-correction into an all-unassessable response.
             contradictionRetried = true;
-            userPrompt = baseUserPrompt + CONSISTENCY_RETRY_INSTRUCTION;
+            userPrompt = baseUserPrompt + buildConsistencyRetryInstruction(conflicts);
+            attempt += 1;
+            continue;
+          }
+          break;
+        }
+
+        // Session 16.3.8 (A4) — an unassessable_parameters entry with a
+        // placeholder, non-specific reason ("N_A", "NA", "-", empty) is
+        // evidence the model discarded the parameter rather than
+        // genuinely reasoning about it (the exact shape found in
+        // evaluation cbaa9075 — all nine parameters, reason "N_A").
+        // Narrowly scoped: a real all-N/A result with real explanations
+        // is accepted as-is; only the placeholder-reason shape is
+        // rejected, and only that parameter's reason is asked to be
+        // rewritten on retry — nothing else in the response is disturbed.
+        const placeholders = detectPlaceholderUnassessability(windowUnassessable);
+        if (placeholders.length > 0) {
+          lastErrorCode = 'uninformative_unassessability';
+          lastErrorMessage = `The model marked parameter(s) unassessable with a placeholder (non-specific) reason instead of a real explanation: ${placeholders.join(', ')}.`;
+          if (!placeholderReasonRetried && attempt < MAX_RETRIES_PER_WINDOW) {
+            placeholderReasonRetried = true;
+            userPrompt = baseUserPrompt + buildPlaceholderReasonRetryInstruction(placeholders);
             attempt += 1;
             continue;
           }

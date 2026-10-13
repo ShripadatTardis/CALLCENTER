@@ -1,6 +1,6 @@
 // Session 16.3 — evidence validation, against the REAL compiled
 // src/lib/automatedQaValidation.ts (via esbuild, not a reimplementation).
-import { validateAutomatedObservations, validateUnassessableParameters, allCanonicalParameterCodesCovered, detectCrossArrayContradiction } from '../tmp/automatedQaValidation.mjs';
+import { validateAutomatedObservations, validateUnassessableParameters, allCanonicalParameterCodesCovered, detectCrossArrayContradiction, isPlaceholderUnassessabilityReason, detectPlaceholderUnassessability } from '../tmp/automatedQaValidation.mjs';
 
 let pass = 0, fail = 0;
 function assert(name, actual, expected) {
@@ -143,6 +143,32 @@ const validTurnIds = new Set(['t1', 't2', 't3']);
     [{ parameterCode: 'context_continuity_rate' }, { parameterCode: 'followup_understanding_rate' }, { parameterCode: 'task_progression_rate' }],
   );
   assert('detects multiple simultaneous conflicts', conflicts.sort(), ['context_continuity_rate', 'followup_understanding_rate']);
+}
+
+// 14. Session 16.3.8 (A4) — placeholder unassessability-reason
+// detection (evaluation cbaa9075: zero observations, nine unassessable
+// entries, every reason literally "N_A").
+assert('placeholder reason "N_A" detected', isPlaceholderUnassessabilityReason('N_A'), true);
+assert('placeholder reason "NA" detected', isPlaceholderUnassessabilityReason('NA'), true);
+assert('placeholder reason "-" detected', isPlaceholderUnassessabilityReason('-'), true);
+assert('placeholder reason "" (empty) detected', isPlaceholderUnassessabilityReason(''), true);
+assert('placeholder reason "n/a" (lowercase, slash) detected', isPlaceholderUnassessabilityReason('n/a'), true);
+assert('whitespace-only reason detected as placeholder', isPlaceholderUnassessabilityReason('   '), true);
+assert('a real, specific reason is NOT flagged as placeholder', isPlaceholderUnassessabilityReason('The agent never asked a clarifying question in this conversation.'), false);
+assert('a short but genuinely specific reason is NOT flagged merely for brevity', isPlaceholderUnassessabilityReason('No reference was made in this call.'), false);
+{
+  const codes = detectPlaceholderUnassessability([
+    { parameterCode: 'context_continuity_rate', reason: 'N_A' },
+    { parameterCode: 'task_progression_rate', reason: 'The agent never progressed the task because the call ended immediately.' },
+    { parameterCode: 'reference_resolution_accuracy', reason: '-' },
+  ]);
+  assert('only placeholder-reason entries are flagged, real ones are not', codes.sort(), ['context_continuity_rate', 'reference_resolution_accuracy']);
+}
+{
+  const codes = detectPlaceholderUnassessability([
+    { parameterCode: 'context_continuity_rate', reason: 'This was the agent\'s first turn, so nothing could be carried forward.' },
+  ]);
+  assert('a genuine all-N/A entry with a real reason is never flagged', codes, []);
 }
 
 assert('canonical parameter codes sanity check passes against the real dictionary', allCanonicalParameterCodesCovered([

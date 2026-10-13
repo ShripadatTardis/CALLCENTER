@@ -23,6 +23,7 @@ import LiveView from "./pages/LiveView";
 import QAReview from "./pages/QAReview";
 import QaQualityExplorer from "./pages/QaQualityExplorer";
 import AutomatedQaInspector from "./pages/AutomatedQaInspector";
+import QaCalibration from "./pages/QaCalibration";
 import WhatsAppHub from "./pages/WhatsAppHub";
 import FormattingHub from "./pages/FormattingHub";
 import AIAgents from "./pages/AIAgents";
@@ -69,6 +70,8 @@ const App = () => (
           <Route path="/qa-review" element={<ProtectedRoute><QAReview /></ProtectedRoute>} />
           <Route path="/qa-review/explorer" element={<ProtectedRoute permission="qa.analytics.view"><QaQualityExplorer /></ProtectedRoute>} />
           <Route path="/qa-review/automated/:evaluationId" element={<ProtectedRoute permission="qa.automated.view"><AutomatedQaInspector /></ProtectedRoute>} />
+          {/* Session 16.4 — also requires qa.automated.view, enforced inside QaCalibration itself (ProtectedRoute only supports one permission). */}
+          <Route path="/qa-review/calibration" element={<ProtectedRoute permission="qa.analytics.view"><QaCalibration /></ProtectedRoute>} />
           <Route path="/whatsapp-hub" element={<ProtectedRoute><WhatsAppHub /></ProtectedRoute>} />
           <Route path="/formatting-hub" element={<ProtectedRoute><FormattingHub /></ProtectedRoute>} />
           <Route path="/ai-agents" element={<ProtectedRoute permission="agents.view"><AIAgents /></ProtectedRoute>} />

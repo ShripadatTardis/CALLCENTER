@@ -1104,9 +1104,17 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
 
   const finishedAt = new Date().toISOString();
   if (result.status === 'failed') {
+    // Session 16.3.8 (follow-up) — a failed evaluation still carries real
+    // diagnostics (model id, turn coverage, token usage, latency) from
+    // whichever windows actually ran before the failure; persist them so
+    // the Inspector never shows "Model id: —" / "0/0 turns" for data the
+    // evaluator already had.
     const { data, error } = await supabase.rpc('call_center_automated_qa_fail', {
       p_evaluation_id: created.id, p_error_code: result.errorCode, p_error_message: result.errorMessage,
       p_request_ids: result.requestIds, p_now: finishedAt,
+      p_model_id: result.modelId, p_evaluated_turn_ids: result.evaluatedTurnIds, p_uncovered_turn_ids: result.uncoveredTurnIds,
+      p_evaluation_completeness: result.evaluationCompleteness, p_window_count: result.windowCount,
+      p_token_usage: result.tokenUsage, p_latency_ms: result.latencyMs,
     });
     if (error) { res.status(500).json({ detail: error.message }); return; }
     await recordAuditEvent({

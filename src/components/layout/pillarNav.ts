@@ -20,6 +20,7 @@ import {
   KeyRound,
   ScrollText,
   ListChecks,
+  Scale,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -111,6 +112,9 @@ export const PILLARS: Pillar[] = [
       // Interaction Quality (QA Review) is outside this session's
       // inventory — left ungated, same reasoning as above.
       { name: 'Interaction Quality', href: '/qa-review', icon: ClipboardCheck },
+      // Session 16.4 — also requires qa.automated.view, enforced inside
+      // the page itself (ProtectedRoute only supports one permission).
+      { name: 'QA Calibration', href: '/qa-review/calibration', icon: Scale, permission: 'qa.analytics.view' },
     ],
   },
   {

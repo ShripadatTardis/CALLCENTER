@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, HelpCircle, Info, ExternalLink, Scale, Copy, Check } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { HelpCircle, Info, ExternalLink, Scale, Copy, Check } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useQaPairCandidates, useQaComparisonDetail, useQaCalibrationBatch } from '@/hooks/qa/useQaCalibration';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -29,6 +28,21 @@ import { QualityMeasurementsHelpDialog } from '@/components/qa/QualityMeasuremen
  * supports one permission) and qa.automated.view (checked here) — this
  * page surfaces both Human aggregate analytics and Automated evaluation
  * results, so holding only one side's permission is not enough.
+ *
+ * Session 16.4.2 — split into two tabs sharing the same underlying
+ * data fetch (useQaPairCandidates / useQaCalibrationBatch are called
+ * once, unconditionally, at the top level — switching tabs never
+ * refetches):
+ * - "QA Comparison": interaction-level investigation (pair selection,
+ *   version selectors, nine-parameter matrix, evidence drill-down). Its
+ *   own Channel/Agent filters only narrow the paired-interactions list.
+ * - "Calibration Insights": population-level analytics (summary counts,
+ *   concentration/divergence tables). Its own Agent/Parameter/
+ *   Classification/Prompt-version filters are independent state and
+ *   never affected by which interaction is selected in the other tab.
+ * Active tab is mirrored to the `?tab=` query param (comparison is the
+ * default and omitted from the URL) so Back/Forward restores it without
+ * a second route.
  */
 
 const CLASSIFICATION_LABEL: Record<ComparisonClassification, string> = {
@@ -81,8 +95,19 @@ const QaCalibration: React.FC = () => {
 
   const canViewAutomated = hasPermission(user, 'qa.automated.view');
 
+  // Session 16.4.2 — called once, unconditionally, regardless of which
+  // tab is active, so switching tabs never triggers a refetch (both are
+  // react-query-cached off this same call).
   const { candidates, isLoading: candidatesLoading } = useQaPairCandidates();
   const { entries: batchEntries, isLoading: batchLoading, truncated } = useQaCalibrationBatch(candidates);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'insights' ? 'insights' : 'comparison';
+  const setActiveTab = (tab: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'insights') next.set('tab', 'insights'); else next.delete('tab');
+    setSearchParams(next);
+  };
 
   // Session 16.4.1 — agent display names for the paired-interactions list,
   // reusing the existing agents directory (no new endpoint). Falls back
@@ -95,48 +120,16 @@ const QaCalibration: React.FC = () => {
     return map;
   }, [agentsData]);
 
-  const [channelFilter, setChannelFilter] = useState(ALL);
-  const [agentFilter, setAgentFilter] = useState(ALL);
-  const [parameterFilter, setParameterFilter] = useState<QaParameterCode | typeof ALL>(ALL);
-  const [classificationFilter, setClassificationFilter] = useState<ComparisonClassification | typeof ALL>(ALL);
-  const [promptVersionFilter, setPromptVersionFilter] = useState(ALL);
-
-  const agentOptions = useMemo(() => Array.from(new Set(candidates.map((c) => c.agentId))).sort(), [candidates]);
-  const promptVersionOptions = useMemo(() => Array.from(new Set(batchEntries.map((e) => e.promptVersion))).sort(), [batchEntries]);
-
+  // --- QA Comparison tab: its own filter state, narrows only the
+  // paired-interactions list (never affects Calibration Insights). ---
+  const [cmpChannelFilter, setCmpChannelFilter] = useState(ALL);
+  const [cmpAgentFilter, setCmpAgentFilter] = useState(ALL);
+  const cmpAgentOptions = useMemo(() => Array.from(new Set(candidates.map((c) => c.agentId))).sort(), [candidates]);
   const filteredCandidates = useMemo(() => candidates.filter((c) => {
-    if (channelFilter !== ALL && c.channel !== channelFilter) return false;
-    if (agentFilter !== ALL && c.agentId !== agentFilter) return false;
+    if (cmpChannelFilter !== ALL && c.channel !== cmpChannelFilter) return false;
+    if (cmpAgentFilter !== ALL && c.agentId !== cmpAgentFilter) return false;
     return true;
-  }), [candidates, channelFilter, agentFilter]);
-
-  const filteredBatchEntries = useMemo(() => batchEntries.filter((e) => {
-    if (channelFilter !== ALL && e.candidate.channel !== channelFilter) return false;
-    if (agentFilter !== ALL && e.candidate.agentId !== agentFilter) return false;
-    if (promptVersionFilter !== ALL && e.promptVersion !== promptVersionFilter) return false;
-    if (classificationFilter !== ALL) {
-      const matchesClassification = parameterFilter !== ALL
-        ? e.comparison.parameters[parameterFilter].classification === classificationFilter
-        : QA_PARAMETER_CODES.some((code) => e.comparison.parameters[code].classification === classificationFilter);
-      if (!matchesClassification) return false;
-    }
-    return true;
-  }), [batchEntries, channelFilter, agentFilter, promptVersionFilter, classificationFilter, parameterFilter]);
-
-  const summary = useMemo(() => {
-    const classificationCounts: Record<ComparisonClassification, number> = { agreement: 0, disagreement: 0, applicability_mismatch: 0, both_not_applicable: 0, not_comparable: 0 };
-    let totalCells = 0;
-    let validated = 0;
-    for (const e of filteredBatchEntries) {
-      if (e.comparison.transcriptComparability === 'matched') validated += 1;
-      const codes = parameterFilter === ALL ? QA_PARAMETER_CODES : [parameterFilter];
-      for (const code of codes) {
-        classificationCounts[e.comparison.parameters[code].classification] += 1;
-        totalCells += 1;
-      }
-    }
-    return { classificationCounts, totalCells, validated };
-  }, [filteredBatchEntries, parameterFilter]);
+  }), [candidates, cmpChannelFilter, cmpAgentFilter]);
 
   const [selectedCandidate, setSelectedCandidate] = useState<QaPairCandidate | null>(null);
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
@@ -157,6 +150,54 @@ const QaCalibration: React.FC = () => {
     for (const t of evaluation?.transcriptSnapshot ?? []) map.set(t.turnId, `${t.speakerLabel}: ${t.text}`);
     return map;
   }, [evaluation]);
+
+  // Session 16.4.2 — Selected Pair Summary: counts describe ONLY the
+  // currently selected Human/Automated pair (never the population) —
+  // replaces the old page-wide summary cards on this tab.
+  const selectedPairCounts = useMemo(() => {
+    if (!comparison) return null;
+    const counts: Record<ComparisonClassification, number> = { agreement: 0, disagreement: 0, applicability_mismatch: 0, both_not_applicable: 0, not_comparable: 0 };
+    for (const code of QA_PARAMETER_CODES) counts[comparison.parameters[code].classification] += 1;
+    return counts;
+  }, [comparison]);
+
+  // --- Calibration Insights tab: its own independent filter state,
+  // applied only to the population-level batch — never depends on, and
+  // never affected by, selectedCandidate above. ---
+  const [insAgentFilter, setInsAgentFilter] = useState(ALL);
+  const [insParameterFilter, setInsParameterFilter] = useState<QaParameterCode | typeof ALL>(ALL);
+  const [insClassificationFilter, setInsClassificationFilter] = useState<ComparisonClassification | typeof ALL>(ALL);
+  const [insPromptVersionFilter, setInsPromptVersionFilter] = useState(ALL);
+
+  const insAgentOptions = useMemo(() => Array.from(new Set(candidates.map((c) => c.agentId))).sort(), [candidates]);
+  const insPromptVersionOptions = useMemo(() => Array.from(new Set(batchEntries.map((e) => e.promptVersion))).sort(), [batchEntries]);
+
+  const filteredBatchEntries = useMemo(() => batchEntries.filter((e) => {
+    if (insAgentFilter !== ALL && e.candidate.agentId !== insAgentFilter) return false;
+    if (insPromptVersionFilter !== ALL && e.promptVersion !== insPromptVersionFilter) return false;
+    if (insClassificationFilter !== ALL) {
+      const matchesClassification = insParameterFilter !== ALL
+        ? e.comparison.parameters[insParameterFilter].classification === insClassificationFilter
+        : QA_PARAMETER_CODES.some((code) => e.comparison.parameters[code].classification === insClassificationFilter);
+      if (!matchesClassification) return false;
+    }
+    return true;
+  }), [batchEntries, insAgentFilter, insPromptVersionFilter, insClassificationFilter, insParameterFilter]);
+
+  const populationSummary = useMemo(() => {
+    const classificationCounts: Record<ComparisonClassification, number> = { agreement: 0, disagreement: 0, applicability_mismatch: 0, both_not_applicable: 0, not_comparable: 0 };
+    let totalCells = 0;
+    let validated = 0;
+    for (const e of filteredBatchEntries) {
+      if (e.comparison.transcriptComparability === 'matched') validated += 1;
+      const codes = insParameterFilter === ALL ? QA_PARAMETER_CODES : [insParameterFilter];
+      for (const code of codes) {
+        classificationCounts[e.comparison.parameters[code].classification] += 1;
+        totalCells += 1;
+      }
+    }
+    return { classificationCounts, totalCells, validated };
+  }, [filteredBatchEntries, insParameterFilter]);
 
   const applicabilityInsight = useMemo(() => applicabilityMismatchConcentration(filteredBatchEntries.map((e) => e.comparison)), [filteredBatchEntries]);
   const disagreementInsight = useMemo(() => judgmentDisagreementConcentration(filteredBatchEntries.map((e) => e.comparison)), [filteredBatchEntries]);
@@ -200,187 +241,195 @@ const QaCalibration: React.FC = () => {
           </div>
         </div>
 
-        {/* D1 — Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
-          <SummaryCard label="Paired interactions" value={candidates.length} />
-          <SummaryCard label="Eligible pairs (latest each)" value={batchEntries.length} loading={batchLoading} />
-          <SummaryCard label="Validated comparable" value={summary.validated} hint="Transcript-hash-matched pairs only — see Known limitations." />
-          <SummaryCard label="Agreement" value={summary.classificationCounts.agreement} of={summary.totalCells} tone="emerald" />
-          <SummaryCard label="Disagreement" value={summary.classificationCounts.disagreement} of={summary.totalCells} tone="red" />
-          <SummaryCard label="Applicability mismatch" value={summary.classificationCounts.applicability_mismatch} of={summary.totalCells} tone="amber" />
-          <SummaryCard label="Not comparable" value={summary.classificationCounts.not_comparable + summary.classificationCounts.both_not_applicable} of={summary.totalCells} />
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="comparison">QA Comparison</TabsTrigger>
+            <TabsTrigger value="insights">Calibration Insights</TabsTrigger>
+          </TabsList>
 
-        {truncated && (
-          <p className="text-[10px] text-muted-foreground">Summary and insights below are computed over the 50 most recently paired interactions — see Known limitations in the documentation for why this is bounded.</p>
-        )}
-
-        {/* D4 — Filters */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterSelect label="Channel" value={channelFilter} onChange={setChannelFilter} options={[{ value: 'voice', label: 'Voice' }, { value: 'chat', label: 'Chat' }]} />
-          <FilterSelect label="Agent" value={agentFilter} onChange={setAgentFilter} options={agentOptions.map((a) => ({ value: a, label: a }))} />
-          <FilterSelect label="Parameter" value={parameterFilter} onChange={(v) => setParameterFilter(v as QaParameterCode | typeof ALL)} options={QA_PARAMETER_CODES.map((c) => ({ value: c, label: QA_PARAMETERS[c].displayName }))} />
-          <FilterSelect label="Classification" value={classificationFilter} onChange={(v) => setClassificationFilter(v as ComparisonClassification | typeof ALL)} options={(Object.keys(CLASSIFICATION_LABEL) as ComparisonClassification[]).map((c) => ({ value: c, label: CLASSIFICATION_LABEL[c] }))} />
-          <FilterSelect label="Prompt version" value={promptVersionFilter} onChange={setPromptVersionFilter} options={promptVersionOptions.map((v) => ({ value: v, label: v }))} />
-        </div>
-
-        {/* Session 16.4.1 — comparison workspace: paired interactions
-            (~35%) | selectors + transcript comparability + matrix (~65%).
-            Evidence used to live inside the right column here, which made
-            it grow very tall while the left column stayed mostly empty —
-            it is now rendered as its own full-width block BELOW this
-            grid (see ParameterDrillDown further down), never nested
-            inside either column. */}
-        <div className="grid grid-cols-1 xl:grid-cols-[35%_65%] gap-3 items-start">
-          {/* Pairs list */}
-          <div className="rounded-md border border-border overflow-hidden">
-            <div className="h-8 flex items-center px-2 bg-card text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Paired interactions ({filteredCandidates.length})
+          {/* ===================== Tab 1 — QA Comparison ===================== */}
+          <TabsContent value="comparison" className="mt-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <FilterSelect label="Channel" value={cmpChannelFilter} onChange={setCmpChannelFilter} options={[{ value: 'voice', label: 'Voice' }, { value: 'chat', label: 'Chat' }]} />
+              <FilterSelect label="Agent" value={cmpAgentFilter} onChange={setCmpAgentFilter} options={cmpAgentOptions.map((a) => ({ value: a, label: agentNameById.get(a) ?? a }))} />
             </div>
-            <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
-              {candidatesLoading && <p className="p-3 text-xs text-muted-foreground">Loading…</p>}
-              {!candidatesLoading && filteredCandidates.length === 0 && (
-                <p className="p-3 text-xs text-muted-foreground">No interaction currently has both a submitted Human QA review and an eligible Automated QA evaluation within scope.</p>
-              )}
-              {filteredCandidates.map((c) => {
-                const isSelected = selectedCandidate?.interactionId === c.interactionId && selectedCandidate?.channel === c.channel;
-                const agentLabel = agentNameById.get(c.agentId) ?? c.agentId;
-                const dateLabel = bestCandidateDate(c);
-                return (
-                  <PairListItem
-                    key={`${c.channel}:${c.interactionId}`}
-                    candidate={c}
-                    isSelected={isSelected}
-                    agentLabel={agentLabel}
-                    dateLabel={dateLabel}
-                    onSelect={() => selectCandidate(c)}
-                  />
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Selectors, transcript comparability, matrix */}
-          <div className="space-y-3 min-w-0">
-            {!selectedCandidate ? (
-              <div className="rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
-                Select a paired interaction on the left to compare its Human QA review against an Automated QA evaluation.
-              </div>
-            ) : (
-              <>
-                {/* B2 — version selectors */}
-                <div className="rounded-md border border-border p-2.5 space-y-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Human QA Review</div>
-                      <Select value={selectedReviewId ?? undefined} onValueChange={setSelectedReviewId}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {selectedCandidate.reviews.map((r) => (
-                            <SelectItem key={r.id} value={r.id} className="text-xs">
-                              {r.submittedAt ? formatTimestamp(r.submittedAt) : '—'} · {r.reviewerUserId.slice(0, 8)} · {r.id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Automated QA Evaluation</div>
-                      <Select value={selectedEvaluationId ?? undefined} onValueChange={setSelectedEvaluationId}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {selectedCandidate.evaluations.map((e) => (
-                            <SelectItem key={e.id} value={e.id} className="text-xs">
-                              {e.completedAt ? formatTimestamp(e.completedAt) : formatTimestamp(e.createdAt)} · {e.promptVersion} · {e.id.slice(0, 8)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
-                    <TranscriptComparabilityBadge status={comparison?.transcriptComparability ?? null} />
-                    <div className="flex items-center gap-2 text-[10px]">
-                      {review && (
-                        <button type="button" className="inline-flex items-center gap-1 text-cyan-700 dark:text-cyan-400 hover:underline" onClick={() => navigate('/qa-review')}>
-                          <ExternalLink className="h-3 w-3" /> Original Human QA review
-                        </button>
-                      )}
-                      {evaluation && (
-                        <button type="button" className="inline-flex items-center gap-1 text-cyan-700 dark:text-cyan-400 hover:underline" onClick={() => navigate(`/qa-review/automated/${evaluation.id}`)}>
-                          <ExternalLink className="h-3 w-3" /> Original Automated QA Inspector
-                        </button>
-                      )}
-                    </div>
-                  </div>
+            {/* Comparison workspace: paired interactions (~35%) |
+                selectors + selected-pair summary + transcript
+                comparability + matrix (~65%). Evidence renders as its
+                own full-width block BELOW this grid (Session 16.4.1),
+                never nested inside either column. */}
+            <div className="grid grid-cols-1 xl:grid-cols-[35%_65%] gap-3 items-start">
+              <div className="rounded-md border border-border overflow-hidden">
+                <div className="h-8 flex items-center px-2 bg-card text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Paired interactions ({filteredCandidates.length})
                 </div>
+                <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
+                  {candidatesLoading && <p className="p-3 text-xs text-muted-foreground">Loading…</p>}
+                  {!candidatesLoading && filteredCandidates.length === 0 && (
+                    <p className="p-3 text-xs text-muted-foreground">No interaction currently has both a submitted Human QA review and an eligible Automated QA evaluation within scope.</p>
+                  )}
+                  {filteredCandidates.map((c) => {
+                    const isSelected = selectedCandidate?.interactionId === c.interactionId && selectedCandidate?.channel === c.channel;
+                    const agentLabel = agentNameById.get(c.agentId) ?? c.agentId;
+                    const dateLabel = bestCandidateDate(c);
+                    return (
+                      <PairListItem
+                        key={`${c.channel}:${c.interactionId}`}
+                        candidate={c}
+                        isSelected={isSelected}
+                        agentLabel={agentLabel}
+                        dateLabel={dateLabel}
+                        onSelect={() => selectCandidate(c)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
 
-                {/* D2 — nine-parameter matrix */}
-                {detailLoading || !comparison ? (
-                  <p className="text-xs text-muted-foreground">Loading comparison…</p>
-                ) : (
-                  <div className="rounded-md border border-border overflow-hidden">
-                    <table className="w-full text-[12px]">
-                      <thead>
-                        <tr className="h-7 bg-card text-[10px] uppercase tracking-wide text-muted-foreground">
-                          <th className="text-left px-2">Parameter</th>
-                          <th className="text-left px-2">Human QA</th>
-                          <th className="text-left px-2">Automated QA</th>
-                          <th className="text-left px-2">Comparison</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {QA_PARAMETER_CODES.map((code) => {
-                          const p = comparison.parameters[code];
-                          const isSelectedRow = selectedParameter === code;
-                          return (
-                            <tr
-                              key={code}
-                              role="button"
-                              tabIndex={0}
-                              className={`h-9 border-t border-border cursor-pointer ${isSelectedRow ? 'bg-cyan-500/10' : 'hover:bg-muted/40'}`}
-                              onClick={() => setSelectedParameter(isSelectedRow ? null : code)}
-                            >
-                              <td className="px-2 font-medium">{QA_PARAMETERS[code].displayName}</td>
-                              <td className="px-2 text-muted-foreground">{p.human.denominator === 0 ? '—' : `${formatFractionAsPercent(p.human.rate ?? undefined)} (${p.human.numerator}/${p.human.denominator})`}</td>
-                              <td className="px-2 text-muted-foreground">{p.automated.denominator === 0 ? '—' : `${formatFractionAsPercent(p.automated.rate ?? undefined)} (${p.automated.numerator}/${p.automated.denominator})`}</td>
-                              <td className="px-2"><ClassificationBadge classification={p.classification} /></td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+              <div className="space-y-3 min-w-0">
+                {!selectedCandidate ? (
+                  <div className="rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
+                    Select a paired interaction on the left to compare its Human QA review against an Automated QA evaluation.
                   </div>
+                ) : (
+                  <>
+                    <div className="rounded-md border border-border p-2.5 space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Human QA Review</div>
+                          <Select value={selectedReviewId ?? undefined} onValueChange={setSelectedReviewId}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {selectedCandidate.reviews.map((r) => (
+                                <SelectItem key={r.id} value={r.id} className="text-xs">
+                                  {r.submittedAt ? formatTimestamp(r.submittedAt) : '—'} · {r.reviewerUserId.slice(0, 8)} · {r.id.slice(0, 8)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Automated QA Evaluation</div>
+                          <Select value={selectedEvaluationId ?? undefined} onValueChange={setSelectedEvaluationId}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {selectedCandidate.evaluations.map((e) => (
+                                <SelectItem key={e.id} value={e.id} className="text-xs">
+                                  {e.completedAt ? formatTimestamp(e.completedAt) : formatTimestamp(e.createdAt)} · {e.promptVersion} · {e.id.slice(0, 8)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
+                        <TranscriptComparabilityBadge status={comparison?.transcriptComparability ?? null} />
+                        <div className="flex items-center gap-2 text-[10px]">
+                          {review && (
+                            <button type="button" className="inline-flex items-center gap-1 text-cyan-700 dark:text-cyan-400 hover:underline" onClick={() => navigate('/qa-review')}>
+                              <ExternalLink className="h-3 w-3" /> Original Human QA review
+                            </button>
+                          )}
+                          {evaluation && (
+                            <button type="button" className="inline-flex items-center gap-1 text-cyan-700 dark:text-cyan-400 hover:underline" onClick={() => navigate(`/qa-review/automated/${evaluation.id}`)}>
+                              <ExternalLink className="h-3 w-3" /> Original Automated QA Inspector
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {/* Selected Pair Summary — describes ONLY this pair, never the population. No bare agreement % since transcript comparability is unknown (see badge above). */}
+                      {selectedPairCounts && (
+                        <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-border">
+                          <SelectedPairStat label="Agreement" value={selectedPairCounts.agreement} tone="emerald" />
+                          <SelectedPairStat label="Disagreement" value={selectedPairCounts.disagreement} tone="red" />
+                          <SelectedPairStat label="Applicability mismatch" value={selectedPairCounts.applicability_mismatch} tone="amber" />
+                          <SelectedPairStat label="Both not applicable" value={selectedPairCounts.both_not_applicable} />
+                          <SelectedPairStat label="Not comparable" value={selectedPairCounts.not_comparable} />
+                        </div>
+                      )}
+                    </div>
+
+                    {detailLoading || !comparison ? (
+                      <p className="text-xs text-muted-foreground">Loading comparison…</p>
+                    ) : (
+                      <div className="rounded-md border border-border overflow-hidden">
+                        <table className="w-full text-[12px]">
+                          <thead>
+                            <tr className="h-7 bg-card text-[10px] uppercase tracking-wide text-muted-foreground">
+                              <th className="text-left px-2">Parameter</th>
+                              <th className="text-left px-2">Human QA</th>
+                              <th className="text-left px-2">Automated QA</th>
+                              <th className="text-left px-2">Comparison</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {QA_PARAMETER_CODES.map((code) => {
+                              const p = comparison.parameters[code];
+                              const isSelectedRow = selectedParameter === code;
+                              return (
+                                <tr
+                                  key={code}
+                                  role="button"
+                                  tabIndex={0}
+                                  className={`h-9 border-t border-border cursor-pointer ${isSelectedRow ? 'bg-cyan-500/10' : 'hover:bg-muted/40'}`}
+                                  onClick={() => setSelectedParameter(isSelectedRow ? null : code)}
+                                >
+                                  <td className="px-2 font-medium">{QA_PARAMETERS[code].displayName}</td>
+                                  <td className="px-2 text-muted-foreground">{p.human.denominator === 0 ? '—' : `${formatFractionAsPercent(p.human.rate ?? undefined)} (${p.human.numerator}/${p.human.denominator})`}</td>
+                                  <td className="px-2 text-muted-foreground">{p.automated.denominator === 0 ? '—' : `${formatFractionAsPercent(p.automated.rate ?? undefined)} (${p.automated.numerator}/${p.automated.denominator})`}</td>
+                                  <td className="px-2"><ClassificationBadge classification={p.classification} /></td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
+            </div>
+
+            {selectedCandidate && comparison && selectedParameter && (
+              <ParameterDrillDown
+                parameterCode={selectedParameter}
+                comparison={comparison.parameters[selectedParameter]}
+                review={review}
+                turnTextById={turnTextById}
+              />
             )}
-          </div>
-        </div>
+          </TabsContent>
 
-        {/* D3 — evidence drill-down. Full-width, outside the two-column
-            workspace above (Session 16.4.1 — this used to be nested in
-            the right column, forcing that column very tall while the
-            left column sat mostly empty). Independently scrollable per
-            side, capped height — see ParameterDrillDown. */}
-        {selectedCandidate && comparison && selectedParameter && (
-          <ParameterDrillDown
-            parameterCode={selectedParameter}
-            comparison={comparison.parameters[selectedParameter]}
-            review={review}
-            turnTextById={turnTextById}
-          />
-        )}
+          {/* ===================== Tab 2 — Calibration Insights ===================== */}
+          <TabsContent value="insights" className="mt-3 space-y-3">
+            {/* Population summary — never depends on the Comparison tab's selected interaction. */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
+              <SummaryCard label="Paired interactions" value={candidates.length} />
+              <SummaryCard label="Eligible pairs (latest each)" value={batchEntries.length} loading={batchLoading} />
+              <SummaryCard label="Validated comparable" value={populationSummary.validated} hint="Transcript-hash-matched pairs only — see Known limitations." />
+              <SummaryCard label="Agreement" value={populationSummary.classificationCounts.agreement} of={populationSummary.totalCells} tone="emerald" />
+              <SummaryCard label="Disagreement" value={populationSummary.classificationCounts.disagreement} of={populationSummary.totalCells} tone="red" />
+              <SummaryCard label="Applicability mismatch" value={populationSummary.classificationCounts.applicability_mismatch} of={populationSummary.totalCells} tone="amber" />
+              <SummaryCard label="Not comparable" value={populationSummary.classificationCounts.not_comparable + populationSummary.classificationCounts.both_not_applicable} of={populationSummary.totalCells} />
+            </div>
 
-        {/* Part E — Calibration insights */}
-        <Collapsible defaultOpen={false}>
-          <CollapsibleTrigger className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
-            <ChevronRight className="h-3.5 w-3.5 transition-transform data-[state=open]:rotate-90" /> Calibration insights
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2 space-y-3">
+            {truncated && (
+              <p className="text-[10px] text-muted-foreground">Computed over the 50 most recently paired interactions — see Known limitations in the documentation for why this is bounded.</p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <FilterSelect label="Agent" value={insAgentFilter} onChange={setInsAgentFilter} options={insAgentOptions.map((a) => ({ value: a, label: agentNameById.get(a) ?? a }))} />
+              <FilterSelect label="Parameter" value={insParameterFilter} onChange={(v) => setInsParameterFilter(v as QaParameterCode | typeof ALL)} options={QA_PARAMETER_CODES.map((c) => ({ value: c, label: QA_PARAMETERS[c].displayName }))} />
+              <FilterSelect label="Classification" value={insClassificationFilter} onChange={(v) => setInsClassificationFilter(v as ComparisonClassification | typeof ALL)} options={(Object.keys(CLASSIFICATION_LABEL) as ComparisonClassification[]).map((c) => ({ value: c, label: CLASSIFICATION_LABEL[c] }))} />
+              <FilterSelect label="Prompt version" value={insPromptVersionFilter} onChange={setInsPromptVersionFilter} options={insPromptVersionOptions.map((v) => ({ value: v, label: v }))} />
+            </div>
+
             <p className="text-[11px] text-muted-foreground max-w-3xl flex items-start gap-1">
               <Info className="h-3 w-3 flex-shrink-0 mt-0.5" />
-              Descriptive findings only, over the filtered pairs above — never an automatic conclusion about which side is correct, and never a claim that one prompt version is "better" than another without directly comparable evidence.
+              Descriptive findings only, over the filtered population above — never an automatic conclusion about which side is correct, and never a claim that one prompt version is "better" than another without directly comparable evidence.
             </p>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <InsightTable title="Applicability mismatch concentration" rows={applicabilityInsight} />
               <InsightTable title="Judgment disagreement concentration" rows={disagreementInsight} />
@@ -424,8 +473,8 @@ const QaCalibration: React.FC = () => {
                 </div>
               </div>
             )}
-          </CollapsibleContent>
-        </Collapsible>
+          </TabsContent>
+        </Tabs>
       </div>
       <QualityMeasurementsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </Layout>
@@ -442,6 +491,16 @@ function SummaryCard({ label, value, of, tone, hint, loading }: { label: string;
         {of !== undefined && <span className="text-[10px] text-muted-foreground font-normal"> / {of}</span>}
       </div>
     </div>
+  );
+}
+
+/** Session 16.4.2 — compact inline stat chip for the Selected Pair Summary, deliberately not reusing SummaryCard's bordered-box style so it reads as a lightweight inline strip rather than a second row of population-style cards. */
+function SelectedPairStat({ label, value, tone }: { label: string; value: number; tone?: 'emerald' | 'red' | 'amber' }) {
+  const toneClass = tone === 'emerald' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'red' ? 'text-red-700 dark:text-red-400' : tone === 'amber' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground';
+  return (
+    <span className="text-[10px] text-muted-foreground">
+      {label}: <span className={`font-semibold ${toneClass}`}>{value}</span>
+    </span>
   );
 }
 

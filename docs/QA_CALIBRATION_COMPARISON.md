@@ -63,18 +63,36 @@ For each parameter, per pair:
 
 Directionality (higher-is-better vs. lower-is-better) is never special-cased in the comparison engine itself — it is already fully encoded in the ratio each side supplies (`computeQaRatios`' own directionality handling, unchanged), so e.g. a shared `ISSUE` value on a lower-is-better parameter like Unnecessary Clarification is correctly an **Agreement** (both sides found the same issue), never inverted into a "good" reading.
 
-## 6. Dashboard (Part D)
+## 6. Dashboard (Part D) — two-tab information architecture (Session 16.4.2)
 
-Route: **`/qa-review/calibration`**, page `QaCalibration` (`src/pages/QaCalibration.tsx`), placed under the existing **Improve** sidebar group next to "Interaction Quality" (`src/components/layout/pillarNav.ts`).
+Route: **`/qa-review/calibration`**, page `QaCalibration` (`src/pages/QaCalibration.tsx`), placed under the existing **Improve** sidebar group next to "Interaction Quality" (`src/components/layout/pillarNav.ts`). The page title and diagnostic-not-ground-truth description sit above two tabs (`src/components/ui/tabs.tsx`, the existing VoiceForce tab component):
 
-- **D1 Summary**: paired-interactions count, eligible-pairs count, validated-comparable count (§4 — currently always 0, with denominator/explanation shown), and classification counts (Agreement / Disagreement / Applicability mismatch / Not comparable, with "Both not applicable" folded into the "Not comparable" display tile since both represent "no defensible judgment comparison was possible," distinctly labeled from the drill-down's finer classification) — every percentage-shaped number shows its explicit denominator, never a bare percentage.
-- **D2 Parameter matrix**: the real nine rows, Human QA rate (numerator/denominator), Automated QA rate (numerator/denominator), and the derived classification badge — all drawn from the live `compareAssessments()` result for the selected (review, evaluation) pair, never hardcoded illustrative values.
-- **D3 Evidence drill-down**: clicking a parameter row expands Human QA's finding(s) (value, reason code, note) and Automated QA's observation(s) (value, agree/disagree-with-Human, CANNOT_VERIFY callout) side by side, with turn text. Turn text is sourced from the **Automated QA evaluation's own persisted `transcript_snapshot`** (Human QA has none — §2/§4) — accurate for every turn the automated evaluation covers; a human-only turn outside that snapshot shows its turn id without fabricated text rather than guessing. Links out to the original Automated QA Inspector (`/qa-review/automated/:id`, a real deep link) and to the Interaction Quality listing for the Human QA review (no deep-link route exists for an individual review dialog today — documented limitation, §9).
-- **D4 Filters**: Channel, Agent, Parameter, Comparison classification, Automated prompt version — applied client-side over the already-bulk-fetched comparison batch (no additional network round-trip per filter change, matching the Explorer's own established pattern).
+- **"QA Comparison"** (default) — interaction-level investigation.
+- **"Calibration Insights"** — population-level analytics.
+
+Both tabs read from the **same two data hooks**, called once, unconditionally, at the top of the component (`useQaPairCandidates`, `useQaCalibrationBatch`) — switching tabs is a pure client-side state change and triggers no new fetch (react-query already caches the result each tab reads from). The active tab is mirrored to `?tab=insights` in the URL (comparison, the default, is omitted) so browser Back/Forward restores it without a second route.
+
+**Why split them**: the original single-page layout mixed interaction-scoped state (which pair is selected, which parameter's evidence is open) with population-scoped state (aggregate counts, concentration tables) in one filter bar and one set of summary cards — changing a filter or selecting an interaction could visually suggest it affected "the numbers" when it only affected one or the other. Splitting into tabs makes the scope of every number on screen unambiguous: everything in "QA Comparison" describes the one selected pair; everything in "Calibration Insights" describes the filtered population and is **never** affected by which interaction happens to be selected in the other tab (verified live — see the completion report).
+
+### 6a. Tab 1 — QA Comparison
+
+- **Filters** (own state: `cmpChannelFilter`/`cmpAgentFilter`): Channel, Agent only — these narrow which interactions appear in the paired-interactions list below; they do not touch Calibration Insights' population.
+- **Paired interactions list**: unchanged from 16.4.1 — agent display name + best-effort date as the primary label (§3 limitation below), shortened id + copy button + channel + review/evaluation counts as the secondary line.
+- **Version selectors (B2)**: Human QA Review / Automated QA Evaluation dropdowns, defaulting to the latest eligible of each, independently reselectable to any historical version.
+- **Transcript comparability badge**: see §4.
+- **Selected Pair Summary** (new, Session 16.4.2 — replaces the page-wide summary cards that used to sit above the workspace): a compact inline stat strip — Agreement / Disagreement / Applicability mismatch / Both not applicable / Not comparable counts — computed **only** from the currently selected pair's nine `ParameterComparison` results (`comparison.parameters[code].classification`, tallied client-side, no new scoring). No bare "N% agreement" figure is ever shown here, consistent with transcript comparability being unknown.
+- **D2 Parameter matrix** and **D3 Evidence drill-down**: unchanged from 16.4.1 (full-width evidence panel below the two-column workspace, independently scrollable per side, classification-aware empty states).
+
+### 6b. Tab 2 — Calibration Insights
+
+- **Own, independent filter state** (`insAgentFilter`/`insParameterFilter`/`insClassificationFilter`/`insPromptVersionFilter`) — matches the brief's example: a supervisor can leave "Agent = EMI Reminder" selected on the Comparison tab while independently filtering Insights to "Prompt Version = v2," and switching tabs preserves both selections untouched.
+- **D1 Population summary**: paired-interactions count, eligible-pairs count, validated-comparable count (§4), and classification counts — identical computation to the pre-16.4.2 page-wide cards, just now scoped to this tab and driven by the Insights tab's own filters instead of the Comparison tab's.
+- **Part E analytical sections** (§7) are now **directly visible**, not nested inside one collapsible accordion — removing that wrapper was the other half of fixing the "unnecessary whitespace" complaint 16.4.1 addressed on the Comparison tab's evidence panel.
+- The 50-pair population cap (§9) is disclosed via the same `truncated` notice, now shown on this tab specifically.
 
 ## 7. Calibration insights (Part E)
 
-All computed from the same filtered comparison batch, purely descriptive:
+All computed from the Calibration Insights tab's own filtered comparison batch, purely descriptive:
 
 - **Applicability mismatch concentration** — which parameter(s) most often have one side find an opportunity the other didn't.
 - **Judgment disagreement concentration** — which parameter(s) most often have both sides assess the same turn(s) but reach different values.
@@ -98,6 +116,8 @@ Every insight view carries an explicit on-page disclaimer: descriptive only, nev
 - **Turn-level agreement rolls up per parameter as "any disagreement → Disagreement"** — a pair with 9 agreeing turns and 1 disagreeing turn for a parameter is classified Disagreement at the pair level; the per-turn detail (which turns agreed) remains visible in the drill-down, not discarded.
 - **`repetition_loop_rate` and `customer_correction_rate`** are interaction/customer-level on both sides (at most one real finding/observation per review or evaluation) — the general turn-intersection algorithm still applies correctly to this shape (a map with at most one entry), not special-cased, but a "turn-level" comparison for these two parameters is really an interaction-level one in practice.
 - **No automated correctness verdict is ever produced.** This session implements measurement **comparison**, not adjudication, corrective-action routing, or any claim about which side is right — all explicitly deferred per the brief (Session 16.5+).
+- **Automated visual verification at tablet/mobile breakpoints and non-100% browser zoom remains unavailable in this environment** (Session 16.4.1 finding, unresolved in 16.4.2) — the browser-automation tooling's `resize_window` does not change the controlled tab's actual viewport (`window.innerWidth` was confirmed to stay fixed after a resize request), and no Playwright fallback was available. The responsive Tailwind classes follow the same `sm:`-gated pattern already proven elsewhere in this codebase, but have not been visually confirmed narrow.
+- **No true "interaction start time" is available on the paired-interactions list** — see §3's date-label limitation, unchanged by this session.
 
 ## 10. Future calibration extensions (documented now, not built)
 

@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2 } from 'lucide
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
 import { computeAutomatedQaRatios } from '@/lib/automatedQaRatios';
-import { QA_PARAMETER_CODES, QA_PARAMETERS } from '@/lib/qaParameters';
+import { QA_PARAMETERS, type QaParameterCode } from '@/lib/qaParameters';
 import { humanizeReasonCode } from '@/lib/qaExceptionEditor';
 import { formatTimestamp, formatFractionAsPercent } from '@/lib/format';
 import type { QaTurn } from '@/lib/qaConversation';
@@ -50,6 +50,19 @@ function formatTimeOnly(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
+
+/**
+ * Session 16.3.6 — display-only reordering of the Quality Measurements
+ * grid (row 1: 4 higher-is-better; row 2: 2 higher-is-better; row 3: all
+ * 3 lower-is-better, together). This is purely a rendering order — the
+ * canonical QA_PARAMETER_CODES array (used for ratio calculation
+ * elsewhere) is untouched.
+ */
+const MEASUREMENT_DISPLAY_ORDER: QaParameterCode[] = [
+  'context_continuity_rate', 'followup_understanding_rate', 'reference_resolution_accuracy', 'task_progression_rate',
+  'conversation_recovery_rate', 'response_grounding_rate',
+  'unnecessary_clarification_rate', 'repetition_loop_rate', 'customer_correction_rate',
+];
 
 const AutomatedQaInspector: React.FC = () => {
   const { evaluationId } = useParams<{ evaluationId: string }>();
@@ -180,13 +193,19 @@ const AutomatedQaInspector: React.FC = () => {
             {evaluation.status !== 'failed' && (
               <div>
                 <h2 className="text-[14px] font-semibold mb-1.5">Quality Measurements</h2>
-                {/* Session 16.3.4 — ~50% smaller cards (row1: first 5
-                    parameters, row2: remaining 4, per the session brief's
-                    explicit ordering), direction (higher/lower-is-better)
-                    moved from permanent text onto the card's own title
-                    tooltip to save width. */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-1.5">
-                  {QA_PARAMETER_CODES.map((code) => {
+                {/* Session 16.3.4 — ~50% smaller cards. Session 16.3.6 —
+                    4-column grid in MEASUREMENT_DISPLAY_ORDER: row 1 is
+                    the 4 "higher is better" primary conversation/
+                    understanding/resolution parameters, row 2 is the
+                    remaining 2 higher-is-better parameters (2 of 4 cells
+                    used, not stretched), row 3 is all 3 lower-is-better
+                    parameters together (3 of 4 cells used, not
+                    stretched) — default CSS grid behavior already leaves
+                    unused trailing cells empty rather than stretching
+                    siblings to fill them. Direction (higher/lower-is-
+                    better) stays on the card's own title tooltip. */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
+                  {MEASUREMENT_DISPLAY_ORDER.map((code) => {
                     const def = QA_PARAMETERS[code];
                     const r = ratios[code];
                     const unassessable = evaluation.unassessableParameters.find((u) => u.parameterCode === code);

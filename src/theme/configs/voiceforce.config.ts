@@ -47,21 +47,48 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
   },
 
   color: {
+    // Session 7.6.2 — every `withAppearance`-wrapped field below carries
+    // the REAL `.dark` override from src/index.css alongside the
+    // already-verified `:root` (light) value. None invented.
     surfaces: {
-      base: { background: 'hsl(210 20% 98%)', foreground: 'hsl(222.2 84% 4.9%)' }, // --background / --foreground
-      raised: { background: 'hsl(0 0% 100%)', foreground: 'hsl(222.2 84% 4.9%)' }, // --card / --card-foreground
-      overlay: { background: 'hsl(0 0% 100%)', foreground: 'hsl(222.2 84% 4.9%)' }, // --popover / --popover-foreground
+      base: { // --background / --foreground
+        light: { background: 'hsl(210 20% 98%)', foreground: 'hsl(222.2 84% 4.9%)' },
+        dark: { background: 'hsl(222.2 84% 4.9%)', foreground: 'hsl(210 40% 98%)' },
+      },
+      raised: { // --card / --card-foreground
+        light: { background: 'hsl(0 0% 100%)', foreground: 'hsl(222.2 84% 4.9%)' },
+        dark: { background: 'hsl(222.2 84% 4.9%)', foreground: 'hsl(210 40% 98%)' },
+      },
+      overlay: { // --popover / --popover-foreground
+        light: { background: 'hsl(0 0% 100%)', foreground: 'hsl(222.2 84% 4.9%)' },
+        dark: { background: 'hsl(222.2 84% 4.9%)', foreground: 'hsl(210 40% 98%)' },
+      },
       // Real current value of --accent/--accent-foreground, the neutral
       // hover-state surface (ghost button hover, dropdown item hover) —
       // gap B: structurally separated from `brand.decorative` below so
       // the two real, different concepts can never collide again.
-      interactiveSubtle: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(222.2 47.4% 11.2%)' },
-      sidebar: { background: 'hsl(0 0% 98%)', foreground: 'hsl(240 5.3% 26.1%)' }, // --sidebar-background / --sidebar-foreground
+      interactiveSubtle: {
+        light: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(222.2 47.4% 11.2%)' },
+        dark: { background: 'hsl(217.2 32.6% 17.5%)', foreground: 'hsl(210 40% 98%)' },
+      },
+      sidebar: { // --sidebar-background / --sidebar-foreground / --sidebar-border (Session 7.6.3)
+        light: { background: 'hsl(0 0% 98%)', foreground: 'hsl(240 5.3% 26.1%)', border: 'hsl(220 13% 91%)' },
+        dark: { background: 'hsl(222.2 47.4% 11.2%)', foreground: 'hsl(210 40% 98%)', border: 'hsl(217.2 32.6% 17.5%)' },
+      },
     },
     roles: {
-      primary: { background: 'hsl(222.2 47.4% 11.2%)', foreground: 'hsl(210 40% 98%)' }, // --primary / --primary-foreground
-      secondary: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(222.2 47.4% 11.2%)' }, // --secondary / --secondary-foreground
-      muted: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(215.4 16.3% 46.9%)' }, // --muted / --muted-foreground (also the real source of what the pre-revision schema called "secondaryText" — folded in here, not duplicated)
+      primary: { // --primary / --primary-foreground
+        light: { background: 'hsl(222.2 47.4% 11.2%)', foreground: 'hsl(210 40% 98%)' },
+        dark: { background: 'hsl(210 40% 98%)', foreground: 'hsl(222.2 47.4% 11.2%)' },
+      },
+      secondary: { // --secondary / --secondary-foreground
+        light: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(222.2 47.4% 11.2%)' },
+        dark: { background: 'hsl(217.2 32.6% 17.5%)', foreground: 'hsl(210 40% 98%)' },
+      },
+      muted: { // --muted / --muted-foreground (also the real source of what the pre-revision schema called "secondaryText" — folded in here, not duplicated)
+        light: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(215.4 16.3% 46.9%)' },
+        dark: { background: 'hsl(217.2 32.6% 17.5%)', foreground: 'hsl(215 20.2% 65.1%)' },
+      },
     },
     brand: {
       // VoiceForce has not deliberately chosen a sparing-use decorative
@@ -100,20 +127,50 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
       // (`positive`/`escalated`/`warning` variants) for the tinted
       // text+fill presentation, and src/components/ui/alert.tsx /
       // src/index.css's --destructive for the solid presentation.
+      // Session 7.6.3: text/fill/border now carry Badge.tsx's real
+      // `dark:` Tailwind classes alongside the already-verified light
+      // values — none invented (hex->rgb conversions of Tailwind's own
+      // published shade values, same convention as color.interactive.action).
       positive: {
-        text: 'rgb(4 120 87)', // emerald-700
-        fill: 'rgb(16 185 129 / 0.1)', // emerald-500/10
-        solid: { background: 'rgb(16 185 129)', foreground: 'rgb(255 255 255)' }, // VoiceForce has no real "solid positive" component today (no success Alert exists) — this is the Tailwind emerald-500 value as the honest best-available real color, used nowhere yet; see gap report for this caveat.
+        // badge.tsx `positive`: border-emerald-600/40 bg-emerald-500/10
+        // text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400
+        text: { light: 'rgb(4 120 87)', dark: 'rgb(52 211 153)' }, // emerald-700 / emerald-400
+        fill: { light: 'rgb(16 185 129 / 0.1)', dark: 'rgb(16 185 129 / 0.1)' }, // emerald-500/10, unchanged by mode
+        border: { light: 'rgb(5 150 105 / 0.4)', dark: 'rgb(16 185 129 / 0.4)' }, // emerald-600/40 / emerald-500/40
+        // VoiceForce has no real "solid positive" component today (no
+        // success Alert exists) — this is the Tailwind emerald-500
+        // value as the honest best-available real color, used nowhere
+        // yet; see gap report for this caveat. Session 7.6.2: light
+        // and dark are honestly identical (no second real value exists).
+        solid: {
+          light: { background: 'rgb(16 185 129)', foreground: 'rgb(255 255 255)' },
+          dark: { background: 'rgb(16 185 129)', foreground: 'rgb(255 255 255)' },
+        },
       },
       negative: {
-        text: 'rgb(185 28 28)', // red-700 (Badge's `escalated` variant)
-        fill: 'rgb(239 68 68 / 0.1)', // red-500/10
-        solid: { background: 'hsl(0 84.2% 60.2%)', foreground: 'hsl(210 40% 98%)' }, // --destructive / --destructive-foreground — the real, currently-used solid destructive presentation (Alert's destructive variant, destructive Button variant)
+        // badge.tsx `escalated`: border-red-600/40 bg-red-500/10
+        // text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400
+        text: { light: 'rgb(185 28 28)', dark: 'rgb(248 113 113)' }, // red-700 / red-400
+        fill: { light: 'rgb(239 68 68 / 0.1)', dark: 'rgb(239 68 68 / 0.1)' }, // red-500/10, unchanged by mode
+        border: { light: 'rgb(220 38 38 / 0.4)', dark: 'rgb(239 68 68 / 0.4)' }, // red-600/40 / red-500/40
+        solid: { // --destructive / --destructive-foreground — the real, currently-used solid destructive presentation (Alert's destructive variant, destructive Button variant). Session 7.6.2: --destructive genuinely differs by appearance mode; --destructive-foreground does not (both modes: hsl(210 40% 98%)).
+          light: { background: 'hsl(0 84.2% 60.2%)', foreground: 'hsl(210 40% 98%)' },
+          dark: { background: 'hsl(0 62.8% 30.6%)', foreground: 'hsl(210 40% 98%)' },
+        },
       },
       caution: {
-        text: 'rgb(180 83 9)', // amber-700
-        fill: 'rgb(245 158 11 / 0.1)', // amber-500/10
-        solid: { background: 'rgb(245 158 11)', foreground: 'rgb(255 255 255)' }, // no real "solid caution" component exists today either — same caveat as positive.solid above
+        // badge.tsx `warning`: border-amber-600/50 bg-amber-500/10
+        // text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400
+        text: { light: 'rgb(180 83 9)', dark: 'rgb(251 191 36)' }, // amber-700 / amber-400
+        fill: { light: 'rgb(245 158 11 / 0.1)', dark: 'rgb(245 158 11 / 0.1)' }, // amber-500/10, unchanged by mode
+        border: { light: 'rgb(217 119 6 / 0.5)', dark: 'rgb(245 158 11 / 0.4)' }, // amber-600/50 / amber-500/40 (opacity itself also changes, not just hue)
+        // No real "solid caution" component exists today either — same
+        // caveat as positive.solid above. Session 7.6.2: light and dark
+        // are honestly identical (no second real value to assert).
+        solid: {
+          light: { background: 'rgb(245 158 11)', foreground: 'rgb(255 255 255)' },
+          dark: { background: 'rgb(245 158 11)', foreground: 'rgb(255 255 255)' },
+        },
       },
     },
   },
@@ -129,8 +186,10 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
   },
 
   borders: {
-    default: { widthPx: 1, color: 'hsl(214.3 31.8% 91.4%)' }, // --border
-    field: { widthPx: 1, color: 'hsl(214.3 31.8% 91.4%)' }, // --input (same current value as --border, structurally distinct token)
+    // --border / --input — Session 7.6.2: both genuinely differ by
+    // appearance mode, and remain equal to each other in both modes.
+    default: { widthPx: 1, color: { light: 'hsl(214.3 31.8% 91.4%)', dark: 'hsl(217.2 32.6% 17.5%)' } }, // --border
+    field: { widthPx: 1, color: { light: 'hsl(214.3 31.8% 91.4%)', dark: 'hsl(217.2 32.6% 17.5%)' } }, // --input (same current value as --border, structurally distinct token)
     focusRingWidthPx: 2, // `ring-2` on every focus-visible primitive (button.tsx, input.tsx — confirmed)
   },
 
@@ -186,9 +245,17 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
 
   navigation: {
     item: {
-      defaultForeground: 'hsl(240 5.3% 26.1% / 0.6)', // --sidebar-foreground at the real `/60` opacity modifier used in Sidebar.tsx's default pillar-icon state
-      hover: { background: 'hsl(240 4.8% 95.9%)', foreground: 'hsl(240 5.3% 26.1%)' }, // --sidebar-accent / --sidebar-foreground
-      active: { background: '#0891B2', foreground: 'rgb(255 255 255)' }, // real value: bg-cyan-600 text-white, Sidebar.tsx's active-pillar state (same real shade as color.interactive.action.variants.solidBackground — expected, not a duplication, see schema.ts's own note on this field)
+      // --sidebar-foreground at the real `/60` opacity modifier used in
+      // Sidebar.tsx's default pillar-icon state. Session 7.6.2:
+      // --sidebar-foreground genuinely differs by appearance mode.
+      defaultForeground: { light: 'hsl(240 5.3% 26.1% / 0.6)', dark: 'hsl(210 40% 98% / 0.6)' },
+      // --sidebar-accent / --sidebar-foreground. Session 7.6.2: both
+      // genuinely differ by appearance mode.
+      hover: {
+        light: { background: 'hsl(240 4.8% 95.9%)', foreground: 'hsl(240 5.3% 26.1%)' },
+        dark: { background: 'hsl(217.2 32.6% 17.5%)', foreground: 'hsl(210 40% 98%)' },
+      },
+      active: { background: '#0891B2', foreground: 'rgb(255 255 255)' }, // real value: bg-cyan-600 text-white, Sidebar.tsx's active-pillar state (same real shade as color.interactive.action.variants.solidBackground — expected, not a duplication, see schema.ts's own note on this field). Session 7.6.2: a hardcoded Tailwind utility color, not a :root/.dark CSS custom property — no confirmed second value, intentionally left unwrapped (see gap report).
     },
     // topBar: no distinct top-bar surface color found separate from
     // `color.surfaces.base` — correctly left unset.
@@ -205,39 +272,72 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
 
   components: {
     button: {
+      // Session 7.6.2: primary/secondary/danger/quiet all track real
+      // CSS custom properties that genuinely differ by appearance mode.
       variants: {
-        primary: { background: 'hsl(222.2 47.4% 11.2%)', foreground: 'hsl(210 40% 98%)' }, // --primary / --primary-foreground
-        secondary: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(222.2 47.4% 11.2%)' }, // --secondary / --secondary-foreground
-        quiet: { foreground: 'hsl(222.2 47.4% 11.2%)' }, // ghost variant — no background in its default state, hover uses color.surfaces.interactiveSubtle
-        danger: { background: 'hsl(0 84.2% 60.2%)', foreground: 'hsl(210 40% 98%)' }, // --destructive / --destructive-foreground
+        primary: { light: { background: 'hsl(222.2 47.4% 11.2%)', foreground: 'hsl(210 40% 98%)' }, dark: { background: 'hsl(210 40% 98%)', foreground: 'hsl(222.2 47.4% 11.2%)' } }, // --primary / --primary-foreground
+        secondary: { light: { background: 'hsl(210 40% 96.1%)', foreground: 'hsl(222.2 47.4% 11.2%)' }, dark: { background: 'hsl(217.2 32.6% 17.5%)', foreground: 'hsl(210 40% 98%)' } }, // --secondary / --secondary-foreground
+        quiet: { foreground: { light: 'hsl(222.2 47.4% 11.2%)', dark: 'hsl(210 40% 98%)' } }, // ghost variant — no background in its default state, hover uses color.surfaces.interactiveSubtle. Foreground tracks --primary.
+        danger: { light: { background: 'hsl(0 84.2% 60.2%)', foreground: 'hsl(210 40% 98%)' }, dark: { background: 'hsl(0 62.8% 30.6%)', foreground: 'hsl(210 40% 98%)' } }, // --destructive / --destructive-foreground
       },
       // busyIndicatorColor: omitted — no Busy state exists in button.tsx today; no current value to extract.
     },
     input: {
-      defaultBorder: 'hsl(214.3 31.8% 91.4%)',
-      focusBorder: 'hsl(222.2 84% 4.9%)', // --ring
-      filledText: 'hsl(222.2 84% 4.9%)', // --foreground
+      // Session 7.6.2: all four track real CSS custom properties that
+      // genuinely differ by appearance mode.
+      defaultBorder: { light: 'hsl(214.3 31.8% 91.4%)', dark: 'hsl(217.2 32.6% 17.5%)' }, // --border
+      focusBorder: { light: 'hsl(222.2 84% 4.9%)', dark: 'hsl(212.7 26.8% 83.9%)' }, // --ring
+      filledText: { light: 'hsl(222.2 84% 4.9%)', dark: 'hsl(210 40% 98%)' }, // --foreground
       // errorBorder / errorText: omitted — confirmed absent from input.tsx today.
-      disabledBackground: 'hsl(210 20% 98%)', // --background
+      disabledBackground: { light: 'hsl(210 20% 98%)', dark: 'hsl(222.2 84% 4.9%)' }, // --background
     },
     table: {
-      headerBackground: 'hsl(0 0% 100%)', // --card
-      headerText: 'hsl(215.4 16.3% 46.9%)', // --muted-foreground
-      rowHoverBackground: 'hsl(210 40% 96.1% / 0.5)', // --muted at the real `/50` opacity modifier
-      rowSelectedBackground: 'hsl(210 40% 96.1%)', // --muted, full opacity (confirmed distinct from hover, Session 7.5 §3.5)
+      // Session 7.6.2: all four track real CSS custom properties that
+      // genuinely differ by appearance mode.
+      headerBackground: { light: 'hsl(0 0% 100%)', dark: 'hsl(222.2 84% 4.9%)' }, // --card
+      headerText: { light: 'hsl(215.4 16.3% 46.9%)', dark: 'hsl(215 20.2% 65.1%)' }, // --muted-foreground
+      rowHoverBackground: { light: 'hsl(210 40% 96.1% / 0.5)', dark: 'hsl(217.2 32.6% 17.5% / 0.5)' }, // --muted at the real `/50` opacity modifier
+      rowSelectedBackground: { light: 'hsl(210 40% 96.1%)', dark: 'hsl(217.2 32.6% 17.5%)' }, // --muted, full opacity (confirmed distinct from hover, Session 7.5 §3.5)
       // rowLoadingPlaceholderColor / sortIndicatorColor: omitted — confirmed absent from table.tsx today.
     },
     badge: {
+      // Session 7.6.3: same real badge.tsx values as color.semantic
+      // above, duplicated at this schema path per the existing
+      // convention (components.badge is a `.pick` of color.semantic's
+      // shape, not a reference to it) — now including the real border
+      // color and dark-mode text/border values.
       variants: {
-        positive: { text: 'rgb(4 120 87)', fill: 'rgb(16 185 129 / 0.1)' },
-        caution: { text: 'rgb(180 83 9)', fill: 'rgb(245 158 11 / 0.1)' },
-        negative: { text: 'rgb(185 28 28)', fill: 'rgb(239 68 68 / 0.1)' },
+        positive: {
+          text: { light: 'rgb(4 120 87)', dark: 'rgb(52 211 153)' },
+          fill: { light: 'rgb(16 185 129 / 0.1)', dark: 'rgb(16 185 129 / 0.1)' },
+          border: { light: 'rgb(5 150 105 / 0.4)', dark: 'rgb(16 185 129 / 0.4)' },
+        },
+        caution: {
+          text: { light: 'rgb(180 83 9)', dark: 'rgb(251 191 36)' },
+          fill: { light: 'rgb(245 158 11 / 0.1)', dark: 'rgb(245 158 11 / 0.1)' },
+          border: { light: 'rgb(217 119 6 / 0.5)', dark: 'rgb(245 158 11 / 0.4)' },
+        },
+        negative: {
+          text: { light: 'rgb(185 28 28)', dark: 'rgb(248 113 113)' },
+          fill: { light: 'rgb(239 68 68 / 0.1)', dark: 'rgb(239 68 68 / 0.1)' },
+          border: { light: 'rgb(220 38 38 / 0.4)', dark: 'rgb(239 68 68 / 0.4)' },
+        },
       },
     },
     alert: {
+      // Session 7.6.2: default tracks --background/--foreground;
+      // destructive tracks --background/--destructive — both genuinely
+      // differ by appearance mode. Session 7.6.3: destructive's real
+      // border (`border-destructive/50` light, `dark:border-destructive`
+      // full-opacity dark) added; default has no explicit border
+      // override in alert.tsx today (inherits borders.default.color),
+      // correctly left unset rather than duplicated.
       variants: {
-        default: { background: 'hsl(210 20% 98%)', foreground: 'hsl(222.2 84% 4.9%)' },
-        destructive: { background: 'hsl(210 20% 98%)', foreground: 'hsl(0 84.2% 60.2%)' }, // alert.tsx's real implementation: background stays default, only text/border recolor
+        default: { light: { background: 'hsl(210 20% 98%)', foreground: 'hsl(222.2 84% 4.9%)' }, dark: { background: 'hsl(222.2 84% 4.9%)', foreground: 'hsl(210 40% 98%)' } },
+        destructive: {
+          light: { background: 'hsl(210 20% 98%)', foreground: 'hsl(0 84.2% 60.2%)', border: 'hsl(0 84.2% 60.2% / 0.5)' },
+          dark: { background: 'hsl(222.2 84% 4.9%)', foreground: 'hsl(0 62.8% 30.6%)', border: 'hsl(0 62.8% 30.6%)' },
+        }, // alert.tsx's real implementation: background stays default, only text/border recolor
         // success / warning: omitted — confirmed absent from alert.tsx today.
       },
     },

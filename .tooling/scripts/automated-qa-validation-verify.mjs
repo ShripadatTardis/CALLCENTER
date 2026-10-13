@@ -1,6 +1,6 @@
 // Session 16.3 — evidence validation, against the REAL compiled
 // src/lib/automatedQaValidation.ts (via esbuild, not a reimplementation).
-import { validateAutomatedObservations, validateUnassessableParameters, allCanonicalParameterCodesCovered } from '../tmp/automatedQaValidation.mjs';
+import { validateAutomatedObservations, validateUnassessableParameters, allCanonicalParameterCodesCovered, detectCrossArrayContradiction } from '../tmp/automatedQaValidation.mjs';
 
 let pass = 0, fail = 0;
 function assert(name, actual, expected) {
@@ -113,6 +113,36 @@ const validTurnIds = new Set(['t1', 't2', 't3']);
   ]);
   assert('only the well-formed unassessable entry survives', r.length, 1);
   assert('well-formed entry parameter_code preserved', r[0].parameterCode, 'response_grounding_rate');
+}
+
+// 13. Session 16.3.5 — cross-array contradiction detection. A parameter
+// must never appear in both observations and unassessable_parameters in
+// the same response (found live: PASS/100% for a parameter the model's
+// own unassessable_parameters entry called "not applicable").
+{
+  const conflicts = detectCrossArrayContradiction(
+    [{ parameterCode: 'context_continuity_rate' }, { parameterCode: 'task_progression_rate' }],
+    [{ parameterCode: 'context_continuity_rate' }, { parameterCode: 'reference_resolution_accuracy' }],
+  );
+  assert('detects the parameter present in both collections', conflicts, ['context_continuity_rate']);
+}
+{
+  const conflicts = detectCrossArrayContradiction(
+    [{ parameterCode: 'task_progression_rate' }],
+    [{ parameterCode: 'reference_resolution_accuracy' }],
+  );
+  assert('no conflicts when the two collections are disjoint', conflicts, []);
+}
+{
+  const conflicts = detectCrossArrayContradiction([], []);
+  assert('no conflicts on two empty collections', conflicts, []);
+}
+{
+  const conflicts = detectCrossArrayContradiction(
+    [{ parameterCode: 'context_continuity_rate' }, { parameterCode: 'followup_understanding_rate' }],
+    [{ parameterCode: 'context_continuity_rate' }, { parameterCode: 'followup_understanding_rate' }, { parameterCode: 'task_progression_rate' }],
+  );
+  assert('detects multiple simultaneous conflicts', conflicts.sort(), ['context_continuity_rate', 'followup_understanding_rate']);
 }
 
 assert('canonical parameter codes sanity check passes against the real dictionary', allCanonicalParameterCodesCovered([

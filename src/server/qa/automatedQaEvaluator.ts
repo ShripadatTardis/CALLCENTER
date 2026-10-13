@@ -2,7 +2,7 @@ import { callGenericLlm, isRetryableLlmError } from './genericLlmClient.js';
 import { buildSystemPrompt, buildUserPrompt, PROMPT_VERSION } from '../../lib/automatedQaPrompt.js';
 import { buildAutomatedQaJsonSchema } from '../../lib/automatedQaSchema.js';
 import { planQaTurnWindows, estimateTokens } from '../../lib/automatedQaWindowPlanner.js';
-import { validateAutomatedObservations, validateUnassessableParameters, type AutomatedQaObservationInput, type UnassessableParameter } from '../../lib/automatedQaValidation.js';
+import { validateAutomatedObservations, validateUnassessableParameters, detectCrossArrayContradiction, type AutomatedQaObservationInput, type UnassessableParameter } from '../../lib/automatedQaValidation.js';
 import type { QaTurn } from '../../lib/qaConversation.js';
 
 /**
@@ -34,6 +34,15 @@ const MAX_OUTPUT_TOKENS_CAP = 6144;
 const SAFETY_MARGIN_TOKENS = 200;
 const MAX_RETRIES_PER_WINDOW = 2;
 const RETRY_BACKOFF_MS = [500, 1500];
+
+// Session 16.3.5 — appended verbatim to the user prompt on the ONE
+// contradiction-recovery retry (brief §4: retry once with an explicit
+// instruction that the two collections must be mutually exclusive).
+// Never appended more than once per window — see `contradictionRetried`.
+const CONSISTENCY_RETRY_INSTRUCTION =
+  '\n\nCORRECTION REQUIRED: Your previous response classified the same parameter in BOTH `observations` and `unassessable_parameters`. ' +
+  'Each parameter must appear in EXACTLY ONE of the two collections, never both. If a parameter has no genuine assessment opportunity, ' +
+  'list it ONLY in `unassessable_parameters` and do not also add an `observations` entry for it.';
 
 export interface EvaluateInteractionResult {
   status: 'completed' | 'partial' | 'failed';
@@ -104,11 +113,13 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
     const aliasedTurns = window.turns.map((t, i) => ({ ...t, turnId: `T${i + 1}` }));
     const windowTurnIds = new Set(aliasToReal.keys());
     const requestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
-    const userPrompt = buildUserPrompt(aliasedTurns, window.index, windows.length);
+    const baseUserPrompt = buildUserPrompt(aliasedTurns, window.index, windows.length);
+    let userPrompt = baseUserPrompt;
 
     let attempt = 0;
     let succeeded = false;
     let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
+    let contradictionRetried = false;
     while (attempt <= MAX_RETRIES_PER_WINDOW) {
       const res = await callGenericLlm({
         requestId, systemPrompt, userPrompt, jsonSchema: schema,
@@ -123,12 +134,35 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
       if (res.success && res.output && typeof res.output === 'object') {
         const out = res.output as { observations?: unknown; unassessable_parameters?: unknown };
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);
+        const windowUnassessable = validateUnassessableParameters(out.unassessable_parameters);
+
+        // Session 16.3.5 — a parameter must never appear in BOTH
+        // collections (the model classifying something as "not
+        // applicable" in unassessable_parameters while also emitting a
+        // PASS observation for it produces a misleading 100% measurement
+        // for a parameter that had no real opportunity). Never guess
+        // which side is correct and never silently drop one — reject the
+        // whole response, retry ONCE with an explicit correction
+        // instruction, and fail this window closed if it recurs.
+        const conflicts = detectCrossArrayContradiction(validation.accepted, windowUnassessable);
+        if (conflicts.length > 0) {
+          lastErrorCode = 'contradictory_applicability';
+          lastErrorMessage = `The model classified the same parameter(s) as both assessed and unassessable in one response: ${conflicts.join(', ')}.`;
+          if (!contradictionRetried && attempt < MAX_RETRIES_PER_WINDOW) {
+            contradictionRetried = true;
+            userPrompt = baseUserPrompt + CONSISTENCY_RETRY_INSTRUCTION;
+            attempt += 1;
+            continue;
+          }
+          break;
+        }
+
         observations.push(...validation.accepted.map((o) => ({
           ...o,
           primaryTurnId: aliasToReal.get(o.primaryTurnId) ?? o.primaryTurnId,
           evidenceTurnIds: o.evidenceTurnIds.map((id) => aliasToReal.get(id) ?? id),
         })));
-        unassessable.push(...validateUnassessableParameters(out.unassessable_parameters));
+        unassessable.push(...windowUnassessable);
         evaluatedTurnIds.push(...window.turns.map((t) => t.turnId));
         succeeded = true;
         break;

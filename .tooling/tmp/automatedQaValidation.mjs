@@ -203,8 +203,17 @@ function validateUnassessableParameters(raw) {
 function allCanonicalParameterCodesCovered(codes) {
   return QA_PARAMETER_CODES.every((c) => codes.includes(c)) && Object.keys(QA_PARAMETERS).length === QA_PARAMETER_CODES.length;
 }
+function detectCrossArrayContradiction(observations, unassessableParameters) {
+  const observedCodes = new Set(observations.map((o) => o.parameterCode));
+  const conflicts = /* @__PURE__ */ new Set();
+  for (const u of unassessableParameters) {
+    if (observedCodes.has(u.parameterCode)) conflicts.add(u.parameterCode);
+  }
+  return Array.from(conflicts);
+}
 export {
   allCanonicalParameterCodesCovered,
+  detectCrossArrayContradiction,
   validateAutomatedObservations,
   validateUnassessableParameters
 };

@@ -148,3 +148,27 @@ export function validateUnassessableParameters(raw: unknown): UnassessableParame
 export function allCanonicalParameterCodesCovered(codes: readonly string[]): boolean {
   return QA_PARAMETER_CODES.every((c) => codes.includes(c)) && Object.keys(QA_PARAMETERS).length === QA_PARAMETER_CODES.length;
 }
+
+/**
+ * Session 16.3.5 — cross-array consistency check (found via live
+ * verification: a real response classified the same parameter as BOTH
+ * an `observations` entry with value PASS AND an `unassessable_parameters`
+ * entry reasoning it was "not applicable", producing a misleading 100%
+ * PASS for a parameter the model itself said had no real opportunity).
+ * A parameter_code must appear in exactly one of the two collections,
+ * never both, per response. Returns the conflicting codes (empty if
+ * none) — the orchestrator decides what to do with that (retry once,
+ * then fail closed); this function only detects, it never guesses which
+ * side is "correct".
+ */
+export function detectCrossArrayContradiction(
+  observations: Pick<AutomatedQaObservationInput, 'parameterCode'>[],
+  unassessableParameters: Pick<UnassessableParameter, 'parameterCode'>[],
+): QaParameterCode[] {
+  const observedCodes = new Set(observations.map((o) => o.parameterCode));
+  const conflicts = new Set<QaParameterCode>();
+  for (const u of unassessableParameters) {
+    if (observedCodes.has(u.parameterCode)) conflicts.add(u.parameterCode);
+  }
+  return Array.from(conflicts);
+}

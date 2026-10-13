@@ -169,6 +169,77 @@ async function test() {
     assertTrue('a failed evaluation never reports a fabricated COMPLETE coverage', result.evaluationCompleteness !== 'COMPLETE' || result.evaluatedTurnIds.length === 0);
   }
 
+  // 6. Session 16.3.5 — a cross-array contradiction (same parameter in
+  // both observations and unassessable_parameters) on the FIRST attempt
+  // is rejected and retried once with the explicit consistency
+  // instruction; if the retry response is clean, it's persisted.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const sentPrompts = [];
+    const result = await withStubbedFetch(
+      (n, _url, opts) => {
+        sentPrompts.push(JSON.parse(opts.body).user_prompt);
+        if (n === 1) {
+          // T1 appears in BOTH collections — contradictory.
+          return llmSuccess({
+            requestId: 'r1',
+            observations: [{ parameter_code: 'context_continuity_rate', primary_turn_id: 'T1', value: 'PASS' }],
+            unassessable: [{ parameter_code: 'context_continuity_rate', reason: 'not applicable' }],
+          });
+        }
+        // Retry: clean, no contradiction.
+        return llmSuccess({ requestId: 'r2', observations: [{ parameter_code: 'task_progression_rate', primary_turn_id: 'T1', value: 'PASS' }] });
+      },
+      () => evaluateInteraction(turns),
+    );
+    assert('contradiction resolved on retry -> evaluation completes', result.status, 'completed');
+    assert('only the retry (clean) observation is persisted, not the contradictory one', result.observations.length, 1);
+    assert('the persisted observation is from the retry, not the first (rejected) attempt', result.observations[0].parameterCode, 'task_progression_rate');
+    assertTrue('the retry prompt carries the explicit consistency correction', sentPrompts[1].includes('CORRECTION REQUIRED'));
+    assertTrue('the first attempt prompt does NOT carry the correction (only appended on retry)', !sentPrompts[0].includes('CORRECTION REQUIRED'));
+  }
+
+  // 7. Session 16.3.5 — contradiction persists even after the one retry:
+  // never guess which side is correct, never silently drop one side —
+  // fail the evaluation closed with a diagnosable error, no observations
+  // persisted at all for that window.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const result = await withStubbedFetch(
+      () => llmSuccess({
+        requestId: 'r',
+        observations: [{ parameter_code: 'context_continuity_rate', primary_turn_id: 'T1', value: 'PASS' }],
+        unassessable: [{ parameter_code: 'context_continuity_rate', reason: 'not applicable' }],
+      }),
+      (getCallCount) => evaluateInteraction(turns).then((r) => ({ r, calls: getCallCount() })),
+    );
+    assert('a contradiction that persists after the retry fails the evaluation', result.r.status, 'failed');
+    assert('the error code identifies the contradiction specifically', result.r.errorCode, 'contradictory_applicability');
+    assertTrue('the error message names the conflicting parameter', result.r.errorMessage.includes('context_continuity_rate'));
+    assert('no misleading observations are persisted from a failed-closed contradiction', result.r.observations.length, 0);
+    assert('the contradiction retry is bounded — exactly 2 calls, never more', result.calls, 2);
+  }
+
+  // 8. A valid response with legitimately disjoint observations/
+  // unassessable_parameters (the normal, non-contradictory case) is
+  // persisted on the very first attempt — the contradiction check must
+  // never produce a false positive for honest N/A + real findings.
+  {
+    const turns = [turn('t1', 'agent', 'hi')];
+    const result = await withStubbedFetch(
+      (n) => llmSuccess({
+        requestId: `r${n}`,
+        observations: [{ parameter_code: 'task_progression_rate', primary_turn_id: 'T1', value: 'PASS' }],
+        unassessable: [{ parameter_code: 'reference_resolution_accuracy', reason: 'no references to resolve' }],
+      }),
+      (getCallCount) => evaluateInteraction(turns).then((r) => ({ r, calls: getCallCount() })),
+    );
+    assert('disjoint observations/unassessable are accepted on the first attempt, no retry needed', result.calls, 1);
+    assert('valid non-contradictory evaluation completes', result.r.status, 'completed');
+    assert('the real observation is persisted', result.r.observations.length, 1);
+    assert('the real unassessable entry is persisted too', result.r.unassessableParameters.some((u) => u.parameterCode === 'reference_resolution_accuracy'), true);
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);
 }

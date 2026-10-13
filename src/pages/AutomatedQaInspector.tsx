@@ -53,15 +53,20 @@ function formatTimeOnly(iso: string): string {
 
 /**
  * Session 16.3.6 — display-only reordering of the Quality Measurements
- * grid (row 1: 4 higher-is-better; row 2: 2 higher-is-better; row 3: all
- * 3 lower-is-better, together). This is purely a rendering order — the
- * canonical QA_PARAMETER_CODES array (used for ratio calculation
- * elsewhere) is untouched.
+ * grid into three explicit row groups (row 1: 4 higher-is-better; row 2:
+ * 2 higher-is-better; row 3: all 3 lower-is-better, together). Rendered
+ * as three SEPARATE grid containers rather than one flat grid, because a
+ * single `grid-cols-4` with 9 items auto-flows to fill every cell left
+ * to right regardless of a flat array's intended grouping — row 3's
+ * items would visually creep up into row 2's "empty" cells instead of
+ * leaving them empty, which is exactly what the brief rules out. This is
+ * purely a rendering order — the canonical QA_PARAMETER_CODES array
+ * (used for ratio calculation elsewhere) is untouched.
  */
-const MEASUREMENT_DISPLAY_ORDER: QaParameterCode[] = [
-  'context_continuity_rate', 'followup_understanding_rate', 'reference_resolution_accuracy', 'task_progression_rate',
-  'conversation_recovery_rate', 'response_grounding_rate',
-  'unnecessary_clarification_rate', 'repetition_loop_rate', 'customer_correction_rate',
+const MEASUREMENT_ROW_GROUPS: QaParameterCode[][] = [
+  ['context_continuity_rate', 'followup_understanding_rate', 'reference_resolution_accuracy', 'task_progression_rate'],
+  ['conversation_recovery_rate', 'response_grounding_rate'],
+  ['unnecessary_clarification_rate', 'repetition_loop_rate', 'customer_correction_rate'],
 ];
 
 const AutomatedQaInspector: React.FC = () => {
@@ -194,48 +199,48 @@ const AutomatedQaInspector: React.FC = () => {
               <div>
                 <h2 className="text-[14px] font-semibold mb-1.5">Quality Measurements</h2>
                 {/* Session 16.3.4 — ~50% smaller cards. Session 16.3.6 —
-                    4-column grid in MEASUREMENT_DISPLAY_ORDER: row 1 is
-                    the 4 "higher is better" primary conversation/
-                    understanding/resolution parameters, row 2 is the
-                    remaining 2 higher-is-better parameters (2 of 4 cells
-                    used, not stretched), row 3 is all 3 lower-is-better
-                    parameters together (3 of 4 cells used, not
-                    stretched) — default CSS grid behavior already leaves
-                    unused trailing cells empty rather than stretching
-                    siblings to fill them. Direction (higher/lower-is-
-                    better) stays on the card's own title tooltip. */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
-                  {MEASUREMENT_DISPLAY_ORDER.map((code) => {
-                    const def = QA_PARAMETERS[code];
-                    const r = ratios[code];
-                    const unassessable = evaluation.unassessableParameters.find((u) => u.parameterCode === code);
-                    const directionLabel = def.directionality === 'higher_better' ? 'Higher is better' : 'Lower is better';
-                    return (
-                      <div
-                        key={code}
-                        className="rounded-md border border-border bg-card px-1.5 py-1 min-h-[38px] flex flex-col justify-center"
-                        title={directionLabel}
-                      >
-                        <div className="flex items-start justify-between gap-1">
-                          <div className="text-[10px] font-semibold leading-[1.15] line-clamp-2" title={def.displayName}>{def.displayName}</div>
-                          {r.denominator === 0 && unassessable && (
-                            <Info className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
-                          )}
-                        </div>
-                        {r.denominator === 0 ? (
-                          <div className="flex items-baseline gap-1" title={unassessable?.reason}>
-                            <span className="text-[14px] font-semibold leading-tight text-muted-foreground">—</span>
-                            <span className="text-[10px] text-muted-foreground truncate">No eligible population</span>
+                    three separate 4-column grid rows (see
+                    MEASUREMENT_ROW_GROUPS) so each group's unused
+                    trailing cells stay genuinely empty instead of being
+                    filled by the next group's items via grid auto-flow.
+                    Direction (higher/lower-is-better) stays on the
+                    card's own title tooltip. */}
+                <div className="space-y-1.5">
+                  {MEASUREMENT_ROW_GROUPS.map((group, groupIndex) => (
+                    <div key={groupIndex} className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
+                      {group.map((code) => {
+                        const def = QA_PARAMETERS[code];
+                        const r = ratios[code];
+                        const unassessable = evaluation.unassessableParameters.find((u) => u.parameterCode === code);
+                        const directionLabel = def.directionality === 'higher_better' ? 'Higher is better' : 'Lower is better';
+                        return (
+                          <div
+                            key={code}
+                            className="rounded-md border border-border bg-card px-1.5 py-1 min-h-[38px] flex flex-col justify-center"
+                            title={directionLabel}
+                          >
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="text-[10px] font-semibold leading-[1.15] line-clamp-2" title={def.displayName}>{def.displayName}</div>
+                              {r.denominator === 0 && unassessable && (
+                                <Info className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
+                              )}
+                            </div>
+                            {r.denominator === 0 ? (
+                              <div className="flex items-baseline gap-1" title={unassessable?.reason}>
+                                <span className="text-[14px] font-semibold leading-tight text-muted-foreground">—</span>
+                                <span className="text-[10px] text-muted-foreground truncate">No eligible population</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-[14px] font-semibold leading-tight">{formatFractionAsPercent(r.rate ?? undefined)}</span>
+                                <span className="text-[10px] text-muted-foreground truncate">{r.numerator}/{r.denominator} eligible</span>
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[14px] font-semibold leading-tight">{formatFractionAsPercent(r.rate ?? undefined)}</span>
-                            <span className="text-[10px] text-muted-foreground truncate">{r.numerator}/{r.denominator} eligible</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

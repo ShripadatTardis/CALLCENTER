@@ -1,6 +1,8 @@
 # Session 7.5 — Central UI Configuration Schema
 
-**Mode: SCHEMA DESIGN ONLY.** No existing screen, component, CSS file, or Tailwind config was modified. No customer configuration instance was authored. No theme engine exists. Nothing here is consumed by the running application. This session follows the approved scope in §F ("Session 7.5 — Token Schema Design, Full-Property Gap Specification & New-Category Audit") of `docs/SESSION_7_4_CUSTOMER_UI_CONFIGURATION_ROADMAP.md`, itself built on `docs/SESSION_7_3_UI_CENTRALIZATION_AUDIT.md` (both closed, commit `65bc2ae`, not revisited or recommitted here).
+**Mode: SCHEMA DESIGN ONLY.** No existing screen, component, CSS file, or Tailwind config was modified. No theme engine exists. Nothing here is consumed by the running application. This session follows the approved scope in §F ("Session 7.5 — Token Schema Design, Full-Property Gap Specification & New-Category Audit") of `docs/SESSION_7_4_CUSTOMER_UI_CONFIGURATION_ROADMAP.md`, itself built on `docs/SESSION_7_3_UI_CENTRALIZATION_AUDIT.md`.
+
+**Revised by Session 7.6.1** (§8 below): the Session 7.6 extraction attempt found this schema's original version could not losslessly represent 7 categories of VoiceForce's real current values. §2-§7 below describe the *original* 7.5 design (kept for history/traceability); §8 is the authoritative, current schema structure and the required VoiceForce→KATON→universal-field mapping table. **Read §8 first if you only want the current state.**
 
 ---
 
@@ -14,7 +16,7 @@ Every field is sourced from one of two places, cited inline in the schema file i
 
 ---
 
-## 2. Schema structure overview
+## 2. Schema structure overview (ORIGINAL — superseded by §8)
 
 | Top-level field | Covers | Primary source |
 |---|---|---|
@@ -33,7 +35,7 @@ Every field is sourced from one of two places, cited inline in the schema file i
 | `breakpoints` | sm/md/lg/xl | New (Tailwind defaults reference) |
 | `components` | Button, Input, Table, Badge, Alert variant/state coverage | 7.3 §B.5-B.11, this session's §4 direct verification |
 
-**Explicitly absent, per Session 7.4 decision 3**: no workflow/progress-stage component field exists anywhere in the schema, and no "provenance" (solid/dashed content-origin) axis exists on the Badge component field — both KATON elements have no VoiceForce functional requirement and are not represented even as unused/optional fields. This is a structural choice, not an oversight — see the schema file's own closing comment on `components`.
+**Explicitly absent, per Session 7.4 decision 3**: no workflow/progress-stage component field exists anywhere in the schema, and no "provenance" (solid/dashed content-origin) axis exists on the Badge component field — both KATON elements have no VoiceForce functional requirement and are not represented even as unused/optional fields. This remains true in the §8 revision too.
 
 ---
 
@@ -136,3 +138,72 @@ No other verification step applies — `npm run verify:full` was not run because
 - VoiceForce's existing appearance and density are unaffected (nothing was wired up that could affect them).
 
 This session is not committed. Session 7.6 was not started.
+
+---
+
+## 8. Session 7.6.1 revision — universal schema, VoiceForce→KATON mapping table
+
+Session 7.6's extraction attempt (`docs/SESSION_7_6_VOICEFORCE_BASELINE_EXTRACTION.md`) found the §2 schema could not losslessly represent 7 categories of VoiceForce's real current values (gaps A-G). This revision fixes the schema itself, using **one** repeated, principled, customer-independent pattern everywhere a value can legitimately vary by context, rather than seven separate one-off patches:
+
+```ts
+{ default: T, variants?: Record<string, T> }  // "scaleOf" in schema.ts
+```
+
+`default` is **required** — the one value a minimal config (KATON, which typically documents a single value per property) supplies. `variants` is **optional**, keyed by a generic semantic word (a size like `"compact"`, a state like `"hover"`, never a raw palette name like `"cyan600"`) — a richer config (VoiceForce) uses it to losslessly preserve every real additional value the baseline reduces to one, satisfying the instruction *"where KATON documents fewer variants, use only explicit, validated defaults or inheritance rules — do not fabricate undocumented KATON specifications."*
+
+### 8.1 Revised schema structure
+
+| Top-level field | Structure | Resolves |
+|---|---|---|
+| `color.surfaces` | `{base, raised, overlay, interactiveSubtle, sidebar}`, each a `{background, foreground}` pair | Gap A (page/card/popover/hover-surface/sidebar background+foreground pairing) |
+| `color.roles` | `{primary, secondary, muted}`, each a `{background, foreground}` pair | Gap A (brand/neutral filled-control pairing); also absorbs the original schema's redundant standalone `neutral.secondaryText` field (same real value as `roles.muted.foreground` — no longer duplicated) |
+| `color.brand` | `{decorative?}` — optional, single color | Gap B: structurally separated from `surfaces.interactiveSubtle` so KATON's sparing-use brand accent and VoiceForce's real neutral hover-surface token can never collide under one field again |
+| `color.interactive.action` | `scaleOf({text?, background?, border?, focusRing?})` | Gap C: a real multi-shade interactive/link/focus scale, not 2 flat values |
+| `color.semantic.{positive,negative,caution}` | `{text, fill, solid: {background, foreground}}` | Unchanged in shape from 7.5, but now explicitly documented to cover BOTH the tinted (Badge) and solid (Alert/destructive-button) real usages without a second field |
+| `shadow` | `scaleOf(string)` | Gap D: 6 real distinct elevation values, not 1 |
+| `heights` | `scaleOf({primaryAction, control, formField, filterField, topBar, sidebarWidth})` | Gap E: real per-component size variants (Button xs/sm/default/lg, Input sm/default), not 1 flat value per role |
+| `typography.scale[].lineHeightPx` / `.lineHeightSource` | `lineHeightPx` now optional; `lineHeightSource: 'explicit' \| 'inherited-default'` required | Gap F: VoiceForce's arbitrary-pixel sizes have no paired custom line-height at any call site — this is now an honestly-recorded state, never a fabricated number |
+| `icons` | `scaleOf({sizePx})` plus `strokeWidth`/`library` | Gap G: real multiple icon sizes, not 1 default + 1 vague "compact" |
+| `borders` | `{default: {widthPx, color}, field: {widthPx, color}, focusRingWidthPx, dashedStyle?}` | Closes the part of gap A about `--input` (structurally distinct from `--border`) and `--ring` (a ring is a width+color mechanism of its own, not conflated with a border) |
+| `cards` | `{headerBackground?, paddingPx?}` only | De-duplicated: `cards.surfaceColor`/`cards.borderColor` from the original 7.5/7.6 draft were removed — they duplicated `color.surfaces.raised` / `borders.default`, which are now the single source for those values |
+
+### 8.2 VoiceForce → KATON → universal schema mapping table
+
+Every row is sourced from either the 7.3 audit (KATON column) or this session's direct extraction (VoiceForce column, cited file/evidence). "—" means no real current value exists for that side.
+
+| VoiceForce source property | KATON category (7.3 §B) | Universal schema field | VoiceForce value | KATON value (if documented) |
+|---|---|---|---|---|
+| `--background` | Neutrals — Ground | `color.surfaces.base.background` | `hsl(210 20% 98%)` | `#EEF3F7` |
+| `--foreground` | — (not itemized) | `color.surfaces.base.foreground` | `hsl(222.2 84% 4.9%)` | — |
+| `--card` | — (not itemized; closest: Subtle) | `color.surfaces.raised.background` | `hsl(0 0% 100%)` | `#F7F9FB` (approximate — KATON's "Subtle" is documented as table-headers/panels, not strictly "card") |
+| `--card-foreground` | — | `color.surfaces.raised.foreground` | `hsl(222.2 84% 4.9%)` | — |
+| `--popover` / `--popover-foreground` | — | `color.surfaces.overlay.{background,foreground}` | `hsl(0 0% 100%)` / `hsl(222.2 84% 4.9%)` | — |
+| `--accent` / `--accent-foreground` (real neutral hover surface) | — (KATON documents no equivalent "neutral hover surface" role) | `color.surfaces.interactiveSubtle.{background,foreground}` | `hsl(210 40% 96.1%)` / `hsl(222.2 47.4% 11.2%)` | — |
+| `--sidebar-background` / `--sidebar-foreground` | — (KATON's 3 source pages don't document their own nav chrome in this level of detail) | `color.surfaces.sidebar.{background,foreground}` | `hsl(0 0% 98%)` / `hsl(240 5.3% 26.1%)` | — |
+| `--primary` / `--primary-foreground` | Brand — Katon navy | `color.roles.primary.{background,foreground}` | `hsl(222.2 47.4% 11.2%)` / `hsl(210 40% 98%)` | `#121B54` / (foreground not separately documented — likely white, not explicit) |
+| `--secondary` / `--secondary-foreground` | — (no direct KATON equivalent) | `color.roles.secondary.{background,foreground}` | `hsl(210 40% 96.1%)` / `hsl(222.2 47.4% 11.2%)` | — |
+| `--muted` / `--muted-foreground` | Neutrals — Subtle / Secondary text | `color.roles.muted.{background,foreground}` | `hsl(210 40% 96.1%)` / `hsl(215.4 16.3% 46.9%)` | `#F7F9FB` / `#4F5878` |
+| Badge `positive` / Alert (no solid-success exists) | Status — Confirmed / Confirmed fill | `color.semantic.positive.{text,fill,solid}` | `rgb(4 120 87)` / `rgb(16 185 129/0.1)` / no real solid usage (Tailwind emerald-500 used as the honest best-available value — see §8.3 ambiguous mapping #1) | `#2E6B3F` / `#E3F0E6` |
+| Badge `escalated` / `--destructive` | Status — Rejected / Rejected fill | `color.semantic.negative.{text,fill,solid}` | `rgb(185 28 28)` / `rgb(239 68 68/0.1)` / `hsl(0 84.2% 60.2%)` + `hsl(210 40% 98%)` | `#A33A2F` / `#F6E3E1` |
+| Badge `warning` / (no solid-caution exists) | Status — Attention / Attention fill | `color.semantic.caution.{text,fill,solid}` | `rgb(180 83 9)` / `rgb(245 158 11/0.1)` / no real solid usage (same caveat as positive) | `#8A5A0B` / `#FDF1DC` |
+| `--border` | Neutrals — Border | `borders.default.{widthPx,color}` | `1px` / `hsl(214.3 31.8% 91.4%)` | `1px` / `#D5DFE8` |
+| `--input` | Neutrals — Field border | `borders.field.{widthPx,color}` | `1px` / `hsl(214.3 31.8% 91.4%)` (same real value as `--border` today) | `1px` / `#7E89A2` (KATON's Field-border value is distinct from its generic Border — VoiceForce's two tokens currently coincide, KATON's don't) |
+| `ring-2` (Tailwind ring utility width) | Borders — "2px around the pane in focus" | `borders.focusRingWidthPx` | `2` | `2` |
+| `cyan-{300,400,500,600,700,800,950}` (7 real shades, 42 files) | Brand/Action — Katon blue / Action / Action pressed / Selected / Highlight (5 documented roles) | `color.interactive.action.{default,variants}` | 7 real hex values, each tagged by real usage role (link text, solid background, focus ring, border, dark surface) — see §8.1/config file | `#0C8FD9` (Katon blue) / `#0A67C7` (Action) / `#095DB5` (Action pressed) / `#C0DDEE` (Selected) / `#E6F3FB` (Highlight) |
+| `shadow-{sm,md,lg,xl,2xl,none}` (6 real values, 29 files) | "One shadow only... menus, panels over content, page previews" | `shadow.{default,variants}` | all 6 real CSS box-shadow values preserved | 1 documented value (exact CSS not given in the KATON source, only the usage note) |
+| Button `h-{7,9,10,11}` / Input `h-{8,10}` | Control heights: 44/36/40/36/56/224px | `heights.{default,variants}` | real: 28/32/36/40/44/56/224px across Button/Input/TopBar/Sidebar | 44 (primary action) / 36 (everything else) / 40 (form field) / 36 (filter field) / 56 (top bar) / 224 (sidebar width) |
+| `text-[9..18px]` (8 sizes, 312 occurrences) | Type ramp — 9 sizes, 13-30px, each with a documented line-height | `typography.scale[]` | 8 real sizes, each `lineHeightSource: 'inherited-default'` (no paired custom line-height found) | 9 sizes, each with an explicit documented line-height (e.g. 13/18, 14/20, ...) |
+| icon `h-{3,3.5,4,5}` (12/14/16/20px) | Icons — 14/16/18/20/24px, Lucide, stroke 1.75 | `icons.{default,variants}` + `strokeWidth` | 12/14/16/20px observed; `strokeWidth: 2` (Lucide's own default, unmodified) | 14/16/18/20/24px; `strokeWidth: 1.75` (KATON overrides Lucide's default; VoiceForce does not) |
+| `radii.{tag,control,panel,card}` | 4/6/8/10px | `radii.{tag,control,panel,card,pill}` | 4/6/8/8px (VoiceForce has no distinct card radius from panel — real finding, not an omission) | 4/6/8/10px |
+| Tailwind default spacing scale | "Tailwind steps in px" — 4..48 | `spacing[]` | `[4,6,8,10,12,16,20,24,28,32,40,48]` | same array (KATON's scale IS Tailwind's defaults) |
+| Tailwind default `screens` | — (not documented) | `breakpoints.{sm,md,lg,xl}` | `640/768/1024/1280` | — |
+
+### 8.3 Ambiguous mappings (reported, not silently resolved)
+
+1. **Semantic `solid` presentation for `positive`/`caution`** — VoiceForce has no real component today that renders a solid-filled success or caution surface (no success/caution Alert exists, per the Session 7.5 audit). The baseline config populates `solid.background`/`solid.foreground` with Tailwind's own published `emerald-500`/`amber-500` + white-text values as the most defensible *real, citable* color (not invented from nothing — it's the same palette VoiceForce already uses for the `fill`/`text` pair, just at full saturation), but this is a genuine judgment call, not an extraction of an actually-rendered current value. Flagged here rather than presented as equivalent in confidence to the other, directly-observed values.
+2. **`--card` vs. KATON's "Subtle"** — KATON's own source documents "Subtle" (`#F7F9FB`) as "table headers, panels," which is closer to VoiceForce's `--muted`/table-header usage than to VoiceForce's `--card` (`hsl(0 0% 100%)`, pure white, used for dialogs/elevated panels). The mapping table pairs `--card` with "Subtle" as the nearest KATON category for traceability, but a future KATON config author should decide independently whether KATON's own `raised`-surface value should be `#F7F9FB` (Subtle) or a brighter white closer to VoiceForce's real `--card` — this is a KATON-config-authoring decision (Session 7.11), not resolved here.
+3. **`--input` vs. `--border` real-value coincidence** — VoiceForce's two structurally-distinct tokens (`borders.default.color`, `borders.field.color`) currently hold the identical real value. This is correctly preserved as-is (not collapsed into one field, since KATON's own source gives these two roles genuinely different values — `#D5DFE8` vs `#7E89A2`), but it means VoiceForce's own config doesn't exercise the real distinction the schema supports. Noted so a reviewer doesn't mistake this for a modeling error.
+4. **Button `quiet`/ghost variant has no real "background" value** — KATON's Quiet button has a background only in non-Default states (per the 7.3 §B.5 screenshot read); VoiceForce's `ghost` Button variant has literally no background in ANY state except hover (which uses `color.surfaces.interactiveSubtle`, not a `components.button.variants.quiet`-owned value). The schema's `buttonComponent.variants.quiet` field was narrowed to `{foreground}` only (no `background`) to reflect this real asymmetry rather than forcing a background value that doesn't exist. Flagged as a deliberate, non-obvious schema shape choice.
+5. **Font family** — VoiceForce's "value" (Tailwind's default `font-sans` stack) is not a deliberately *chosen* typeface the way KATON's Roboto is — it is the absence of a choice. Both are recorded as real, truthful current states, but they are not equivalent in what they represent about either product's design intent; a reviewer should not read "VoiceForce: ui-sans-serif, system-ui, ..." as "VoiceForce deliberately chose a system-font aesthetic" — it simply never overrode the framework default.
+
+All five are genuine judgment calls or noteworthy asymmetries, not schema defects — none blocks the round-trip verification (§ below), since none involves fabricating a value the schema requires but VoiceForce doesn't have.

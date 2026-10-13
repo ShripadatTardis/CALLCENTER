@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, HelpCircle, Info, ExternalLink, Scale } from 'lucide-react';
+import { ChevronDown, ChevronRight, HelpCircle, Info, ExternalLink, Scale, Copy, Check } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useQaPairCandidates, useQaComparisonDetail, useQaCalibrationBatch } from '@/hooks/qa/useQaCalibration';
+import { useAgents } from '@/hooks/agents/useAgents';
 import { QA_PARAMETERS, QA_PARAMETER_CODES, type QaParameterCode } from '@/lib/qaParameters';
 import type { ComparisonClassification, QaPairCandidate } from '@/lib/qaComparison';
 import { applicabilityMismatchConcentration, judgmentDisagreementConcentration, coverageDivergence, promptVersionComparison } from '@/lib/qaComparison';
@@ -52,6 +53,27 @@ function ClassificationBadge({ classification }: { classification: ComparisonCla
 
 const ALL = '__all__';
 
+/**
+ * Session 16.4.1 — best truthful date to show for a paired interaction
+ * in the list. This page does not fetch the raw Voice/Chat interaction
+ * record (that would be a new per-row fetch this session deliberately
+ * avoids — see docs/QA_CALIBRATION_COMPARISON.md), so there is no true
+ * "interaction start time" available here. The most recent of the
+ * latest review's submission and the latest evaluation's completion is
+ * used instead — a real, already-fetched timestamp, never invented —
+ * and is the most useful proxy for "how recently was this looked at."
+ */
+function bestCandidateDate(c: QaPairCandidate): string | null {
+  const reviewDate = c.reviews[0]?.submittedAt ?? null;
+  const evalDate = c.evaluations[0]?.completedAt ?? c.evaluations[0]?.createdAt ?? null;
+  if (reviewDate && evalDate) return reviewDate > evalDate ? reviewDate : evalDate;
+  return reviewDate ?? evalDate;
+}
+
+function shortenId(id: string): string {
+  return id.length <= 10 ? id : `${id.slice(0, 8)}…`;
+}
+
 const QaCalibration: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -61,6 +83,17 @@ const QaCalibration: React.FC = () => {
 
   const { candidates, isLoading: candidatesLoading } = useQaPairCandidates();
   const { entries: batchEntries, isLoading: batchLoading, truncated } = useQaCalibrationBatch(candidates);
+
+  // Session 16.4.1 — agent display names for the paired-interactions list,
+  // reusing the existing agents directory (no new endpoint). Falls back
+  // to the raw agentId (truthful, never invented) when the directory
+  // hasn't loaded or doesn't contain this agent.
+  const { data: agentsData } = useAgents();
+  const agentNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of agentsData?.agents ?? []) map.set(a.agentId, a.displayName);
+    return map;
+  }, [agentsData]);
 
   const [channelFilter, setChannelFilter] = useState(ALL);
   const [agentFilter, setAgentFilter] = useState(ALL);
@@ -191,7 +224,14 @@ const QaCalibration: React.FC = () => {
           <FilterSelect label="Prompt version" value={promptVersionFilter} onChange={setPromptVersionFilter} options={promptVersionOptions.map((v) => ({ value: v, label: v }))} />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[38%_62%] gap-3 items-start">
+        {/* Session 16.4.1 — comparison workspace: paired interactions
+            (~35%) | selectors + transcript comparability + matrix (~65%).
+            Evidence used to live inside the right column here, which made
+            it grow very tall while the left column stayed mostly empty —
+            it is now rendered as its own full-width block BELOW this
+            grid (see ParameterDrillDown further down), never nested
+            inside either column. */}
+        <div className="grid grid-cols-1 xl:grid-cols-[35%_65%] gap-3 items-start">
           {/* Pairs list */}
           <div className="rounded-md border border-border overflow-hidden">
             <div className="h-8 flex items-center px-2 bg-card text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -204,31 +244,23 @@ const QaCalibration: React.FC = () => {
               )}
               {filteredCandidates.map((c) => {
                 const isSelected = selectedCandidate?.interactionId === c.interactionId && selectedCandidate?.channel === c.channel;
+                const agentLabel = agentNameById.get(c.agentId) ?? c.agentId;
+                const dateLabel = bestCandidateDate(c);
                 return (
-                  <button
-                    type="button"
+                  <PairListItem
                     key={`${c.channel}:${c.interactionId}`}
-                    onClick={() => selectCandidate(c)}
-                    className={`w-full text-left px-2 py-1.5 text-xs hover:bg-muted/40 ${isSelected ? 'bg-cyan-500/10' : ''}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium truncate" title={c.interactionId}>{c.interactionId}</span>
-                      <Badge variant="outline" className="h-4 text-[9px] capitalize flex-shrink-0">{c.channel}</Badge>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5">
-                      <span>{c.agentId}</span>
-                      <span>·</span>
-                      <span>{c.reviews.length} review{c.reviews.length !== 1 ? 's' : ''}</span>
-                      <span>·</span>
-                      <span>{c.evaluations.length} evaluation{c.evaluations.length !== 1 ? 's' : ''}</span>
-                    </div>
-                  </button>
+                    candidate={c}
+                    isSelected={isSelected}
+                    agentLabel={agentLabel}
+                    dateLabel={dateLabel}
+                    onSelect={() => selectCandidate(c)}
+                  />
                 );
               })}
             </div>
           </div>
 
-          {/* Selected pair detail */}
+          {/* Selectors, transcript comparability, matrix */}
           <div className="space-y-3 min-w-0">
             {!selectedCandidate ? (
               <div className="rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
@@ -320,20 +352,24 @@ const QaCalibration: React.FC = () => {
                     </table>
                   </div>
                 )}
-
-                {/* D3 — evidence drill-down */}
-                {comparison && selectedParameter && (
-                  <ParameterDrillDown
-                    parameterCode={selectedParameter}
-                    comparison={comparison.parameters[selectedParameter]}
-                    review={review}
-                    turnTextById={turnTextById}
-                  />
-                )}
               </>
             )}
           </div>
         </div>
+
+        {/* D3 — evidence drill-down. Full-width, outside the two-column
+            workspace above (Session 16.4.1 — this used to be nested in
+            the right column, forcing that column very tall while the
+            left column sat mostly empty). Independently scrollable per
+            side, capped height — see ParameterDrillDown. */}
+        {selectedCandidate && comparison && selectedParameter && (
+          <ParameterDrillDown
+            parameterCode={selectedParameter}
+            comparison={comparison.parameters[selectedParameter]}
+            review={review}
+            turnTextById={turnTextById}
+          />
+        )}
 
         {/* Part E — Calibration insights */}
         <Collapsible defaultOpen={false}>
@@ -441,6 +477,66 @@ function TranscriptComparabilityBadge({ status }: { status: 'matched' | 'mismatc
   );
 }
 
+/**
+ * Session 16.4.1 — supervisor-friendly paired-interaction row: agent
+ * display name + a best-effort date as the primary line (see
+ * bestCandidateDate), the shortened interaction id + channel + review/
+ * evaluation counts as the secondary line. The full UUID stays
+ * available via `title` (hover tooltip) and an explicit copy button —
+ * never removed, just no longer the primary label.
+ */
+function PairListItem({
+  candidate, isSelected, agentLabel, dateLabel, onSelect,
+}: {
+  candidate: QaPairCandidate;
+  isSelected: boolean;
+  agentLabel: string;
+  dateLabel: string | null;
+  onSelect: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copyId = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(candidate.interactionId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard access can fail (permissions/insecure context) — not
+      // worth surfacing an error for a convenience action; the full id
+      // is still visible via the title tooltip either way.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full text-left px-2 py-1.5 text-xs hover:bg-muted/40 ${isSelected ? 'bg-cyan-500/10' : ''}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium truncate">{agentLabel}{dateLabel ? ` · ${formatTimestamp(dateLabel)}` : ''}</span>
+        <Badge variant="outline" className="h-4 text-[9px] capitalize flex-shrink-0">{candidate.channel}</Badge>
+      </div>
+      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="font-mono">{shortenId(candidate.interactionId)}</span>
+          </TooltipTrigger>
+          <TooltipContent className="text-[11px] font-mono">{candidate.interactionId}</TooltipContent>
+        </Tooltip>
+        <button type="button" onClick={copyId} aria-label="Copy full interaction id" className="text-muted-foreground hover:text-foreground">
+          {copied ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+        </button>
+        <span>·</span>
+        <span>{candidate.reviews.length} review{candidate.reviews.length !== 1 ? 's' : ''}</span>
+        <span>·</span>
+        <span>{candidate.evaluations.length} evaluation{candidate.evaluations.length !== 1 ? 's' : ''}</span>
+      </div>
+    </button>
+  );
+}
+
 function InsightTable({ title, rows }: { title: string; rows: { parameterCode: QaParameterCode; count: number; ofPairs: number }[] }) {
   return (
     <div>
@@ -465,6 +561,22 @@ function InsightTable({ title, rows }: { title: string; rows: { parameterCode: Q
   );
 }
 
+/** Session 16.4.1 — the per-side empty-state message distinguishes WHY there's nothing to show, using the existing classification/ratio data — never a bare blank panel. */
+function emptyEvidenceMessage(sideDenominator: number, classification: ComparisonClassification): string {
+  if (sideDenominator === 0) return 'Not applicable — no eligible observation recorded for this parameter.';
+  if (classification === 'not_comparable') return 'No overlapping evidence — assessed on different turns than the other side.';
+  return 'No eligible observation recorded for this parameter.';
+}
+
+/**
+ * Session 16.4.1 — full-width evidence comparison, rendered OUTSIDE the
+ * two-column comparison workspace (see the caller) so expanding it never
+ * stretches an otherwise-empty sibling column. Two equal columns,
+ * independently scrollable with a sticky heading once content exceeds
+ * ~460px on desktop; on mobile the columns stack and scroll with the
+ * page instead (no nested scroll region, per the brief's mobile
+ * guidance).
+ */
 function ParameterDrillDown({
   parameterCode, comparison, review, turnTextById,
 }: {
@@ -474,54 +586,60 @@ function ParameterDrillDown({
   turnTextById: Map<string, string>;
 }) {
   const humanFindings = (review?.findings ?? []).filter((f) => f.parameterCode === parameterCode);
+  const humanEmpty = emptyEvidenceMessage(comparison.human.denominator, comparison.classification);
+  const automatedEmpty = emptyEvidenceMessage(comparison.automated.denominator, comparison.classification);
+  const hasAutomatedEvidence = comparison.turnComparisons.length > 0 || comparison.automatedOnlyTurnIds.length > 0;
+
   return (
-    <div className="rounded-md border border-border p-2.5">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[12px] font-semibold">{QA_PARAMETERS[parameterCode].displayName} — evidence</h3>
+    <div className="rounded-md border border-border overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-2.5 py-2 border-b border-border bg-card">
+        <h3 className="text-[12px] font-semibold">{QA_PARAMETERS[parameterCode].displayName} — Evidence Comparison</h3>
         <ClassificationBadge classification={comparison.classification} />
       </div>
-      <p className="text-[11px] text-muted-foreground mb-2">{comparison.reason}</p>
+      <p className="text-[11px] text-muted-foreground px-2.5 pt-2">{comparison.reason}</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Human QA</div>
-          {humanFindings.length === 0 && <p className="text-[11px] text-muted-foreground">No finding recorded for this parameter.</p>}
-          {humanFindings.map((f) => (
-            <div key={f.id} className="rounded border border-border p-1.5 text-[11px] space-y-0.5">
-              <div className="flex items-center gap-1.5"><Badge variant="outline" className="h-4 text-[9px]">{f.value}</Badge>{f.reasonCode && <span className="text-muted-foreground">{f.reasonCode}</span>}</div>
-              <div className="text-muted-foreground">{turnTextById.get(f.primaryTurnId) ?? `Turn ${f.primaryTurnId}`}</div>
-              {f.note && <div className="italic text-muted-foreground">"{f.note}"</div>}
-            </div>
-          ))}
-        </div>
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Automated QA</div>
-          {comparison.turnComparisons.length === 0 && comparison.automatedOnlyTurnIds.length === 0 && (
-            <p className="text-[11px] text-muted-foreground">No observation recorded for this parameter.</p>
-          )}
-          {comparison.turnComparisons.map((t) => (
-            <div key={t.turnId} className="rounded border border-border p-1.5 text-[11px] space-y-0.5">
-              <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className="h-4 text-[9px]">{t.automatedValue}</Badge>
-                {t.cannotVerifyInvolved ? (
-                  <span className="text-[9px] text-muted-foreground">cannot verify — excluded from agreement</span>
-                ) : (
-                  <span className={`text-[9px] ${t.agree ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>{t.agree ? 'agrees with Human' : 'disagrees with Human'}</span>
-                )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 sm:divide-x sm:divide-border mt-2">
+        <div className="flex flex-col max-h-none sm:max-h-[460px]">
+          <div className="sticky top-0 bg-card text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-2.5 py-1.5 border-b border-border">Human QA Evidence</div>
+          <div className="px-2.5 py-2 space-y-1.5 sm:overflow-y-auto">
+            {humanFindings.length === 0 && <p className="text-[11px] text-muted-foreground">{humanEmpty}</p>}
+            {humanFindings.map((f) => (
+              <div key={f.id} className="rounded border border-border p-1.5 text-[11px] space-y-0.5">
+                <div className="flex items-center gap-1.5"><Badge variant="outline" className="h-4 text-[9px]">{f.value}</Badge>{f.reasonCode && <span className="text-muted-foreground">{f.reasonCode}</span>}</div>
+                <div className="text-muted-foreground">{turnTextById.get(f.primaryTurnId) ?? `Turn ${f.primaryTurnId}`}</div>
+                {f.note && <div className="italic text-muted-foreground">"{f.note}"</div>}
               </div>
-              <div className="text-muted-foreground">{turnTextById.get(t.turnId) ?? `Turn ${t.turnId}`}</div>
-            </div>
-          ))}
-          {comparison.automatedOnlyTurnIds.map((turnId) => (
-            <div key={turnId} className="rounded border border-dashed border-border p-1.5 text-[11px] text-muted-foreground">
-              Automated-only: {turnTextById.get(turnId) ?? `Turn ${turnId}`}
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col max-h-none sm:max-h-[460px]">
+          <div className="sticky top-0 bg-card text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-2.5 py-1.5 border-b border-border">Automated QA Evidence</div>
+          <div className="px-2.5 py-2 space-y-1.5 sm:overflow-y-auto">
+            {!hasAutomatedEvidence && <p className="text-[11px] text-muted-foreground">{automatedEmpty}</p>}
+            {comparison.turnComparisons.map((t) => (
+              <div key={t.turnId} className="rounded border border-border p-1.5 text-[11px] space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className="h-4 text-[9px]">{t.automatedValue}</Badge>
+                  {t.cannotVerifyInvolved ? (
+                    <span className="text-[9px] text-muted-foreground">cannot verify — excluded from agreement</span>
+                  ) : (
+                    <span className={`text-[9px] ${t.agree ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>{t.agree ? 'agrees with Human' : 'disagrees with Human'}</span>
+                  )}
+                </div>
+                <div className="text-muted-foreground">{turnTextById.get(t.turnId) ?? `Turn ${t.turnId}`}</div>
+              </div>
+            ))}
+            {comparison.automatedOnlyTurnIds.map((turnId) => (
+              <div key={turnId} className="rounded border border-dashed border-border p-1.5 text-[11px] text-muted-foreground">
+                Automated-only: {turnTextById.get(turnId) ?? `Turn ${turnId}`}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {(comparison.humanOnlyTurnIds.length > 0 || comparison.automatedOnlyTurnIds.length > 0) && (
-        <p className="text-[10px] text-muted-foreground mt-2">
+        <p className="text-[10px] text-muted-foreground px-2.5 py-2 border-t border-border">
           Coverage difference: {comparison.humanOnlyTurnIds.length} turn(s) assessed by Human QA only, {comparison.automatedOnlyTurnIds.length} by Automated QA only — not blended into the agreement/disagreement count above.
         </p>
       )}

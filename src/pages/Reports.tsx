@@ -227,7 +227,7 @@ const Reports: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center space-x-2">
-                <BarChart3 className="h-8 w-8 text-blue-500" />
+                <BarChart3 className="h-[var(--icon-size-extraLarge)] w-[var(--icon-size-extraLarge)] text-blue-500" />
                 <div>
                   <div className={typography.metricValue}>{filteredReports.length}</div>
                   <div className={typography.metricLabel}>Available Reports</div>
@@ -238,7 +238,7 @@ const Reports: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center space-x-2">
-                <Star className="h-8 w-8 text-yellow-500" />
+                <Star className="h-[var(--icon-size-extraLarge)] w-[var(--icon-size-extraLarge)] text-yellow-500" />
                 <div>
                   <div className={typography.metricValue}>{favorites.length}</div>
                   <div className={typography.metricLabel}>Favorite Reports</div>
@@ -249,7 +249,7 @@ const Reports: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center space-x-2">
-                <Calendar className="h-8 w-8 text-green-500" />
+                <Calendar className="h-[var(--icon-size-extraLarge)] w-[var(--icon-size-extraLarge)] text-green-500" />
                 <div>
                   <div className={typography.metricValue}>12</div>
                   <div className={typography.metricLabel}>Scheduled Reports</div>
@@ -260,7 +260,7 @@ const Reports: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center space-x-2">
-                <Download className="h-8 w-8 text-purple-500" />
+                <Download className="h-[var(--icon-size-extraLarge)] w-[var(--icon-size-extraLarge)] text-purple-500" />
                 <div>
                   <div className={typography.metricValue}>156</div>
                   <div className={typography.metricLabel}>Downloads This Month</div>

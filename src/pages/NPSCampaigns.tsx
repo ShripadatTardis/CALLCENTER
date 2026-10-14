@@ -225,7 +225,7 @@ const NPSCampaigns: React.FC = () => {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="h-8 border border-border bg-card text-foreground rounded-md px-2 text-xs"
+              className="h-[var(--height-filter-field)] border border-border bg-card text-foreground rounded-md px-2 text-xs"
             >
               <option value="all">All Status</option>
               <option value="draft">Draft</option>
@@ -237,7 +237,7 @@ const NPSCampaigns: React.FC = () => {
             <select
               value={selectedChannel}
               onChange={(e) => setSelectedChannel(e.target.value)}
-              className="h-8 border border-border bg-card text-foreground rounded-md px-2 text-xs"
+              className="h-[var(--height-filter-field)] border border-border bg-card text-foreground rounded-md px-2 text-xs"
             >
               <option value="all">All Channels</option>
               <option value="voice">Voice</option>

@@ -23,7 +23,7 @@ import { AnalyticsExportButton } from './AnalyticsExportButton';
 export const CampaignAnalyticsTab: React.FC = () => {
   const { data, isLoading } = useCampaigns({ page: 1, pageSize: 200 });
 
-  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground my-8 mx-auto" />;
+  if (isLoading) return <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground my-8 mx-auto" />;
   if (!data || data.data.length === 0) return <p className="text-sm text-muted-foreground py-8 text-center">No campaigns yet.</p>;
 
   const exportRows = data.data.map((c) => ({

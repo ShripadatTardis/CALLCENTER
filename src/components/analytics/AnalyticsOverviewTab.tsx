@@ -29,7 +29,7 @@ function Tile({ label, value, source, origin }: { label: string; value: string; 
 export const AnalyticsOverviewTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = ({ query }) => {
   const { isAllAccess, isLoading, global, scoped } = useVoiceAnalytics(query);
 
-  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground my-8 mx-auto" />;
+  if (isLoading) return <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground my-8 mx-auto" />;
 
   if (isAllAccess && global) {
     const exportRows = [

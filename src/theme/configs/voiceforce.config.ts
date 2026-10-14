@@ -242,6 +242,15 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
       tight: { sizePx: 12 }, // h-3
       compact: { sizePx: 14 }, // h-3.5
       comfortable: { sizePx: 20 }, // h-5, used for primary nav icons
+      // Session 7.10 — two additional real, repeated icon sizes a
+      // targeted investigation found in active use outside this
+      // config's prior 12/14/16/20 set: `h-6 w-6` Loader2 spinners
+      // (AgentDetail.tsx, AIAgents.tsx and others) and `h-8 w-8` KPI/
+      // stat icons (Reports.tsx). Both are real, multi-consumer
+      // patterns, not one-off literals — added as named variants rather
+      // than left as drift.
+      large: { sizePx: 24 }, // h-6, loading-spinner icons
+      extraLarge: { sizePx: 32 }, // h-8, KPI/stat tile icons
     },
   },
 

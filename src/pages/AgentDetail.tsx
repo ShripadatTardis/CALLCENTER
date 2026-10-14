@@ -200,7 +200,7 @@ const AgentDetail: React.FC = () => {
     return (
       <Layout>
         <div className="bg-background min-h-full flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
         </div>
       </Layout>
     );

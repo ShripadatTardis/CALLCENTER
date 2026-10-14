@@ -47,6 +47,18 @@ export const typography = {
   tableHeader: 'text-xs font-medium uppercase tracking-wide text-muted-foreground',
   /** Table body/row text — the dense operational standard (12px), per the approved Phase 2 decision. */
   tableBody: 'text-xs text-foreground',
+  /** Session 7.10 — a genuinely repeated complete treatment found
+   * identically at 4+ call sites in QA Calibration's evidence/review
+   * sub-panels (`text-[10px] font-semibold uppercase tracking-wide
+   * text-muted-foreground`), one deliberate step below subsectionTitle.
+   * Extracted because it recurs byte-identically, not because every
+   * 10px literal in the codebase belongs here. */
+  microLabel: 'text-[10px] font-semibold uppercase tracking-wide text-muted-foreground',
+  /** Session 7.10 — the dense comparison-table header treatment used
+   * identically across QA Calibration's divergence/disagreement tables
+   * (`text-[9px] uppercase tracking-wide text-muted-foreground`), one
+   * step denser than `tableHeader` for this workspace's own tables. */
+  denseTableHeader: 'text-[9px] uppercase tracking-wide text-muted-foreground',
 } as const;
 
 export type TypographyRole = keyof typeof typography;

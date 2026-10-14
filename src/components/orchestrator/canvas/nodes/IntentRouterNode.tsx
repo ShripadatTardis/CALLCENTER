@@ -12,7 +12,7 @@ export const IntentRouterNode = ({ data, selected }: any) => {
     <Card
       className={cn(
         'relative transition-all min-w-[200px]',
-        selected ? 'ring-2 ring-primary shadow-soft-lg' : 'hover:shadow-soft-md',
+        selected ? 'ring-2 ring-primary shadow-[var(--shadow-prominent)]' : 'hover:shadow-[var(--shadow-elevated)]',
         data.hasError && 'border-destructive'
       )}
     >

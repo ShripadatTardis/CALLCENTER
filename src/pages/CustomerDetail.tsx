@@ -281,7 +281,7 @@ const CustomerDetail: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12" role="status" aria-live="polite">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
             <span className="sr-only">Loading customer…</span>
           </div>
         ) : !data ? (

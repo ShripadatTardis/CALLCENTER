@@ -110,7 +110,7 @@ const ChatLogs: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           <div className="w-64">
             <Input
-              className="h-8 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+              className="h-[var(--height-filter-field)] text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
               placeholder="Search sessions… (page)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -126,7 +126,7 @@ const ChatLogs: React.FC = () => {
             <div className="pb-3 border-b border-border">
               <label id="chat-agent-label" className="text-xs font-medium mb-1.5 block text-muted-foreground">Call Agent</label>
               <Select value={agentFilter} onValueChange={updateAgentFilter}>
-                <SelectTrigger aria-labelledby="chat-agent-label" className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="chat-agent-label" className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All agents</SelectItem>
                   {agentRoster.map((a) => (
@@ -139,7 +139,7 @@ const ChatLogs: React.FC = () => {
             <div className="pb-3 border-b border-border">
               <label id="chat-status-label" className="text-xs font-medium mb-1.5 block text-muted-foreground">Status</label>
               <Select value={statusFacet} onValueChange={(v) => updateStatusFilter(v as StatusFacet)}>
-                <SelectTrigger aria-labelledby="chat-status-label" className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="chat-status-label" className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
@@ -151,7 +151,7 @@ const ChatLogs: React.FC = () => {
               <div className="text-xs font-medium text-muted-foreground mb-1.5">Page-local facets (this page only)</div>
               <label id="chat-auth-label" className="text-xs font-medium mb-1.5 block text-muted-foreground">Authenticated</label>
               <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as YesNoFacet)}>
-                <SelectTrigger aria-labelledby="chat-auth-label" className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="chat-auth-label" className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
                   <SelectItem value="yes">Yes</SelectItem>
@@ -195,7 +195,7 @@ const ChatLogs: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           {isLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
             </div>
           ) : isError && sessions.length === 0 ? (
             <p className="text-sm text-muted-foreground px-3 py-4">Chat logs are unavailable right now — see the error above.</p>

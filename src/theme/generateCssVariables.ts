@@ -114,6 +114,14 @@ export function generateRootDeclarations(config: VoiceForceThemeConfig): Declara
     // Session 7.9 — table header/row/cell geometry. Dimensional, not
     // color — identical in both modes, declared once here (:root).
     ...tableDeclarations(config.tables),
+    // Session 7.10 — the three remaining dimensional categories the
+    // Session 7.7 comment above deferred: filter-field height, icon
+    // sizes, and shadow variants (as their own standalone custom
+    // properties, not just panel-internal values). All mode-independent
+    // (identical in both appearance modes), declared once here.
+    ...heightDeclarations(config.heights),
+    ...iconDeclarations(config.icons),
+    ...shadowDeclarations(config.shadow),
   ];
 }
 
@@ -230,6 +238,59 @@ function tableDeclarations(tables: VoiceForceThemeConfig['tables']): Declaration
     if (!density) continue; // expanded/compact are optional
     declarations.push({ name: `--table-row-${name}-padding-x`, value: `${density.paddingXPx}px`, comment: `tables.rows.${name}.paddingXPx` });
     declarations.push({ name: `--table-row-${name}-padding-y`, value: `${density.paddingYPx}px`, comment: `tables.rows.${name}.paddingYPx` });
+  }
+  return declarations;
+}
+
+/**
+ * Session 7.10 — filter-field height. The real, already-matching value
+ * (`heights.variants.compact.filterField`, 32px) a Session 7.9
+ * investigation confirmed as the current filter-bar control height
+ * across the app — this closes the gap of several consumers still
+ * hand-typing literal `h-8`/`uiSize="sm"` instead of referencing one
+ * shared token.
+ */
+function heightDeclarations(heights: VoiceForceThemeConfig['heights']): Declaration[] {
+  const filterFieldPx = heights.variants?.compact?.filterField ?? heights.default.filterField;
+  return [
+    { name: '--height-filter-field', value: `${filterFieldPx}px`, comment: 'heights.variants.compact.filterField' },
+  ];
+}
+
+/**
+ * Session 7.10 — icon sizes. Deferred since Session 7.7's generator
+ * comment; a targeted investigation confirmed every named size is real
+ * and multi-consumer (see voiceforce.config.ts's `icons.variants` for
+ * citations).
+ */
+function iconDeclarations(icons: VoiceForceThemeConfig['icons']): Declaration[] {
+  const declarations: Declaration[] = [
+    { name: '--icon-size-default', value: `${icons.default.sizePx}px`, comment: 'icons.default.sizePx' },
+  ];
+  for (const [name, variant] of Object.entries(icons.variants ?? {})) {
+    declarations.push({ name: `--icon-size-${name}`, value: `${variant.sizePx}px`, comment: `icons.variants.${name}.sizePx` });
+  }
+  return declarations;
+}
+
+/**
+ * Session 7.10 — shadow variants as standalone custom properties (not
+ * just the panel-internal use `panelDeclarations` already resolves).
+ * Closes a real, confirmed bug independent of centralization: several
+ * Orchestrator canvas files reference `shadow-soft-md`/`shadow-soft-lg`,
+ * Tailwind utilities that are not defined anywhere in this codebase (no
+ * `tailwind.config.ts` extension, no matching CSS) — those classes
+ * generate no CSS at all, so the affected nodes currently render with
+ * no shadow. Exposing the real shadow scale as vars lets those files
+ * reference an actual value (`shadow-[var(--shadow-elevated)]` etc.)
+ * instead of an undefined class.
+ */
+function shadowDeclarations(shadow: VoiceForceThemeConfig['shadow']): Declaration[] {
+  const declarations: Declaration[] = [
+    { name: '--shadow-default', value: shadow.default, comment: 'shadow.default' },
+  ];
+  for (const [name, value] of Object.entries(shadow.variants ?? {})) {
+    declarations.push({ name: `--shadow-${name}`, value, comment: `shadow.variants.${name}` });
   }
   return declarations;
 }

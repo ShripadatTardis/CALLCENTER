@@ -63,15 +63,15 @@ export const AnalyticsTimeWindowControl: React.FC<Props> = ({ query, onChange })
         <PopoverContent className="w-72 space-y-3 bg-card border-border text-foreground">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">From (YYYY-MM-DD)</label>
-            <Input value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} placeholder="2026-09-01" className="h-8 text-xs border-border bg-card text-foreground" />
+            <Input value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} placeholder="2026-09-01" className="h-[var(--height-filter-field)] text-xs border-border bg-card text-foreground" />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">To (YYYY-MM-DD)</label>
-            <Input value={customTo} onChange={(e) => setCustomTo(e.target.value)} placeholder="2026-09-25" className="h-8 text-xs border-border bg-card text-foreground" />
+            <Input value={customTo} onChange={(e) => setCustomTo(e.target.value)} placeholder="2026-09-25" className="h-[var(--height-filter-field)] text-xs border-border bg-card text-foreground" />
           </div>
           <Button
             size="sm"
-            className="w-full h-8 text-xs"
+            className="w-full h-[var(--height-filter-field)] text-xs"
             disabled={!customFrom || !customTo}
             onClick={() => onChange({ date_from: customFrom, date_to: customTo, direction: query.direction })}
           >

@@ -69,7 +69,7 @@ const Customers: React.FC = () => {
           <div className="relative w-72">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+              className="h-[var(--height-filter-field)] pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
               placeholder="Search by phone, name, or CIF…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -96,7 +96,7 @@ const Customers: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           {isLoading ? (
             <div className="flex justify-center py-12" role="status" aria-live="polite">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
               <span className="sr-only">Loading customers…</span>
             </div>
           ) : isError && customers.length === 0 ? (

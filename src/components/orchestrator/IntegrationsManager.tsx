@@ -85,7 +85,7 @@ export const IntegrationsManager: React.FC = () => {
           const isSuccess = integration.status === 'success';
 
           return (
-            <Card key={integration.id} className="hover:shadow-soft-lg transition-shadow">
+            <Card key={integration.id} className="hover:shadow-[var(--shadow-prominent)] transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">

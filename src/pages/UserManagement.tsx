@@ -96,7 +96,7 @@ const UserManagement: React.FC = () => {
               ) : (
                 filteredUsers.map((u) => (
                   <React.Fragment key={u.id}>
-                    <tr className="border-b border-border/60 last:border-0 hover:bg-[var(--table-row-hover-bg)]">
+                    <tr className="border-b border-border/60 last:border-0 hover:bg-[hsl(var(--table-row-hover-bg))]">
                       <td className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">
                         <div className="flex items-center gap-2">
                           <div className="h-7 w-7 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-xs font-semibold shrink-0">

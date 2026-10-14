@@ -26,7 +26,7 @@ function Tile({ label, value }: { label: string; value: string }) {
 export const CustomerAnalyticsTab: React.FC = () => {
   const { isLoading, summary } = useCustomerAnalytics();
 
-  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground my-8 mx-auto" />;
+  if (isLoading) return <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground my-8 mx-auto" />;
   if (!summary) return <p className="text-sm text-muted-foreground py-8 text-center">No data available.</p>;
 
   const truncated = summary.sampleSize < summary.totalCount;

@@ -209,7 +209,7 @@ const CallLogs: React.FC = () => {
             <div className="pb-3 border-b border-border">
               <label id="call-agent-label" className="text-xs font-medium mb-1.5 block text-muted-foreground">Call Agent</label>
               <Select value={agentFilter} onValueChange={setAgentFilter}>
-                <SelectTrigger aria-labelledby="call-agent-label" className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-labelledby="call-agent-label" className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All agents</SelectItem>
                   {agentRoster.map((a) => (
@@ -226,7 +226,7 @@ const CallLogs: React.FC = () => {
                 <div>
                   <label className="text-xs font-medium mb-1.5 block text-muted-foreground">FCR</label>
                   <Select value={fcrFacet} onValueChange={(v) => setFcrFacet(v as ClientFacet)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="any">Any</SelectItem>
                       <SelectItem value="yes">Yes</SelectItem>
@@ -237,7 +237,7 @@ const CallLogs: React.FC = () => {
                 <div>
                   <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Authenticated</label>
                   <Select value={authFacet} onValueChange={(v) => setAuthFacet(v as ClientFacet)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="any">Any</SelectItem>
                       <SelectItem value="yes">Yes</SelectItem>
@@ -249,7 +249,7 @@ const CallLogs: React.FC = () => {
               <div>
                 <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Campaign (text match)</label>
                 <Input
-                  className="h-8 text-xs"
+                  className="h-[var(--height-filter-field)] text-xs"
                   value={campaignFacet}
                   onChange={(e) => setCampaignFacet(e.target.value)}
                   placeholder="Campaign name contains…"
@@ -299,7 +299,7 @@ const CallLogs: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-[var(--panel-dense-radius)] border border-border">
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
           </div>
         ) : isError && interactions.length === 0 ? (
           <p className="text-sm text-muted-foreground px-3 py-4">Call logs are unavailable right now — see the error above.</p>
@@ -340,7 +340,7 @@ const CallLogs: React.FC = () => {
                   const outcomeVariant = call.outcome === 'resolved' ? 'positive' : call.outcome === 'escalated' ? 'escalated' : 'secondary';
                   // Session 7.9 — hover:bg-card corrected to the centralized --table-row-hover-bg var (same real value); py-1.5/px-3 cell padding now the centralized --table-row-standard-* vars.
                   return (
-                  <tr key={call.interactionId} className="border-b border-border/60 last:border-0 hover:bg-[var(--table-row-hover-bg)]">
+                  <tr key={call.interactionId} className="border-b border-border/60 last:border-0 hover:bg-[hsl(var(--table-row-hover-bg))]">
                     <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] whitespace-nowrap text-xs text-muted-foreground">
                       {formatTimestamp(call.startTime)}
                     </td>

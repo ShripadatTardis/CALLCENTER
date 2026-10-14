@@ -228,11 +228,11 @@ const LiveView: React.FC = () => {
               placeholder="Search by name, number, or intent…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-8 pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+              className="h-[var(--height-filter-field)] pl-7 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-32 text-xs border-border bg-card text-foreground">
+            <SelectTrigger className="h-[var(--height-filter-field)] w-32 text-xs border-border bg-card text-foreground">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -243,7 +243,7 @@ const LiveView: React.FC = () => {
             </SelectContent>
           </Select>
           <Select value={intentFilter} onValueChange={setIntentFilter}>
-            <SelectTrigger className="h-8 w-40 text-xs border-border bg-card text-foreground">
+            <SelectTrigger className="h-[var(--height-filter-field)] w-40 text-xs border-border bg-card text-foreground">
               <SelectValue placeholder="Intent" />
             </SelectTrigger>
             <SelectContent>
@@ -261,7 +261,7 @@ const LiveView: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
         {live.isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
           </div>
         ) : live.isError && calls.length === 0 ? (
           <p className="text-sm text-muted-foreground px-3 py-4">Live calls are unavailable right now — see the error above.</p>

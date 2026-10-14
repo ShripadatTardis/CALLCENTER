@@ -37,7 +37,7 @@ export const CampaignFiltersBar: React.FC<CampaignFiltersBarProps> = ({
         aria-label="Filter by status"
         value={selectedStatus}
         onChange={(e) => setSelectedStatus(e.target.value)}
-        className="border border-border bg-card text-foreground rounded-md px-2 h-8 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+        className="border border-border bg-card text-foreground rounded-md px-2 h-[var(--height-filter-field)] text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
       >
         <option value="all">All statuses</option>
         <option value="draft">Draft</option>

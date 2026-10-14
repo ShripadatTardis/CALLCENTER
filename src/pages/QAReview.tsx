@@ -347,7 +347,7 @@ const QAReview: React.FC = () => {
               <div>
                 <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Channel</label>
                 <Select value={channelFilter} onValueChange={setChannelFilter}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Channel" /></SelectTrigger>
+                  <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue placeholder="Channel" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>All channels</SelectItem>
                     <SelectItem value="voice">Voice</SelectItem>
@@ -358,7 +358,7 @@ const QAReview: React.FC = () => {
               <div>
                 <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Agent</label>
                 <Select value={agentFilter} onValueChange={setAgentFilter}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Agent" /></SelectTrigger>
+                  <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue placeholder="Agent" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>All agents</SelectItem>
                     {agentOptions.map((a) => (
@@ -370,7 +370,7 @@ const QAReview: React.FC = () => {
               <div>
                 <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Outcome</label>
                 <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Outcome" /></SelectTrigger>
+                  <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue placeholder="Outcome" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>All outcomes</SelectItem>
                     {outcomeOptions.map((o) => (
@@ -383,7 +383,7 @@ const QAReview: React.FC = () => {
                 <div>
                   <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Escalation</label>
                   <Select value={escalationFilter} onValueChange={setEscalationFilter}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Escalation" /></SelectTrigger>
+                    <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue placeholder="Escalation" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ALL}>Any</SelectItem>
                       <SelectItem value="yes">Escalated</SelectItem>
@@ -394,7 +394,7 @@ const QAReview: React.FC = () => {
                 <div>
                   <label className="text-xs font-medium mb-1.5 block text-muted-foreground">FCR</label>
                   <Select value={fcrFilter} onValueChange={setFcrFilter}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="FCR" /></SelectTrigger>
+                    <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue placeholder="FCR" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ALL}>Any</SelectItem>
                       <SelectItem value="yes">Yes</SelectItem>
@@ -407,7 +407,7 @@ const QAReview: React.FC = () => {
                 <div>
                   <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Sentiment</label>
                   <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sentiment" /></SelectTrigger>
+                    <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue placeholder="Sentiment" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={ALL}>All sentiment</SelectItem>
                       {sentimentOptions.map((s) => (
@@ -459,7 +459,7 @@ const QAReview: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
           </div>
         ) : filteredRows.length === 0 ? (
           <p className="text-sm text-muted-foreground px-1">No interactions match the current filters.</p>

@@ -165,7 +165,7 @@ const QaQualityExplorer: React.FC = () => {
           <div>
             <label className="text-[11px] text-muted-foreground block mb-0.5">Channel</label>
             <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
-              <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-[var(--height-filter-field)] w-28 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All channels</SelectItem>
                 <SelectItem value="voice">Voice</SelectItem>
@@ -176,7 +176,7 @@ const QaQualityExplorer: React.FC = () => {
           <div>
             <label className="text-[11px] text-muted-foreground block mb-0.5">Agent</label>
             <Select value={agentId} onValueChange={setAgentId}>
-              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-[var(--height-filter-field)] w-44 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All agents</SelectItem>
                 {(agentsQuery.data?.agents ?? []).map((a) => (
@@ -187,16 +187,16 @@ const QaQualityExplorer: React.FC = () => {
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground block mb-0.5">Submitted from</label>
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-36 text-xs" />
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-[var(--height-filter-field)] w-36 text-xs" />
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground block mb-0.5">Submitted to</label>
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-36 text-xs" />
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-[var(--height-filter-field)] w-36 text-xs" />
           </div>
           <div>
             <label className="text-[11px] text-muted-foreground block mb-0.5">Reviewer</label>
             <Select value={reviewerUserId} onValueChange={setReviewerUserId}>
-              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-[var(--height-filter-field)] w-36 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All reviewers</SelectItem>
                 {reviewerOptions.map((id) => (

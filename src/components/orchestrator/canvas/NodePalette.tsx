@@ -78,7 +78,7 @@ export const NodePalette: React.FC = () => {
               return (
                 <Card
                   key={node.type}
-                  className="cursor-grab active:cursor-grabbing hover:shadow-soft-md transition-shadow"
+                  className="cursor-grab active:cursor-grabbing hover:shadow-[var(--shadow-elevated)] transition-shadow"
                   draggable
                   onDragStart={(e) => handleDragStart(e, node.type)}
                 >

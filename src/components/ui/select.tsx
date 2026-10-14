@@ -28,7 +28,9 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      uiSize === "sm" ? "h-8 text-xs" : "h-10",
+      // Session 7.10: height now reads from the centralized
+      // filter-field token instead of a literal `h-8`.
+      uiSize === "sm" ? "h-[var(--height-filter-field)] text-xs" : "h-10",
       className
     )}
     {...props}

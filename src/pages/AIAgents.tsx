@@ -52,7 +52,7 @@ const AIAgents: React.FC = () => {
 
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
           </div>
         ) : isError ? (
           <p className="text-sm text-red-700 dark:text-red-400 px-1">Could not load the agent roster.</p>

@@ -174,7 +174,7 @@ export const ChatSessionDetailDialog: React.FC<ChatSessionDetailDialogProps> = (
       <DialogContent className="max-w-4xl h-[92vh] max-h-[92vh] overflow-hidden flex flex-col gap-2.5 p-5">
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground" />
           </div>
         ) : isError || !session ? (
           <>

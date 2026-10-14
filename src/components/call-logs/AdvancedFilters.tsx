@@ -82,7 +82,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
             value={filters.outcome ?? 'any'}
             onValueChange={(value) => update({ outcome: value === 'any' ? undefined : (value as 'resolved' | 'escalated') })}
           >
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">Any</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
@@ -96,7 +96,7 @@ export const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({ filters, onFil
             value={filters.direction ?? 'any'}
             onValueChange={(value) => update({ direction: value === 'any' ? undefined : (value as 'inbound' | 'outbound') })}
           >
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="any">Any</SelectItem>
               <SelectItem value="inbound">Inbound</SelectItem>
@@ -133,6 +133,6 @@ export const CallLogsSearch: React.FC<{ value: string; onChange: (v: string) => 
     placeholder="Search caller name, phone, intent, summary…"
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="h-8 text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
+    className="h-[var(--height-filter-field)] text-xs border-border bg-card text-foreground placeholder:text-muted-foreground"
   />
 );

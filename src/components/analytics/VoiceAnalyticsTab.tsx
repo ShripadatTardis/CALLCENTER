@@ -33,7 +33,7 @@ function Tile({ label, value, source, origin = 'server-aggregate' }: { label: st
 export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = ({ query }) => {
   const { isAllAccess, isLoading, global, scoped, classification, agentsById } = useVoiceAnalytics(query);
 
-  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground my-8 mx-auto" />;
+  if (isLoading) return <Loader2 className="h-[var(--icon-size-large)] w-[var(--icon-size-large)] animate-spin text-muted-foreground my-8 mx-auto" />;
 
   if (isAllAccess && global) {
     const nameToId = new Map(Array.from(agentsById.values()).map((a) => [a.displayName, a.agentId]));

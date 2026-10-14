@@ -119,7 +119,7 @@ export const ConversationTranscript: React.FC<ConversationTranscriptProps> = ({
               placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
-              className="h-8 pl-8 text-xs"
+              className="h-[var(--height-filter-field)] pl-8 text-xs"
             />
           </div>
         </div>

@@ -22,7 +22,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         type={type}
         className={cn(
           "flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-          uiSize === "sm" ? "h-8 text-xs md:text-xs" : "h-10",
+          // Session 7.10: height now reads from the centralized
+          // filter-field token (heights.variants.compact.filterField,
+          // 32px) instead of a literal `h-8` — same real value, now
+          // config-driven.
+          uiSize === "sm" ? "h-[var(--height-filter-field)] text-xs md:text-xs" : "h-10",
           className
         )}
         ref={ref}

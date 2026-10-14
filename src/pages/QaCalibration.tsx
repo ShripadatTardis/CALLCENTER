@@ -14,6 +14,7 @@ import type { ComparisonClassification, QaPairCandidate } from '@/lib/qaComparis
 import { applicabilityMismatchConcentration, judgmentDisagreementConcentration, coverageDivergence, promptVersionComparison } from '@/lib/qaComparison';
 import { formatFractionAsPercent, formatTimestamp } from '@/lib/format';
 import { QualityMeasurementsHelpDialog } from '@/components/qa/QualityMeasurementsHelpDialog';
+import { typography } from '@/lib/typography';
 
 /**
  * Session 16.4 — Human QA vs Automated QA Calibration & Comparison.
@@ -297,9 +298,9 @@ const QaCalibration: React.FC = () => {
                     <div className="rounded-md border border-border p-2.5 space-y-2">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Human QA Review</div>
+                          <div className={`${typography.microLabel} mb-1`}>Human QA Review</div>
                           <Select value={selectedReviewId ?? undefined} onValueChange={setSelectedReviewId}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {selectedCandidate.reviews.map((r) => (
                                 <SelectItem key={r.id} value={r.id} className="text-xs">
@@ -310,9 +311,9 @@ const QaCalibration: React.FC = () => {
                           </Select>
                         </div>
                         <div>
-                          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Automated QA Evaluation</div>
+                          <div className={`${typography.microLabel} mb-1`}>Automated QA Evaluation</div>
                           <Select value={selectedEvaluationId ?? undefined} onValueChange={setSelectedEvaluationId}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-[var(--height-filter-field)] text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {selectedCandidate.evaluations.map((e) => (
                                 <SelectItem key={e.id} value={e.id} className="text-xs">
@@ -439,7 +440,7 @@ const QaCalibration: React.FC = () => {
                 <h3 className="text-[11px] font-semibold mb-1">Coverage divergence (Automated − Human eligible-opportunity count, averaged)</h3>
                 <div className="rounded-md border border-border overflow-hidden">
                   <table className="w-full text-[11px]">
-                    <thead><tr className="h-6 bg-card text-[9px] uppercase tracking-wide text-muted-foreground"><th className="text-left px-2">Parameter</th><th className="text-left px-2">Pairs compared</th><th className="text-left px-2">Mean difference</th></tr></thead>
+                    <thead><tr className={`h-6 bg-card ${typography.denseTableHeader}`}><th className="text-left px-2">Parameter</th><th className="text-left px-2">Pairs compared</th><th className="text-left px-2">Mean difference</th></tr></thead>
                     <tbody>
                       {coverageInsight.map((r) => (
                         <tr key={r.parameterCode} className="h-7 border-t border-border">
@@ -458,7 +459,7 @@ const QaCalibration: React.FC = () => {
                 <h3 className="text-[11px] font-semibold mb-1">Disagreement by prompt version (descriptive only)</h3>
                 <div className="rounded-md border border-border overflow-hidden">
                   <table className="w-full text-[11px]">
-                    <thead><tr className="h-6 bg-card text-[9px] uppercase tracking-wide text-muted-foreground"><th className="text-left px-2">Parameter</th><th className="text-left px-2">Prompt</th><th className="text-left px-2">Comparable pairs</th><th className="text-left px-2">Disagreements</th></tr></thead>
+                    <thead><tr className={`h-6 bg-card ${typography.denseTableHeader}`}><th className="text-left px-2">Parameter</th><th className="text-left px-2">Prompt</th><th className="text-left px-2">Comparable pairs</th><th className="text-left px-2">Disagreements</th></tr></thead>
                     <tbody>
                       {promptInsight.map((r) => (
                         <tr key={`${r.parameterCode}:${r.promptVersion}`} className="h-7 border-t border-border">
@@ -659,7 +660,7 @@ function ParameterDrillDown({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 sm:divide-x sm:divide-border mt-2">
         <div className="flex flex-col max-h-none sm:max-h-[460px]">
-          <div className="sticky top-0 bg-card text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-2.5 py-1.5 border-b border-border">Human QA Evidence</div>
+          <div className={`sticky top-0 bg-card ${typography.microLabel} px-2.5 py-1.5 border-b border-border`}>Human QA Evidence</div>
           <div className="px-2.5 py-2 space-y-1.5 sm:overflow-y-auto">
             {humanFindings.length === 0 && <p className="text-[11px] text-muted-foreground">{humanEmpty}</p>}
             {humanFindings.map((f) => (
@@ -672,7 +673,7 @@ function ParameterDrillDown({
           </div>
         </div>
         <div className="flex flex-col max-h-none sm:max-h-[460px]">
-          <div className="sticky top-0 bg-card text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-2.5 py-1.5 border-b border-border">Automated QA Evidence</div>
+          <div className={`sticky top-0 bg-card ${typography.microLabel} px-2.5 py-1.5 border-b border-border`}>Automated QA Evidence</div>
           <div className="px-2.5 py-2 space-y-1.5 sm:overflow-y-auto">
             {!hasAutomatedEvidence && <p className="text-[11px] text-muted-foreground">{automatedEmpty}</p>}
             {comparison.turnComparisons.map((t) => (

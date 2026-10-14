@@ -29,16 +29,21 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
     <div className="overflow-x-auto border border-border rounded-md bg-card/40">
       <table className="w-full text-[13px] text-foreground">
         <thead>
+          {/* Session 7.10 — migrated from literal py-2/px-3 to the
+              centralized table-geometry tokens (Session 7.9), the real
+              gap a Session 7.9 investigation flagged as unresolved
+              because this child component wasn't located via the
+              OutboundCampaigns.tsx page file alone. */}
           <tr className={`${typography.tableHeader} border-b border-border`}>
-            <th className="text-left py-2 px-3">Campaign</th>
-            <th className="text-left py-2 px-3">Status</th>
-            <th className="text-left py-2 px-3">Call Agent</th>
-            <th className="text-right py-2 px-3">Targets</th>
-            <th className="text-right py-2 px-3">Attempted</th>
-            <th className="text-right py-2 px-3">Classified</th>
-            <th className="text-right py-2 px-3">Unclassified</th>
-            <th className="text-right py-2 px-3">Success rate</th>
-            <th className="py-2 px-3" />
+            <th className="text-left h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Campaign</th>
+            <th className="text-left h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Status</th>
+            <th className="text-left h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Call Agent</th>
+            <th className="text-right h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Targets</th>
+            <th className="text-right h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Attempted</th>
+            <th className="text-right h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Classified</th>
+            <th className="text-right h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Unclassified</th>
+            <th className="text-right h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Success rate</th>
+            <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)]" />
           </tr>
         </thead>
         <tbody>
@@ -50,7 +55,7 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
               <tr
                 key={campaign.id}
                 onClick={() => onViewCampaign(campaign)}
-                className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+                className="border-b border-border/60 last:border-b-0 hover:bg-[hsl(var(--table-row-hover-bg))] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
                 tabIndex={0}
                 role="button"
                 aria-label={`Open campaign ${campaign.name}`}
@@ -61,18 +66,18 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                   }
                 }}
               >
-                <td className="py-2 px-3">
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)]">
                   <div className="font-medium text-foreground">{campaign.name}</div>
                   <div className="text-[11px] text-muted-foreground">by {campaign.createdBy ?? 'unknown'}</div>
                 </td>
-                <td className="py-2 px-3">
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)]">
                   <CampaignStatusBadge status={campaign.status} />
                 </td>
-                <td className="py-2 px-3 text-foreground">{campaign.agentName ?? campaign.agentId}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.targetCount}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.triggeredCount}</td>
-                <td className="py-2 px-3 text-right tabular-nums text-foreground">{campaign.stats.classifiedCount}</td>
-                <td className="py-2 px-3 text-right tabular-nums">
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-foreground">{campaign.agentName ?? campaign.agentId}</td>
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-right tabular-nums text-foreground">{campaign.stats.targetCount}</td>
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-right tabular-nums text-foreground">{campaign.stats.triggeredCount}</td>
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-right tabular-nums text-foreground">{campaign.stats.classifiedCount}</td>
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-right tabular-nums">
                   {unclassified > 0 ? (
                     <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
                       <AlertTriangle size={11} aria-hidden="true" />
@@ -82,10 +87,10 @@ export const CampaignGrid: React.FC<CampaignGridProps> = ({ campaigns, onViewCam
                     <span className="text-muted-foreground">0</span>
                   )}
                 </td>
-                <td className="py-2 px-3 text-right tabular-nums text-foreground">
+                <td className="px-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-right tabular-nums text-foreground">
                   {rate === null ? <span className="text-muted-foreground">—</span> : `${rate.toFixed(0)}%`}
                 </td>
-                <td className="py-2 pr-3 text-right">
+                <td className="pr-[var(--table-row-standard-padding-x)] py-[var(--table-row-standard-padding-y)] text-right">
                   <ChevronRight size={14} className="text-muted-foreground" aria-hidden="true" />
                 </td>
               </tr>

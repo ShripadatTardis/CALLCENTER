@@ -99,7 +99,7 @@ export const FlowLibrary: React.FC = () => {
         {sampleFlows.map((flow) => (
           <Card 
             key={flow.id} 
-            className="cursor-pointer hover:shadow-soft-lg transition-shadow"
+            className="cursor-pointer hover:shadow-[var(--shadow-prominent)] transition-shadow"
             onClick={() => navigate(`/orchestrator/flow/${flow.id}`)}
           >
             <CardHeader>

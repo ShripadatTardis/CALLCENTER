@@ -79,7 +79,8 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({ selectedNodeId, no
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">{localData.label}</CardTitle>
-            <Badge variant="outline" className={localData.hasError ? 'border-destructive text-destructive' : 'badge-green'}>
+            {/* Session 7.10.1 correction — this is a real validation status (Valid/Invalid), not a category tag; migrated to the centralized positive/negative status tokens. */}
+            <Badge variant="outline" className={localData.hasError ? 'border-destructive text-destructive' : 'border-[var(--status-positive-border)] text-[var(--status-positive-text)]'}>
               {localData.hasError ? 'Invalid' : 'Valid'}
             </Badge>
           </div>

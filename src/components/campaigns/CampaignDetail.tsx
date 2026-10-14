@@ -93,7 +93,7 @@ const InteractionLookupDialog: React.FC<{ interactionId: string; phone: string; 
     return (
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="max-w-sm">
-          <div className="flex items-center gap-2 text-sm">
+          <div className={`flex items-center gap-2 ${typography.body}`}>
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading interaction…
           </div>
@@ -153,16 +153,16 @@ const AgentResultDialog: React.FC<{
     // as InteractionLookupDialog above): real focus trap/Escape-to-close,
     // same visual footprint otherwise.
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md text-[13px] text-foreground space-y-3">
-        <h3 className="text-sm font-semibold">Agent result</h3>
+      <DialogContent className={`max-w-md ${typography.denseBody} space-y-3`}>
+        <h3 className={typography.cardTitle}>Agent result</h3>
 
         <div className="space-y-0.5">
-          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Call outcome</div>
+          <div className={typography.fieldLabelMicro}>Call outcome</div>
           <div>{target.campaignResultLabel ?? 'Unclassified'}</div>
         </div>
 
         <div className="space-y-0.5">
-          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Agent outcome</div>
+          <div className={typography.fieldLabelMicro}>Agent outcome</div>
           {outcome.availability === 'unavailable' ? (
             <div className="text-muted-foreground">Not available for this call</div>
           ) : (
@@ -171,7 +171,7 @@ const AgentResultDialog: React.FC<{
               {outcome.availability === 'unrecognized' && (
                 <Badge
                   variant="outline"
-                  className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                  className="text-[9px] py-0 px-1 border-[var(--status-caution-border)] text-[var(--status-caution-text)]"
                   title="This outcome code is not declared in the campaign's captured agent contract — shown as returned by the backend, not guessed."
                 >
                   unrecognised
@@ -183,7 +183,7 @@ const AgentResultDialog: React.FC<{
 
         {outputs.length > 0 && (
           <div className="space-y-1">
-            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Structured outputs</div>
+            <div className={typography.fieldLabelMicro}>Structured outputs</div>
             <div className="border border-border rounded divide-y divide-border">
               {outputs.map((field) => (
                 <div key={field.fieldCode} className="flex items-center justify-between gap-2 px-2 py-1">
@@ -192,7 +192,7 @@ const AgentResultDialog: React.FC<{
                     {!field.known && (
                       <Badge
                         variant="outline"
-                        className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                        className="text-[9px] py-0 px-1 border-[var(--status-caution-border)] text-[var(--status-caution-text)]"
                         title="This field code is not declared in the campaign's captured agent contract."
                       >
                         unrecognised
@@ -211,7 +211,7 @@ const AgentResultDialog: React.FC<{
             derived from Agent Outcome via this campaign's OWN captured
             policy, never re-derived from today's live catalogue. */}
         <div className="space-y-0.5">
-          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Campaign Classification</div>
+          <div className={typography.fieldLabelMicro}>Campaign Classification</div>
           {!campaign.outcomePolicySnapshot ? (
             <div className="text-muted-foreground">No outcome policy captured for this campaign (legacy)</div>
           ) : !target.resultClassificationCode ? (
@@ -222,7 +222,7 @@ const AgentResultDialog: React.FC<{
               {target.resultClassificationContractDrift && (
                 <Badge
                   variant="outline"
-                  className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                  className="text-[9px] py-0 px-1 border-[var(--status-caution-border)] text-[var(--status-caution-text)]"
                   title="This agent outcome has no mapping in the campaign's captured policy — classified as the safe fallback, not guessed."
                 >
                   policy drift
@@ -234,13 +234,13 @@ const AgentResultDialog: React.FC<{
 
         {target.resultClassificationNextActionType && (
           <div className="space-y-0.5">
-            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Next Action</div>
+            <div className={typography.fieldLabelMicro}>Next Action</div>
             <div className="text-foreground">{target.resultClassificationNextActionType.replace('_', ' ')}</div>
           </div>
         )}
 
         <div className="space-y-0.5">
-          <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Configuration</div>
+          <div className={typography.fieldLabelMicro}>Configuration</div>
           {governingVersion ? (
             <div className="text-foreground">
               v{governingVersion.versionNumber}
@@ -373,25 +373,25 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-border rounded-md bg-card/40 text-[13px]">
+      <div className={`flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-border rounded-md bg-card/40 ${typography.denseBody}`}>
         <div className="flex items-baseline gap-1.5">
           <span className="font-semibold tabular-nums text-foreground">{campaign.stats.targetCount}</span>
-          <span className="text-muted-foreground text-[11px]">targets</span>
+          <span className={typography.metadata}>targets</span>
         </div>
         <div className="flex items-baseline gap-1.5">
           <span className="font-semibold tabular-nums text-foreground">{campaign.stats.triggeredCount}</span>
-          <span className="text-muted-foreground text-[11px]">calls triggered</span>
+          <span className={typography.metadata}>calls triggered</span>
         </div>
         <div className="flex items-baseline gap-1.5">
           <span className="font-semibold tabular-nums text-foreground">{rate === null ? '—' : `${rate.toFixed(1)}%`}</span>
-          <span className="text-muted-foreground text-[11px]">success rate</span>
+          <span className={typography.metadata}>success rate</span>
         </div>
         {unclassified > 0 && (
           <div className="flex items-baseline gap-1.5">
             {/* VoiceForce design system — neutral data-value rule: an
                 ordinary summary count is not a warning badge. */}
             <span className="font-semibold tabular-nums text-foreground">{unclassified}</span>
-            <span className="text-muted-foreground text-[11px]">unclassified / pending</span>
+            <span className={typography.metadata}>unclassified / pending</span>
           </div>
         )}
         {isPolicyEnabled && (
@@ -399,26 +399,26 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
             <div className="h-4 w-px bg-muted" aria-hidden="true" />
             <div className="flex items-baseline gap-1.5">
               <span className="font-semibold tabular-nums text-foreground">{campaign.stats.policyClassifiedCount}</span>
-              <span className="text-muted-foreground text-[11px]">classified (policy)</span>
+              <span className={typography.metadata}>classified (policy)</span>
             </div>
             <div className="flex items-baseline gap-1.5">
               <span className="font-semibold tabular-nums text-foreground">{policyRate === null ? '—' : `${policyRate.toFixed(1)}%`}</span>
-              <span className="text-muted-foreground text-[11px]">successful (policy)</span>
+              <span className={typography.metadata}>successful (policy)</span>
             </div>
           </>
         )}
         <div className="h-4 w-px bg-muted" aria-hidden="true" />
         <div className="flex items-baseline gap-1.5">
           <span className="text-foreground">{campaign.agentName ?? campaign.agentId}</span>
-          <span className="text-muted-foreground text-[11px] font-mono">{campaign.agentId}</span>
+          <span className={`${typography.metadata} font-mono`}>{campaign.agentId}</span>
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-muted-foreground text-[11px]">Created {formatTimestamp(campaign.createdAt)}</span>
+          <span className={typography.metadata}>Created {formatTimestamp(campaign.createdAt)}</span>
         </div>
       </div>
 
       {campaign.agentContractSnapshot && campaign.agentContractSnapshot.contractCompleteness !== 'complete' && (
-        <p className="text-[12px] text-muted-foreground px-3">
+        <p className={`${typography.bodySecondary} px-3`}>
           Agent contract: partial / legacy — expected input, outcome and output metadata are not currently exposed
           by Call Centre for this agent. This is a Call Centre capability state, not an application error; the
           campaign uses the existing legacy Trigger Call contract.
@@ -432,7 +432,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           agent with none. Never synthesized — Call Outcome/Agent
           Outcome keep displaying exactly as Session 12.5 left them. */}
       {!campaign.outcomePolicySnapshot && (campaign.agentContractSnapshot?.expectedOutcomes.length ?? 0) > 0 && (
-        <p className="text-[12px] text-muted-foreground px-3">
+        <p className={`${typography.bodySecondary} px-3`}>
           No Outcome Policy captured for this campaign (legacy) — Agent Outcome is still shown per target where
           available, but no Campaign Classification is derived from it.
         </p>
@@ -467,7 +467,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           change to call_center_campaign_list_targets, out of scope).
         */}
         {campaign.stats.targetCount !== targets.length && (
-          <div className="mb-1.5 px-0.5 flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+          <div className="mb-1.5 px-0.5 flex items-center gap-1.5 text-[11px] text-[var(--status-caution-text)]">
             <AlertTriangle size={11} aria-hidden="true" />
             {campaign.stats.targetCount} target{campaign.stats.targetCount === 1 ? '' : 's'} exist for this
             campaign, but only {targets.length} could be loaded below — some targets may reference a customer or
@@ -475,7 +475,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           </div>
         )}
         <div className="overflow-x-auto border border-border rounded-md bg-card/40">
-          <table className="w-full text-[13px] text-foreground">
+          <table className={`w-full ${typography.denseBody}`}>
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
                 <th className="text-left py-2 px-3 font-medium">Name</th>
@@ -531,7 +531,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                       </span>
                     ) : (
                       <span className="text-muted-foreground inline-flex items-center gap-1">
-                        {target.latestReconciliationStatus === 'unresolved' && <AlertTriangle size={11} className="text-amber-700 dark:text-amber-400" aria-hidden="true" />}
+                        {target.latestReconciliationStatus === 'unresolved' && <AlertTriangle size={11} className="text-[var(--status-caution-text)]" aria-hidden="true" />}
                         {reconciliationLabel(target)}
                       </span>
                     )}
@@ -546,7 +546,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                           {outcome.availability === 'unrecognized' && (
                             <Badge
                               variant="outline"
-                              className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                              className="text-[9px] py-0 px-1 border-[var(--status-caution-border)] text-[var(--status-caution-text)]"
                               title="Not declared in this campaign's captured agent contract"
                             >
                               unrecognised
@@ -565,7 +565,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
                         {target.resultClassificationContractDrift && (
                           <Badge
                             variant="outline"
-                            className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:text-amber-400"
+                            className="text-[9px] py-0 px-1 border-[var(--status-caution-border)] text-[var(--status-caution-text)]"
                             title="No captured policy mapping for this agent outcome — safe fallback, not guessed."
                           >
                             drift
@@ -678,7 +678,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Campaign History</DialogTitle>
-              <DialogDescription className="text-xs">
+              <DialogDescription className={typography.bodySecondary}>
                 A read-only log of status changes, skips, holds, amendments, retries, and target additions for this
                 campaign.
               </DialogDescription>
@@ -693,7 +693,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Configuration History</DialogTitle>
-              <DialogDescription className="text-xs">
+              <DialogDescription className={typography.bodySecondary}>
                 Read-only. Every configuration version that has governed this campaign — Agent, Agent Contract, Input
                 Mapping and Outcome Mapping — with the current version marked and a structural diff against the
                 version before it.

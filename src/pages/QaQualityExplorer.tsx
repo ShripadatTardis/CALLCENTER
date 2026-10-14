@@ -140,7 +140,7 @@ const QaQualityExplorer: React.FC = () => {
           <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/qa-review')}>
             <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Back to Interaction Quality
           </Button>
-          <p className="text-sm text-muted-foreground">You don't have permission to view the Human QA Quality Explorer (requires qa.analytics.view).</p>
+          <p className={typography.bodyMuted}>You don't have permission to view the Human QA Quality Explorer (requires qa.analytics.view).</p>
         </div>
       </Layout>
     );
@@ -163,7 +163,7 @@ const QaQualityExplorer: React.FC = () => {
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-card/40 p-2">
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">Channel</label>
+            <label className={`${typography.metadata} block mb-0.5`}>Channel</label>
             <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
               <SelectTrigger className="h-[var(--height-filter-field)] w-28 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -174,7 +174,7 @@ const QaQualityExplorer: React.FC = () => {
             </Select>
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">Agent</label>
+            <label className={`${typography.metadata} block mb-0.5`}>Agent</label>
             <Select value={agentId} onValueChange={setAgentId}>
               <SelectTrigger className="h-[var(--height-filter-field)] w-44 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -186,15 +186,15 @@ const QaQualityExplorer: React.FC = () => {
             </Select>
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">Submitted from</label>
+            <label className={`${typography.metadata} block mb-0.5`}>Submitted from</label>
             <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-[var(--height-filter-field)] w-36 text-xs" />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">Submitted to</label>
+            <label className={`${typography.metadata} block mb-0.5`}>Submitted to</label>
             <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-[var(--height-filter-field)] w-36 text-xs" />
           </div>
           <div>
-            <label className="text-[11px] text-muted-foreground block mb-0.5">Reviewer</label>
+            <label className={`${typography.metadata} block mb-0.5`}>Reviewer</label>
             <Select value={reviewerUserId} onValueChange={setReviewerUserId}>
               <SelectTrigger className="h-[var(--height-filter-field)] w-36 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -249,13 +249,13 @@ const QaQualityExplorer: React.FC = () => {
                     <span className="text-xs font-medium text-foreground">{def.displayName}</span>
                     {r.denominator > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                   </div>
-                  <div className="text-lg font-semibold tabular-nums text-foreground">
+                  <div className={typography.metricValue}>
                     {r.rate === null ? '—' : formatFractionAsPercent(r.rate)}
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className={typography.metadata}>
                     {r.denominator === 0 ? 'No eligible population' : `${r.numerator} ${lowerBetter ? 'affected' : def.cleanValue} / ${r.denominator} eligible`}
                   </div>
-                  <div className="text-[10px] text-muted-foreground">{lowerBetter ? 'Lower is better' : 'Higher is better'}</div>
+                  <div className={typography.microCaption}>{lowerBetter ? 'Lower is better' : 'Higher is better'}</div>
                 </button>
               );
             })}
@@ -266,13 +266,13 @@ const QaQualityExplorer: React.FC = () => {
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className="flex items-center justify-between">
             <div className={typography.sectionTitle}>Failure Reasons</div>
-            <span className="text-[11px] text-muted-foreground">Count = findings, not affected interactions</span>
+            <span className={typography.metadata}>Count = findings, not affected interactions</span>
           </div>
           {reasons.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No findings in the current scope.</p>
+            <p className={typography.bodySecondary}>No findings in the current scope.</p>
           ) : (
             <div className="rounded border border-border overflow-auto max-h-56">
-              <table className="w-full text-xs">
+              <table className={`w-full ${typography.tableBody}`}>
                 <thead>
                   <tr className="border-b border-border text-muted-foreground">
                     <th className={`text-left ${typography.tableHeader}`}>Parameter</th>
@@ -330,10 +330,10 @@ const QaQualityExplorer: React.FC = () => {
             </div>
           </div>
           {trend.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No submitted observations for this parameter in the current scope.</p>
+            <p className={typography.bodySecondary}>No submitted observations for this parameter in the current scope.</p>
           ) : (
             <div className="rounded border border-border overflow-auto max-h-48">
-              <table className="w-full text-xs">
+              <table className={`w-full ${typography.tableBody}`}>
                 <thead>
                   <tr className="border-b border-border text-muted-foreground">
                     <th className={`text-left ${typography.tableHeader}`}>Period starting</th>
@@ -361,10 +361,10 @@ const QaQualityExplorer: React.FC = () => {
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className={typography.sectionTitle}>Agent-Level Quality</div>
           {agentRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No submitted reviews in the current scope.</p>
+            <p className={typography.bodySecondary}>No submitted reviews in the current scope.</p>
           ) : (
             <div className="rounded border border-border overflow-auto max-h-56">
-              <table className="w-full text-xs">
+              <table className={`w-full ${typography.tableBody}`}>
                 <thead>
                   <tr className="border-b border-border text-muted-foreground">
                     <th className={`text-left ${typography.tableHeader}`}>Agent</th>
@@ -390,13 +390,13 @@ const QaQualityExplorer: React.FC = () => {
               </table>
             </div>
           )}
-          <p className="text-[11px] text-muted-foreground">Every percentage keeps its own eligible-population denominator — an agent with few reviewed interactions is not equally representative as one with many; compare the "Reviewed interactions" column alongside any rate.</p>
+          <p className={typography.metadata}>Every percentage keeps its own eligible-population denominator — an agent with few reviewed interactions is not equally representative as one with many; compare the "Reviewed interactions" column alongside any rate.</p>
         </div>
 
         {/* Interaction-level Human QA outcomes */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className={typography.sectionTitle}>Human-Reviewed Interaction Outcomes</div>
-          <p className="text-[11px] text-muted-foreground">These are Human QA judgments captured at review time, not Voice Agent API facts.</p>
+          <p className={typography.metadata}>These are Human QA judgments captured at review time, not Voice Agent API facts.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
             <OutcomeBreakdown title="Request Completion" breakdown={outcomes.requestCompletion} />
             <OutcomeBreakdown title="First Contact Resolution" breakdown={outcomes.fcr} />
@@ -482,10 +482,10 @@ const FailureDrillDownDialog: React.FC<{
       <DialogHeader className="flex-shrink-0">
         <DialogTitle className="text-sm">{title}</DialogTitle>
       </DialogHeader>
-      <div className="text-xs text-muted-foreground flex-shrink-0">{findings.length} observation{findings.length === 1 ? '' : 's'}</div>
+      <div className={`${typography.bodySecondary} flex-shrink-0`}>{findings.length} observation{findings.length === 1 ? '' : 's'}</div>
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {findings.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No observations.</p>
+          <p className={typography.bodySecondary}>No observations.</p>
         ) : (
           findings.map((f) => (
             <div key={f.id} className="rounded border border-border p-2 text-xs space-y-1">

@@ -22,31 +22,47 @@ export const FlowLibrary: React.FC = () => {
     navigate('/orchestrator/new');
   };
 
+  // Session 7.10.1 — migrated from `badge-blue`/`-purple`/`-green`, which
+  // are undefined anywhere in tailwind.config.ts/index.css (confirmed by
+  // grep) and rendered NO styling at all — a real functional bug,
+  // same class as Session 7.10's `shadow-soft-md`/`-lg` fix. Real-meaning
+  // mapping: draft="not yet started" -> neutral; approved="ready, not
+  // yet live" -> pending; live="active" -> positive; archived unchanged
+  // (already the centralized bg-muted/text-muted-foreground tokens).
   const getStatusBadgeClass = (status: FlowStatus) => {
     switch (status) {
       case 'draft':
-        return 'badge-blue';
+        return 'border-[var(--status-neutral-border)] text-[var(--status-neutral-text)]';
       case 'approved':
-        return 'badge-purple';
+        return 'border-[var(--status-pending-border)] text-[var(--status-pending-text)]';
       case 'live':
-        return 'badge-green';
+        return 'border-[var(--status-positive-border)] text-[var(--status-positive-text)]';
       case 'archived':
         return 'bg-muted text-muted-foreground';
       default:
-        return 'badge-blue';
+        return 'border-[var(--status-neutral-border)] text-[var(--status-neutral-text)]';
     }
   };
 
+  // Session 7.10.1 correction — a CHANNEL category tag, not a business
+  // status; `badge-blue`/`-green`/`-purple` were undefined anywhere in
+  // this codebase and rendered no styling at all. Deliberately NOT
+  // mapped onto the status roles (positive/caution/negative/pending/
+  // neutral) — voice/text/whatsapp carry no status meaning. Reuses the
+  // existing, already dual-customer-populated chart series palette
+  // (the same kind of arbitrary, non-status categorical color these
+  // tags need) rather than inventing a new schema section. Preserves
+  // the 3 real distinctions, 1:1 with the prior (broken) color intent.
   const getChannelBadgeClass = (channel: FlowChannel) => {
     switch (channel) {
       case 'voice':
-        return 'badge-blue';
+        return 'border-[var(--chart-series-1)] text-[var(--chart-series-1)]';
       case 'text':
-        return 'badge-green';
+        return 'border-[var(--chart-series-3)] text-[var(--chart-series-3)]';
       case 'whatsapp':
-        return 'badge-purple';
+        return 'border-[var(--chart-series-2)] text-[var(--chart-series-2)]';
       default:
-        return 'badge-blue';
+        return 'border-[var(--chart-series-1)] text-[var(--chart-series-1)]';
     }
   };
 

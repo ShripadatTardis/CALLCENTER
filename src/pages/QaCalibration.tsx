@@ -212,7 +212,7 @@ const QaCalibration: React.FC = () => {
     return (
       <Layout>
         <div className="bg-background h-full min-h-0 p-4">
-          <p className="text-sm text-muted-foreground">
+          <p className={typography.bodyMuted}>
             QA Calibration requires both <span className="font-medium">qa.analytics.view</span> and <span className="font-medium">qa.automated.view</span>.
           </p>
         </div>
@@ -226,7 +226,7 @@ const QaCalibration: React.FC = () => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="text-[18px] font-semibold flex items-center gap-1.5"><Scale className="h-4 w-4" /> QA Calibration</h1>
+              <h1 className={`${typography.pageTitle} flex items-center gap-1.5`}><Scale className="h-4 w-4" /> QA Calibration</h1>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex items-center justify-center h-7 w-7 text-muted-foreground hover:text-foreground" aria-label="Understanding Quality Measurements">
@@ -236,7 +236,7 @@ const QaCalibration: React.FC = () => {
                 <TooltipContent>Understanding Quality Measurements</TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-xs text-muted-foreground max-w-2xl mt-0.5">
+            <p className={`${typography.pageDescription} max-w-2xl mt-0.5`}>
               A measurement reliability diagnostic — where Human QA and Automated QA agree, disagree, or disagree on whether a parameter even applied. Neither source is treated as ground truth; this never re-runs Automated QA or modifies either side's scoring.
             </p>
           </div>
@@ -262,13 +262,13 @@ const QaCalibration: React.FC = () => {
                 never nested inside either column. */}
             <div className="grid grid-cols-1 xl:grid-cols-[35%_65%] gap-3 items-start">
               <div className="rounded-md border border-border overflow-hidden">
-                <div className="h-8 flex items-center px-2 bg-card text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className={`h-8 flex items-center px-2 bg-card ${typography.subsectionTitle}`}>
                   Paired interactions ({filteredCandidates.length})
                 </div>
                 <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
-                  {candidatesLoading && <p className="p-3 text-xs text-muted-foreground">Loading…</p>}
+                  {candidatesLoading && <p className={`p-3 ${typography.bodySecondary}`}>Loading…</p>}
                   {!candidatesLoading && filteredCandidates.length === 0 && (
-                    <p className="p-3 text-xs text-muted-foreground">No interaction currently has both a submitted Human QA review and an eligible Automated QA evaluation within scope.</p>
+                    <p className={`p-3 ${typography.bodySecondary}`}>No interaction currently has both a submitted Human QA review and an eligible Automated QA evaluation within scope.</p>
                   )}
                   {filteredCandidates.map((c) => {
                     const isSelected = selectedCandidate?.interactionId === c.interactionId && selectedCandidate?.channel === c.channel;
@@ -290,7 +290,7 @@ const QaCalibration: React.FC = () => {
 
               <div className="space-y-3 min-w-0">
                 {!selectedCandidate ? (
-                  <div className="rounded-md border border-border p-6 text-center text-xs text-muted-foreground">
+                  <div className={`rounded-md border border-border p-6 text-center ${typography.bodySecondary}`}>
                     Select a paired interaction on the left to compare its Human QA review against an Automated QA evaluation.
                   </div>
                 ) : (
@@ -352,10 +352,10 @@ const QaCalibration: React.FC = () => {
                     </div>
 
                     {detailLoading || !comparison ? (
-                      <p className="text-xs text-muted-foreground">Loading comparison…</p>
+                      <p className={typography.bodySecondary}>Loading comparison…</p>
                     ) : (
                       <div className="rounded-md border border-border overflow-hidden">
-                        <table className="w-full text-[12px]">
+                        <table className={`w-full ${typography.tableBody}`}>
                           <thead>
                             <tr className="h-7 bg-card text-[10px] uppercase tracking-wide text-muted-foreground">
                               <th className="text-left px-2">Parameter</th>
@@ -416,7 +416,7 @@ const QaCalibration: React.FC = () => {
             </div>
 
             {truncated && (
-              <p className="text-[10px] text-muted-foreground">Computed over the 50 most recently paired interactions — see Known limitations in the documentation for why this is bounded.</p>
+              <p className={typography.microCaption}>Computed over the 50 most recently paired interactions — see Known limitations in the documentation for why this is bounded.</p>
             )}
 
             <div className="flex flex-wrap items-center gap-1.5">
@@ -426,7 +426,7 @@ const QaCalibration: React.FC = () => {
               <FilterSelect label="Prompt version" value={insPromptVersionFilter} onChange={setInsPromptVersionFilter} options={insPromptVersionOptions.map((v) => ({ value: v, label: v }))} />
             </div>
 
-            <p className="text-[11px] text-muted-foreground max-w-3xl flex items-start gap-1">
+            <p className={`${typography.metadata} max-w-3xl flex items-start gap-1`}>
               <Info className="h-3 w-3 flex-shrink-0 mt-0.5" />
               Descriptive findings only, over the filtered population above — never an automatic conclusion about which side is correct, and never a claim that one prompt version is "better" than another without directly comparable evidence.
             </p>
@@ -486,10 +486,10 @@ function SummaryCard({ label, value, of, tone, hint, loading }: { label: string;
   const toneClass = tone === 'emerald' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'red' ? 'text-red-700 dark:text-red-400' : tone === 'amber' ? 'text-amber-700 dark:text-amber-400' : '';
   return (
     <div className="rounded-md border border-border bg-card px-2.5 py-1.5" title={hint}>
-      <div className="text-[10px] text-muted-foreground truncate">{label}</div>
+      <div className={`${typography.microCaption} truncate`}>{label}</div>
       <div className={`text-[16px] font-semibold leading-tight ${toneClass}`}>
         {loading ? '…' : value}
-        {of !== undefined && <span className="text-[10px] text-muted-foreground font-normal"> / {of}</span>}
+        {of !== undefined && <span className={typography.microCaption}> / {of}</span>}
       </div>
     </div>
   );
@@ -499,7 +499,7 @@ function SummaryCard({ label, value, of, tone, hint, loading }: { label: string;
 function SelectedPairStat({ label, value, tone }: { label: string; value: number; tone?: 'emerald' | 'red' | 'amber' }) {
   const toneClass = tone === 'emerald' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'red' ? 'text-red-700 dark:text-red-400' : tone === 'amber' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground';
   return (
-    <span className="text-[10px] text-muted-foreground">
+    <span className={typography.microCaption}>
       {label}: <span className={`font-semibold ${toneClass}`}>{value}</span>
     </span>
   );
@@ -572,13 +572,13 @@ function PairListItem({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full text-left px-2 py-1.5 text-xs hover:bg-muted/40 ${isSelected ? 'bg-cyan-500/10' : ''}`}
+      className={`w-full text-left px-2 py-1.5 ${typography.tableBody} hover:bg-muted/40 ${isSelected ? 'bg-cyan-500/10' : ''}`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium truncate">{agentLabel}{dateLabel ? ` · ${formatTimestamp(dateLabel)}` : ''}</span>
         <Badge variant="outline" className="h-4 text-[9px] capitalize flex-shrink-0">{candidate.channel}</Badge>
       </div>
-      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+      <div className={`${typography.microCaption} flex items-center gap-1.5 mt-0.5`}>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="font-mono">{shortenId(candidate.interactionId)}</span>
@@ -602,7 +602,7 @@ function InsightTable({ title, rows }: { title: string; rows: { parameterCode: Q
     <div>
       <h3 className="text-[11px] font-semibold mb-1">{title}</h3>
       {rows.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">No occurrences in the current filter.</p>
+        <p className={typography.metadata}>No occurrences in the current filter.</p>
       ) : (
         <div className="rounded-md border border-border overflow-hidden">
           <table className="w-full text-[11px]">
@@ -656,13 +656,13 @@ function ParameterDrillDown({
         <h3 className="text-[12px] font-semibold">{QA_PARAMETERS[parameterCode].displayName} — Evidence Comparison</h3>
         <ClassificationBadge classification={comparison.classification} />
       </div>
-      <p className="text-[11px] text-muted-foreground px-2.5 pt-2">{comparison.reason}</p>
+      <p className={`${typography.metadata} px-2.5 pt-2`}>{comparison.reason}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 sm:divide-x sm:divide-border mt-2">
         <div className="flex flex-col max-h-none sm:max-h-[460px]">
           <div className={`sticky top-0 bg-card ${typography.microLabel} px-2.5 py-1.5 border-b border-border`}>Human QA Evidence</div>
           <div className="px-2.5 py-2 space-y-1.5 sm:overflow-y-auto">
-            {humanFindings.length === 0 && <p className="text-[11px] text-muted-foreground">{humanEmpty}</p>}
+            {humanFindings.length === 0 && <p className={typography.metadata}>{humanEmpty}</p>}
             {humanFindings.map((f) => (
               <div key={f.id} className="rounded border border-border p-1.5 text-[11px] space-y-0.5">
                 <div className="flex items-center gap-1.5"><Badge variant="outline" className="h-4 text-[9px]">{f.value}</Badge>{f.reasonCode && <span className="text-muted-foreground">{f.reasonCode}</span>}</div>
@@ -675,7 +675,7 @@ function ParameterDrillDown({
         <div className="flex flex-col max-h-none sm:max-h-[460px]">
           <div className={`sticky top-0 bg-card ${typography.microLabel} px-2.5 py-1.5 border-b border-border`}>Automated QA Evidence</div>
           <div className="px-2.5 py-2 space-y-1.5 sm:overflow-y-auto">
-            {!hasAutomatedEvidence && <p className="text-[11px] text-muted-foreground">{automatedEmpty}</p>}
+            {!hasAutomatedEvidence && <p className={typography.metadata}>{automatedEmpty}</p>}
             {comparison.turnComparisons.map((t) => (
               <div key={t.turnId} className="rounded border border-border p-1.5 text-[11px] space-y-0.5">
                 <div className="flex items-center gap-1.5">
@@ -690,7 +690,7 @@ function ParameterDrillDown({
               </div>
             ))}
             {comparison.automatedOnlyTurnIds.map((turnId) => (
-              <div key={turnId} className="rounded border border-dashed border-border p-1.5 text-[11px] text-muted-foreground">
+              <div key={turnId} className={`rounded border border-dashed border-border p-1.5 ${typography.metadata}`}>
                 Automated-only: {turnTextById.get(turnId) ?? `Turn ${turnId}`}
               </div>
             ))}
@@ -699,7 +699,7 @@ function ParameterDrillDown({
       </div>
 
       {(comparison.humanOnlyTurnIds.length > 0 || comparison.automatedOnlyTurnIds.length > 0) && (
-        <p className="text-[10px] text-muted-foreground px-2.5 py-2 border-t border-border">
+        <p className={`${typography.microCaption} px-2.5 py-2 border-t border-border`}>
           Coverage difference: {comparison.humanOnlyTurnIds.length} turn(s) assessed by Human QA only, {comparison.automatedOnlyTurnIds.length} by Automated QA only — not blended into the agreement/disagreement count above.
         </p>
       )}

@@ -28,7 +28,8 @@ export const ConditionNode = ({ data, selected }: any) => {
             <div className="ml-auto w-2 h-2 rounded-full bg-destructive" />
           )}
         </div>
-        <Badge variant="outline" className="text-xs badge-blue mb-2">
+        {/* Session 7.10.1 correction — a node-type category tag, not a status; same fix as BaseNode.tsx. */}
+        <Badge variant="outline" className="text-xs border-[var(--chart-series-1)] text-[var(--chart-series-1)] mb-2">
           {data.type}
         </Badge>
         <div className="space-y-1">

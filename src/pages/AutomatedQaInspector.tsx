@@ -13,6 +13,7 @@ import { computeAutomatedQaRatios } from '@/lib/automatedQaRatios';
 import { QA_PARAMETERS, type QaParameterCode } from '@/lib/qaParameters';
 import { humanizeReasonCode } from '@/lib/qaExceptionEditor';
 import { formatTimestamp, formatFractionAsPercent } from '@/lib/format';
+import { typography } from '@/lib/typography';
 import type { QaTurn } from '@/lib/qaConversation';
 import type { AutomatedQaObservation } from '@/services/qa/automatedQaService';
 import { AUTOMATED_QA_STATUS_BADGE } from '@/lib/automatedQaStatusBadge';
@@ -155,7 +156,7 @@ const AutomatedQaInspector: React.FC = () => {
           <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/qa-review')}>
             <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Back to Interaction Quality
           </Button>
-          <p className="text-sm text-muted-foreground">You don't have permission to view Automated QA results (requires qa.automated.view).</p>
+          <p className={typography.bodyMuted}>You don't have permission to view Automated QA results (requires qa.automated.view).</p>
         </div>
       </Layout>
     );
@@ -165,7 +166,7 @@ const AutomatedQaInspector: React.FC = () => {
     return (
       <Layout>
         <div className="bg-background h-full min-h-0 p-4">
-          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Loading evaluation…</p>
+          <p className={typography.bodyMuted} role="status" aria-live="polite">Loading evaluation…</p>
         </div>
       </Layout>
     );
@@ -242,7 +243,7 @@ const AutomatedQaInspector: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72">
-                <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Evaluation history — selecting opens that result</DropdownMenuLabel>
+                <DropdownMenuLabel className={typography.microCaption}>Evaluation history — selecting opens that result</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {history.map((ev) => {
                   const denom = ev.evaluatedTurnIds.length + ev.uncoveredTurnIds.length;
@@ -258,7 +259,7 @@ const AutomatedQaInspector: React.FC = () => {
                         <span className="font-medium">{ev.completedAt ? formatTimestamp(ev.completedAt) : formatTimestamp(ev.createdAt)}</span>
                         {isCurrent && <span className="text-[9px] text-muted-foreground">current</span>}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className={typography.microCaption}>
                         {ev.status} · {ev.promptVersion} · {denom > 0 ? `${ev.evaluatedTurnIds.length}/${denom} turns` : '—'}
                       </span>
                     </DropdownMenuItem>
@@ -305,7 +306,7 @@ const AutomatedQaInspector: React.FC = () => {
             {evaluation.status !== 'failed' && (
               <div>
                 <div className="flex items-center gap-1 mb-1.5">
-                  <h2 className="text-[14px] font-semibold">Quality Measurements</h2>
+                  <h2 className={typography.cardTitle}>Quality Measurements</h2>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
@@ -350,12 +351,12 @@ const AutomatedQaInspector: React.FC = () => {
                             {r.denominator === 0 ? (
                               <div className="flex items-baseline gap-1" title={unassessable?.reason}>
                                 <span className="text-[14px] font-semibold leading-tight text-muted-foreground">—</span>
-                                <span className="text-[10px] text-muted-foreground truncate">No eligible population</span>
+                                <span className={`${typography.microCaption} truncate`}>No eligible population</span>
                               </div>
                             ) : (
                               <div className="flex items-baseline gap-1">
                                 <span className="text-[14px] font-semibold leading-tight">{formatFractionAsPercent(r.rate ?? undefined)}</span>
-                                <span className="text-[10px] text-muted-foreground truncate">{r.numerator}/{r.denominator} eligible</span>
+                                <span className={`${typography.microCaption} truncate`}>{r.numerator}/{r.denominator} eligible</span>
                               </div>
                             )}
                           </div>
@@ -369,10 +370,10 @@ const AutomatedQaInspector: React.FC = () => {
 
             {observations.length > 0 && (
               <div>
-                <h2 className="text-[14px] font-semibold mb-1.5">Findings</h2>
+                <h2 className={`${typography.cardTitle} mb-1.5`}>Findings</h2>
                 <div className="rounded-md border border-border overflow-hidden">
                   <div className="max-h-[420px] overflow-y-auto">
-                    <table className="w-full text-[12px]">
+                    <table className={`w-full ${typography.tableBody}`}>
                       <thead className="sticky top-0 z-10">
                         <tr className="h-[30px] bg-card text-muted-foreground uppercase tracking-wide text-[11px] font-semibold">
                           <th className="text-left px-2">Parameter</th>
@@ -426,7 +427,7 @@ const AutomatedQaInspector: React.FC = () => {
           {/* RIGHT — Conversation, Selected Finding, Technical Details */}
           <div className="min-w-0 space-y-3">
             <div>
-              <h2 className="text-[14px] font-semibold mb-1.5">Conversation</h2>
+              <h2 className={`${typography.cardTitle} mb-1.5`}>Conversation</h2>
               <div ref={conversationContainerRef} className="rounded-md border border-border min-h-[100px] max-h-[420px] overflow-y-auto p-2.5 space-y-2">
                 {turns.map((t) => {
                   const isPrimary = selectedFinding?.primaryTurnId === t.turnId;
@@ -457,7 +458,7 @@ const AutomatedQaInspector: React.FC = () => {
             </div>
 
             <div>
-              <h2 className="text-[14px] font-semibold mb-1.5">Selected Finding</h2>
+              <h2 className={`${typography.cardTitle} mb-1.5`}>Selected Finding</h2>
               <div className="rounded-md border border-border bg-card p-2.5 min-h-[80px]" aria-live="polite">
                 {selectedFinding ? (() => {
                   const def = QA_PARAMETERS[selectedFinding.parameterCode];
@@ -466,18 +467,18 @@ const AutomatedQaInspector: React.FC = () => {
                   return (
                     <div className="space-y-1 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-[13px]">{def.displayName}</span>
+                        <span className={typography.denseHeading}>{def.displayName}</span>
                         <Badge variant="outline" className={`h-5 ${isClean ? 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400' : 'border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400'}`}>
                           {selectedFinding.value}
                         </Badge>
                       </div>
                       <div><span className="text-muted-foreground">Reason: </span>{selectedFinding.reasonCode ? humanizeReasonCode(selectedFinding.reasonCode) : '—'}</div>
                       <div><span className="text-muted-foreground">Turn: </span>{turnIdx ? `Turn ${turnIdx}` : selectedFinding.primaryTurnId}</div>
-                      <div className="text-muted-foreground leading-snug pt-0.5">{selectedFinding.explanation ?? 'No explanation provided.'}</div>
+                      <div className={`${typography.bodySecondary} pt-0.5`}>{selectedFinding.explanation ?? 'No explanation provided.'}</div>
                     </div>
                   );
                 })() : (
-                  <p className="text-xs text-muted-foreground">Select a finding from the table to see its full explanation and evidence turn.</p>
+                  <p className={typography.bodySecondary}>Select a finding from the table to see its full explanation and evidence turn.</p>
                 )}
               </div>
             </div>

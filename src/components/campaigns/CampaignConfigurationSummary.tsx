@@ -51,7 +51,7 @@ export const CampaignConfigurationSummary: React.FC<{
             <span className="flex items-center gap-2">
               {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />}
               <span className={typography.sectionTitle}>Configuration</span>
-              <span className="text-xs text-muted-foreground">{campaign.agentName ?? campaign.agentId}</span>
+              <span className={typography.bodySecondary}>{campaign.agentName ?? campaign.agentId}</span>
             </span>
             {unmappedRequired.length > 0 && (
               <span className="flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
@@ -72,18 +72,18 @@ export const CampaignConfigurationSummary: React.FC<{
                   <Badge variant="outline" className="text-[9px] py-0 px-1 border-border text-muted-foreground">
                     {contract.contractCompleteness}
                   </Badge>
-                  <span className="text-[11px] text-muted-foreground">Source: {contract.contractSource}</span>
+                  <span className={typography.metadata}>Source: {contract.contractSource}</span>
                 </div>
                 {contract.expectedInputFields.length === 0 && contract.expectedOutcomes.length === 0 && contract.outputFields.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No declared inputs, outcomes or output fields for this agent.</p>
+                  <p className={typography.bodySecondary}>No declared inputs, outcomes or output fields for this agent.</p>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                     {contract.expectedInputFields.length > 0 && (
                       <div className="space-y-1 bg-background/40 rounded p-2">
-                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Expected Inputs</div>
+                        <div className={typography.microLabel}>Expected Inputs</div>
                         <div className="space-y-1">
                           {contract.expectedInputFields.map((f) => (
-                            <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-1.5 text-xs">
+                            <div key={f.fieldCode} className={`flex flex-wrap items-baseline gap-x-1.5 ${typography.tableBody}`}>
                               <span className="text-foreground font-medium">{f.displayName}</span>
                               <span className="text-muted-foreground">({f.fieldCode})</span>
                               {f.required ? (
@@ -101,7 +101,7 @@ export const CampaignConfigurationSummary: React.FC<{
                       <div className="space-y-1 bg-background/40 rounded p-2">
                         {contract.expectedOutcomes.length > 0 && (
                           <>
-                            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Expected Outcomes</div>
+                            <div className={typography.microLabel}>Expected Outcomes</div>
                             <div className="flex flex-wrap gap-1">
                               {contract.expectedOutcomes.map((o) => (
                                 <Badge key={o.outcomeCode} variant="outline" className="text-[10px] py-0 px-1.5 border-border text-foreground" title={o.description}>
@@ -113,7 +113,7 @@ export const CampaignConfigurationSummary: React.FC<{
                         )}
                         {contract.outputFields.length > 0 && (
                           <>
-                            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mt-1">Output Fields</div>
+                            <div className={`${typography.microLabel} mt-1`}>Output Fields</div>
                             <div className="flex flex-wrap gap-1">
                               {contract.outputFields.map((f) => (
                                 <Badge key={f.fieldCode} variant="outline" className="text-[10px] py-0 px-1.5 border-border text-muted-foreground" title={f.description}>
@@ -129,7 +129,7 @@ export const CampaignConfigurationSummary: React.FC<{
                 )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No agent contract captured for this campaign.</p>
+              <p className={typography.bodySecondary}>No agent contract captured for this campaign.</p>
             )}
 
             {/* Input Mapping */}
@@ -140,7 +140,7 @@ export const CampaignConfigurationSummary: React.FC<{
                   {[...requiredFields, ...optionalFields].map((f) => {
                     const m = mappingByField.get(f.fieldCode);
                     return (
-                      <div key={f.fieldCode} className="px-2 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div key={f.fieldCode} className={`px-2 py-1.5 flex flex-wrap items-center justify-between gap-2 ${typography.tableBody}`}>
                         <span className="flex items-center gap-1.5">
                           <span className="text-foreground">{f.displayName}</span>
                           {f.required && (
@@ -169,7 +169,7 @@ export const CampaignConfigurationSummary: React.FC<{
                   {outcomeMappings.map((m) => {
                     const outcomeDisplay = contract?.expectedOutcomes.find((o) => o.outcomeCode === m.agentOutcomeCode)?.displayName ?? m.agentOutcomeCode;
                     return (
-                      <div key={m.agentOutcomeCode} className="px-2 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div key={m.agentOutcomeCode} className={`px-2 py-1.5 flex flex-wrap items-center justify-between gap-2 ${typography.tableBody}`}>
                         <span className="text-foreground">{outcomeDisplay}</span>
                         <span className="text-muted-foreground">→ {classificationLabel(m.campaignClassificationCode)}</span>
                       </div>
@@ -183,11 +183,11 @@ export const CampaignConfigurationSummary: React.FC<{
             {campaign.rules.length > 0 && (
               <div className="space-y-1 pt-1 border-t border-border/60">
                 <span className={typography.subsectionTitle}>Legacy Result Rules</span>
-                <p className="text-[11px] text-muted-foreground">
+                <p className={typography.metadata}>
                   Generic/operational rules that still govern this campaign's generic Current Result, independently
                   of Agent Outcome → Campaign Classification above.
                 </p>
-                <div className="border border-border rounded divide-y divide-border text-xs">
+                <div className={`border border-border rounded divide-y divide-border ${typography.tableBody}`}>
                   {campaign.rules
                     .slice()
                     .sort((a, b) => a.priority - b.priority)

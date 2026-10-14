@@ -18,6 +18,14 @@ export default {
 			}
 		},
 		extend: {
+			// Session 7.11 — reads the active customer config's
+			// typography.families.interface (the var's own value is
+			// already a full comma-separated font stack, e.g.
+			// "Roboto, ui-sans-serif, ..." for KATON) instead of
+			// Tailwind's unmodified built-in `font-sans` stack.
+			fontFamily: {
+				sans: ['var(--font-family-interface)'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',

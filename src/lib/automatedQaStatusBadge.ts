@@ -1,10 +1,19 @@
 import type { AutomatedQaStatus } from '@/services/qa/automatedQaService';
 
-/** Session 16.3 — shared status-color map, single source so AutomatedQaInspector and AutomatedQaPanel never drift apart. */
+/** Session 16.3 — shared status-color map, single source so AutomatedQaInspector and AutomatedQaPanel never drift apart.
+ * Session 7.10.1 — migrated from literal Tailwind color classes to the
+ * centralized `--status-*` CSS custom properties (src/theme/schema.ts's
+ * `color.semantic.*`), so changing the active customer config now
+ * changes every consumer of this map. Real-meaning mapping:
+ * queued="not yet started" -> neutral; running="in progress" -> pending
+ * (matches Badge's own existing "Pending/Open"+"Information/Running"
+ * convention); completed -> positive; partial="needs attention,
+ * incomplete" -> caution; failed -> negative. Same real hue families as
+ * before (slate/blue/emerald/amber/red), now config-driven. */
 export const AUTOMATED_QA_STATUS_BADGE: Record<AutomatedQaStatus, string> = {
-  queued: 'border-slate-400 text-slate-600 dark:border-slate-500 dark:text-slate-400',
-  running: 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400',
-  completed: 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400',
-  partial: 'border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400',
-  failed: 'border-red-600 text-red-700 dark:border-red-400 dark:text-red-400',
+  queued: 'border-[var(--status-neutral-border)] text-[var(--status-neutral-text)]',
+  running: 'border-[var(--status-pending-border)] text-[var(--status-pending-text)]',
+  completed: 'border-[var(--status-positive-border)] text-[var(--status-positive-text)]',
+  partial: 'border-[var(--status-caution-border)] text-[var(--status-caution-text)]',
+  failed: 'border-[var(--status-negative-border)] text-[var(--status-negative-text)]',
 };

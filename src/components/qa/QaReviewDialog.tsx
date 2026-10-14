@@ -21,6 +21,7 @@ import {
 } from '@/lib/qaExceptionEditor';
 import type { QaFindingInput, QaChannel, QaFinding } from '@/services/qa/qaService';
 import { formatTimestamp } from '@/lib/format';
+import { typography } from '@/lib/typography';
 
 interface QaReviewDialogProps {
   isOpen: boolean;
@@ -319,9 +320,9 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
                     <div
                       key={turn.turnId}
                       aria-current={isCurrent ? 'true' : undefined}
-                      className={`rounded-md p-2 text-sm ${isCurrent ? 'bg-cyan-50 dark:bg-cyan-950/30 ring-1 ring-cyan-400' : ''}`}
+                      className={`rounded-md p-2 ${typography.body} ${isCurrent ? 'bg-cyan-50 dark:bg-cyan-950/30 ring-1 ring-cyan-400' : ''}`}
                     >
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                      <div className={`flex items-center gap-1.5 ${typography.bodySecondary} mb-0.5`}>
                         <span className={`font-semibold ${turn.role === 'customer' ? 'text-foreground' : 'text-cyan-700 dark:text-cyan-400'}`}>
                           {turn.speakerLabel}
                         </span>
@@ -336,17 +337,17 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
                     </div>
                   );
                 })}
-                {allTurns.length === 0 && <p className="text-sm text-muted-foreground">No conversation available for this interaction.</p>}
+                {allTurns.length === 0 && <p className={typography.bodyMuted}>No conversation available for this interaction.</p>}
               </div>
             </div>
 
             <div className="w-[38%] min-w-0 flex flex-col border border-border rounded-md p-3 gap-2">
-              <div className="text-xs text-muted-foreground flex-shrink-0">
+              <div className={`${typography.bodySecondary} flex-shrink-0`}>
                 {reviewableTurns.length - remainingCount}/{reviewableTurns.length} reviewable turns · {findingsCount} finding{findingsCount === 1 ? '' : 's'}
               </div>
 
               {!currentTurn ? (
-                <p className="text-sm text-muted-foreground">No agent turns to review in this interaction.</p>
+                <p className={typography.bodyMuted}>No agent turns to review in this interaction.</p>
               ) : exceptionOpen ? (
                 <ExceptionEditor
                   draft={draft}
@@ -365,7 +366,7 @@ export const QaReviewDialog: React.FC<QaReviewDialogProps> = ({ isOpen, onClose,
                       duplicating it here cost vertical space (tight at
                       1366×768) without adding information. A compact
                       identifier replaces it. */}
-                  <div className="flex-shrink-0 text-xs text-muted-foreground truncate">
+                  <div className={`flex-shrink-0 ${typography.bodySecondary} truncate`}>
                     <span className="font-medium text-foreground">T{currentTurnIndexInAll + 1}</span> · {currentTurn.speakerLabel} response
                     {currentTurn.text && <span> — {currentTurn.text.length > 70 ? `${currentTurn.text.slice(0, 70)}…` : currentTurn.text}</span>}
                   </div>
@@ -454,7 +455,7 @@ const ExceptionEditor: React.FC<{
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
       <div className="flex items-center justify-between flex-shrink-0">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">What is wrong with this turn?</p>
+        <p className={typography.panelLabel}>What is wrong with this turn?</p>
         <Button variant="ghost" size="xs" onClick={onCancel} aria-label="Close exception editor"><X className="h-3.5 w-3.5" /></Button>
       </div>
       <div className="flex flex-wrap gap-1.5 flex-shrink-0">
@@ -516,12 +517,12 @@ const ExceptionEditor: React.FC<{
                 // §6 — the problem value is implied by selecting this
                 // parameter at all; shown read-only for confidence, never
                 // asked as a redundant choice.
-                row.value && <p className="text-[11px] text-muted-foreground">Will record as <span className="font-medium text-foreground">{row.value}</span></p>
+                row.value && <p className={typography.metadata}>Will record as <span className="font-medium text-foreground">{row.value}</span></p>
               )}
 
               {row.value && requiresReasonCode(code, row.value) && (
                 <div role="radiogroup" aria-label={`Reason — ${def.displayName}`}>
-                  <p className="text-[10px] text-muted-foreground mb-1">What happened?</p>
+                  <p className={`${typography.microCaption} mb-1`}>What happened?</p>
                   <div className="flex flex-wrap gap-1.5">
                     {def.reasonCodes.map((r) => (
                       <button
@@ -540,10 +541,10 @@ const ExceptionEditor: React.FC<{
               )}
 
               <div>
-                <p className="text-[10px] text-muted-foreground mb-1">Supporting evidence (optional)</p>
+                <p className={`${typography.microCaption} mb-1`}>Supporting evidence (optional)</p>
                 <div className="max-h-20 overflow-y-auto border border-border/60 rounded-sm p-1 space-y-0.5">
                   {evidenceCandidates.map((t) => (
-                    <label key={t.turnId} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <label key={t.turnId} className={`flex items-center gap-1.5 ${typography.metadata}`}>
                       <Checkbox
                         checked={row.evidenceTurnIds.includes(t.turnId)}
                         onCheckedChange={(checked) => {
@@ -569,7 +570,7 @@ const ExceptionEditor: React.FC<{
           );
         })}
         {Object.keys(draft).length === 0 && (
-          <p className="text-xs text-muted-foreground">Select one or more parameters above.</p>
+          <p className={typography.bodySecondary}>Select one or more parameters above.</p>
         )}
       </div>
 
@@ -619,31 +620,31 @@ const QaSummaryPanel: React.FC<{
   return (
     <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
       <div className="flex items-center justify-between flex-shrink-0">
-        <p className="text-sm font-semibold">Summary</p>
+        <p className={typography.cardTitle}>Summary</p>
         <Button variant="ghost" size="xs" onClick={onBack}>Back to conversation</Button>
       </div>
 
-      <div className="text-xs text-muted-foreground">
+      <div className={typography.bodySecondary}>
         {remainingCount === 0 ? 'All reviewable turns reviewed.' : `${remainingCount} turn(s) not yet reviewed — submission is blocked until every turn is Good, Flagged, or N/A.`}
       </div>
 
       <div className="border border-border rounded-md p-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Findings by parameter</p>
+        <p className={`${typography.panelLabel} mb-1.5`}>Findings by parameter</p>
         {exceptionFindings.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No findings recorded.</p>
+          <p className={typography.bodySecondary}>No findings recorded.</p>
         ) : (
           <div className="space-y-1">
             {Array.from(byParameter.entries()).map(([code, count]) => (
-              <p key={code} className="text-xs">{QA_PARAMETERS[code].displayName}: {count}</p>
+              <p key={code} className={typography.tableBody}>{QA_PARAMETERS[code].displayName}: {count}</p>
             ))}
           </div>
         )}
       </div>
 
       <div className="border border-border rounded-md p-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Findings — jump to evidence</p>
+        <p className={`${typography.panelLabel} mb-1.5`}>Findings — jump to evidence</p>
         {exceptionFindings.length === 0 ? (
-          <p className="text-xs text-muted-foreground">—</p>
+          <p className={typography.bodySecondary}>—</p>
         ) : (
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {exceptionFindings.map((f) => (
@@ -661,7 +662,7 @@ const QaSummaryPanel: React.FC<{
       </div>
 
       <div className="border border-border rounded-md p-2 space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interaction-level conclusions</p>
+        <p className={typography.panelLabel}>Interaction-level conclusions</p>
         <div className="grid grid-cols-2 gap-2">
           <LabeledSelect label="Request completion" value={requestCompletion} options={INTERACTION_LEVEL_VALUES.requestCompletion} onChange={(v) => setRequestCompletion(v as RequestCompletion)} disabled={isReadOnly} />
           <LabeledSelect label="First contact resolution" value={fcr} options={INTERACTION_LEVEL_VALUES.fcr} onChange={(v) => setFcr(v as QaFcr)} disabled={isReadOnly} />
@@ -686,7 +687,7 @@ const QaSummaryPanel: React.FC<{
 
 const LabeledSelect: React.FC<{ label: string; value: string | null; options: readonly string[]; onChange: (v: string) => void; disabled?: boolean }> = ({ label, value, options, onChange, disabled }) => (
   <div>
-    <label className="text-[11px] text-muted-foreground block mb-0.5">{label}</label>
+    <label className={`${typography.metadata} block mb-0.5`}>{label}</label>
     <Select value={value ?? ''} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
       <SelectContent>

@@ -9,6 +9,7 @@
      Run `npm run generate:theme` after changing src/theme/configs/voiceforce.config.ts.
      Source: src/theme/generateCssVariables.ts + src/theme/configs/voiceforce.config.ts. */
   :root {
+    --font-family-interface: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"; /* typography.families.interface */
     --background: 210 20% 98%; /* color.surfaces.base.light.background */
     --foreground: 222.2 84% 4.9%; /* color.surfaces.base.light.foreground */
     --card: 0 0% 100%; /* color.surfaces.raised.light.background */
@@ -49,6 +50,9 @@
     --status-pending-text: rgb(29 78 216); /* color.semantic.pending.text.light */
     --status-pending-fill: rgb(59 130 246 / 0.1); /* color.semantic.pending.fill.light */
     --status-pending-border: rgb(37 99 235 / 0.4); /* color.semantic.pending.border.light */
+    --status-neutral-text: rgb(71 85 105); /* color.semantic.neutral.text.light */
+    --status-neutral-fill: rgb(100 116 139 / 0.1); /* color.semantic.neutral.fill.light */
+    --status-neutral-border: rgb(148 163 184); /* color.semantic.neutral.border.light */
     --chart-series-1: #3B82F6; /* charts.seriesPalette[0] */
     --chart-series-2: #8B5CF6; /* charts.seriesPalette[1] */
     --chart-series-3: #10B981; /* charts.seriesPalette[2] */
@@ -96,6 +100,60 @@
     --shadow-prominent: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); /* shadow.variants.prominent */
     --shadow-maximum: 0 25px 50px -12px rgb(0 0 0 / 0.25); /* shadow.variants.maximum */
     --shadow-none: 0 0 #0000; /* shadow.variants.none */
+    --radius: 0.5rem; /* radii.panel (base for Tailwind borderRadius lg/md/sm) */
+    --type-pageTitle-size: 18px; /* typography.roles.pageTitle.sizePx */
+    --type-pageTitle-weight: 600; /* typography.roles.pageTitle.weight */
+    --type-pageTitle-line-height: 28px; /* typography.roles.pageTitle.lineHeightPx */
+    --type-pageDescription-size: 12px; /* typography.roles.pageDescription.sizePx */
+    --type-pageDescription-weight: 400; /* typography.roles.pageDescription.weight */
+    --type-pageDescription-line-height: 16px; /* typography.roles.pageDescription.lineHeightPx */
+    --type-sectionTitle-size: 12px; /* typography.roles.sectionTitle.sizePx */
+    --type-sectionTitle-weight: 600; /* typography.roles.sectionTitle.weight */
+    --type-sectionTitle-line-height: 16px; /* typography.roles.sectionTitle.lineHeightPx */
+    --type-subsectionTitle-size: 11px; /* typography.roles.subsectionTitle.sizePx */
+    --type-subsectionTitle-weight: 600; /* typography.roles.subsectionTitle.weight */
+    --type-cardTitle-size: 14px; /* typography.roles.cardTitle.sizePx */
+    --type-cardTitle-weight: 600; /* typography.roles.cardTitle.weight */
+    --type-cardTitle-line-height: 20px; /* typography.roles.cardTitle.lineHeightPx */
+    --type-body-size: 14px; /* typography.roles.body.sizePx */
+    --type-body-weight: 400; /* typography.roles.body.weight */
+    --type-body-line-height: 20px; /* typography.roles.body.lineHeightPx */
+    --type-bodySecondary-size: 12px; /* typography.roles.bodySecondary.sizePx */
+    --type-bodySecondary-weight: 400; /* typography.roles.bodySecondary.weight */
+    --type-bodySecondary-line-height: 16px; /* typography.roles.bodySecondary.lineHeightPx */
+    --type-metadata-size: 11px; /* typography.roles.metadata.sizePx */
+    --type-metadata-weight: 400; /* typography.roles.metadata.weight */
+    --type-label-size: 12px; /* typography.roles.label.sizePx */
+    --type-label-weight: 500; /* typography.roles.label.weight */
+    --type-label-line-height: 16px; /* typography.roles.label.lineHeightPx */
+    --type-metricValue-size: 18px; /* typography.roles.metricValue.sizePx */
+    --type-metricValue-weight: 600; /* typography.roles.metricValue.weight */
+    --type-metricValue-line-height: 28px; /* typography.roles.metricValue.lineHeightPx */
+    --type-metricLabel-size: 11px; /* typography.roles.metricLabel.sizePx */
+    --type-metricLabel-weight: 400; /* typography.roles.metricLabel.weight */
+    --type-tableHeader-size: 12px; /* typography.roles.tableHeader.sizePx */
+    --type-tableHeader-weight: 500; /* typography.roles.tableHeader.weight */
+    --type-tableHeader-line-height: 16px; /* typography.roles.tableHeader.lineHeightPx */
+    --type-tableBody-size: 12px; /* typography.roles.tableBody.sizePx */
+    --type-tableBody-weight: 400; /* typography.roles.tableBody.weight */
+    --type-tableBody-line-height: 16px; /* typography.roles.tableBody.lineHeightPx */
+    --type-microLabel-size: 10px; /* typography.roles.microLabel.sizePx */
+    --type-microLabel-weight: 600; /* typography.roles.microLabel.weight */
+    --type-denseTableHeader-size: 9px; /* typography.roles.denseTableHeader.sizePx */
+    --type-denseTableHeader-weight: 400; /* typography.roles.denseTableHeader.weight */
+    --type-denseBody-size: 13px; /* typography.roles.denseBody.sizePx */
+    --type-denseBody-weight: 400; /* typography.roles.denseBody.weight */
+    --type-denseHeading-size: 13px; /* typography.roles.denseHeading.sizePx */
+    --type-denseHeading-weight: 600; /* typography.roles.denseHeading.weight */
+    --type-microCaption-size: 10px; /* typography.roles.microCaption.sizePx */
+    --type-microCaption-weight: 400; /* typography.roles.microCaption.weight */
+    --type-bodyMuted-size: 14px; /* typography.roles.bodyMuted.sizePx */
+    --type-bodyMuted-weight: 400; /* typography.roles.bodyMuted.weight */
+    --type-bodyMuted-line-height: 20px; /* typography.roles.bodyMuted.lineHeightPx */
+    --type-fieldLabelMicro-size: 11px; /* typography.roles.fieldLabelMicro.sizePx */
+    --type-fieldLabelMicro-weight: 400; /* typography.roles.fieldLabelMicro.weight */
+    --type-panelLabel-size: 12px; /* typography.roles.panelLabel.sizePx */
+    --type-panelLabel-weight: 600; /* typography.roles.panelLabel.weight */
 
     /* Preserved verbatim — not sourced from the config. Session 7.6.3
        confirmed (grep) these are consumed only by the unused
@@ -104,9 +162,6 @@
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* Not generated — radii/cards migration is deferred to a later session. */
-    --radius: 0.5rem;
   }
 
   .dark {
@@ -147,6 +202,9 @@
     --status-pending-text: rgb(96 165 250); /* color.semantic.pending.text.dark */
     --status-pending-fill: rgb(59 130 246 / 0.1); /* color.semantic.pending.fill.dark */
     --status-pending-border: rgb(59 130 246 / 0.4); /* color.semantic.pending.border.dark */
+    --status-neutral-text: rgb(148 163 184); /* color.semantic.neutral.text.dark */
+    --status-neutral-fill: rgb(100 116 139 / 0.1); /* color.semantic.neutral.fill.dark */
+    --status-neutral-border: rgb(100 116 139); /* color.semantic.neutral.border.dark */
     --table-header-bg: 222.2 84% 4.9%; /* components.table.headerBackground.dark */
     --table-header-text: 215 20.2% 65.1%; /* components.table.headerText.dark */
     --table-row-hover-bg: 222.2 84% 4.9%; /* components.table.rowHoverBackground.dark */
@@ -166,6 +224,9 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    /* Session 7.11 — font-sans now resolves through the customer
+       config's --font-family-interface var (tailwind.config.ts), not
+       Tailwind's hardcoded default stack. */
+    @apply bg-background text-foreground font-sans;
   }
 }

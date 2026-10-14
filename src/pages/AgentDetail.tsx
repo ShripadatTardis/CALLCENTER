@@ -102,8 +102,8 @@ const CollapsibleSubsection: React.FC<{ title: string; children: React.ReactNode
  */
 const MetricRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="flex items-baseline gap-2 border-b border-border/40 pb-0.5 min-w-0">
-    <span className="text-muted-foreground text-xs truncate" title={label}>{label}</span>
-    <span className="text-foreground text-sm tabular-nums ml-auto flex-shrink-0">{value}</span>
+    <span className={`${typography.bodySecondary} truncate`} title={label}>{label}</span>
+    <span className={`${typography.body} tabular-nums ml-auto flex-shrink-0`}>{value}</span>
   </div>
 );
 
@@ -214,7 +214,7 @@ const AgentDetail: React.FC = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to {returnTo.label}
           </Button>
-          <p className="text-sm text-muted-foreground px-1">
+          <p className={`${typography.bodyMuted} px-1`}>
             No agent found for id "{agentId}" in the live roster (GET /api/v1/agents).
           </p>
         </div>
@@ -301,7 +301,7 @@ const AgentDetail: React.FC = () => {
             <Bot className="h-5 w-5 text-cyan-400 shrink-0" />
             <h1 className={typography.pageTitle}>{agent.displayName}</h1>
             {agent.isDefault && <Badge variant="outline" className="text-xs border-slate-600 text-foreground">Default</Badge>}
-            <span className="text-[11px] text-muted-foreground font-mono">{agent.agentId}</span>
+            <span className={`${typography.metadata} font-mono`}>{agent.agentId}</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border/50 pt-1 text-[13px]">
@@ -321,15 +321,15 @@ const AgentDetail: React.FC = () => {
             <div className="h-4 w-px bg-muted" aria-hidden="true" />
             <span className="flex items-baseline gap-1.5">
               <span className="font-semibold tabular-nums text-foreground">{callMetrics.callsHandled}</span>
-              <span className="text-muted-foreground text-[11px]">Calls handled</span>
+              <span className={typography.metadata}>Calls handled</span>
             </span>
             <span className="flex items-baseline gap-1.5">
               <span className="font-semibold tabular-nums text-foreground">{chatMetrics.chatsHandled}</span>
-              <span className="text-muted-foreground text-[11px]">Chats handled</span>
+              <span className={typography.metadata}>Chats handled</span>
             </span>
             <span className="flex items-baseline gap-1.5">
               <span className="font-semibold tabular-nums text-foreground">{campaignOutcomes.campaignCount}</span>
-              <span className="text-muted-foreground text-[11px]">Campaigns</span>
+              <span className={typography.metadata}>Campaigns</span>
             </span>
             {/* Session (Agent Detail UX restructure) HIG fix — counter
                 scope ("most recent 100 rows") was previously reachable
@@ -420,26 +420,26 @@ const AgentDetail: React.FC = () => {
                 <span className="flex items-center gap-2 min-w-0">
                   {contractOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
                   <span className={typography.sectionTitle}>Agent Contract</span>
-                  <span className="text-sm text-foreground truncate">{contractSummary}</span>
+                  <span className={`${typography.body} truncate`}>{contractSummary}</span>
                 </span>
-                <span className="text-[11px] text-muted-foreground flex-shrink-0">Source: {contract.contractSource}</span>
+                <span className={`${typography.metadata} flex-shrink-0`}>Source: {contract.contractSource}</span>
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent id="agent-contract-panel">
               <div className="px-3 pb-3 pt-1 border-t border-border space-y-3 text-sm">
                 {contract.contractCompleteness === 'partial' ? (
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className={typography.metadata}>
                     Expected inputs, expected outcomes and structured outputs are not yet published by the live Partner
                     API (contract source: legacy roster only). Nothing is fabricated here — this section will populate
                     automatically once the revised /agents contract is live.
                   </p>
                 ) : contractIsEmpty ? (
-                  <p className="text-[11px] text-muted-foreground">No declared inputs, outcomes or output fields for this agent.</p>
+                  <p className={typography.metadata}>No declared inputs, outcomes or output fields for this agent.</p>
                 ) : (
                   <>
                     {contract.expectedInputFields.length > 0 && (
                       <div>
-                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Expected Inputs</div>
+                        <div className={`${typography.subsectionTitle} mb-1`}>Expected Inputs</div>
                         <div className="space-y-1">
                           {contract.expectedInputFields.map((f) => (
                             <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
@@ -462,7 +462,7 @@ const AgentDetail: React.FC = () => {
 
                     {contract.expectedOutcomes.length > 0 && (
                       <div>
-                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Expected Outcomes</div>
+                        <div className={`${typography.subsectionTitle} mb-1`}>Expected Outcomes</div>
                         <div className="flex flex-wrap gap-1.5">
                           {contract.expectedOutcomes.map((o) => (
                             <Badge key={o.outcomeCode} variant="outline" className="text-[10px] py-0 px-1.5 border-border text-foreground" title={o.description}>
@@ -475,7 +475,7 @@ const AgentDetail: React.FC = () => {
 
                     {contract.outputFields.length > 0 && (
                       <div>
-                        <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Output Fields</div>
+                        <div className={`${typography.subsectionTitle} mb-1`}>Output Fields</div>
                         <div className="space-y-1">
                           {contract.outputFields.map((f) => (
                             <div key={f.fieldCode} className="flex flex-wrap items-baseline gap-x-2 text-xs" title={f.description}>
@@ -524,7 +524,7 @@ const AgentDetail: React.FC = () => {
             {allRecentInteractions.length > 0 && <DataNotes title="Interaction scope" ariaLabel="Interaction scope — what this list represents" notes={recentInteractionsNotes} />}
           </div>
           {allRecentInteractions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent interactions for this agent.</p>
+            <p className={typography.bodyMuted}>No recent interactions for this agent.</p>
           ) : (
             <>
               <div className="rounded-md border border-border flex-1 min-h-0 overflow-auto">
@@ -544,8 +544,8 @@ const AgentDetail: React.FC = () => {
                       row.kind === 'call' ? (
                         <TableRow key={`call-${row.call.interactionId}`} className="border-border/60">
                           <TableCell className="w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Voice</Badge></TableCell>
-                          <TableCell className="w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
-                          <TableCell className="text-foreground text-xs">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
+                          <TableCell className={`w-32 whitespace-nowrap ${typography.tableBody}`}>{formatTimestamp(row.call.startTime)}</TableCell>
+                          <TableCell className={typography.tableBody}>{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
                           <TableCell className="w-20 text-right">
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedInteraction(row.call)}>
                               View
@@ -555,8 +555,8 @@ const AgentDetail: React.FC = () => {
                       ) : (
                         <TableRow key={`chat-${row.chat.sessionId}`} className="border-border/60">
                           <TableCell className="w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Chat</Badge></TableCell>
-                          <TableCell className="w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
-                          <TableCell className="text-foreground text-xs">{formatStatusLabel(row.chat.status)}</TableCell>
+                          <TableCell className={`w-32 whitespace-nowrap ${typography.tableBody}`}>{formatTimestamp(row.chat.updatedAt)}</TableCell>
+                          <TableCell className={typography.tableBody}>{formatStatusLabel(row.chat.status)}</TableCell>
                           <TableCell className="w-20 text-right">
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
                               View
@@ -576,7 +576,7 @@ const AgentDetail: React.FC = () => {
                   selection. Always shown once there is at least one row,
                   so the page-size selector stays reachable even on a
                   single page. */}
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground flex-shrink-0">
+              <div className={`flex flex-wrap items-center justify-between gap-2 flex-shrink-0 ${typography.bodySecondary}`}>
                 <span role="status" aria-live="polite">
                   Showing {interactionsStart + 1}–{Math.min(interactionsStart + interactionsPageSize, allRecentInteractions.length)} of {allRecentInteractions.length} · Page {interactionsCurrentPage} of {interactionsTotalPages}
                 </span>

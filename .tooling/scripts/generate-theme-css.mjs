@@ -1,9 +1,10 @@
 // Session 7.7 — build-time theme generation.
+// Session 7.11 — extended with multi-customer configuration selection.
 //
-// Bundles the REAL compiled src/theme/schema.ts + voiceforce.config.ts
+// Bundles the REAL compiled src/theme/schema.ts + every customer config
 // + generateCssVariables.ts (via esbuild, same convention every
 // *-verify.mjs script in this repo already uses — not a
-// reimplementation), validates the active config against the schema,
+// reimplementation), validates the SELECTED config against the schema,
 // generates the `:root`/`.dark` CSS custom property declarations, and
 // writes them into src/index.css between the
 // GENERATED-THEME-VARIABLES marker comments this script also owns.
@@ -12,6 +13,16 @@
 // if any declaration resolves to an empty value — per the explicit
 // instruction to fail loudly on invalid/missing values rather than
 // silently substitute anything.
+//
+// Customer selection (Session 7.11): explicit, deterministic, validated.
+//   node .tooling/scripts/generate-theme-css.mjs                 -> voiceforce (default)
+//   node .tooling/scripts/generate-theme-css.mjs --theme=katon    -> katon
+//   VITE_THEME=katon node .tooling/scripts/generate-theme-css.mjs -> katon
+// A `--theme=` CLI flag takes precedence over VITE_THEME if both are
+// set (CLI flag exists specifically so npm scripts work identically on
+// Windows and POSIX shells without needing cross-env or shell-specific
+// env-var syntax). An unrecognized theme id is a hard, non-zero-exit
+// failure — never a silent fallback to a default.
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,20 +42,36 @@ await build({
   outfile: bundlePath,
 });
 
-const { voiceForceThemeConfigSchema, voiceforceBaselineConfig, generateRootDeclarations, generateDarkDeclarations, renderDeclarationBlock } =
+const { voiceForceThemeConfigSchema, voiceforceBaselineConfig, katonConfig, generateRootDeclarations, generateDarkDeclarations, renderDeclarationBlock } =
   await import(`file://${bundlePath.replace(/\\/g, '/')}`);
 
-const validation = voiceForceThemeConfigSchema.safeParse(voiceforceBaselineConfig);
+// Session 7.11 — the customer-configuration registry. Adding a future
+// customer is adding one entry here plus one new config file — never a
+// change to any consuming screen/component (the brief's own onboarding
+// acceptance criterion).
+const THEME_REGISTRY = {
+  voiceforce: voiceforceBaselineConfig,
+  katon: katonConfig,
+};
+
+const cliThemeArg = process.argv.find((a) => a.startsWith('--theme='));
+const requestedTheme = (cliThemeArg ? cliThemeArg.slice('--theme='.length) : process.env.VITE_THEME) || 'voiceforce';
+
+if (!Object.prototype.hasOwnProperty.call(THEME_REGISTRY, requestedTheme)) {
+  console.error(`FAIL: unknown customer configuration "${requestedTheme}". Known configurations: ${Object.keys(THEME_REGISTRY).join(', ')}.`);
+  process.exit(1);
+}
+
+const activeConfig = THEME_REGISTRY[requestedTheme];
+
+const validation = voiceForceThemeConfigSchema.safeParse(activeConfig);
 if (!validation.success) {
-  console.error('FAIL: active theme configuration does not validate against the schema.');
+  console.error(`FAIL: "${requestedTheme}" theme configuration does not validate against the schema.`);
   console.error(validation.error.format());
   process.exit(1);
 }
 
-// The active configuration — per Session 7.4's decision 8, VoiceForce
-// is the explicit default. No KATON config exists yet; there is
-// nothing to select between.
-const activeConfig = voiceforceBaselineConfig;
+console.log(`Generating theme CSS for customer configuration: "${requestedTheme}".`);
 
 const rootDeclarations = generateRootDeclarations(activeConfig);
 const darkDeclarations = generateDarkDeclarations(activeConfig);
@@ -70,9 +97,6 @@ const generated = [
   '    --sidebar-primary-foreground: 0 0% 100%;',
   '    --sidebar-accent-foreground: 240 5.9% 10%;',
   '    --sidebar-ring: 217.2 91.2% 59.8%;',
-  '',
-  '    /* Not generated — radii/cards migration is deferred to a later session. */',
-  '    --radius: 0.5rem;',
   '  }',
   '',
   '  .dark {',

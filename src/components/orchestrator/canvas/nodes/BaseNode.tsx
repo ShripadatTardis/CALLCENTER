@@ -62,7 +62,8 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
             </Badge>
           )}
         </div>
-        <Badge variant="outline" className="text-xs badge-blue">
+        {/* Session 7.10.1 correction — a node-type category tag, not a status; `badge-blue` was undefined anywhere in this codebase and rendered no styling. Reuses the existing, already dual-customer-populated chart series palette (an arbitrary, non-status categorical color, the same kind of concept these tags need) rather than inventing a new schema section. */}
+        <Badge variant="outline" className="text-xs border-[var(--chart-series-1)] text-[var(--chart-series-1)]">
           {data.type}
         </Badge>
       </div>

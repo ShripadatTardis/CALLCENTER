@@ -330,7 +330,7 @@ const CreateCampaign: React.FC = () => {
                 </button>
               );
             })}
-            <span className="shrink-0 text-[12px] text-muted-foreground ml-1">{STAGES[step]}</span>
+            <span className={`shrink-0 ${typography.bodySecondary} ml-1`}>{STAGES[step]}</span>
           </nav>
 
           {/* Workflow stage navigator — contextual workflow chrome, not
@@ -348,7 +348,7 @@ const CreateCampaign: React.FC = () => {
                   disabled={locked}
                   onClick={() => !locked && setStep(i)}
                   aria-current={i === step ? 'step' : undefined}
-                  className={`w-full text-left px-2.5 py-2 rounded text-[13px] flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  className={`w-full text-left px-2.5 py-2 rounded ${typography.denseBody} flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed ${
                     i === step ? 'bg-cyan-600 text-foreground' : state === 'completed' ? 'text-cyan-300 hover:bg-card' : 'text-muted-foreground hover:bg-card'
                   }`}
                 >
@@ -434,7 +434,7 @@ const CreateCampaign: React.FC = () => {
                         {agentContract.contractCompleteness === 'complete' ? 'Complete contract' : 'Partial contract (legacy)'}
                       </Badge>
                     </div>
-                    <div className="text-muted-foreground font-mono text-[11px]">{agentContract.agentId}</div>
+                    <div className={`${typography.metadata} font-mono`}>{agentContract.agentId}</div>
                     {agentContract.contractCompleteness === 'partial' ? (
                       <p className={`${typography.bodySecondary} border-t border-border pt-3`}>
                         Expected inputs and outcomes are not currently exposed by Call Centre for this agent. This
@@ -455,13 +455,13 @@ const CreateCampaign: React.FC = () => {
                                   <div className="flex items-center gap-2 min-w-0">
                                     <span className={`${typography.body} truncate`}>{f.displayName}</span>
                                     {f.required && (
-                                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 flex-shrink-0 border-amber-700 text-amber-700 dark:border-amber-400 dark:text-amber-400">
+                                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 flex-shrink-0 border-[var(--status-caution-border)] text-[var(--status-caution-text)]">
                                         required
                                       </Badge>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2 flex-shrink-0">
-                                    <span className="text-muted-foreground font-mono text-[11px]">{f.fieldCode}</span>
+                                    <span className={`${typography.metadata} font-mono`}>{f.fieldCode}</span>
                                     {f.dataType && (
                                       <span className={`${typography.metadata} whitespace-nowrap`}>
                                         {f.dataType}{f.format ? `, ${f.format}` : ''}
@@ -511,13 +511,13 @@ const CreateCampaign: React.FC = () => {
                     onChange={(e) => void handleCsvChange(e.target.files?.[0] ?? null)}
                     className="text-[12px] text-foreground"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-2">
+                  <p className={`${typography.metadata} mt-2`}>
                     Columns: <code>name, phone, customer_reference</code> (optional), plus extra columns captured as
                     campaign-specific attributes.
                   </p>
                 </div>
                 {csvErrors.length > 0 && (
-                  <div className="text-[12px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 rounded p-2">
+                  <div className="text-[12px] text-[var(--status-negative-text)] bg-[var(--status-negative-fill)] border border-[var(--status-negative-border)] rounded p-2">
                     {csvErrors.map((e, i) => (
                       <div key={i}>{e}</div>
                     ))}
@@ -552,14 +552,14 @@ const CreateCampaign: React.FC = () => {
             )}
 
             {step === 4 && (
-              <div className="space-y-2 text-[13px] max-w-lg">
-                <p className="text-muted-foreground text-[12px]">
+              <div className={`space-y-2 ${typography.denseBody} max-w-lg`}>
+                <p className={typography.bodySecondary}>
                   Maps the selected Call Agent's expected input fields to Customer 360 or CSV data. Campaign start
                   is blocked, deterministically, if a required field is left unmapped — never guessed by an AI.
                 </p>
                 {!agentContract && <p className={typography.bodySecondary}>Select a Call Agent first.</p>}
                 {agentContract && agentContract.expectedInputFields.length === 0 && (
-                  <p className="text-[12px] text-muted-foreground border border-border rounded p-2.5 bg-background/60">
+                  <p className={`${typography.bodySecondary} border border-border rounded p-2.5 bg-background/60`}>
                     This agent declares no expected input fields — there is nothing to map. The campaign will call
                     each target using its phone number, the selected agent, and its Customer 360 reference where
                     known, exactly as it does today.
@@ -568,7 +568,7 @@ const CreateCampaign: React.FC = () => {
                 {agentContract && agentContract.expectedInputFields.length > 0 && (
                   <div className="space-y-2">
                     {csvColumns.length === 0 && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400 border border-amber-700/40 rounded p-2">
+                      <p className="text-[11px] text-[var(--status-caution-text)] border border-[var(--status-caution-border)] rounded p-2">
                         No CSV columns available yet — upload the Audience CSV (previous stage) to map its columns here, or map fields to Customer 360 data only.
                       </p>
                     )}
@@ -587,7 +587,7 @@ const CreateCampaign: React.FC = () => {
                               <span className="font-medium text-foreground">{field.displayName}</span>
                               <span className="text-muted-foreground font-mono text-[10px]">{field.fieldCode}</span>
                               {field.required ? (
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-amber-700 text-amber-700 dark:border-amber-400 dark:text-amber-400">
+                                <Badge variant="outline" className="text-[9px] py-0 px-1 border-[var(--status-caution-border)] text-[var(--status-caution-text)]">
                                   required
                                 </Badge>
                               ) : (
@@ -667,13 +667,13 @@ const CreateCampaign: React.FC = () => {
                       })}
                     </div>
                     {requiredFieldsUnmapped.length > 0 && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                      <p className="text-[11px] text-[var(--status-caution-text)]">
                         {requiredFieldsUnmapped.length} required field{requiredFieldsUnmapped.length === 1 ? '' : 's'} still unmapped — a target missing a
                         required value will not be dialled when the campaign runs.
                       </p>
                     )}
                     {!mappingDuplicates.valid && (
-                      <p className="text-[11px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 rounded p-2">
+                      <p className="text-[11px] text-[var(--status-negative-text)] bg-[var(--status-negative-fill)] border border-[var(--status-negative-border)] rounded p-2">
                         Duplicate source mapping{mappingDuplicates.duplicateSourceKeys.length === 1 ? '' : 's'}: {mappingDuplicates.duplicateSourceKeys.join(', ')} — each source field may
                         back only one agent input.
                       </p>
@@ -684,12 +684,12 @@ const CreateCampaign: React.FC = () => {
             )}
 
             {step === 5 && (
-              <div className="space-y-4 text-[13px] max-w-2xl">
+              <div className={`space-y-4 ${typography.denseBody} max-w-2xl`}>
                 {advertisedOutcomes.length > 0 && (
                   <div className="space-y-2">
                     <div>
-                      <h3 className="text-[13px] font-semibold text-foreground">Agent Outcome Mapping</h3>
-                      <p className="text-muted-foreground text-[12px]">
+                      <h3 className={typography.denseHeading}>Agent Outcome Mapping</h3>
+                      <p className={typography.bodySecondary}>
                         Define what each Agent Outcome means for this campaign by mapping it to a Campaign
                         Classification. Classification codes are defined centrally by Call Centre, never invented per
                         campaign. Captured immutably at launch — a later change to this agent's contract never
@@ -697,7 +697,7 @@ const CreateCampaign: React.FC = () => {
                       </p>
                     </div>
                     <div className="border border-border rounded overflow-hidden">
-                      <table className="w-full text-[13px] text-foreground">
+                      <table className={`w-full ${typography.denseBody}`}>
                         <thead>
                           <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
                             <th className="text-left py-2 px-3 font-medium">Agent Outcome</th>
@@ -714,7 +714,7 @@ const CreateCampaign: React.FC = () => {
                                     <span className="font-medium text-foreground">{outcome.displayName}</span>
                                     <span className="text-muted-foreground font-mono text-[10px]">{outcome.outcomeCode}</span>
                                   </div>
-                                  {outcome.description && <p className="text-[11px] text-muted-foreground mt-0.5">{outcome.description}</p>}
+                                  {outcome.description && <p className={`${typography.metadata} mt-0.5`}>{outcome.description}</p>}
                                 </td>
                                 <td className="py-2 px-3 align-top w-56">
                                   <Select
@@ -740,13 +740,13 @@ const CreateCampaign: React.FC = () => {
                       </table>
                     </div>
                     {requiredOutcomesUnmapped.length > 0 && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                      <p className="text-[11px] text-[var(--status-caution-text)]">
                         {requiredOutcomesUnmapped.length} outcome{requiredOutcomesUnmapped.length === 1 ? '' : 's'} not yet mapped to a
                         Campaign Classification — required before Launch Now (Save as Draft remains available).
                       </p>
                     )}
                     {!hasSuccessfulMapping && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                      <p className="text-[11px] text-[var(--status-caution-text)]">
                         At least one agent outcome must be mapped to the Successful classification — required before
                         Launch Now (Save as Draft remains available).
                       </p>
@@ -754,7 +754,7 @@ const CreateCampaign: React.FC = () => {
                   </div>
                 )}
                 {advertisedOutcomes.length === 0 && agentContract && (
-                  <p className="text-[12px] text-muted-foreground border border-border rounded p-2.5 bg-background/60">
+                  <p className={`${typography.bodySecondary} border border-border rounded p-2.5 bg-background/60`}>
                     {selectedAgent?.displayName ?? 'This agent'} advertises no business outcomes — there is nothing to
                     map to a Campaign Classification. Reconciled calls for this campaign will show only the generic
                     call-level result below.
@@ -774,8 +774,8 @@ const CreateCampaign: React.FC = () => {
                 {advertisedOutcomes.length === 0 && (
                 <div className="space-y-2">
                   <div>
-                    <h3 className="text-[13px] font-semibold text-foreground">Generic Call Result Rules</h3>
-                    <p className="text-muted-foreground text-[12px]">
+                    <h3 className={typography.denseHeading}>Generic Call Result Rules</h3>
+                    <p className={typography.bodySecondary}>
                       Call Centre determines the generic outcome of every call independently of the agent-specific
                       mapping above. These deterministic rules — seeded with generic conservative defaults — decide
                       what VoiceForce does with it. No AI interpretation happens here.
@@ -852,7 +852,7 @@ const CreateCampaign: React.FC = () => {
             )}
 
             {step === 6 && (
-              <div className="space-y-2 text-[13px] max-w-lg">
+              <div className={`space-y-2 ${typography.denseBody} max-w-lg`}>
                 <ReviewRow label="Campaign" value={name || '—'} status={name ? 'ready' : 'blocker'} />
                 <ReviewRow
                   label="Call Agent"
@@ -892,7 +892,7 @@ const CreateCampaign: React.FC = () => {
                 )}
 
                 {!isReady && (
-                  <div className="border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 rounded p-2.5 text-red-700 dark:text-red-300 space-y-1">
+                  <div className="border border-[var(--status-negative-border)] bg-[var(--status-negative-fill)] rounded p-2.5 text-[var(--status-negative-text)] space-y-1">
                     {blockers.map((b) => (
                       <div key={b} className="flex items-center gap-1.5">
                         <AlertTriangle size={12} aria-hidden="true" />
@@ -901,7 +901,7 @@ const CreateCampaign: React.FC = () => {
                     ))}
                   </div>
                 )}
-                {submitError && <p className="text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-900 rounded p-2">{submitError}</p>}
+                {submitError && <p className="text-[var(--status-negative-text)] bg-[var(--status-negative-fill)] border border-[var(--status-negative-border)] rounded p-2">{submitError}</p>}
 
                 <div className="flex gap-2 pt-3">
                   <Button
@@ -944,7 +944,8 @@ const ReviewRow: React.FC<{ label: string; value: string; status: 'ready' | 'inf
     <span className="flex items-center gap-2 text-foreground">
       {value}
       <span
-        className={`w-1.5 h-1.5 rounded-full ${status === 'ready' ? 'bg-green-400' : status === 'info' ? 'bg-cyan-400' : 'bg-red-400'}`}
+        // Session 7.10.1 — ready/info/blocker map onto the existing positive/pending/negative roles; the `-text` tier (fully opaque, unlike `-fill`'s 10% tint) is used here since a 6px dot needs full saturation to stay visible.
+        className={`w-1.5 h-1.5 rounded-full ${status === 'ready' ? 'bg-[var(--status-positive-text)]' : status === 'info' ? 'bg-[var(--status-pending-text)]' : 'bg-[var(--status-negative-text)]'}`}
         aria-hidden="true"
       />
     </span>

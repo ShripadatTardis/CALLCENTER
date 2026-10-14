@@ -44,12 +44,17 @@ export const IntegrationsManager: React.FC = () => {
     }
   };
 
+  // Session 7.10.1 correction — an integration-type category tag, not a
+  // business status; `badge-blue`/`-purple`/`-green` were undefined
+  // anywhere in this codebase and rendered no styling. Same fix as
+  // FlowLibrary.tsx's channel badge: reuses the chart series palette,
+  // preserving the 3 real distinctions.
   const getTypeBadge = (type: string) => {
     switch (type) {
-      case 'kb': return 'badge-blue';
-      case 'product': return 'badge-purple';
-      case 'api': return 'badge-green';
-      default: return 'badge-blue';
+      case 'kb': return 'border-[var(--chart-series-1)] text-[var(--chart-series-1)]';
+      case 'product': return 'border-[var(--chart-series-2)] text-[var(--chart-series-2)]';
+      case 'api': return 'border-[var(--chart-series-3)] text-[var(--chart-series-3)]';
+      default: return 'border-[var(--chart-series-1)] text-[var(--chart-series-1)]';
     }
   };
 

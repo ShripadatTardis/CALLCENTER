@@ -12,6 +12,7 @@ import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import { validateMappingSourceUniqueness } from '@/lib/campaignInputMappingUniqueness';
 import { selectCurrentVersionMappings } from '@/lib/campaignConfigurationDiff';
 import type { CampaignDetail, InputMappingSourceType, NewCampaignAgentInputMappingInput } from '@/types/campaign';
+import { typography } from '@/lib/typography';
 
 interface CampaignSettingsDialogProps {
   campaign: CampaignDetail;
@@ -183,7 +184,7 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
 
         <div className="space-y-4 text-sm">
           <section className="space-y-1.5">
-            <h3 id="settings-agent-heading" className="text-[13px] font-semibold text-foreground">Agent</h3>
+            <h3 id="settings-agent-heading" className={typography.denseHeading}>Agent</h3>
             <Select value={agentId} onValueChange={handleAgentChange}>
               <SelectTrigger id="settings-agent-select" aria-labelledby="settings-agent-heading" className="h-9 text-[12px]">
                 <SelectValue />
@@ -206,8 +207,8 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
 
           {agentContract && (
             <section className="space-y-1.5">
-              <h3 className="text-[13px] font-semibold text-foreground">Agent Contract</h3>
-              <div className="border border-border rounded p-2 text-[12px] text-muted-foreground">
+              <h3 className={typography.denseHeading}>Agent Contract</h3>
+              <div className={`border border-border rounded p-2 ${typography.bodySecondary}`}>
                 {agentContract.expectedInputFields.length} input field(s), {agentContract.expectedOutcomes.length} outcome(s),{' '}
                 {agentContract.outputFields.length} output field(s) · {agentContract.contractCompleteness}
               </div>
@@ -216,7 +217,7 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
 
           {requiredInputFields.length > 0 && (
             <section className="space-y-1.5">
-              <h3 className="text-[13px] font-semibold text-foreground">Input Mapping</h3>
+              <h3 className={typography.denseHeading}>Input Mapping</h3>
               <div className="border border-border rounded divide-y divide-border">
                 {agentContract?.expectedInputFields.map((field) => {
                   const mapping = fieldMappings[field.fieldCode];
@@ -279,7 +280,7 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
 
           {advertisedOutcomes.length > 0 && (
             <section className="space-y-1.5">
-              <h3 className="text-[13px] font-semibold text-foreground">Outcome Mapping</h3>
+              <h3 className={typography.denseHeading}>Outcome Mapping</h3>
               <div className="border border-border rounded divide-y divide-border">
                 {advertisedOutcomes.map((outcome) => (
                   <div key={outcome.outcomeCode} className="p-2 flex items-center gap-2 flex-wrap">
@@ -318,7 +319,7 @@ export const CampaignSettingsDialog: React.FC<CampaignSettingsDialogProps> = ({
           )}
 
           <section className="space-y-1.5">
-            <label htmlFor="settings-reason-textarea" className="text-[13px] font-semibold text-foreground block">
+            <label htmlFor="settings-reason-textarea" className={`${typography.denseHeading} block`}>
               {isDraft ? 'Notes (optional)' : 'Reason (required)'}
             </label>
             <Textarea

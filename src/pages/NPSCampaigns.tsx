@@ -54,16 +54,27 @@ const NPSCampaigns: React.FC = () => {
     return matchesSearch && matchesStatus && matchesChannel;
   });
 
+  // Session 7.10.1 — migrated from literal per-status Tailwind color
+  // classes to the centralized `--status-*` tokens. Real-meaning
+  // mapping: running="in progress, not yet resolved" and
+  // scheduled="not yet started" both map to `pending` (matching
+  // Badge's own existing "Pending/Open"+"Information/Running"
+  // convention — this intentionally normalizes a real inconsistency
+  // the prior literal classes had, where "running" was green (closer
+  // to a completed/positive hue) despite meaning "in progress", not
+  // "done"); completed -> positive; paused="stalled, needs attention"
+  // -> caution; draft/default unchanged (already the centralized
+  // bg-muted/text-foreground tokens).
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'running':
-        return 'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300';
+        return 'bg-[var(--status-pending-fill)] text-[var(--status-pending-text)]';
       case 'completed':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300';
+        return 'bg-[var(--status-positive-fill)] text-[var(--status-positive-text)]';
       case 'scheduled':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300';
+        return 'bg-[var(--status-pending-fill)] text-[var(--status-pending-text)]';
       case 'paused':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300';
+        return 'bg-[var(--status-caution-fill)] text-[var(--status-caution-text)]';
       case 'draft':
         return 'bg-muted text-foreground';
       default:
@@ -189,7 +200,11 @@ const NPSCampaigns: React.FC = () => {
       <TooltipProvider>
         {/* App-wide viewport-framing correction (follow-up to Session 15) — Pattern B. */}
         <div className="bg-background h-full min-h-0 overflow-y-auto text-foreground p-4 space-y-3">
-          <div className="rounded-md border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+          {/* Session 7.10.1 — migrated from unconditional dark-mode-only
+              literal classes (no light-mode styling existed before this
+              change) to the centralized caution tokens, which fixes the
+              missing light-mode treatment as a side effect. */}
+          <div className="rounded-md border border-[var(--status-caution-border)] bg-[var(--status-caution-fill)] px-3 py-2 text-xs text-[var(--status-caution-text)]">
             Demo data — NPS Campaigns has no real backend/execution engine yet (Session 5/9 audits). Shown for illustration only; actions below do not persist or place real calls.
           </div>
 

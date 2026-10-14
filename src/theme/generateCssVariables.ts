@@ -17,14 +17,15 @@ import type { VoiceForceThemeConfig } from './schema';
  * and the `--status-*`/`--chart-*`/`--panel-*` properties Session 7.8
  * adds below), each with an explicit comment citing its schema source.
  * A field with no CSS custom property counterpart (most of
- * `color.interactive.action`'s cyan scale, `heights`, `icons`,
- * `typography`, `components.table`/`.input`/`.button`/`.alert`) is NOT
- * emitted here — those remain literal Tailwind utility classes at their
- * call sites, unchanged, deferred to Sessions 7.9/7.10.
- *
- * `--radius` is also NOT emitted — the schema stores its already-
- * resolved pixel derivatives (`radii.panel`/`control`/`tag`), not the
- * base rem value, and radii/cards migration is explicitly deferred.
+ * `color.interactive.action`'s cyan scale, `typography`,
+ * `components.table`/`.input`/`.button`/`.alert`) is NOT emitted here —
+ * those remain literal Tailwind utility classes at their call sites,
+ * unchanged (disclosed as a Class D gap in
+ * docs/SESSION_7_10_FINAL_UI_CENTRALIZATION.md §9/§10).
+ * `heights.variants.compact.filterField`, `icons.default`/`.variants`,
+ * `shadow.default`/`.variants`, and `radii.panel` (as `--radius`) ARE
+ * emitted (Session 7.10/7.11) — see `heightDeclarations`/
+ * `iconDeclarations`/`shadowDeclarations`/`radiiDeclarations` below.
  *
  * `--sidebar-accent-foreground`, `--sidebar-primary`, `--sidebar-
  * primary-foreground`, `--sidebar-ring` are also NOT emitted from the
@@ -56,8 +57,15 @@ function hsl(value: string): string {
 }
 
 export function generateRootDeclarations(config: VoiceForceThemeConfig): Declaration[] {
-  const { color, borders, components, navigation } = config;
+  const { color, borders, components, navigation, typography } = config;
   return [
+    // Session 7.11 — the interface font-family stack, now actually
+    // consumed by tailwind.config.ts's `fontFamily.sans` extension
+    // (previously tracked in the schema since Session 7.5 but never
+    // emitted — VoiceForce's own value happened to match Tailwind's
+    // unmodified default, masking the gap; KATON's real "Roboto" value
+    // makes the missing wire-up visible). Mode-independent.
+    { name: '--font-family-interface', value: typography.families.interface, comment: 'typography.families.interface' },
     { name: '--background', value: hsl(color.surfaces.base.light.background), comment: 'color.surfaces.base.light.background' },
     { name: '--foreground', value: hsl(color.surfaces.base.light.foreground), comment: 'color.surfaces.base.light.foreground' },
     { name: '--card', value: hsl(color.surfaces.raised.light.background), comment: 'color.surfaces.raised.light.background' },
@@ -90,9 +98,11 @@ export function generateRootDeclarations(config: VoiceForceThemeConfig): Declara
     { name: '--nav-active-background', value: navigation.item.active.background, comment: 'navigation.item.active.background (mode-independent, confirmed no real dark override exists — Session 7.6.3 §5)' },
     { name: '--nav-active-foreground', value: navigation.item.active.foreground, comment: 'navigation.item.active.foreground (mode-independent)' },
     // Appearance-aware navigation values — declared in both :root and
-    // `.dark` (see generateDarkDeclarations below).
-    { name: '--nav-heading-active-text', value: navigation.item.headingActiveText?.light ?? '', comment: 'navigation.item.headingActiveText.light' },
-    { name: '--nav-item-active-text', value: navigation.item.expandedActiveText?.light ?? '', comment: 'navigation.item.expandedActiveText.light' },
+    // `.dark` (see generateDarkDeclarations below). Both source fields
+    // are optional (Session 7.11: KATON's source material documents no
+    // distinct secondary active-text treatment) — omitted, not emitted
+    // as empty, when absent.
+    ...navActiveTextDeclarations(navigation.item, 'light'),
     // Session 7.8 Task 1 — semantic status roles (Badge's tinted
     // text/fill/border presentation). `negative`'s SOLID presentation is
     // already covered by `--destructive` above; these are the separate
@@ -122,6 +132,14 @@ export function generateRootDeclarations(config: VoiceForceThemeConfig): Declara
     ...heightDeclarations(config.heights),
     ...iconDeclarations(config.icons),
     ...shadowDeclarations(config.shadow),
+    // Session 7.11 — closes the `--radius` gap Session 7.10 disclosed
+    // (deferred, never emitted from config; `generate-theme-css.mjs`
+    // hardcoded `0.5rem` regardless of the active customer). Mode-
+    // independent (radii aren't appearance-dependent), declared once
+    // here.
+    ...radiiDeclarations(config.radii),
+    // Session 7.10.1 — the 15 named typography roles. Mode-independent.
+    ...typographyRoleDeclarations(config.typography.roles),
   ];
 }
 
@@ -151,8 +169,7 @@ export function generateDarkDeclarations(config: VoiceForceThemeConfig): Declara
     { name: '--sidebar-foreground', value: hsl(color.surfaces.sidebar.dark.foreground), comment: 'color.surfaces.sidebar.dark.foreground' },
     { name: '--sidebar-border', value: hsl(color.surfaces.sidebar.dark.border ?? borders.default.color.dark), comment: 'color.surfaces.sidebar.dark.border' },
     { name: '--sidebar-accent', value: hsl(navigation.item.hover.dark.background), comment: 'navigation.item.hover.dark.background' },
-    { name: '--nav-heading-active-text', value: navigation.item.headingActiveText?.dark ?? '', comment: 'navigation.item.headingActiveText.dark' },
-    { name: '--nav-item-active-text', value: navigation.item.expandedActiveText?.dark ?? '', comment: 'navigation.item.expandedActiveText.dark' },
+    ...navActiveTextDeclarations(navigation.item, 'dark'),
     ...statusRoleDeclarations(color.semantic, 'dark'),
     // Session 7.9 — table header/row colors (appearance-aware).
     { name: '--table-header-bg', value: hsl(components.table.headerBackground.dark), comment: 'components.table.headerBackground.dark' },
@@ -165,10 +182,31 @@ export function generateDarkDeclarations(config: VoiceForceThemeConfig): Declara
   ];
 }
 
-type StatusRoleName = 'positive' | 'caution' | 'negative' | 'pending';
+/**
+ * Session 7.11 — `headingActiveText`/`expandedActiveText` are both
+ * optional schema fields; emitting them unconditionally (as the Session
+ * 7.7 code did) produced an empty CSS value for any config that
+ * honestly omits them (confirmed by KATON's config, which has no
+ * distinct secondary active-text treatment) — tripping the generator's
+ * own "never silently emit an empty value" guard. Now conditionally
+ * emitted, matching the pattern every other optional field in this file
+ * already uses (e.g. `panelDeclarations`'s `headerPaddingPx` check).
+ */
+function navActiveTextDeclarations(item: VoiceForceThemeConfig['navigation']['item'], mode: 'light' | 'dark'): Declaration[] {
+  const declarations: Declaration[] = [];
+  if (item.headingActiveText) {
+    declarations.push({ name: '--nav-heading-active-text', value: item.headingActiveText[mode], comment: `navigation.item.headingActiveText.${mode}` });
+  }
+  if (item.expandedActiveText) {
+    declarations.push({ name: '--nav-item-active-text', value: item.expandedActiveText[mode], comment: `navigation.item.expandedActiveText.${mode}` });
+  }
+  return declarations;
+}
+
+type StatusRoleName = 'positive' | 'caution' | 'negative' | 'pending' | 'neutral';
 
 function statusRoleDeclarations(semantic: VoiceForceThemeConfig['color']['semantic'], mode: 'light' | 'dark'): Declaration[] {
-  const roles: StatusRoleName[] = ['positive', 'caution', 'negative', 'pending'];
+  const roles: StatusRoleName[] = ['positive', 'caution', 'negative', 'pending', 'neutral'];
   const declarations: Declaration[] = [];
   for (const role of roles) {
     const value = semantic[role];
@@ -291,6 +329,46 @@ function shadowDeclarations(shadow: VoiceForceThemeConfig['shadow']): Declaratio
   ];
   for (const [name, value] of Object.entries(shadow.variants ?? {})) {
     declarations.push({ name: `--shadow-${name}`, value, comment: `shadow.variants.${name}` });
+  }
+  return declarations;
+}
+
+/**
+ * Session 7.11 — `--radius` (Tailwind's `theme.extend.borderRadius` base
+ * value, which `lg`/`md`/`sm` all derive from via `calc()`). Previously
+ * hardcoded at `0.5rem` in `generate-theme-css.mjs` regardless of the
+ * active customer config — a real gap Session 7.10 disclosed but did
+ * not close. Sourced from `radii.panel` (8px for both current configs,
+ * which is also VoiceForce's and KATON's real documented `lg`-equivalent
+ * radius) and expressed in rem to match Tailwind's existing `calc(var(
+ * --radius) - Npx)` chain for `md`/`sm`.
+ */
+function radiiDeclarations(radii: VoiceForceThemeConfig['radii']): Declaration[] {
+  return [
+    { name: '--radius', value: `${radii.panel / 16}rem`, comment: 'radii.panel (base for Tailwind borderRadius lg/md/sm)' },
+  ];
+}
+
+/**
+ * Session 7.10.1 — closes the CRITICAL gap identified in this session's
+ * own brief: `src/lib/typography.ts`'s 15 roles previously held
+ * hardcoded Tailwind size/weight classes with no path back to this
+ * config. Each role now emits its own `--type-{role}-size`/`-weight`/
+ * (optional) `-line-height` custom properties; `typography.ts` consumes
+ * them via Tailwind's arbitrary-property syntax
+ * (`text-[length:var(--x)]`, `[font-weight:var(--x)]`,
+ * `leading-[var(--x)]`) instead of a fixed `text-lg`/`text-[11px]`
+ * class. Mode-independent (font metrics aren't appearance-dependent),
+ * declared once here.
+ */
+function typographyRoleDeclarations(roles: VoiceForceThemeConfig['typography']['roles']): Declaration[] {
+  const declarations: Declaration[] = [];
+  for (const [name, role] of Object.entries(roles)) {
+    declarations.push({ name: `--type-${name}-size`, value: `${role.sizePx}px`, comment: `typography.roles.${name}.sizePx` });
+    declarations.push({ name: `--type-${name}-weight`, value: `${role.weight}`, comment: `typography.roles.${name}.weight` });
+    if (role.lineHeightPx !== undefined) {
+      declarations.push({ name: `--type-${name}-line-height`, value: `${role.lineHeightPx}px`, comment: `typography.roles.${name}.lineHeightPx` });
+    }
   }
   return declarations;
 }

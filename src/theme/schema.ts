@@ -140,9 +140,89 @@ const typeRampStep = z.object({
   usage: z.string().optional(),
 });
 
+/**
+ * Session 7.10.1 — one named, reusable typography ROLE (e.g. "page
+ * title", "table header") as a complete, config-driven treatment:
+ * size + weight + an optional line-height. Distinct from `scale`
+ * above (scale is the raw inventory of real pixel steps a config
+ * documents; `roles` is which step — by its own concrete values, not
+ * an index into `scale`, since different configs' scales have
+ * different lengths/steps and a positional index would be meaningless
+ * across customers) a named semantic role actually renders at.
+ *
+ * This closes the gap Session 7.10.1's own brief identified as
+ * CRITICAL: `src/lib/typography.ts`'s role map previously held
+ * hardcoded Tailwind size/weight classes (`text-lg`, `text-[11px]`,
+ * `font-semibold`) — real values, but NOT sourced from this config,
+ * so a second customer's typography could never actually change what
+ * any role rendered as. `lineHeightPx` is optional: several VoiceForce
+ * roles use Tailwind's bare arbitrary-pixel classes today with no
+ * explicit line-height (browser default `normal` applies, unchanged
+ * from before this session) — line-height is only set where a role's
+ * CURRENT real rendering already has one (Tailwind's bundled
+ * `text-xs`/`text-sm`/`text-lg` line-heights), to avoid a layout
+ * regression from switching off those bundled classes.
+ */
+const typographyRole = z.object({
+  sizePx: pxValue,
+  weight: z.number().int().min(100).max(900),
+  lineHeightPx: pxValue.optional(),
+});
+
+/**
+ * The fixed, known inventory of semantic roles `src/lib/typography.ts`
+ * already exports (Sessions 7.5–7.10) — a named object, not an open
+ * record, since this is a closed, deliberately-curated vocabulary (a
+ * config cannot invent a 16th role; a new role is a schema change, the
+ * same discipline every other named-field section in this schema
+ * already follows, e.g. `components.table`).
+ */
+const typographyRoles = z.object({
+  pageTitle: typographyRole,
+  pageDescription: typographyRole,
+  sectionTitle: typographyRole,
+  subsectionTitle: typographyRole,
+  cardTitle: typographyRole,
+  body: typographyRole,
+  bodySecondary: typographyRole,
+  metadata: typographyRole,
+  label: typographyRole,
+  metricValue: typographyRole,
+  metricLabel: typographyRole,
+  tableHeader: typographyRole,
+  tableBody: typographyRole,
+  microLabel: typographyRole,
+  denseTableHeader: typographyRole,
+  /** Session 7.10.2 — a one-step-below-cardTitle dense body treatment,
+   * found byte-identically repeated across CreateCampaign/CampaignDetail
+   * wizard & detail panels (no existing role covers 13px at all). */
+  denseBody: typographyRole,
+  /** Session 7.10.2 — the bold sibling of denseBody: dialog/panel
+   * sub-headings (e.g. "Agent Contract", "Outcome Mapping") found
+   * byte-identically repeated in CampaignSettingsDialog/AutomatedQaInspector. */
+  denseHeading: typographyRole,
+  /** Session 7.10.2 — a muted caption one step below `metadata`/`microLabel`,
+   * found repeated across QaCalibration/QaQualityExplorer/QaReviewDialog/
+   * AutomatedQaInspector — distinct from microLabel (not uppercase/bold). */
+  microCaption: typographyRole,
+  /** Session 7.10.2 — `body`'s muted sibling (14px, not 12px like
+   * bodySecondary): empty-state/permission-denied inline messages, found
+   * repeated across AgentDetail/AutomatedQaInspector/QaCalibration/
+   * QaQualityExplorer/QaReviewDialog. */
+  bodyMuted: typographyRole,
+  /** Session 7.10.2 — an 11px uppercase muted field-label, found
+   * byte-identically repeated 6x in CampaignDetail's AgentResultDialog. */
+  fieldLabelMicro: typographyRole,
+  /** Session 7.10.2 — a 12px/600 uppercase muted panel label, bolder than
+   * `tableHeader` (500) and without its line-height, found repeated 4x in
+   * QaReviewDialog. */
+  panelLabel: typographyRole,
+});
+
 const typography = z.object({
   families: fontFamilies,
   scale: z.array(typeRampStep).min(1),
+  roles: typographyRoles,
 });
 
 // ---------------------------------------------------------------------
@@ -263,6 +343,19 @@ const colorSemantic = z.object({
    * "Information/Running" as ONE role — the audit found no real
    * evidence the codebase treats these as two distinct hues today. */
   pending: semanticStatusRole,
+  /** Session 7.10.1 — "Inactive/Neutral" (e.g. a `queued` evaluation
+   * that hasn't started, a `draft` campaign). A Session 7.10.1
+   * investigation confirmed this is a real, repeated business-status
+   * concept distinct from the 4 existing roles (it means "not yet
+   * active," not "needs attention" (caution), "failed" (negative), or
+   * "in progress/awaiting action" (pending)) — several real call sites
+   * (`src/lib/automatedQaStatusBadge.ts`'s `queued`,
+   * `src/pages/NPSCampaigns.tsx`'s `draft`) already hand-roll an
+   * equivalent slate/gray treatment with no shared token. Genuinely
+   * new, not a renamed duplicate of an existing role — per the
+   * brief's own explicit instruction to extend the schema when real
+   * distinctions can't be represented otherwise. */
+  neutral: semanticStatusRole,
 });
 
 const color = z.object({
@@ -576,6 +669,8 @@ const badgeComponent = z.object({
     negative: semanticStatusRole.pick({ text: true, fill: true, border: true }),
     // Session 7.8 — mirrors color.semantic.pending.
     pending: semanticStatusRole.pick({ text: true, fill: true, border: true }),
+    // Session 7.10.1 — mirrors color.semantic.neutral.
+    neutral: semanticStatusRole.pick({ text: true, fill: true, border: true }),
   }),
 });
 

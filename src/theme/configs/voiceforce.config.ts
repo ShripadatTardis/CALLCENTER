@@ -44,6 +44,38 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
       { name: '16px', sizePx: 16, lineHeightSource: 'inherited-default', weight: 600, usage: '3 occurrences — headings' },
       { name: '18px', sizePx: 18, lineHeightSource: 'inherited-default', weight: 600, usage: '1 occurrence — page title' },
     ],
+    // Session 7.10.1 — real current values of every src/lib/typography.ts
+    // role, transcribed directly from that file's Tailwind classes (e.g.
+    // `pageTitle: 'text-lg font-semibold ...'` -> sizePx 18 (Tailwind's
+    // own `text-lg`), weight 600 (`font-semibold`)). `lineHeightPx` is
+    // only set where the role's CURRENT class bundles one (Tailwind's
+    // `text-lg`/`text-sm`/`text-xs` each carry a fixed line-height);
+    // roles already using a bare `text-[Npx]` arbitrary class today have
+    // no bundled line-height (browser default `normal` applies, both
+    // before and after this session) and correctly omit the field.
+    roles: {
+      pageTitle: { sizePx: 18, weight: 600, lineHeightPx: 28 }, // text-lg font-semibold
+      pageDescription: { sizePx: 12, weight: 400, lineHeightPx: 16 }, // text-xs
+      sectionTitle: { sizePx: 12, weight: 600, lineHeightPx: 16 }, // text-xs font-semibold
+      subsectionTitle: { sizePx: 11, weight: 600 }, // text-[11px] font-semibold
+      cardTitle: { sizePx: 14, weight: 600, lineHeightPx: 20 }, // text-sm font-semibold
+      body: { sizePx: 14, weight: 400, lineHeightPx: 20 }, // text-sm
+      bodySecondary: { sizePx: 12, weight: 400, lineHeightPx: 16 }, // text-xs
+      metadata: { sizePx: 11, weight: 400 }, // text-[11px]
+      label: { sizePx: 12, weight: 500, lineHeightPx: 16 }, // text-xs font-medium
+      metricValue: { sizePx: 18, weight: 600, lineHeightPx: 28 }, // text-lg font-semibold
+      metricLabel: { sizePx: 11, weight: 400 }, // text-[11px]
+      tableHeader: { sizePx: 12, weight: 500, lineHeightPx: 16 }, // text-xs font-medium
+      tableBody: { sizePx: 12, weight: 400, lineHeightPx: 16 }, // text-xs
+      microLabel: { sizePx: 10, weight: 600 }, // text-[10px] font-semibold (Session 7.10)
+      denseTableHeader: { sizePx: 9, weight: 400 }, // text-[9px] (Session 7.10)
+      denseBody: { sizePx: 13, weight: 400 }, // text-[13px] (Session 7.10.2)
+      denseHeading: { sizePx: 13, weight: 600 }, // text-[13px] font-semibold (Session 7.10.2)
+      microCaption: { sizePx: 10, weight: 400 }, // text-[10px] (Session 7.10.2)
+      bodyMuted: { sizePx: 14, weight: 400, lineHeightPx: 20 }, // text-sm (Session 7.10.2)
+      fieldLabelMicro: { sizePx: 11, weight: 400 }, // text-[11px] uppercase tracking-wide (Session 7.10.2)
+      panelLabel: { sizePx: 12, weight: 600 }, // text-xs font-semibold uppercase tracking-wide (Session 7.10.2)
+    },
   },
 
   color: {
@@ -192,6 +224,22 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
         solid: {
           light: { background: 'rgb(59 130 246)', foreground: 'rgb(255 255 255)' },
           dark: { background: 'rgb(59 130 246)', foreground: 'rgb(255 255 255)' },
+        },
+      },
+      // Session 7.10.1 — "Inactive/Neutral" (e.g. `queued`/`draft`).
+      // Real value, transcribed directly from
+      // src/lib/automatedQaStatusBadge.ts's `queued` state (the one
+      // real precedent found for this concept): border-slate-400
+      // text-slate-600 dark:border-slate-500 dark:text-slate-400.
+      neutral: {
+        text: { light: 'rgb(71 85 105)', dark: 'rgb(148 163 184)' }, // slate-600 / slate-400
+        fill: { light: 'rgb(100 116 139 / 0.1)', dark: 'rgb(100 116 139 / 0.1)' }, // slate-500/10 — no real fill precedent exists (automatedQaStatusBadge.ts's queued state is outline-only, no fill); same honest-placeholder convention as positive/caution/pending's .fill where no bg tint was found, formula-matched to the other 4 roles' border/fill/text shade pattern.
+        border: { light: 'rgb(148 163 184)', dark: 'rgb(100 116 139)' }, // slate-400 / slate-500
+        // No real "solid neutral" component exists today — same honest
+        // caveat as positive.solid/caution.solid/pending.solid above.
+        solid: {
+          light: { background: 'rgb(100 116 139)', foreground: 'rgb(255 255 255)' },
+          dark: { background: 'rgb(100 116 139)', foreground: 'rgb(255 255 255)' },
         },
       },
     },
@@ -415,6 +463,12 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
           text: { light: 'rgb(29 78 216)', dark: 'rgb(96 165 250)' },
           fill: { light: 'rgb(59 130 246 / 0.1)', dark: 'rgb(59 130 246 / 0.1)' },
           border: { light: 'rgb(37 99 235 / 0.4)', dark: 'rgb(59 130 246 / 0.4)' },
+        },
+        // Session 7.10.1 — mirrors color.semantic.neutral above.
+        neutral: {
+          text: { light: 'rgb(71 85 105)', dark: 'rgb(148 163 184)' },
+          fill: { light: 'rgb(100 116 139 / 0.1)', dark: 'rgb(100 116 139 / 0.1)' },
+          border: { light: 'rgb(148 163 184)', dark: 'rgb(100 116 139)' },
         },
       },
     },

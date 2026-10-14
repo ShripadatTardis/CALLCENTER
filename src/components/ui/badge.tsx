@@ -49,6 +49,11 @@ const badgeVariants = cva(
          * citation (no prior Badge variant covered this concept). */
         pending:
           "border-[var(--status-pending-border)] bg-[var(--status-pending-fill)] text-[var(--status-pending-text)] hover:bg-[var(--status-pending-fill)]",
+        /** New in Session 7.10.1 — "Inactive/Neutral" (e.g. `queued`,
+         * `draft`). See color.semantic.neutral in the config for the
+         * real-value citation. */
+        neutral:
+          "border-[var(--status-neutral-border)] bg-[var(--status-neutral-fill)] text-[var(--status-neutral-text)] hover:bg-[var(--status-neutral-fill)]",
       },
     },
     defaultVariants: {

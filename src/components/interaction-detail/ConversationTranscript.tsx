@@ -129,7 +129,8 @@ export const ConversationTranscript: React.FC<ConversationTranscriptProps> = ({
         {isLoading && entries.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">{loadingLabel}</p>
         ) : isError && entries.length === 0 ? (
-          <div className="text-sm text-amber-700 dark:text-amber-400 flex items-center justify-between gap-2 py-4">
+          // Session 7.10.1 — a real error/failed state (negative), not an attention/caution one — migrated to the centralized negative token.
+          <div className="text-sm text-[var(--status-negative-text)] flex items-center justify-between gap-2 py-4">
             <span>{errorLabel}</span>
             {onRetry && (
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onRetry}>

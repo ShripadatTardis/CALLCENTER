@@ -124,7 +124,11 @@ const UserManagement: React.FC = () => {
                             {u.status === 'active' ? 'Active' : 'Inactive'}
                           </span>
                           {u.identityStatus === 'pending' && (
-                            <span className="text-[11px] text-amber-500">Invited — pending sign-in</span>
+                            // Session 7.8 — was a hardcoded text-amber-500 with
+                            // no dark: variant (light/dark identical, likely
+                            // low-contrast in dark mode); now uses the
+                            // centralized pending-status token.
+                            <span className="text-[11px] text-[var(--status-pending-text)]">Invited — pending sign-in</span>
                           )}
                         </div>
                       </td>

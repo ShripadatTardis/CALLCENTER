@@ -294,7 +294,9 @@ const CallLogs: React.FC = () => {
 
         {/* The record table is the sole flex-grow, internally-scrolling
             region on this page (L1) — see the header comment. */}
-        <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
+        {/* Session 7.8 — centralized `panels.dense` token (rounded-md,
+            border-border, no background/padding — same real values). */}
+        <div className="flex-1 min-h-0 overflow-auto rounded-[var(--panel-dense-radius)] border border-border">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

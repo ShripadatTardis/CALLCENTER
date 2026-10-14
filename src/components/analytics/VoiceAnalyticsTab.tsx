@@ -11,7 +11,10 @@ import { AnalyticsExportButton } from './AnalyticsExportButton';
 import type { AnalyticsMetricsQueryDto } from '@/types/api/analytics';
 import { Loader2 } from 'lucide-react';
 
-const OUTCOME_COLORS: Record<string, string> = { Resolved: '#10B981', Escalated: '#EF4444', Other: '#94A3B8' };
+// Session 7.8 — sourced from the generated --chart-series-* CSS custom
+// properties (charts.seriesPalette in src/theme/configs/voiceforce.config.ts)
+// instead of literal hex; real values unchanged (emerald/red/slate).
+const OUTCOME_COLORS: Record<string, string> = { Resolved: 'var(--chart-series-3)', Escalated: 'var(--chart-series-5)', Other: 'var(--chart-series-6)' };
 
 function Tile({ label, value, source, origin = 'server-aggregate' }: { label: string; value: string; source: string; origin?: MetricOrigin }) {
   return (
@@ -65,11 +68,11 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={global.charts?.call_volume ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-gridline)" />
                   <XAxis dataKey="t" tick={false} />
                   <YAxis />
                   <Tooltip labelFormatter={(v) => new Date(v).toLocaleString()} />
-                  <Bar dataKey="started" fill="#3B82F6" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="started" fill="var(--chart-series-1)" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               <MetricSourceCaption origin="server-aggregate" source="charts.call_volume" />
@@ -83,7 +86,7 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
                 <PieChart>
                   <Pie data={global.outcomes} dataKey="value" nameKey="name" outerRadius={80} label={({ name, value }) => `${name}: ${value}`}>
                     {global.outcomes.map((o) => (
-                      <Cell key={o.name} fill={OUTCOME_COLORS[o.name] ?? '#8884d8'} />
+                      <Cell key={o.name} fill={OUTCOME_COLORS[o.name] ?? 'var(--chart-series-7)'} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -98,11 +101,11 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={global.ahtDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-gridline)" />
                   <XAxis dataKey="bucket" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#8B5CF6" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="count" fill="var(--chart-series-2)" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               <MetricSourceCaption origin="server-aggregate" source="aht_distribution" />
@@ -114,11 +117,11 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={global.charts?.latency_over_time ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-gridline)" />
                   <XAxis dataKey="t" tick={false} />
                   <YAxis />
                   <Tooltip labelFormatter={(v) => new Date(v).toLocaleString()} />
-                  <Line type="monotone" dataKey="avg_ms" stroke="#10B981" strokeWidth={2} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="avg_ms" stroke="var(--chart-series-3)" strokeWidth={2} dot={false} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
               <MetricSourceCaption origin="server-aggregate" source="charts.latency_over_time" />
@@ -130,11 +133,11 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={global.charts?.concurrency ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-gridline)" />
                   <XAxis dataKey="t" tick={false} />
                   <YAxis />
                   <Tooltip labelFormatter={(v) => new Date(v).toLocaleString()} />
-                  <Line type="monotone" dataKey="concurrent" stroke="#F59E0B" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="concurrent" stroke="var(--chart-series-4)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
               <MetricSourceCaption origin="server-aggregate" source="charts.concurrency" />
@@ -200,7 +203,7 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
               <PieChart>
                 <Pie data={scoped.outcomes} dataKey="value" nameKey="name" outerRadius={70} label={({ name, value }) => `${name}: ${value}`}>
                   {scoped.outcomes.map((o) => (
-                    <Cell key={o.name} fill={OUTCOME_COLORS[o.name] ?? '#8884d8'} />
+                    <Cell key={o.name} fill={OUTCOME_COLORS[o.name] ?? 'var(--chart-series-7)'} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -215,11 +218,11 @@ export const VoiceAnalyticsTab: React.FC<{ query: AnalyticsMetricsQueryDto }> = 
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={scoped.ahtDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-gridline)" />
                 <XAxis dataKey="bucket" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="count" fill="#8B5CF6" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="count" fill="var(--chart-series-2)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <MetricSourceCaption origin="page-scoped" source={`${scoped.sampleSize} authorized call-data rows`} />

@@ -464,7 +464,9 @@ const QAReview: React.FC = () => {
         ) : filteredRows.length === 0 ? (
           <p className="text-sm text-muted-foreground px-1">No interactions match the current filters.</p>
         ) : (
-          <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
+          // Session 7.8 — centralized `panels.dense` token (rounded-md,
+          // border-border, no background/padding — same real values).
+          <div className="flex-1 min-h-0 overflow-auto rounded-[var(--panel-dense-radius)] border border-border">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">

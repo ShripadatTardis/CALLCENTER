@@ -249,6 +249,20 @@ const colorSemantic = z.object({
   positive: semanticStatusRole,
   negative: semanticStatusRole, // technical/destructive failure AND business-escalation "rejected" status share this one role, per the existing `destructive`-reservation convention's own text; the DISTINCTION between them is which component consumes it (Alert=technical failure, Badge `escalated`=business state), not a second color role — see the mapping table for how both existing real usages are preserved without duplicating the field.
   caution: semanticStatusRole,
+  /** Session 7.8 — "Pending/Open" and "Information/Running/Active"
+   * status concepts. A Session 7.8 audit (28 tool calls, 1 agent run)
+   * found NO single dominant real color already serving this concept
+   * consistently — the few genuine precedents found
+   * (`automatedQaStatusBadge.ts`'s `running` → blue-500/600, several
+   * Reports.tsx/NPSCampaigns.tsx "completed"/"scheduled" states also
+   * landing on blue) all converge on blue, so that's the real value
+   * used here (not invented) — see
+   * docs/SESSION_7_8_UI_COMPONENT_CENTRALIZATION.md §1 for the full
+   * citation list. Covers both "Pending/Open" (e.g. Action Required's
+   * `open` status, previously miscolored with the `negative` role) and
+   * "Information/Running" as ONE role — the audit found no real
+   * evidence the codebase treats these as two distinct hues today. */
+  pending: semanticStatusRole,
 });
 
 const color = z.object({
@@ -332,9 +346,68 @@ const shadow = scaleOf(z.string());
 // creating between `cards.surfaceColor` and the generic neutral tokens).
 // ---------------------------------------------------------------------
 
-const cards = z.object({
-  headerBackground: colorValue.optional(),
-  paddingPx: pxValue.optional(),
+/**
+ * Session 7.8 — card/panel presentation, replacing the Session 7.5 stub
+ * `cards` field (which had no real value populated for either of its
+ * two fields — confirmed unconsumed anywhere, see 7.8's audit). A
+ * Session 7.8 audit (23 tool calls, 1 agent run) found three parallel,
+ * un-unified real card implementations in the live app (the shadcn
+ * `Card` primitive, the `SectionCard`/`CollapsibleSectionCard` family,
+ * and 52 files hand-rolling a `bg-card`-styled `<div>`), converging on
+ * a SMALL number of real, repeated visual recipes rather than one
+ * universal shape — see docs/SESSION_7_8_UI_COMPONENT_CENTRALIZATION.md
+ * §2 for the full citation table. Each named variant below is one of
+ * those real, already-repeated recipes, not an invented ideal.
+ */
+const panelVariant = z.object({
+  /** Most variants reuse `color.surfaces.raised`/`borders.default` — set
+   * only when a variant's real background/border genuinely differs
+   * (e.g. the dense table-wrapper variant has no background at all). */
+  background: withAppearance(colorValue).optional(),
+  borderColor: withAppearance(colorValue).optional(),
+  radiusPx: pxValue,
+  /** A `shadow.*` key (see the `shadow` field below), or unset for the
+   * (dominant) real recipes that use no shadow at all. */
+  shadow: z.string().optional(),
+  paddingPx: z.object({ x: pxValue, y: pxValue }),
+  headerPaddingPx: z.object({ x: pxValue, y: pxValue }).optional(),
+  /** The real `space-y-*`/`gap-*` value between a panel's internal
+   * sections, where one consistently exists. */
+  contentGapPx: pxValue.optional(),
+  /** Session 7.8's audit confirmed NO file in scope sets an explicit
+   * card/panel `min-h-*` today — honestly left unset per-variant unless
+   * a real value is found, never fabricated to force visual uniformity
+   * (the brief's own instruction: "do not impose the same fixed height
+   * on all panels... preserve content-driven heights where
+   * appropriate"). */
+  minHeightPx: pxValue.optional(),
+});
+
+const panels = z.object({
+  /** KPI/summary strips and compact info cards — e.g. Dashboard's Live
+   * Operations/Performance Ratios strips, AgentActivityPanel,
+   * ActionRequiredCard, QA Calibration's SummaryCard. The dominant real
+   * recipe found: `rounded-md border border-border bg-card`, no
+   * shadow, ~12px padding — explicitly code-commented in two separate
+   * files as an intentional departure from the shadcn `Card` default. */
+  summary: panelVariant,
+  /** The shadcn `Card` primitive's own real current recipe (`rounded-
+   * lg border bg-card shadow-sm`, 24px padding) — found in active use
+   * in exactly one place in this audit's scope (Analytics' KPI tiles).
+   * Kept as its own named variant rather than discarded, since it is a
+   * real, currently-rendered visual treatment, not hypothetical. */
+  standard: panelVariant,
+  /** Dense operational table/list wrappers — CallLogs, QAReview, most
+   * of QA Calibration's tables and filter groups. Real recipe: `rounded
+   * -md border border-border`, no background (the table/rows supply
+   * their own), no padding on the wrapper itself. */
+  dense: panelVariant,
+  /** Small bordered items inside a denser workspace, e.g. QA
+   * Calibration's evidence-column entries. Real recipe uses Tailwind's
+   * plain `rounded` (4px, distinct from the 6px `summary`/`dense`
+   * radius), `p-1.5` (6px). Optional — not every config needs this
+   * finer-grained variant. */
+  workspace: panelVariant.optional(),
 });
 
 // ---------------------------------------------------------------------
@@ -457,6 +530,8 @@ const badgeComponent = z.object({
     positive: semanticStatusRole.pick({ text: true, fill: true, border: true }),
     caution: semanticStatusRole.pick({ text: true, fill: true, border: true }),
     negative: semanticStatusRole.pick({ text: true, fill: true, border: true }),
+    // Session 7.8 — mirrors color.semantic.pending.
+    pending: semanticStatusRole.pick({ text: true, fill: true, border: true }),
   }),
 });
 
@@ -505,7 +580,7 @@ export const voiceForceThemeConfigSchema = z.object({
   heights,
   icons,
   shadow,
-  cards,
+  panels,
   navigation,
   charts,
   breakpoints,

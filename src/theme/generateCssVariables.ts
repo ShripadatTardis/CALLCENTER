@@ -13,15 +13,14 @@ import type { VoiceForceThemeConfig } from './schema';
  *
  * Deliberately NOT a general-purpose "every schema field" generator —
  * it emits exactly the named custom properties `src/index.css` already
- * declares (plus the two new `--nav-*` properties Session 7.7 Task 5
- * introduces for the navigation active-text states), each with an
- * explicit comment citing its schema source. A field with no CSS custom
- * property counterpart (most of `color.interactive.action`'s cyan
- * scale, `shadow`, `heights`, `icons`, `typography`, `charts`, `cards`,
- * `components.*`) is NOT emitted here — those remain literal Tailwind
- * utility classes at their call sites, unchanged, per Session 7.7's own
- * scope (badges/tables/cards/charts/typography migrate in Sessions
- * 7.8–7.10, not here).
+ * declares (plus the `--nav-*` properties Session 7.7 Task 5 introduced,
+ * and the `--status-*`/`--chart-*`/`--panel-*` properties Session 7.8
+ * adds below), each with an explicit comment citing its schema source.
+ * A field with no CSS custom property counterpart (most of
+ * `color.interactive.action`'s cyan scale, `heights`, `icons`,
+ * `typography`, `components.table`/`.input`/`.button`/`.alert`) is NOT
+ * emitted here — those remain literal Tailwind utility classes at their
+ * call sites, unchanged, deferred to Sessions 7.9/7.10.
  *
  * `--radius` is also NOT emitted — the schema stores its already-
  * resolved pixel derivatives (`radii.panel`/`control`/`tag`), not the
@@ -94,6 +93,19 @@ export function generateRootDeclarations(config: VoiceForceThemeConfig): Declara
     // `.dark` (see generateDarkDeclarations below).
     { name: '--nav-heading-active-text', value: navigation.item.headingActiveText?.light ?? '', comment: 'navigation.item.headingActiveText.light' },
     { name: '--nav-item-active-text', value: navigation.item.expandedActiveText?.light ?? '', comment: 'navigation.item.expandedActiveText.light' },
+    // Session 7.8 Task 1 — semantic status roles (Badge's tinted
+    // text/fill/border presentation). `negative`'s SOLID presentation is
+    // already covered by `--destructive` above; these are the separate
+    // tinted values badge.tsx's `escalated`/`warning`/`positive`
+    // variants (and the new `pending` variant) use.
+    ...statusRoleDeclarations(color.semantic, 'light'),
+    // Session 7.8 Task 4 — chart series/gridline colors.
+    ...chartDeclarations(config.charts),
+    // Session 7.8 Tasks 2/3 — panel/card presentation. Dimensional, not
+    // color — identical in both modes, so declared once here (:root)
+    // and allowed to cascade into `.dark` unchanged, same convention as
+    // the mode-independent `--nav-*` values above.
+    ...panelDeclarations(config.panels, config.shadow),
   ];
 }
 
@@ -125,7 +137,73 @@ export function generateDarkDeclarations(config: VoiceForceThemeConfig): Declara
     { name: '--sidebar-accent', value: hsl(navigation.item.hover.dark.background), comment: 'navigation.item.hover.dark.background' },
     { name: '--nav-heading-active-text', value: navigation.item.headingActiveText?.dark ?? '', comment: 'navigation.item.headingActiveText.dark' },
     { name: '--nav-item-active-text', value: navigation.item.expandedActiveText?.dark ?? '', comment: 'navigation.item.expandedActiveText.dark' },
+    ...statusRoleDeclarations(color.semantic, 'dark'),
+    // Panel/chart tokens are mode-independent (declared once in :root
+    // only — see generateRootDeclarations) and intentionally NOT
+    // repeated here.
   ];
+}
+
+type StatusRoleName = 'positive' | 'caution' | 'negative' | 'pending';
+
+function statusRoleDeclarations(semantic: VoiceForceThemeConfig['color']['semantic'], mode: 'light' | 'dark'): Declaration[] {
+  const roles: StatusRoleName[] = ['positive', 'caution', 'negative', 'pending'];
+  const declarations: Declaration[] = [];
+  for (const role of roles) {
+    const value = semantic[role];
+    declarations.push({ name: `--status-${role}-text`, value: value.text[mode], comment: `color.semantic.${role}.text.${mode}` });
+    declarations.push({ name: `--status-${role}-fill`, value: value.fill[mode], comment: `color.semantic.${role}.fill.${mode}` });
+    if (value.border) {
+      declarations.push({ name: `--status-${role}-border`, value: value.border[mode], comment: `color.semantic.${role}.border.${mode}` });
+    }
+  }
+  return declarations;
+}
+
+function chartDeclarations(charts: VoiceForceThemeConfig['charts']): Declaration[] {
+  const declarations: Declaration[] = charts.seriesPalette.map((value, i) => ({
+    name: `--chart-series-${i + 1}`,
+    value,
+    comment: `charts.seriesPalette[${i}]`,
+  }));
+  if (charts.gridlineColor) {
+    declarations.push({ name: '--chart-gridline', value: charts.gridlineColor, comment: 'charts.gridlineColor' });
+  }
+  return declarations;
+}
+
+function resolveShadow(shadowKey: string | undefined, shadow: VoiceForceThemeConfig['shadow']): string | undefined {
+  if (!shadowKey) return undefined;
+  if (shadowKey === 'default') return shadow.default;
+  return shadow.variants?.[shadowKey];
+}
+
+function panelDeclarations(panels: VoiceForceThemeConfig['panels'], shadow: VoiceForceThemeConfig['shadow']): Declaration[] {
+  const declarations: Declaration[] = [];
+  const variantNames = ['summary', 'standard', 'dense', 'workspace'] as const;
+  for (const name of variantNames) {
+    const variant = panels[name];
+    if (!variant) continue; // workspace is optional
+    const prefix = `--panel-${name}`;
+    declarations.push({ name: `${prefix}-radius`, value: `${variant.radiusPx}px`, comment: `panels.${name}.radiusPx` });
+    declarations.push({ name: `${prefix}-padding-x`, value: `${variant.paddingPx.x}px`, comment: `panels.${name}.paddingPx.x` });
+    declarations.push({ name: `${prefix}-padding-y`, value: `${variant.paddingPx.y}px`, comment: `panels.${name}.paddingPx.y` });
+    if (variant.headerPaddingPx) {
+      declarations.push({ name: `${prefix}-header-padding-x`, value: `${variant.headerPaddingPx.x}px`, comment: `panels.${name}.headerPaddingPx.x` });
+      declarations.push({ name: `${prefix}-header-padding-y`, value: `${variant.headerPaddingPx.y}px`, comment: `panels.${name}.headerPaddingPx.y` });
+    }
+    if (variant.contentGapPx !== undefined) {
+      declarations.push({ name: `${prefix}-gap`, value: `${variant.contentGapPx}px`, comment: `panels.${name}.contentGapPx` });
+    }
+    if (variant.minHeightPx !== undefined) {
+      declarations.push({ name: `${prefix}-min-height`, value: `${variant.minHeightPx}px`, comment: `panels.${name}.minHeightPx` });
+    }
+    const resolvedShadow = resolveShadow(variant.shadow, shadow);
+    if (resolvedShadow) {
+      declarations.push({ name: `${prefix}-shadow`, value: resolvedShadow, comment: `panels.${name}.shadow ('${variant.shadow}')` });
+    }
+  }
+  return declarations;
 }
 
 export function renderDeclarationBlock(declarations: Declaration[], indent = '  '): string {

@@ -18,7 +18,12 @@ import { typography } from '@/lib/typography';
 function statusBadge(status: ActionItem['status']) {
   if (status === 'in_progress') return <Badge variant="secondary" className="text-xs">In Progress</Badge>;
   if (status === 'resolved') return <Badge variant="positive" className="text-xs">Resolved</Badge>;
-  return <Badge variant="escalated" className="text-xs">Open</Badge>;
+  // Session 7.8 — "Open" is a pending/not-yet-actioned state, not a
+  // negative/escalated one; it previously borrowed the `escalated` red
+  // variant (same hue as a real escalation), which this session's
+  // status-color audit flagged as a miscoloring. Now uses the new
+  // `pending` variant (blue) instead — an intentional visual change.
+  return <Badge variant="pending" className="text-xs">Open</Badge>;
 }
 
 function ageSeconds(createdAt: string): number {

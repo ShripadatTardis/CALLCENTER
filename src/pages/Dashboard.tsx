@@ -263,12 +263,12 @@ const Dashboard: React.FC = () => {
           {/* Recent Interactions — Voice + Chat merged (see hook-level
               comment above for why this is a genuine merge, not a new
               aggregation). VoiceForce design system (Phase 2C): a plain
-              div matching AgentActivityPanel's exact box recipe
-              (rounded-md border border-border bg-card p-3), not the
+              div matching AgentActivityPanel's exact box recipe, not the
               shadcn Card's rounded-lg/shadow-sm — these two panels sit
               side by side as equal-weight peers and should read as one
-              coherent family, not two different container styles. */}
-          <div className="rounded-md border border-border bg-card p-3 space-y-2 flex flex-col">
+              coherent family, not two different container styles.
+              Session 7.8: now the centralized `panels.summary` token. */}
+          <div className="rounded-[var(--panel-summary-radius)] border border-border bg-card p-[var(--panel-summary-padding-x)] space-y-[var(--panel-summary-gap)] flex flex-col">
             <div className="flex items-center justify-between flex-shrink-0">
               <div className={typography.cardTitle}>Recent Interactions</div>
               <button

@@ -23,13 +23,32 @@ const badgeVariants = cva(
          * technical failure/error/destructive-action semantics only.
          * Opt-in — existing `destructive`/`default`/`secondary`/`outline`
          * usage elsewhere in the product is completely unaffected.
+         *
+         * Session 7.8 — these four variants now source their colors from
+         * the generated `--status-{role}-{text,fill,border}` CSS custom
+         * properties (src/theme/schema.ts's `color.semantic.*`) instead
+         * of literal Tailwind color classes, so changing the central
+         * config now changes every consumer of these variants. The
+         * real values are unchanged from before this session (same
+         * red/amber/emerald hex/rgb, same light+dark pairs) — the one
+         * intentional, documented simplification: the previous
+         * `hover:bg-{color}-500/15` (a slightly more saturated fill on
+         * hover) now reuses the same fill token as the resting state,
+         * since no second "hover fill" token exists in the config and
+         * introducing one for a one-step opacity nuance wasn't judged
+         * worth the added surface.
          */
         escalated:
-          "border-red-600/40 bg-red-500/10 text-red-700 hover:bg-red-500/15 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/15",
+          "border-[var(--status-negative-border)] bg-[var(--status-negative-fill)] text-[var(--status-negative-text)] hover:bg-[var(--status-negative-fill)]",
         warning:
-          "border-amber-600/50 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/15",
+          "border-[var(--status-caution-border)] bg-[var(--status-caution-fill)] text-[var(--status-caution-text)] hover:bg-[var(--status-caution-fill)]",
         positive:
-          "border-emerald-600/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/15",
+          "border-[var(--status-positive-border)] bg-[var(--status-positive-fill)] text-[var(--status-positive-text)] hover:bg-[var(--status-positive-fill)]",
+        /** New in Session 7.8 — "Pending/Open"/"Information/Running".
+         * See color.semantic.pending in the config for the real-value
+         * citation (no prior Badge variant covered this concept). */
+        pending:
+          "border-[var(--status-pending-border)] bg-[var(--status-pending-fill)] text-[var(--status-pending-text)] hover:bg-[var(--status-pending-fill)]",
       },
     },
     defaultVariants: {

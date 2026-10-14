@@ -71,11 +71,11 @@ export const ChatAnalyticsTab: React.FC = () => {
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={metrics.intentDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-gridline)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={60} />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="value" fill="#3B82F6" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="value" fill="var(--chart-series-1)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <MetricSourceCaption origin="page-scoped" source={`${metrics.sampleSize} fetched chat/sessions rows`} />

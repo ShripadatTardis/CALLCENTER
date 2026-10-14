@@ -37,6 +37,42 @@
     --nav-active-foreground: rgb(255 255 255); /* navigation.item.active.foreground (mode-independent) */
     --nav-heading-active-text: #06B6D4; /* navigation.item.headingActiveText.light */
     --nav-item-active-text: #0891B2; /* navigation.item.expandedActiveText.light */
+    --status-positive-text: rgb(4 120 87); /* color.semantic.positive.text.light */
+    --status-positive-fill: rgb(16 185 129 / 0.1); /* color.semantic.positive.fill.light */
+    --status-positive-border: rgb(5 150 105 / 0.4); /* color.semantic.positive.border.light */
+    --status-caution-text: rgb(180 83 9); /* color.semantic.caution.text.light */
+    --status-caution-fill: rgb(245 158 11 / 0.1); /* color.semantic.caution.fill.light */
+    --status-caution-border: rgb(217 119 6 / 0.5); /* color.semantic.caution.border.light */
+    --status-negative-text: rgb(185 28 28); /* color.semantic.negative.text.light */
+    --status-negative-fill: rgb(239 68 68 / 0.1); /* color.semantic.negative.fill.light */
+    --status-negative-border: rgb(220 38 38 / 0.4); /* color.semantic.negative.border.light */
+    --status-pending-text: rgb(29 78 216); /* color.semantic.pending.text.light */
+    --status-pending-fill: rgb(59 130 246 / 0.1); /* color.semantic.pending.fill.light */
+    --status-pending-border: rgb(37 99 235 / 0.4); /* color.semantic.pending.border.light */
+    --chart-series-1: #3B82F6; /* charts.seriesPalette[0] */
+    --chart-series-2: #8B5CF6; /* charts.seriesPalette[1] */
+    --chart-series-3: #10B981; /* charts.seriesPalette[2] */
+    --chart-series-4: #F59E0B; /* charts.seriesPalette[3] */
+    --chart-series-5: #EF4444; /* charts.seriesPalette[4] */
+    --chart-series-6: #94A3B8; /* charts.seriesPalette[5] */
+    --chart-series-7: #8884d8; /* charts.seriesPalette[6] */
+    --chart-gridline: #f0f0f0; /* charts.gridlineColor */
+    --panel-summary-radius: 6px; /* panels.summary.radiusPx */
+    --panel-summary-padding-x: 12px; /* panels.summary.paddingPx.x */
+    --panel-summary-padding-y: 12px; /* panels.summary.paddingPx.y */
+    --panel-summary-gap: 8px; /* panels.summary.contentGapPx */
+    --panel-standard-radius: 8px; /* panels.standard.radiusPx */
+    --panel-standard-padding-x: 24px; /* panels.standard.paddingPx.x */
+    --panel-standard-padding-y: 24px; /* panels.standard.paddingPx.y */
+    --panel-standard-header-padding-x: 24px; /* panels.standard.headerPaddingPx.x */
+    --panel-standard-header-padding-y: 24px; /* panels.standard.headerPaddingPx.y */
+    --panel-standard-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* panels.standard.shadow ('subtle') */
+    --panel-dense-radius: 6px; /* panels.dense.radiusPx */
+    --panel-dense-padding-x: 0px; /* panels.dense.paddingPx.x */
+    --panel-dense-padding-y: 0px; /* panels.dense.paddingPx.y */
+    --panel-workspace-radius: 4px; /* panels.workspace.radiusPx */
+    --panel-workspace-padding-x: 6px; /* panels.workspace.paddingPx.x */
+    --panel-workspace-padding-y: 6px; /* panels.workspace.paddingPx.y */
 
     /* Preserved verbatim — not sourced from the config. Session 7.6.3
        confirmed (grep) these are consumed only by the unused
@@ -76,6 +112,18 @@
     --sidebar-accent: 217.2 32.6% 17.5%; /* navigation.item.hover.dark.background */
     --nav-heading-active-text: #22D3EE; /* navigation.item.headingActiveText.dark */
     --nav-item-active-text: #67E8F9; /* navigation.item.expandedActiveText.dark */
+    --status-positive-text: rgb(52 211 153); /* color.semantic.positive.text.dark */
+    --status-positive-fill: rgb(16 185 129 / 0.1); /* color.semantic.positive.fill.dark */
+    --status-positive-border: rgb(16 185 129 / 0.4); /* color.semantic.positive.border.dark */
+    --status-caution-text: rgb(251 191 36); /* color.semantic.caution.text.dark */
+    --status-caution-fill: rgb(245 158 11 / 0.1); /* color.semantic.caution.fill.dark */
+    --status-caution-border: rgb(245 158 11 / 0.4); /* color.semantic.caution.border.dark */
+    --status-negative-text: rgb(248 113 113); /* color.semantic.negative.text.dark */
+    --status-negative-fill: rgb(239 68 68 / 0.1); /* color.semantic.negative.fill.dark */
+    --status-negative-border: rgb(239 68 68 / 0.4); /* color.semantic.negative.border.dark */
+    --status-pending-text: rgb(96 165 250); /* color.semantic.pending.text.dark */
+    --status-pending-fill: rgb(59 130 246 / 0.1); /* color.semantic.pending.fill.dark */
+    --status-pending-border: rgb(59 130 246 / 0.4); /* color.semantic.pending.border.dark */
 
     --sidebar-primary: 199 89% 48%;
     --sidebar-primary-foreground: 0 0% 100%;

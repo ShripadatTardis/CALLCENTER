@@ -19,7 +19,10 @@ function ageSeconds(createdAt: string): number {
 function statusBadge(status: ActionItem['status']) {
   if (status === 'in_progress') return <Badge variant="secondary" className="whitespace-nowrap text-xs">In Progress</Badge>;
   if (status === 'resolved') return <Badge variant="positive" className="whitespace-nowrap text-xs">Resolved</Badge>;
-  return <Badge variant="escalated" className="whitespace-nowrap text-xs">Open</Badge>;
+  // Session 7.8 — see src/pages/ActionRequired.tsx's statusBadge() for
+  // the full rationale: "Open" now uses the `pending` variant instead
+  // of `escalated`, an intentional visual-standardization fix.
+  return <Badge variant="pending" className="whitespace-nowrap text-xs">Open</Badge>;
 }
 
 /**
@@ -47,14 +50,15 @@ export const ActionRequiredCard: React.FC<{ agentRoster: AgentSummary[] }> = ({ 
   return (
     <>
       {/* VoiceForce design system (Phase 2C) — a plain div matching
-          AgentActivityPanel/Dashboard's Recent Interactions box recipe
-          (rounded-md border border-border bg-card p-3), not the shadcn
-          Card's rounded-lg/shadow-sm — same single operational-card
-          treatment used by the full Action Required queue page's own
-          item list, so the two surfaces feel like one consistent
-          containment convention instead of two different container
-          styles for the same data. */}
-      <div className="rounded-md border border-border bg-card p-3 space-y-2">
+          AgentActivityPanel/Dashboard's Recent Interactions box recipe,
+          not the shadcn Card's rounded-lg/shadow-sm — same single
+          operational-card treatment used by the full Action Required
+          queue page's own item list, so the two surfaces feel like one
+          consistent containment convention instead of two different
+          container styles for the same data. Session 7.8: now the
+          centralized `panels.summary` token (same real values:
+          rounded-md, border-border, bg-card, 12px padding, 8px gap). */}
+      <div className="rounded-[var(--panel-summary-radius)] border border-border bg-card p-[var(--panel-summary-padding-x)] space-y-[var(--panel-summary-gap)]">
         <div className="flex items-center justify-between">
           <div className={typography.cardTitle}>
             Action Required{items.length > 0 ? ` (${items.length})` : ''}

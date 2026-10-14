@@ -172,6 +172,28 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
           dark: { background: 'rgb(245 158 11)', foreground: 'rgb(255 255 255)' },
         },
       },
+      // Session 7.8 — "Pending/Open"/"Information/Running". No single
+      // existing component already defines this role the way badge.tsx
+      // does for positive/caution/negative; blue is the real color every
+      // genuine precedent found converges on (automatedQaStatusBadge.ts's
+      // `running` state: border-blue-500 text-blue-600 dark:border-blue-400
+      // dark:text-blue-400; several Reports.tsx/NPSCampaigns.tsx
+      // "completed"/pending-ish states also land on blue-100/blue-800).
+      // Shade/opacity formula matches the other three roles exactly
+      // (border-{600}/40 light, border-{500}/40 dark, bg-{500}/10,
+      // text-{700} light / text-{400} dark) for visual consistency with
+      // the existing semantic set, not arbitrarily chosen.
+      pending: {
+        text: { light: 'rgb(29 78 216)', dark: 'rgb(96 165 250)' }, // blue-700 / blue-400
+        fill: { light: 'rgb(59 130 246 / 0.1)', dark: 'rgb(59 130 246 / 0.1)' }, // blue-500/10, unchanged by mode
+        border: { light: 'rgb(37 99 235 / 0.4)', dark: 'rgb(59 130 246 / 0.4)' }, // blue-600/40 / blue-500/40
+        // No real "solid pending" component exists today — same honest
+        // caveat as positive.solid/caution.solid above.
+        solid: {
+          light: { background: 'rgb(59 130 246)', foreground: 'rgb(255 255 255)' },
+          dark: { background: 'rgb(59 130 246)', foreground: 'rgb(255 255 255)' },
+        },
+      },
     },
   },
 
@@ -237,10 +259,40 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
     },
   },
 
-  cards: {
-    // headerBackground / paddingPx: no single current value found — Card
-    // usage does not consistently apply a distinct header background,
-    // and padding varies by call site; correctly left unset.
+  // Session 7.8 — real recipes found across Dashboard.tsx,
+  // AgentActivityPanel.tsx, ActionRequiredCard.tsx, QaCalibration.tsx,
+  // CallLogs.tsx, QAReview.tsx (file:line citations in
+  // docs/SESSION_7_8_UI_COMPONENT_CENTRALIZATION.md §2). `background`/
+  // `borderColor` are left unset on every variant below — all four
+  // real recipes found reuse `color.surfaces.raised`/`borders.default`
+  // directly (no variant has its own distinct surface color).
+  panels: {
+    summary: {
+      radiusPx: 6, // rounded-md — the dominant real KPI/summary-card radius (Dashboard strips, AgentActivityPanel, ActionRequiredCard, QA Calibration's SummaryCard)
+      paddingPx: { x: 12, y: 12 }, // p-3, the most common real value (AgentActivityPanel's non-compact variant, ActionRequiredCard, Dashboard's Recent Interactions panel)
+      contentGapPx: 8, // space-y-2, same files
+    },
+    standard: {
+      // The shadcn Card primitive's own real, currently-rendered recipe
+      // (Analytics' KPI tiles) — rounded-lg + shadow-sm + p-6, unmodified.
+      radiusPx: 8,
+      shadow: 'subtle', // shadow.variants.subtle === shadow-sm, matching Card's real className exactly
+      paddingPx: { x: 24, y: 24 }, // p-6
+      headerPaddingPx: { x: 24, y: 24 }, // CardHeader's own p-6
+    },
+    dense: {
+      // CallLogs/QAReview/most of QA Calibration's table and filter-group
+      // wrappers: rounded-md border, no background (the table/rows supply
+      // their own), no padding on the wrapper itself.
+      radiusPx: 6,
+      paddingPx: { x: 0, y: 0 },
+    },
+    workspace: {
+      // QA Calibration's evidence-column items: plain `rounded` (4px,
+      // distinct from summary/dense's 6px), p-1.5.
+      radiusPx: 4,
+      paddingPx: { x: 6, y: 6 },
+    },
   },
 
   navigation: {
@@ -326,6 +378,12 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
           text: { light: 'rgb(185 28 28)', dark: 'rgb(248 113 113)' },
           fill: { light: 'rgb(239 68 68 / 0.1)', dark: 'rgb(239 68 68 / 0.1)' },
           border: { light: 'rgb(220 38 38 / 0.4)', dark: 'rgb(239 68 68 / 0.4)' },
+        },
+        // Session 7.8 — mirrors color.semantic.pending above.
+        pending: {
+          text: { light: 'rgb(29 78 216)', dark: 'rgb(96 165 250)' },
+          fill: { light: 'rgb(59 130 246 / 0.1)', dark: 'rgb(59 130 246 / 0.1)' },
+          border: { light: 'rgb(37 99 235 / 0.4)', dark: 'rgb(59 130 246 / 0.4)' },
         },
       },
     },

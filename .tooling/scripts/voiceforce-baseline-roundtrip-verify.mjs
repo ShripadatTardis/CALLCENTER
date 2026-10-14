@@ -204,6 +204,18 @@ reproduced('icons.variants.compact.sizePx (14px)', voiceforceBaselineConfig.icon
 assertTrue('color.brand and color.surfaces are distinct top-level color groups, with interactiveSubtle living only under surfaces (never under brand)', 'brand' in voiceforceBaselineConfig.color && 'surfaces' in voiceforceBaselineConfig.color && 'interactiveSubtle' in voiceforceBaselineConfig.color.surfaces && !('interactiveSubtle' in voiceforceBaselineConfig.color.brand));
 assertTrue('color.brand.decorative is correctly left unset (VoiceForce has no real decorative-accent value) rather than fabricated', voiceforceBaselineConfig.color.brand.decorative === undefined);
 
+// --- 8. Session 7.8 — the new `pending` semantic role (Task 1) and
+// `panels` tokens (Tasks 2/3), real values confirmed. ---
+reproduced('color.semantic.pending.text (new Session 7.8 role) light', voiceforceBaselineConfig.color.semantic.pending.text.light, 'rgb(29 78 216)');
+reproduced('color.semantic.pending.text dark', voiceforceBaselineConfig.color.semantic.pending.text.dark, 'rgb(96 165 250)');
+reproduced('components.badge.variants.pending mirrors color.semantic.pending', voiceforceBaselineConfig.components.badge.variants.pending.text.light, voiceforceBaselineConfig.color.semantic.pending.text.light);
+reproduced('panels.summary.radiusPx (rounded-md, the dominant real KPI/summary-card radius)', voiceforceBaselineConfig.panels.summary.radiusPx, 6);
+reproduced('panels.summary.paddingPx.x (p-3, the most common real value)', voiceforceBaselineConfig.panels.summary.paddingPx.x, 12);
+reproduced('panels.standard.radiusPx (the shadcn Card primitive\'s real rounded-lg)', voiceforceBaselineConfig.panels.standard.radiusPx, 8);
+reproduced('panels.dense.paddingPx.x (CallLogs/QAReview table wrappers have no padding)', voiceforceBaselineConfig.panels.dense.paddingPx.x, 0);
+assertTrue('panels.standard.shadow references the real shadow.variants.subtle (shadow-sm) key', voiceforceBaselineConfig.panels.standard.shadow === 'subtle' && voiceforceBaselineConfig.shadow.variants.subtle === '0 1px 2px 0 rgb(0 0 0 / 0.05)');
+reproduced('charts.seriesPalette[0] (Bar fill, VoiceAnalyticsTab/ChatAnalyticsTab)', voiceforceBaselineConfig.charts.seriesPalette[0], '#3B82F6');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(fail === 0
   ? '\nResult: the VoiceForce baseline configuration is a complete, schema-valid VoiceForceThemeConfig, and every checked value reproduces its real CSS/component source exactly in BOTH light and dark appearance modes. All 7 Session 7.6 gaps and the Session 7.6.2 light/dark gap are resolved.'

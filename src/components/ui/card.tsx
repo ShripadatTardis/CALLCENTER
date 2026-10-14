@@ -6,10 +6,12 @@ const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
+  // Session 7.8 — centralized `panels.standard` token. Same real
+  // values as before (rounded-lg/8px, border, bg-card, shadow-sm).
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      "rounded-[var(--panel-standard-radius)] border bg-card text-card-foreground shadow-[var(--panel-standard-shadow)]",
       className
     )}
     {...props}
@@ -21,9 +23,11 @@ const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
+  // Session 7.8 — centralized `panels.standard.headerPaddingPx` (24px,
+  // same real value as the prior literal `p-6`).
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn("flex flex-col space-y-1.5 p-[var(--panel-standard-header-padding-x)]", className)}
     {...props}
   />
 ))
@@ -60,7 +64,10 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+  // Session 7.8 — centralized `panels.standard.paddingPx` (24px, same
+  // real value as the prior literal `p-6`); `pt-0` is structural
+  // (avoids double-spacing under CardHeader), not a token value.
+  <div ref={ref} className={cn("p-[var(--panel-standard-padding-x)] pt-0", className)} {...props} />
 ))
 CardContent.displayName = "CardContent"
 

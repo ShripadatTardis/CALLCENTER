@@ -18,8 +18,36 @@
 // appearance modes (sections 1D/1E below), closing the gap Session
 // 7.7's pre-flight found — the baseline previously only ever checked
 // `:root` (light).
-import { voiceforceBaselineConfig } from '../tmp/voiceforceConfig.mjs';
-import { voiceForceThemeConfigSchema } from '../tmp/themeSchema.mjs';
+//
+// Session 7.7 fix: this script previously imported pre-built bundles
+// from `.tooling/tmp/`, which were never committed to git (they were
+// local-only build artifacts from manual esbuild runs during
+// development). CI's clean checkout has no `.tooling/tmp/`, so
+// `npm run verify:full` failed there with ERR_MODULE_NOT_FOUND for
+// `.tooling/tmp/voiceforceConfig.mjs` (GitHub Actions run on commit
+// 2857a33). Fixed by self-bundling at runtime via esbuild's JS API —
+// the exact same pattern `.tooling/scripts/generate-theme-css.mjs`
+// already uses — so this script has zero dependency on any leftover
+// or pre-committed temporary file; it works from a clean checkout.
+import { build } from 'esbuild';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const bundleDir = mkdtempSync(join(tmpdir(), 'cc-roundtrip-verify-'));
+const bundlePath = join(bundleDir, 'bundle.mjs');
+
+await build({
+  entryPoints: [join(repoRoot, '.tooling', 'scripts', 'voiceforce-baseline-roundtrip-verify.entry.mjs')],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outfile: bundlePath,
+});
+
+const { voiceforceBaselineConfig, voiceForceThemeConfigSchema } = await import(`file://${bundlePath.replace(/\\/g, '/')}`);
 
 let pass = 0, fail = 0;
 function reproduced(name, actual, expected) {
@@ -126,6 +154,11 @@ reproduced('alert.tsx destructive: dark:border-destructive (full opacity) -> com
 assertTrue('alert.tsx default variant has no explicit border override (correctly left unset, not fabricated)', voiceforceBaselineConfig.components.alert.variants.default.light.border === undefined && voiceforceBaselineConfig.components.alert.variants.default.dark.border === undefined);
 reproduced('--sidebar-border (light) -> color.surfaces.sidebar.light.border', voiceforceBaselineConfig.color.surfaces.sidebar.light.border, 'hsl(220 13% 91%)');
 reproduced('.dark --sidebar-border -> color.surfaces.sidebar.dark.border', voiceforceBaselineConfig.color.surfaces.sidebar.dark.border, 'hsl(217.2 32.6% 17.5%)');
+
+// --- 1G. Session 7.7 — the two additional navigation active-text
+// states Session 7.6.3 flagged as a gap, now closed. ---
+reproduced('Sidebar.tsx accordion trigger text-cyan-500/dark:text-cyan-400 -> navigation.item.headingActiveText', voiceforceBaselineConfig.navigation.item.headingActiveText.dark, '#22D3EE');
+reproduced('Sidebar.tsx expanded nav Link text-cyan-600/dark:text-cyan-300 -> navigation.item.expandedActiveText', voiceforceBaselineConfig.navigation.item.expandedActiveText.dark, '#67E8F9');
 
 // --- 2. Gap C: the real 7-shade cyan/interactive scale, every shade preserved ---
 // All 7 real Tailwind cyan shades found in use (grep evidence: 300/400/

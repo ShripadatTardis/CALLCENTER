@@ -256,6 +256,11 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
         dark: { background: 'hsl(217.2 32.6% 17.5%)', foreground: 'hsl(210 40% 98%)' },
       },
       active: { background: '#0891B2', foreground: 'rgb(255 255 255)' }, // real value: bg-cyan-600 text-white, Sidebar.tsx's active-pillar state (same real shade as color.interactive.action.variants.solidBackground — expected, not a duplication, see schema.ts's own note on this field). Session 7.6.2: a hardcoded Tailwind utility color, not a :root/.dark CSS custom property — no confirmed second value, intentionally left unwrapped (see gap report).
+      // Session 7.7: the two real additional active-text states the
+      // Session 7.6.3 investigation found and flagged as a gap —
+      // closed now, as Session 7.7 Task 5 requires centralizing them.
+      headingActiveText: { light: '#06B6D4', dark: '#22D3EE' }, // Sidebar.tsx accordion trigger: text-cyan-500 dark:text-cyan-400
+      expandedActiveText: { light: '#0891B2', dark: '#67E8F9' }, // Sidebar.tsx expanded nav Link: text-cyan-600 dark:text-cyan-300
     },
     // topBar: no distinct top-bar surface color found separate from
     // `color.surfaces.base` — correctly left unset.

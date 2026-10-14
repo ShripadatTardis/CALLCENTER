@@ -5,91 +5,84 @@
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
 
 @layer base {
+  /* GENERATED-THEME-VARIABLES:START — do not hand-edit between these markers.
+     Run `npm run generate:theme` after changing src/theme/configs/voiceforce.config.ts.
+     Source: src/theme/generateCssVariables.ts + src/theme/configs/voiceforce.config.ts. */
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 20% 98%; /* color.surfaces.base.light.background */
+    --foreground: 222.2 84% 4.9%; /* color.surfaces.base.light.foreground */
+    --card: 0 0% 100%; /* color.surfaces.raised.light.background */
+    --card-foreground: 222.2 84% 4.9%; /* color.surfaces.raised.light.foreground */
+    --popover: 0 0% 100%; /* color.surfaces.overlay.light.background */
+    --popover-foreground: 222.2 84% 4.9%; /* color.surfaces.overlay.light.foreground */
+    --primary: 222.2 47.4% 11.2%; /* color.roles.primary.light.background */
+    --primary-foreground: 210 40% 98%; /* color.roles.primary.light.foreground */
+    --secondary: 210 40% 96.1%; /* color.roles.secondary.light.background */
+    --secondary-foreground: 222.2 47.4% 11.2%; /* color.roles.secondary.light.foreground */
+    --muted: 210 40% 96.1%; /* color.roles.muted.light.background */
+    --muted-foreground: 215.4 16.3% 46.9%; /* color.roles.muted.light.foreground */
+    --accent: 210 40% 96.1%; /* color.surfaces.interactiveSubtle.light.background */
+    --accent-foreground: 222.2 47.4% 11.2%; /* color.surfaces.interactiveSubtle.light.foreground */
+    --destructive: 0 84.2% 60.2%; /* color.semantic.negative.solid.light.background */
+    --destructive-foreground: 210 40% 98%; /* color.semantic.negative.solid.light.foreground */
+    --border: 214.3 31.8% 91.4%; /* borders.default.color.light */
+    --input: 214.3 31.8% 91.4%; /* borders.field.color.light */
+    --ring: 222.2 84% 4.9%; /* components.input.focusBorder.light */
+    --sidebar-background: 0 0% 98%; /* color.surfaces.sidebar.light.background */
+    --sidebar-foreground: 240 5.3% 26.1%; /* color.surfaces.sidebar.light.foreground */
+    --sidebar-border: 220 13% 91%; /* color.surfaces.sidebar.light.border */
+    --sidebar-accent: 240 4.8% 95.9%; /* navigation.item.hover.light.background */
+    --nav-focus-ring: #22D3EE; /* color.interactive.action.default.focusRing (mode-independent, matches today's single focus-visible:outline-cyan-400 class) */
+    --nav-active-background: #0891B2; /* navigation.item.active.background (mode-independent, confirmed no real dark override exists — Session 7.6.3 §5) */
+    --nav-active-foreground: rgb(255 255 255); /* navigation.item.active.foreground (mode-independent) */
+    --nav-heading-active-text: #06B6D4; /* navigation.item.headingActiveText.light */
+    --nav-item-active-text: #0891B2; /* navigation.item.expandedActiveText.light */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
+    /* Preserved verbatim — not sourced from the config. Session 7.6.3
+       confirmed (grep) these are consumed only by the unused
+       src/components/ui/sidebar.tsx primitive, which nothing imports. */
     --sidebar-primary: 199 89% 48%;
-
     --sidebar-primary-foreground: 0 0% 100%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Not generated — radii/cards migration is deferred to a later session. */
+    --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 222.2 84% 4.9%; /* color.surfaces.base.dark.background */
+    --foreground: 210 40% 98%; /* color.surfaces.base.dark.foreground */
+    --card: 222.2 84% 4.9%; /* color.surfaces.raised.dark.background */
+    --card-foreground: 210 40% 98%; /* color.surfaces.raised.dark.foreground */
+    --popover: 222.2 84% 4.9%; /* color.surfaces.overlay.dark.background */
+    --popover-foreground: 210 40% 98%; /* color.surfaces.overlay.dark.foreground */
+    --primary: 210 40% 98%; /* color.roles.primary.dark.background */
+    --primary-foreground: 222.2 47.4% 11.2%; /* color.roles.primary.dark.foreground */
+    --secondary: 217.2 32.6% 17.5%; /* color.roles.secondary.dark.background */
+    --secondary-foreground: 210 40% 98%; /* color.roles.secondary.dark.foreground */
+    --muted: 217.2 32.6% 17.5%; /* color.roles.muted.dark.background */
+    --muted-foreground: 215 20.2% 65.1%; /* color.roles.muted.dark.foreground */
+    --accent: 217.2 32.6% 17.5%; /* color.surfaces.interactiveSubtle.dark.background */
+    --accent-foreground: 210 40% 98%; /* color.surfaces.interactiveSubtle.dark.foreground */
+    --destructive: 0 62.8% 30.6%; /* color.semantic.negative.solid.dark.background */
+    --destructive-foreground: 210 40% 98%; /* color.semantic.negative.solid.dark.foreground */
+    --border: 217.2 32.6% 17.5%; /* borders.default.color.dark */
+    --input: 217.2 32.6% 17.5%; /* borders.field.color.dark */
+    --ring: 212.7 26.8% 83.9%; /* components.input.focusBorder.dark */
+    --sidebar-background: 222.2 47.4% 11.2%; /* color.surfaces.sidebar.dark.background */
+    --sidebar-foreground: 210 40% 98%; /* color.surfaces.sidebar.dark.foreground */
+    --sidebar-border: 217.2 32.6% 17.5%; /* color.surfaces.sidebar.dark.border */
+    --sidebar-accent: 217.2 32.6% 17.5%; /* navigation.item.hover.dark.background */
+    --nav-heading-active-text: #22D3EE; /* navigation.item.headingActiveText.dark */
+    --nav-item-active-text: #67E8F9; /* navigation.item.expandedActiveText.dark */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 222.2 47.4% 11.2%;
-    --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 199 89% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 199 89% 48%;
   }
+  /* GENERATED-THEME-VARIABLES:END */
 }
 
 @layer base {

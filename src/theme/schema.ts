@@ -360,6 +360,22 @@ const navigationItemStates = z.object({
    * wrapped with `withAppearance` (see docs/SESSION_7_6_2_LIGHT_DARK_SCHEMA_COMPLETENESS.md
    * known-gaps section). */
   active: surfacePair,
+  /** Session 7.7: the real `text-cyan-500 dark:text-cyan-400` active
+   * state on the expanded navigation's pillar-heading (accordion
+   * trigger) — a distinct active-text presentation from `active` above
+   * (which models the icon-rail button), found during the Session
+   * 7.6.3 investigation and flagged as a documented gap there. Genuinely
+   * differs by appearance mode (real `dark:` Tailwind class), so it is
+   * appearance-aware. Optional: a minimal config has no such distinct
+   * heading-active state. */
+  headingActiveText: withAppearance(colorValue).optional(),
+  /** Session 7.7: the real `text-cyan-600 dark:text-cyan-300` active
+   * state on an expanded navigation item's own label text (its
+   * background already comes from `hover.background`, reused for the
+   * active row per the real `bg-sidebar-accent` class on both). Also
+   * found during Session 7.6.3 and flagged there. Optional for the same
+   * reason as `headingActiveText`. */
+  expandedActiveText: withAppearance(colorValue).optional(),
 });
 
 const navigation = z.object({

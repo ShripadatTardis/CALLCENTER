@@ -5,15 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "npm run generate:theme",
     "dev:vercel": "node scripts/dev-with-env.mjs",
     "build": "vite build",
+    "prebuild": "npm run generate:theme",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "responsive:check": "node scripts/responsive-check.mjs",
+    "generate:theme": "node .tooling/scripts/generate-theme-css.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.api.json",
     "verify": "npm run typecheck && npm run build",
-    "verify:full": "npm run verify && node .tooling/scripts/campaign-idempotency-verify.mjs && node .tooling/scripts/campaign-mapping-uniqueness-verify.mjs && node .tooling/scripts/campaign-outcome-policy-verify.mjs && node .tooling/scripts/campaign-structured-outcomes-verify.mjs && node .tooling/scripts/campaign-configuration-versioning-verify.mjs && node .tooling/scripts/campaign-settings-mapping-scope-verify.mjs && node .tooling/scripts/ratio-math-verify.mjs && node .tooling/scripts/ratio-dimensions-verify.mjs && node .tooling/scripts/chat-materialization-verify.mjs && node .tooling/scripts/call-normalization-verify.mjs && node .tooling/scripts/agent-contract-inputs-verify.mjs && node .tooling/scripts/campaign-configuration-history-verify.mjs && node .tooling/scripts/ratio-channel-verify.mjs && node .tooling/scripts/dashboard-navigation-verify.mjs && node .tooling/scripts/rbac-authorization-verify.mjs && node .tooling/scripts/user-provisioning-verify.mjs && node .tooling/scripts/business-data-scope-verify.mjs && node .tooling/scripts/action-items-verify.mjs && node .tooling/scripts/call-metrics-verify.mjs && node .tooling/scripts/qa-review-verify.mjs && node .tooling/scripts/qa-exception-editor-verify.mjs && node .tooling/scripts/qa-analysis-verify.mjs && node .tooling/scripts/qa-analysis-authorization-verify.mjs && node .tooling/scripts/automated-qa-window-planner-verify.mjs && node .tooling/scripts/automated-qa-validation-verify.mjs && node .tooling/scripts/automated-qa-schema-prompt-ratios-verify.mjs && node .tooling/scripts/automated-qa-evaluator-verify.mjs && node .tooling/scripts/automated-qa-human-review-blinding-verify.mjs && node .tooling/scripts/automated-qa-llm-client-verify.mjs && node .tooling/scripts/qa-comparison-verify.mjs && node .tooling/scripts/voiceforce-baseline-roundtrip-verify.mjs"
+    "verify:full": "npm run verify && node .tooling/scripts/campaign-idempotency-verify.mjs && node .tooling/scripts/campaign-mapping-uniqueness-verify.mjs && node .tooling/scripts/campaign-outcome-policy-verify.mjs && node .tooling/scripts/campaign-structured-outcomes-verify.mjs && node .tooling/scripts/campaign-configuration-versioning-verify.mjs && node .tooling/scripts/campaign-settings-mapping-scope-verify.mjs && node .tooling/scripts/ratio-math-verify.mjs && node .tooling/scripts/ratio-dimensions-verify.mjs && node .tooling/scripts/chat-materialization-verify.mjs && node .tooling/scripts/call-normalization-verify.mjs && node .tooling/scripts/agent-contract-inputs-verify.mjs && node .tooling/scripts/campaign-configuration-history-verify.mjs && node .tooling/scripts/ratio-channel-verify.mjs && node .tooling/scripts/dashboard-navigation-verify.mjs && node .tooling/scripts/rbac-authorization-verify.mjs && node .tooling/scripts/user-provisioning-verify.mjs && node .tooling/scripts/business-data-scope-verify.mjs && node .tooling/scripts/action-items-verify.mjs && node .tooling/scripts/call-metrics-verify.mjs && node .tooling/scripts/qa-review-verify.mjs && node .tooling/scripts/qa-exception-editor-verify.mjs && node .tooling/scripts/qa-analysis-verify.mjs && node .tooling/scripts/qa-analysis-authorization-verify.mjs && node .tooling/scripts/automated-qa-window-planner-verify.mjs && node .tooling/scripts/automated-qa-validation-verify.mjs && node .tooling/scripts/automated-qa-schema-prompt-ratios-verify.mjs && node .tooling/scripts/automated-qa-evaluator-verify.mjs && node .tooling/scripts/automated-qa-human-review-blinding-verify.mjs && node .tooling/scripts/automated-qa-llm-client-verify.mjs && node .tooling/scripts/qa-comparison-verify.mjs && node .tooling/scripts/voiceforce-baseline-roundtrip-verify.mjs && node .tooling/scripts/theme-css-generation-verify.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -74,6 +77,7 @@
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",
+    "esbuild": "^0.21.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vercel/node": "^13.0.2",

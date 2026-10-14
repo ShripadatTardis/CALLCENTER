@@ -80,7 +80,7 @@ export const Sidebar: React.FC = () => {
           aria-expanded={navOpen}
           aria-controls="app-nav-overlay"
           onClick={() => setNavOpen((v) => !v)}
-          className="w-9 h-9 rounded flex items-center justify-center text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 mb-1"
+          className="w-9 h-9 rounded flex items-center justify-center text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--nav-focus-ring)] mb-1"
         >
           <Menu size={18} aria-hidden="true" />
         </button>
@@ -97,9 +97,9 @@ export const Sidebar: React.FC = () => {
                 aria-label={pillar.label}
                 onClick={() => setNavOpen(true)}
                 className={cn(
-                  'w-9 h-9 rounded flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
+                  'w-9 h-9 rounded flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--nav-focus-ring)]',
                   isActive
-                    ? 'bg-cyan-600 text-white'
+                    ? 'bg-[var(--nav-active-background)] text-[var(--nav-active-foreground)]'
                     : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )}
               >
@@ -133,7 +133,7 @@ export const Sidebar: React.FC = () => {
                 type="button"
                 aria-label="Close navigation"
                 onClick={closeNav}
-                className="p-1 rounded hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+                className="p-1 rounded hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--nav-focus-ring)]"
               >
                 <X size={16} aria-hidden="true" />
               </button>
@@ -158,7 +158,7 @@ export const Sidebar: React.FC = () => {
                         className={cn(
                           typography.subsectionTitle,
                           'py-1.5 hover:no-underline hover:text-sidebar-foreground',
-                          isPillarActive ? 'text-cyan-500 dark:text-cyan-400' : 'text-sidebar-foreground/60'
+                          isPillarActive ? 'text-[var(--nav-heading-active-text)]' : 'text-sidebar-foreground/60'
                         )}
                       >
                         {pillar.label}
@@ -174,9 +174,9 @@ export const Sidebar: React.FC = () => {
                               to={item.href}
                               onClick={closeNav}
                               className={cn(
-                                'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400',
+                                'flex items-center gap-2 px-2 py-1.5 rounded text-[13px] hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--nav-focus-ring)]',
                                 isActive
-                                  ? 'bg-sidebar-accent text-cyan-600 dark:text-cyan-300 font-medium'
+                                  ? 'bg-sidebar-accent text-[var(--nav-item-active-text)] font-medium'
                                   : 'text-sidebar-foreground/90'
                               )}
                             >

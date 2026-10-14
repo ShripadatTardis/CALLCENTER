@@ -65,10 +65,11 @@ const AIAgents: React.FC = () => {
                 {/* G1 dense operational grid (docs/VOICEFORCE_OPERATIONAL_GRID_STANDARD.md
                     §G1): ~32-36px header, not the shadcn default h-12/px-4. */}
                 <TableRow className={`border-border hover:bg-transparent ${typography.tableHeader}`}>
-                  <TableHead className="h-9 px-3">Agent</TableHead>
-                  <TableHead className="h-9 px-3">Direction</TableHead>
-                  <TableHead className="h-9 px-3">Usage</TableHead>
-                  <TableHead className="h-9 px-3 text-right">Action</TableHead>
+                  {/* Session 7.9 — h-9/px-3 removed: now the shared TableHead's own centralized default. */}
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Usage</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -78,7 +79,8 @@ const AIAgents: React.FC = () => {
                   return (
                     <TableRow
                       key={agent.agentId}
-                      className="cursor-pointer border-border/60 hover:bg-card focus-within:bg-card"
+                      // Session 7.9 — hover:bg-card removed: now the shared TableRow's own centralized default (focus-within:bg-card kept, it's a distinct keyboard-focus affordance, not the same concern).
+                      className="cursor-pointer border-border/60 focus-within:bg-card"
                       onClick={openDetail}
                     >
                       {/* C1: identity column is the flexible one — no fixed
@@ -86,7 +88,7 @@ const AIAgents: React.FC = () => {
                           Assistant". Immutable agent_id shown as a compact
                           secondary line, matching every other operational
                           grid's identity-cell convention. */}
-                      <TableCell className="py-1.5 px-3">
+                      <TableCell >
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground">{agent.displayName}</span>
                           {agent.isDefault && (
@@ -95,10 +97,10 @@ const AIAgents: React.FC = () => {
                         </div>
                         <span className="text-xs text-muted-foreground font-mono">{agent.agentId}</span>
                       </TableCell>
-                      <TableCell className="py-1.5 px-3">
+                      <TableCell >
                         <Badge variant="secondary" className="text-xs">{formatStatusLabel(agent.direction)}</Badge>
                       </TableCell>
-                      <TableCell className="py-1.5 px-3 text-foreground whitespace-nowrap">
+                      <TableCell className="text-foreground whitespace-nowrap">
                         {campaignsQuery.isLoading ? (
                           <span className="text-muted-foreground">…</span>
                         ) : (
@@ -107,7 +109,7 @@ const AIAgents: React.FC = () => {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="py-1.5 px-3 text-right">
+                      <TableCell className="text-right">
                         <Button
                           variant="ghost"
                           size="xs"

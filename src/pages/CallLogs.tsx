@@ -314,16 +314,19 @@ const CallLogs: React.FC = () => {
                   text treatment now comes from the shared
                   src/lib/typography.ts roles (tableHeader/tableBody)
                   instead of a page-local text-sm/text-xs mix. */}
+              {/* Session 7.9 — header cell geometry (h-9/px-3) now sourced
+                  from the centralized tables.header CSS vars, same real
+                  value as before. */}
               <thead>
                 <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
-                  <th className="h-9 px-3 whitespace-nowrap">Timestamp</th>
-                  <th className="h-9 px-3">Caller / Context</th>
-                  <th className="h-9 px-3">Agent</th>
-                  <th className="h-9 px-3 text-right">Duration</th>
-                  <th className="h-9 px-3">Outcome</th>
-                  <th className="h-9 px-3">FCR</th>
-                  <th className="h-9 px-3">Intent accuracy</th>
-                  <th className="h-9 px-3 text-right">Action</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)] whitespace-nowrap">Timestamp</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Caller / Context</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Agent</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)] text-right">Duration</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Outcome</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">FCR</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)]">Intent accuracy</th>
+                  <th className="h-[var(--table-header-height)] px-[var(--table-header-padding-x)] text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,16 +338,17 @@ const CallLogs: React.FC = () => {
                   // fields (docs/SCREEN_REVIEW_03_CALL_LOGS.md §G). Now shows
                   // an honest empty state instead.
                   const outcomeVariant = call.outcome === 'resolved' ? 'positive' : call.outcome === 'escalated' ? 'escalated' : 'secondary';
+                  // Session 7.9 — hover:bg-card corrected to the centralized --table-row-hover-bg var (same real value); py-1.5/px-3 cell padding now the centralized --table-row-standard-* vars.
                   return (
-                  <tr key={call.interactionId} className="border-b border-border/60 last:border-0 hover:bg-card">
-                    <td className="py-1.5 px-3 whitespace-nowrap text-xs text-muted-foreground">
+                  <tr key={call.interactionId} className="border-b border-border/60 last:border-0 hover:bg-[var(--table-row-hover-bg)]">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] whitespace-nowrap text-xs text-muted-foreground">
                       {formatTimestamp(call.startTime)}
                     </td>
                     {/* Caller/Context: phone folded into the identity cell
                         (matches Dashboard's pattern), single line, name and
                         intent truncate together rather than each getting
                         their own row. */}
-                    <td className="py-1.5 px-3 max-w-[260px]">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] max-w-[260px]">
                       {/* VoiceForce design system (Phase 2B) — identifying
                           fields stay prominent at the dense 12px table-body
                           size via font-weight, not a larger font-size (per
@@ -365,13 +369,13 @@ const CallLogs: React.FC = () => {
                         real agent names ("Inbound Banking Assistant") never
                         truncate at normal widths (see LiveView's identical
                         pattern, the reference G1/C1 implementation). */}
-                    <td className="py-1.5 px-3 min-w-[7rem] max-w-[14rem]">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] min-w-[7rem] max-w-[14rem]">
                       <span className="font-medium text-foreground truncate block" title={agentLabel}>{agentLabel}</span>
                     </td>
-                    <td className="py-1.5 px-3 text-right whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] text-right whitespace-nowrap" title={formatDurationExact(call.durationSeconds)}>
                       <span className="font-mono tabular-nums text-foreground text-xs">{formatDurationLong(call.durationSeconds)}</span>
                     </td>
-                    <td className="py-1.5 px-3">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)]">
                       <Badge variant={outcomeVariant} className="whitespace-nowrap text-xs">
                         {call.outcome ?? 'Unknown'}
                       </Badge>
@@ -381,12 +385,12 @@ const CallLogs: React.FC = () => {
                         not status badges, so they no longer get
                         semantic green/amber/red coloring merely because
                         the value is higher or lower. */}
-                    <td className="py-1.5 px-3">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)]">
                       <span className="text-foreground">
                         {call.fcr === undefined ? '—' : call.fcr ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td className="py-1.5 px-3">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)]">
                       <span className="text-foreground">
                         {formatPercent(call.intentAccuracy, 0)}
                       </span>
@@ -395,7 +399,7 @@ const CallLogs: React.FC = () => {
                         pair (both called handleViewDetail; Play never played
                         audio inline, only the dialog's own <audio> element
                         does) into one truthful action. */}
-                    <td className="py-1.5 px-3 text-right whitespace-nowrap">
+                    <td className="py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] text-right whitespace-nowrap">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -426,10 +430,14 @@ const CallLogs: React.FC = () => {
               {pagination.total_records} total call{pagination.total_records === 1 ? '' : 's'} · Page {currentPage} of {totalPages}
             </span>
             <div className="flex items-center gap-1">
+              {/* Session 7.9 — size="sm" + manual h-7 override normalized
+                  to the existing `xs` button-size token (button.tsx),
+                  which already IS h-7 — removes the redundant override
+                  rather than introducing a new pagination-height token. */}
               <Button
                 variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                size="xs"
+                className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1 || isFetching}
               >
@@ -438,8 +446,8 @@ const CallLogs: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                size="xs"
+                className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages || isFetching}
               >

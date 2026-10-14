@@ -295,6 +295,20 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
     },
   },
 
+  // Session 7.9 — real values, citations in
+  // docs/SESSION_7_9_TABLE_GEOMETRY_CENTRALIZATION.md §1.
+  tables: {
+    header: {
+      heightPx: 36, // h-9 — src/components/ui/table.tsx's TableHead, independently matched in CallLogs/LiveView/AgentDetail/AIAgents
+      paddingXPx: 12, // px-3
+    },
+    rows: {
+      standard: { paddingXPx: 12, paddingYPx: 6 }, // py-1.5/px-3 — the shared TableCell default, matched everywhere except UserManagement
+      expanded: { paddingXPx: 12, paddingYPx: 8 }, // py-2/px-3 — UserManagement.tsx's real, content-justified looser density (its rows carry a status line + a conditional second line)
+      // compact: omitted — no table in this codebase uses a density denser than `standard` today; inventing one would be fabrication.
+    },
+  },
+
   navigation: {
     item: {
       // --sidebar-foreground at the real `/60` opacity modifier used in
@@ -353,8 +367,16 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
       // genuinely differ by appearance mode.
       headerBackground: { light: 'hsl(0 0% 100%)', dark: 'hsl(222.2 84% 4.9%)' }, // --card
       headerText: { light: 'hsl(215.4 16.3% 46.9%)', dark: 'hsl(215 20.2% 65.1%)' }, // --muted-foreground
-      rowHoverBackground: { light: 'hsl(210 40% 96.1% / 0.5)', dark: 'hsl(217.2 32.6% 17.5% / 0.5)' }, // --muted at the real `/50` opacity modifier
-      rowSelectedBackground: { light: 'hsl(210 40% 96.1%)', dark: 'hsl(217.2 32.6% 17.5%)' }, // --muted, full opacity (confirmed distinct from hover, Session 7.5 §3.5)
+      // Session 7.9 correction: the Session 7.6.2 value here
+      // (--muted/50) was extracted from the shared Table primitive's
+      // own unused default (`hover:bg-muted/50`). A Session 7.9
+      // investigation found the REAL, dominant hover color — 4 of 6
+      // audited tables (CallLogs, LiveView, AgentDetail, UserManagement)
+      // independently hand-override it to `hover:bg-card`, and the
+      // primitive's own default is used nowhere. Now tracks --card
+      // (same value as color.surfaces.raised.background) instead.
+      rowHoverBackground: { light: 'hsl(0 0% 100%)', dark: 'hsl(222.2 84% 4.9%)' }, // --card
+      rowSelectedBackground: { light: 'hsl(210 40% 96.1%)', dark: 'hsl(217.2 32.6% 17.5%)' }, // --muted, full opacity (confirmed distinct from hover, Session 7.5 §3.5) — no real "selected row" consumer found in Session 7.9's investigation either; left as the honest best-available value, unchanged.
       // rowLoadingPlaceholderColor / sortIndicatorColor: omitted — confirmed absent from table.tsx today.
     },
     badge: {

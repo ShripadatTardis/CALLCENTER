@@ -531,31 +531,33 @@ const AgentDetail: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="h-9 px-3 w-24 text-muted-foreground text-xs">Channel</TableHead>
-                      <TableHead className="h-9 px-3 w-32 text-muted-foreground text-xs">When</TableHead>
-                      <TableHead className="h-9 px-3 text-muted-foreground text-xs">Outcome / Status</TableHead>
-                      <TableHead className="h-9 px-3 w-20 text-muted-foreground text-xs text-right">Action</TableHead>
+                      {/* Session 7.9 — h-9/px-3 removed from all four: now the shared TableHead's own centralized default. */}
+                      <TableHead className="w-24 text-muted-foreground text-xs">Channel</TableHead>
+                      <TableHead className="w-32 text-muted-foreground text-xs">When</TableHead>
+                      <TableHead className="text-muted-foreground text-xs">Outcome / Status</TableHead>
+                      <TableHead className="w-20 text-muted-foreground text-xs text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {/* Session 7.9 — hover:bg-card and py-1.5/px-3 removed below (both branches): now the shared TableRow/TableCell's own centralized defaults. */}
                     {recentInteractions.map((row) =>
                       row.kind === 'call' ? (
-                        <TableRow key={`call-${row.call.interactionId}`} className="border-border/60 hover:bg-card">
-                          <TableCell className="py-1.5 px-3 w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Voice</Badge></TableCell>
-                          <TableCell className="py-1.5 px-3 w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
-                          <TableCell className="py-1.5 px-3 text-foreground text-xs">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
-                          <TableCell className="py-1.5 px-3 w-20 text-right">
+                        <TableRow key={`call-${row.call.interactionId}`} className="border-border/60">
+                          <TableCell className="w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Voice</Badge></TableCell>
+                          <TableCell className="w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.call.startTime)}</TableCell>
+                          <TableCell className="text-foreground text-xs">{formatStatusLabel(row.call.outcome || row.call.status)}</TableCell>
+                          <TableCell className="w-20 text-right">
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedInteraction(row.call)}>
                               View
                             </Button>
                           </TableCell>
                         </TableRow>
                       ) : (
-                        <TableRow key={`chat-${row.chat.sessionId}`} className="border-border/60 hover:bg-card">
-                          <TableCell className="py-1.5 px-3 w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Chat</Badge></TableCell>
-                          <TableCell className="py-1.5 px-3 w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
-                          <TableCell className="py-1.5 px-3 text-foreground text-xs">{formatStatusLabel(row.chat.status)}</TableCell>
-                          <TableCell className="py-1.5 px-3 w-20 text-right">
+                        <TableRow key={`chat-${row.chat.sessionId}`} className="border-border/60">
+                          <TableCell className="w-24"><Badge variant="outline" className="text-xs py-0 px-1.5 border-slate-600 text-foreground">Chat</Badge></TableCell>
+                          <TableCell className="w-32 text-foreground text-xs whitespace-nowrap">{formatTimestamp(row.chat.updatedAt)}</TableCell>
+                          <TableCell className="text-foreground text-xs">{formatStatusLabel(row.chat.status)}</TableCell>
+                          <TableCell className="w-20 text-right">
                             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted" onClick={() => setSelectedChatSessionId(row.chat.sessionId)}>
                               View
                             </Button>
@@ -601,10 +603,11 @@ const AgentDetail: React.FC = () => {
                     </Select>
                   </div>
                   <div className="flex items-center gap-1">
+                    {/* Session 7.9 — normalized to the existing `xs` button-size token (already h-7 px-2), same as CallLogs/QAReview. */}
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="h-7 px-2 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      size="xs"
+                      className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                       onClick={() => setInteractionsPage(Math.max(1, interactionsCurrentPage - 1))}
                       disabled={interactionsCurrentPage <= 1}
                     >
@@ -613,8 +616,8 @@ const AgentDetail: React.FC = () => {
                     </Button>
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="h-7 px-2 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                      size="xs"
+                      className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                       onClick={() => setInteractionsPage(Math.min(interactionsTotalPages, interactionsCurrentPage + 1))}
                       disabled={interactionsCurrentPage >= interactionsTotalPages}
                     >

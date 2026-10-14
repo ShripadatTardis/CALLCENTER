@@ -106,6 +106,14 @@ export function generateRootDeclarations(config: VoiceForceThemeConfig): Declara
     // and allowed to cascade into `.dark` unchanged, same convention as
     // the mode-independent `--nav-*` values above.
     ...panelDeclarations(config.panels, config.shadow),
+    // Session 7.9 — table header/row colors (appearance-aware).
+    { name: '--table-header-bg', value: hsl(components.table.headerBackground.light), comment: 'components.table.headerBackground.light' },
+    { name: '--table-header-text', value: hsl(components.table.headerText.light), comment: 'components.table.headerText.light' },
+    { name: '--table-row-hover-bg', value: hsl(components.table.rowHoverBackground.light), comment: 'components.table.rowHoverBackground.light' },
+    { name: '--table-row-selected-bg', value: hsl(components.table.rowSelectedBackground.light), comment: 'components.table.rowSelectedBackground.light' },
+    // Session 7.9 — table header/row/cell geometry. Dimensional, not
+    // color — identical in both modes, declared once here (:root).
+    ...tableDeclarations(config.tables),
   ];
 }
 
@@ -138,9 +146,14 @@ export function generateDarkDeclarations(config: VoiceForceThemeConfig): Declara
     { name: '--nav-heading-active-text', value: navigation.item.headingActiveText?.dark ?? '', comment: 'navigation.item.headingActiveText.dark' },
     { name: '--nav-item-active-text', value: navigation.item.expandedActiveText?.dark ?? '', comment: 'navigation.item.expandedActiveText.dark' },
     ...statusRoleDeclarations(color.semantic, 'dark'),
-    // Panel/chart tokens are mode-independent (declared once in :root
-    // only — see generateRootDeclarations) and intentionally NOT
-    // repeated here.
+    // Session 7.9 — table header/row colors (appearance-aware).
+    { name: '--table-header-bg', value: hsl(components.table.headerBackground.dark), comment: 'components.table.headerBackground.dark' },
+    { name: '--table-header-text', value: hsl(components.table.headerText.dark), comment: 'components.table.headerText.dark' },
+    { name: '--table-row-hover-bg', value: hsl(components.table.rowHoverBackground.dark), comment: 'components.table.rowHoverBackground.dark' },
+    { name: '--table-row-selected-bg', value: hsl(components.table.rowSelectedBackground.dark), comment: 'components.table.rowSelectedBackground.dark' },
+    // Panel/chart/table-geometry tokens are mode-independent (declared
+    // once in :root only — see generateRootDeclarations) and
+    // intentionally NOT repeated here.
   ];
 }
 
@@ -202,6 +215,21 @@ function panelDeclarations(panels: VoiceForceThemeConfig['panels'], shadow: Voic
     if (resolvedShadow) {
       declarations.push({ name: `${prefix}-shadow`, value: resolvedShadow, comment: `panels.${name}.shadow ('${variant.shadow}')` });
     }
+  }
+  return declarations;
+}
+
+function tableDeclarations(tables: VoiceForceThemeConfig['tables']): Declaration[] {
+  const declarations: Declaration[] = [
+    { name: '--table-header-height', value: `${tables.header.heightPx}px`, comment: 'tables.header.heightPx' },
+    { name: '--table-header-padding-x', value: `${tables.header.paddingXPx}px`, comment: 'tables.header.paddingXPx' },
+  ];
+  const densityNames = ['standard', 'expanded', 'compact'] as const;
+  for (const name of densityNames) {
+    const density = tables.rows[name];
+    if (!density) continue; // expanded/compact are optional
+    declarations.push({ name: `--table-row-${name}-padding-x`, value: `${density.paddingXPx}px`, comment: `tables.rows.${name}.paddingXPx` });
+    declarations.push({ name: `--table-row-${name}-padding-y`, value: `${density.paddingYPx}px`, comment: `tables.rows.${name}.paddingYPx` });
   }
   return declarations;
 }

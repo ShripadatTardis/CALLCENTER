@@ -69,11 +69,15 @@ const UserManagement: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
           <table className="w-full text-sm">
             <thead>
+              {/* Session 7.9 — this table's real px-3/py-2 geometry is
+                  genuinely looser than the h-9/py-1.5 standard everywhere
+                  else (its rows carry 2 real lines of content) — now the
+                  centralized `expanded` row density, not drift. */}
               <tr className={`border-b border-border text-left ${typography.tableHeader}`}>
-                <th className="px-3 py-2">User</th>
-                <th className="px-3 py-2">Role(s)</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+                <th className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">User</th>
+                <th className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">Role(s)</th>
+                <th className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">Status</th>
+                <th className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)] text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -92,8 +96,8 @@ const UserManagement: React.FC = () => {
               ) : (
                 filteredUsers.map((u) => (
                   <React.Fragment key={u.id}>
-                    <tr className="border-b border-border/60 last:border-0 hover:bg-card">
-                      <td className="px-3 py-2">
+                    <tr className="border-b border-border/60 last:border-0 hover:bg-[var(--table-row-hover-bg)]">
+                      <td className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">
                         <div className="flex items-center gap-2">
                           <div className="h-7 w-7 rounded-full bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-xs font-semibold shrink-0">
                             {(u.displayName ?? u.email).slice(0, 2).toUpperCase()}
@@ -104,7 +108,7 @@ const UserManagement: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">
                         <div className="flex flex-wrap gap-1">
                           {u.roles.length === 0 ? (
                             <span className="text-xs text-muted-foreground">No roles assigned</span>
@@ -117,7 +121,7 @@ const UserManagement: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)]">
                         <div className="flex flex-col gap-0.5">
                           <span className={`flex items-center gap-1.5 text-xs ${u.status === 'active' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
@@ -132,7 +136,7 @@ const UserManagement: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <td className="px-[var(--table-row-expanded-padding-x)] py-[var(--table-row-expanded-padding-y)] text-right whitespace-nowrap">
                         <Button
                           variant="ghost"
                           size="xs"

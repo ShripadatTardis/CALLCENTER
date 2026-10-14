@@ -73,6 +73,16 @@
     --panel-workspace-radius: 4px; /* panels.workspace.radiusPx */
     --panel-workspace-padding-x: 6px; /* panels.workspace.paddingPx.x */
     --panel-workspace-padding-y: 6px; /* panels.workspace.paddingPx.y */
+    --table-header-bg: 0 0% 100%; /* components.table.headerBackground.light */
+    --table-header-text: 215.4 16.3% 46.9%; /* components.table.headerText.light */
+    --table-row-hover-bg: 0 0% 100%; /* components.table.rowHoverBackground.light */
+    --table-row-selected-bg: 210 40% 96.1%; /* components.table.rowSelectedBackground.light */
+    --table-header-height: 36px; /* tables.header.heightPx */
+    --table-header-padding-x: 12px; /* tables.header.paddingXPx */
+    --table-row-standard-padding-x: 12px; /* tables.rows.standard.paddingXPx */
+    --table-row-standard-padding-y: 6px; /* tables.rows.standard.paddingYPx */
+    --table-row-expanded-padding-x: 12px; /* tables.rows.expanded.paddingXPx */
+    --table-row-expanded-padding-y: 8px; /* tables.rows.expanded.paddingYPx */
 
     /* Preserved verbatim — not sourced from the config. Session 7.6.3
        confirmed (grep) these are consumed only by the unused
@@ -124,6 +134,10 @@
     --status-pending-text: rgb(96 165 250); /* color.semantic.pending.text.dark */
     --status-pending-fill: rgb(59 130 246 / 0.1); /* color.semantic.pending.fill.dark */
     --status-pending-border: rgb(59 130 246 / 0.4); /* color.semantic.pending.border.dark */
+    --table-header-bg: 222.2 84% 4.9%; /* components.table.headerBackground.dark */
+    --table-header-text: 215 20.2% 65.1%; /* components.table.headerText.dark */
+    --table-row-hover-bg: 222.2 84% 4.9%; /* components.table.rowHoverBackground.dark */
+    --table-row-selected-bg: 217.2 32.6% 17.5%; /* components.table.rowSelectedBackground.dark */
 
     --sidebar-primary: 199 89% 48%;
     --sidebar-primary-foreground: 0 0% 100%;

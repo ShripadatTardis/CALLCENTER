@@ -513,13 +513,57 @@ const formFieldComponent = z.object({
 const tableComponent = z.object({
   // Session 7.6.2: all four track real --card/--muted-foreground/
   // --muted CSS custom properties, each genuinely differing by
-  // appearance mode.
+  // appearance mode. Session 7.9 correction: `rowHoverBackground` was
+  // originally extracted from the SHARED `Table` PRIMITIVE's own
+  // default (`hover:bg-muted/50`, src/components/ui/table.tsx) — a
+  // Session 7.9 investigation found that default is not actually what
+  // any real table renders. 4 of 6 audited tables (CallLogs, LiveView,
+  // AgentDetail, UserManagement) independently hand-override it to
+  // `hover:bg-card`, and the primitive's own default is used nowhere.
+  // `rowHoverBackground` now tracks the real, dominant value
+  // (`color.surfaces.raised`, i.e. `--card`) instead of the
+  // never-actually-rendered one — see
+  // docs/SESSION_7_9_TABLE_GEOMETRY_CENTRALIZATION.md §1 for the full
+  // citation table.
   headerBackground: withAppearance(colorValue),
   headerText: withAppearance(colorValue),
   rowHoverBackground: withAppearance(colorValue),
   rowSelectedBackground: withAppearance(colorValue),
   rowLoadingPlaceholderColor: colorValue.optional(),
   sortIndicatorColor: colorValue.optional(),
+});
+
+/**
+ * Session 7.9 — table header/row/cell geometry (dimensional, not
+ * color — `tableComponent` above already owns the color roles). Real
+ * values found by a Session 7.9 investigation (22 tool calls, 1 agent
+ * run): the shared `Table` primitive's own `h-9`/`px-3` header and
+ * `py-1.5`/`px-3` body-cell values are ALREADY the de facto standard,
+ * independently hand-typed to match across CallLogs/LiveView/
+ * AgentDetail/AIAgents (each with its own code comment citing this
+ * exact convention) — this is extraction of an existing convention,
+ * not an invented one. `expanded` is populated from UserManagement.tsx's
+ * genuinely looser `py-2` row padding (its rows carry two lines of
+ * real content — a status line and a conditional "Invited — pending
+ * sign-in" line) — a real, justified density difference, not drift.
+ * `compact` is left unset: no table in scope uses a density denser
+ * than `standard` today; inventing one would be fabrication.
+ */
+const tableRowDensity = z.object({
+  paddingXPx: pxValue,
+  paddingYPx: pxValue,
+});
+
+const tables = z.object({
+  header: z.object({
+    heightPx: pxValue, // h-9 — src/components/ui/table.tsx's TableHead
+    paddingXPx: pxValue, // px-3
+  }),
+  rows: z.object({
+    standard: tableRowDensity, // py-1.5/px-3 — the shared TableCell default, matched everywhere except UserManagement
+    expanded: tableRowDensity.optional(), // py-2/px-3 — UserManagement.tsx's real, content-justified looser density
+    compact: tableRowDensity.optional(), // no real compact table found in scope — honestly left unset
+  }),
 });
 
 const badgeComponent = z.object({
@@ -581,6 +625,7 @@ export const voiceForceThemeConfigSchema = z.object({
   icons,
   shadow,
   panels,
+  tables,
   navigation,
   charts,
   breakpoints,

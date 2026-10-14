@@ -216,6 +216,16 @@ reproduced('panels.dense.paddingPx.x (CallLogs/QAReview table wrappers have no p
 assertTrue('panels.standard.shadow references the real shadow.variants.subtle (shadow-sm) key', voiceforceBaselineConfig.panels.standard.shadow === 'subtle' && voiceforceBaselineConfig.shadow.variants.subtle === '0 1px 2px 0 rgb(0 0 0 / 0.05)');
 reproduced('charts.seriesPalette[0] (Bar fill, VoiceAnalyticsTab/ChatAnalyticsTab)', voiceforceBaselineConfig.charts.seriesPalette[0], '#3B82F6');
 
+// --- 9. Session 7.9 — table header/row geometry (Tasks 3/4) and the
+// rowHoverBackground correction (real hover:bg-card, not the unused
+// primitive default). ---
+reproduced('tables.header.heightPx (h-9, the shared TableHead default, independently matched across 4 real tables)', voiceforceBaselineConfig.tables.header.heightPx, 36);
+reproduced('tables.header.paddingXPx (px-3)', voiceforceBaselineConfig.tables.header.paddingXPx, 12);
+reproduced('tables.rows.standard.paddingYPx (py-1.5, the shared TableCell default)', voiceforceBaselineConfig.tables.rows.standard.paddingYPx, 6);
+reproduced('tables.rows.expanded.paddingYPx (py-2, UserManagement.tsx\'s real, content-justified looser density)', voiceforceBaselineConfig.tables.rows.expanded.paddingYPx, 8);
+assertTrue('tables.rows.compact is honestly left unset — no table in scope uses a density denser than standard', voiceforceBaselineConfig.tables.rows.compact === undefined);
+assertTrue('components.table.rowHoverBackground now matches color.surfaces.raised (--card) — the real, dominant hover value, not the unused primitive default (--muted/50)', voiceforceBaselineConfig.components.table.rowHoverBackground.light === voiceforceBaselineConfig.color.surfaces.raised.light.background && voiceforceBaselineConfig.components.table.rowHoverBackground.dark === voiceforceBaselineConfig.color.surfaces.raised.dark.background);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log(fail === 0
   ? '\nResult: the VoiceForce baseline configuration is a complete, schema-valid VoiceForceThemeConfig, and every checked value reproduces its real CSS/component source exactly in BOTH light and dark appearance modes. All 7 Session 7.6 gaps and the Session 7.6.2 light/dark gap are resolved.'

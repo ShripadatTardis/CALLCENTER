@@ -55,10 +55,17 @@ const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, ...props }, ref) => (
+  // Session 7.9 — hover/selected now source from the centralized
+  // --table-row-hover-bg/--table-row-selected-bg CSS vars. The hover
+  // value is CORRECTED, not just relocated: the prior `hover:bg-muted/50`
+  // was this primitive's own default, never actually matched by any
+  // real table (every real table hand-overrides it to `hover:bg-card`)
+  // — see components.table.rowHoverBackground's schema comment for the
+  // full citation. This default now reflects the real, dominant value.
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      "border-b transition-colors hover:bg-[var(--table-row-hover-bg)] data-[state=selected]:bg-[var(--table-row-selected-bg)]",
       className
     )}
     {...props}
@@ -84,7 +91,10 @@ const TableHead = React.forwardRef<
       // choice (see src/lib/typography.ts `tableHeader`), applied only
       // where a screen opts in, so this shared default never silently
       // changes the look of every existing table-header consumer.
-      "h-9 px-3 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      // Session 7.9: now sourced from tables.header's CSS vars
+      // (src/theme/schema.ts) instead of literal h-9/px-3 — same real
+      // values, now centrally controlled.
+      "h-[var(--table-header-height)] px-[var(--table-header-padding-x)] text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -96,9 +106,11 @@ const TableCell = React.forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
+  // Session 7.9 — sourced from tables.rows.standard's CSS vars instead
+  // of literal py-1.5/px-3 — same real value, centrally controlled.
   <td
     ref={ref}
-    className={cn("py-1.5 px-3 align-middle [&:has([role=checkbox])]:pr-0", className)}
+    className={cn("py-[var(--table-row-standard-padding-y)] px-[var(--table-row-standard-padding-x)] align-middle [&:has([role=checkbox])]:pr-0", className)}
     {...props}
   />
 ))

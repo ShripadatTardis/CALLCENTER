@@ -686,10 +686,11 @@ const QAReview: React.FC = () => {
           <div className="flex items-center justify-between flex-shrink-0 text-xs text-muted-foreground px-1">
             <span>Page {currentPage} of {totalPages}</span>
             <div className="flex items-center gap-1">
+              {/* Session 7.9 — normalized to the existing `xs` button-size token (already h-7), same as CallLogs/AgentDetail. */}
               <Button
                 variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                size="xs"
+                className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
               >
@@ -698,8 +699,8 @@ const QAReview: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
-                className="h-7 border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                size="xs"
+                className="border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages}
               >

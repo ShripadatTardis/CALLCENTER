@@ -4,6 +4,7 @@ import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAu
 import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulationFetcher.js';
 import { fetchQaTurnsForInteraction } from '../src/server/qa/transcriptFetcher.js';
 import { evaluateInteraction, PROMPT_VERSION } from '../src/server/qa/automatedQaEvaluator.js';
+import { persistAttemptDiagnosticsSafely } from '../src/lib/automatedQaAttemptDiagnostics.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1016,6 +1017,32 @@ async function handleAutomatedQaGet(req: VercelRequest, res: VercelResponse): Pr
   res.status(400).json({ detail: `Unknown action: ${action}` });
 }
 
+/**
+ * Session 16.4.4 — persists this run's per-attempt diagnostics
+ * (automatedQaAttemptDiagnostics.ts) via the new, separate
+ * call_center_automated_qa_attempts_record RPC. Never allowed to affect
+ * the evaluation's own terminal status/response (brief §6) —
+ * persistAttemptDiagnosticsSafely is provably unable to throw, so a
+ * diagnostic-write failure (e.g. the migration hasn't been applied yet)
+ * degrades to a logged no-op, not a 500.
+ */
+async function persistAutomatedQaAttempts(
+  supabase: ReturnType<typeof getServiceRoleClient>,
+  evaluationId: string,
+  attempts: unknown[],
+  now: string,
+): Promise<void> {
+  await persistAttemptDiagnosticsSafely(
+    async (evalId, atts, p_now) => {
+      const { error } = await supabase.rpc('call_center_automated_qa_attempts_record', {
+        p_evaluation_id: evalId, p_attempts: atts, p_now,
+      });
+      return { error };
+    },
+    evaluationId, attempts, now,
+  );
+}
+
 async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await requirePermission(req, res, 'qa.automated.run');
   if (!user) return;
@@ -1117,6 +1144,7 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
       p_token_usage: result.tokenUsage, p_latency_ms: result.latencyMs,
     });
     if (error) { res.status(500).json({ detail: error.message }); return; }
+    await persistAutomatedQaAttempts(supabase, created.id, result.attempts, finishedAt);
     await recordAuditEvent({
       actorType: 'user', actorUserId: user.id, action: 'automated_qa.failed',
       resourceType: 'automated_qa_evaluation', resourceId: created.id, result: 'error',
@@ -1145,6 +1173,7 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
     p_now: finishedAt,
   });
   if (error) { res.status(500).json({ detail: error.message }); return; }
+  await persistAutomatedQaAttempts(supabase, created.id, result.attempts, finishedAt);
 
   await recordAuditEvent({
     actorType: 'user', actorUserId: user.id, action: `automated_qa.${result.status}`,

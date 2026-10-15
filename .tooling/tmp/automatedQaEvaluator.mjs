@@ -1,3 +1,6 @@
+// src/server/qa/automatedQaEvaluator.ts
+import { randomUUID } from "node:crypto";
+
 // api/_voicebot.ts
 function getBackendConfig() {
   const baseUrl = process.env.VOICEBOT_BASE_URL;
@@ -12,7 +15,7 @@ function getBackendConfig() {
 function isRetryableLlmError(errorCode) {
   return errorCode === "rate_limited" || errorCode === "llm_unavailable" || errorCode === "inference_timeout";
 }
-function toCamelResponse(raw) {
+function toCamelResponse(raw, rawResponseText) {
   return {
     success: !!raw?.success,
     requestId: raw?.request_id ?? null,
@@ -25,7 +28,8 @@ function toCamelResponse(raw) {
       completionTokens: raw?.usage?.completion_tokens ?? null
     },
     errorCode: raw?.error_code ?? null,
-    errorMessage: raw?.error_message ?? null
+    errorMessage: raw?.error_message ?? null,
+    rawResponseText
   };
 }
 async function callGenericLlm(req) {
@@ -56,7 +60,8 @@ async function callGenericLlm(req) {
       latencyMs: null,
       usage: { promptTokens: null, completionTokens: null },
       errorCode: "network_error",
-      errorMessage: err instanceof Error ? err.message : String(err)
+      errorMessage: err instanceof Error ? err.message : String(err),
+      rawResponseText: null
     };
   }
   const text = await res.text();
@@ -73,7 +78,8 @@ async function callGenericLlm(req) {
       latencyMs: null,
       usage: { promptTokens: null, completionTokens: null },
       errorCode: "invalid_model_output",
-      errorMessage: `Non-JSON response body (HTTP ${res.status})`
+      errorMessage: `Non-JSON response body (HTTP ${res.status})`,
+      rawResponseText: text
     };
   }
   const raw = parsed;
@@ -88,10 +94,11 @@ async function callGenericLlm(req) {
       latencyMs: null,
       usage: { promptTokens: null, completionTokens: null },
       errorCode: "http_error",
-      errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ""}`
+      errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ""}`,
+      rawResponseText: text
     };
   }
-  return toCamelResponse(parsed);
+  return toCamelResponse(parsed, text);
 }
 
 // src/lib/qaParameters.ts
@@ -463,6 +470,26 @@ function detectPlaceholderUnassessability(unassessableParameters) {
   return unassessableParameters.filter((u) => isPlaceholderUnassessabilityReason(u.reason)).map((u) => u.parameterCode);
 }
 
+// src/lib/automatedQaAttemptDiagnostics.ts
+var RAW_RESPONSE_MAX_CHARS = 6e4;
+function boundRawResponse(text) {
+  if (text == null) return null;
+  if (text.length <= RAW_RESPONSE_MAX_CHARS) return text;
+  const omitted = text.length - RAW_RESPONSE_MAX_CHARS;
+  return `${text.slice(0, RAW_RESPONSE_MAX_CHARS)}
+...[truncated, ${omitted} more characters omitted]`;
+}
+function countRawParameterOccurrences(rawEntries, targetCodes) {
+  const counts = {};
+  for (const code of targetCodes) counts[code] = 0;
+  if (!Array.isArray(rawEntries)) return counts;
+  for (const entry of rawEntries) {
+    const code = entry?.parameter_code;
+    if (typeof code === "string" && code in counts) counts[code] += 1;
+  }
+  return counts;
+}
+
 // src/server/qa/automatedQaEvaluator.ts
 var CONTEXT_WINDOW_TOKENS = 8192;
 var MAX_OUTPUT_TOKENS = 3072;
@@ -493,7 +520,8 @@ async function evaluateInteraction(turns) {
       latencyMs: 0,
       observations: [],
       errorCode: "no_reviewable_turns",
-      errorMessage: "The transcript had no turns to evaluate."
+      errorMessage: "The transcript had no turns to evaluate.",
+      attempts: []
     };
   }
   const allValidTurnIds = new Set(turns.map((t) => t.turnId));
@@ -502,6 +530,7 @@ async function evaluateInteraction(turns) {
   const requestIds = [];
   const evaluatedTurnIds = [];
   const uncoveredTurnIds = [];
+  const attempts = [];
   let modelId = null;
   let promptTokens = 0;
   let completionTokens = 0;
@@ -513,7 +542,7 @@ async function evaluateInteraction(turns) {
     const aliasToReal = new Map(window.turns.map((t, i) => [`T${i + 1}`, t.turnId]));
     const aliasedTurns = window.turns.map((t, i) => ({ ...t, turnId: `T${i + 1}` }));
     const windowTurnIds = new Set(aliasToReal.keys());
-    const requestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
+    const baseRequestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
     const baseUserPrompt = buildUserPrompt(aliasedTurns, window.index, windows.length);
     let userPrompt = baseUserPrompt;
     let attempt = 0;
@@ -521,7 +550,15 @@ async function evaluateInteraction(turns) {
     let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
     let contradictionRetried = false;
     let placeholderReasonRetried = false;
+    let previousAttemptId = null;
+    let retryReason = null;
+    let correctionInstructionId = null;
     while (attempt <= MAX_RETRIES_PER_WINDOW) {
+      const attemptNumber = attempt + 1;
+      const attemptId = randomUUID();
+      const requestId = `${baseRequestId}-a${attemptNumber}`;
+      const requestedMaxOutputTokens = windowMaxOutputTokens;
+      const startedAt = (/* @__PURE__ */ new Date()).toISOString();
       const res = await callGenericLlm({
         requestId,
         systemPrompt,
@@ -530,22 +567,60 @@ async function evaluateInteraction(turns) {
         temperature: 0,
         maxOutputTokens: windowMaxOutputTokens
       });
+      const completedAt = (/* @__PURE__ */ new Date()).toISOString();
       requestIds.push(requestId);
       if (res.latencyMs) latencyMs += res.latencyMs;
       if (res.usage.promptTokens) promptTokens += res.usage.promptTokens;
       if (res.usage.completionTokens) completionTokens += res.usage.completionTokens;
       if (res.modelId) modelId = res.modelId;
+      const recordAttempt = (outcome2, errorCode, errorMessage, validationDetail) => {
+        attempts.push({
+          attemptId,
+          windowIndex: window.index,
+          attemptNumber,
+          requestId,
+          modelId: res.modelId || null,
+          outcome: outcome2,
+          errorCode,
+          errorMessage,
+          rawResponseText: boundRawResponse(res.rawResponseText),
+          validationDetail,
+          retryReason,
+          correctionInstructionId,
+          previousAttemptId,
+          requestedMaxOutputTokens,
+          promptTokens: res.usage.promptTokens,
+          completionTokens: res.usage.completionTokens,
+          latencyMs: res.latencyMs,
+          startedAt,
+          completedAt
+        });
+        previousAttemptId = attemptId;
+      };
       if (res.success && res.output && typeof res.output === "object") {
         const out = res.output;
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);
         const windowUnassessable = validateUnassessableParameters(out.unassessable_parameters);
+        const rejectedObservations = validation.rejected.map((r) => ({ reason: r.reason }));
         const conflicts = detectCrossArrayContradiction(validation.accepted, windowUnassessable);
         if (conflicts.length > 0) {
           lastErrorCode = "contradictory_applicability";
           lastErrorMessage = `The model classified the same parameter(s) as both assessed and unassessable in one response: ${conflicts.join(", ")}.`;
+          recordAttempt("contradictory_applicability", lastErrorCode, lastErrorMessage, {
+            rejectedObservations,
+            contradiction: {
+              parameterCodes: conflicts,
+              observationOccurrences: countRawParameterOccurrences(out.observations, conflicts),
+              unassessableOccurrences: countRawParameterOccurrences(out.unassessable_parameters, conflicts),
+              detectedAt: "cross_array_contradiction"
+            },
+            placeholder: null
+          });
           if (!contradictionRetried && attempt < MAX_RETRIES_PER_WINDOW) {
             contradictionRetried = true;
             userPrompt = baseUserPrompt + buildConsistencyRetryInstruction(conflicts);
+            retryReason = lastErrorCode;
+            correctionInstructionId = "consistency_retry_v1";
             attempt += 1;
             continue;
           }
@@ -555,14 +630,22 @@ async function evaluateInteraction(turns) {
         if (placeholders.length > 0) {
           lastErrorCode = "uninformative_unassessability";
           lastErrorMessage = `The model marked parameter(s) unassessable with a placeholder (non-specific) reason instead of a real explanation: ${placeholders.join(", ")}.`;
+          recordAttempt("uninformative_unassessability", lastErrorCode, lastErrorMessage, {
+            rejectedObservations,
+            contradiction: null,
+            placeholder: { parameterCodes: placeholders, detectedAt: "placeholder_unassessability" }
+          });
           if (!placeholderReasonRetried && attempt < MAX_RETRIES_PER_WINDOW) {
             placeholderReasonRetried = true;
             userPrompt = baseUserPrompt + buildPlaceholderReasonRetryInstruction(placeholders);
+            retryReason = lastErrorCode;
+            correctionInstructionId = "placeholder_retry_v1";
             attempt += 1;
             continue;
           }
           break;
         }
+        recordAttempt("success", null, null, { rejectedObservations, contradiction: null, placeholder: null });
         observations.push(...validation.accepted.map((o) => ({
           ...o,
           primaryTurnId: aliasToReal.get(o.primaryTurnId) ?? o.primaryTurnId,
@@ -575,13 +658,19 @@ async function evaluateInteraction(turns) {
       }
       lastErrorCode = res.errorCode;
       lastErrorMessage = res.errorMessage;
+      const outcome = res.errorCode === "network_error" || res.errorCode === "http_error" ? "transport_failure" : res.errorCode === "invalid_model_output" ? "parse_failure" : "llm_error";
+      recordAttempt(outcome, res.errorCode, res.errorMessage, null);
       if (attempt === MAX_RETRIES_PER_WINDOW) break;
       if (res.errorCode === "output_truncated" && windowMaxOutputTokens < MAX_OUTPUT_TOKENS_CAP) {
         windowMaxOutputTokens = Math.min(windowMaxOutputTokens * 2, MAX_OUTPUT_TOKENS_CAP);
+        retryReason = res.errorCode;
+        correctionInstructionId = "output_truncated_budget_escalation";
         attempt += 1;
         continue;
       }
       if (!isRetryableLlmError(res.errorCode)) break;
+      retryReason = res.errorCode;
+      correctionInstructionId = "transient_backoff_retry";
       await sleep(RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)]);
       attempt += 1;
     }
@@ -614,7 +703,8 @@ async function evaluateInteraction(turns) {
     latencyMs,
     observations,
     errorCode: status === "failed" ? lastErrorCode : null,
-    errorMessage: status === "failed" ? lastErrorMessage : null
+    errorMessage: status === "failed" ? lastErrorMessage : null,
+    attempts
   };
 }
 export {

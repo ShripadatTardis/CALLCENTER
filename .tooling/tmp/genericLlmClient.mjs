@@ -25,7 +25,7 @@ var LLM_ERROR_CODES = [
 function isRetryableLlmError(errorCode) {
   return errorCode === "rate_limited" || errorCode === "llm_unavailable" || errorCode === "inference_timeout";
 }
-function toCamelResponse(raw) {
+function toCamelResponse(raw, rawResponseText) {
   return {
     success: !!raw?.success,
     requestId: raw?.request_id ?? null,
@@ -38,7 +38,8 @@ function toCamelResponse(raw) {
       completionTokens: raw?.usage?.completion_tokens ?? null
     },
     errorCode: raw?.error_code ?? null,
-    errorMessage: raw?.error_message ?? null
+    errorMessage: raw?.error_message ?? null,
+    rawResponseText
   };
 }
 async function callGenericLlm(req) {
@@ -69,7 +70,8 @@ async function callGenericLlm(req) {
       latencyMs: null,
       usage: { promptTokens: null, completionTokens: null },
       errorCode: "network_error",
-      errorMessage: err instanceof Error ? err.message : String(err)
+      errorMessage: err instanceof Error ? err.message : String(err),
+      rawResponseText: null
     };
   }
   const text = await res.text();
@@ -86,7 +88,8 @@ async function callGenericLlm(req) {
       latencyMs: null,
       usage: { promptTokens: null, completionTokens: null },
       errorCode: "invalid_model_output",
-      errorMessage: `Non-JSON response body (HTTP ${res.status})`
+      errorMessage: `Non-JSON response body (HTTP ${res.status})`,
+      rawResponseText: text
     };
   }
   const raw = parsed;
@@ -101,10 +104,11 @@ async function callGenericLlm(req) {
       latencyMs: null,
       usage: { promptTokens: null, completionTokens: null },
       errorCode: "http_error",
-      errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ""}`
+      errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ""}`,
+      rawResponseText: text
     };
   }
-  return toCamelResponse(parsed);
+  return toCamelResponse(parsed, text);
 }
 export {
   LLM_ERROR_CODES,

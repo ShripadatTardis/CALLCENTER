@@ -38,6 +38,14 @@ export interface LlmResponse {
   usage: { promptTokens: number | null; completionTokens: number | null };
   errorCode: string | null;
   errorMessage: string | null;
+  /**
+   * Session 16.4.4 — the exact response body text, captured before JSON
+   * parsing, for attempt-level diagnostics (automatedQaAttemptDiagnostics.ts).
+   * Null only when no body was ever received (a transport-level failure,
+   * e.g. `network_error`) — every other outcome, including malformed/
+   * non-JSON bodies, carries the real text verbatim, never normalized.
+   */
+  rawResponseText: string | null;
 }
 
 /** The documented error_code vocabulary (brief §13 / API spec's ERROR RESPONSES table) — exhaustive, used to classify retryable vs. permanent failures. */
@@ -53,7 +61,7 @@ export function isRetryableLlmError(errorCode: string | null): boolean {
   return errorCode === 'rate_limited' || errorCode === 'llm_unavailable' || errorCode === 'inference_timeout';
 }
 
-function toCamelResponse(raw: any): LlmResponse {
+function toCamelResponse(raw: any, rawResponseText: string): LlmResponse {
   return {
     success: !!raw?.success,
     requestId: raw?.request_id ?? null,
@@ -67,6 +75,7 @@ function toCamelResponse(raw: any): LlmResponse {
     },
     errorCode: raw?.error_code ?? null,
     errorMessage: raw?.error_message ?? null,
+    rawResponseText,
   };
 }
 
@@ -101,6 +110,7 @@ export async function callGenericLlm(req: LlmJsonSchemaRequest): Promise<LlmResp
       success: false, requestId: req.requestId, output: null, modelId: req.modelId ?? '',
       finishReason: 'error', latencyMs: null, usage: { promptTokens: null, completionTokens: null },
       errorCode: 'network_error', errorMessage: err instanceof Error ? err.message : String(err),
+      rawResponseText: null,
     };
   }
 
@@ -113,6 +123,7 @@ export async function callGenericLlm(req: LlmJsonSchemaRequest): Promise<LlmResp
       success: false, requestId: req.requestId, output: null, modelId: req.modelId ?? '',
       finishReason: 'error', latencyMs: null, usage: { promptTokens: null, completionTokens: null },
       errorCode: 'invalid_model_output', errorMessage: `Non-JSON response body (HTTP ${res.status})`,
+      rawResponseText: text,
     };
   }
 
@@ -129,8 +140,9 @@ export async function callGenericLlm(req: LlmJsonSchemaRequest): Promise<LlmResp
       success: false, requestId: req.requestId, output: null, modelId: req.modelId ?? '',
       finishReason: 'error', latencyMs: null, usage: { promptTokens: null, completionTokens: null },
       errorCode: 'http_error', errorMessage: `HTTP ${res.status}${detail ? `: ${detail}` : ''}`,
+      rawResponseText: text,
     };
   }
 
-  return toCamelResponse(parsed);
+  return toCamelResponse(parsed, text);
 }

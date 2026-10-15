@@ -329,6 +329,18 @@ const AutomatedQaInspector: React.FC = () => {
               now the shared `QualityMeasurementsGrid`/`FindingsList`
               components (see their own header comments). */}
           <div className="min-w-0 space-y-3">
+            {evaluation.status === 'failed' && observations.length === 0 && (
+              // Session 16.4.4 (brief §7) — the failed banner above this
+              // grid explains the error code/message, but this region
+              // itself used to render nothing at all once both gates
+              // below correctly hid their content, matching the blank-
+              // panel gap docs/AUTOMATED_QA_FAILED_EVALUATION_INVESTIGATION.md
+              // §4 documented. An explicit, in-region explanation now
+              // fills that space instead.
+              <div className="rounded-md border border-border bg-card p-3">
+                <p className={typography.bodyMuted}>Evaluation failed before producing quality measurements or findings.</p>
+              </div>
+            )}
             {evaluation.status !== 'failed' && (
               <QualityMeasurementsGrid
                 ratios={ratios}

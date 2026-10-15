@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { callGenericLlm, isRetryableLlmError } from './genericLlmClient.js';
 import { buildSystemPrompt, buildUserPrompt, buildConsistencyRetryInstruction, buildPlaceholderReasonRetryInstruction, PROMPT_VERSION } from '../../lib/automatedQaPrompt.js';
 import { buildAutomatedQaJsonSchema } from '../../lib/automatedQaSchema.js';
 import { planQaTurnWindows, estimateTokens } from '../../lib/automatedQaWindowPlanner.js';
 import { validateAutomatedObservations, validateUnassessableParameters, detectCrossArrayContradiction, detectPlaceholderUnassessability, type AutomatedQaObservationInput, type UnassessableParameter } from '../../lib/automatedQaValidation.js';
+import { boundRawResponse, countRawParameterOccurrences, type QaAttemptDiagnostic, type QaAttemptOutcome, type QaAttemptValidationDetail } from '../../lib/automatedQaAttemptDiagnostics.js';
 import type { QaTurn } from '../../lib/qaConversation.js';
 
 /**
@@ -49,6 +51,8 @@ export interface EvaluateInteractionResult {
   observations: AutomatedQaObservationInput[];
   errorCode: string | null;
   errorMessage: string | null;
+  /** Session 16.4.4 — one diagnostic record per LLM call attempt (initial + every retry), across every window. Never fed back into scoring/applicability — diagnosis only. */
+  attempts: QaAttemptDiagnostic[];
 }
 
 function sleep(ms: number): Promise<void> {
@@ -68,6 +72,7 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
       unassessableParameters: [], evaluationCompleteness: 'PARTIAL', windowCount: 0,
       tokenUsage: { promptTokens: 0, completionTokens: 0 }, latencyMs: 0, observations: [],
       errorCode: 'no_reviewable_turns', errorMessage: 'The transcript had no turns to evaluate.',
+      attempts: [],
     };
   }
 
@@ -77,6 +82,7 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
   const requestIds: string[] = [];
   const evaluatedTurnIds: string[] = [];
   const uncoveredTurnIds: string[] = [];
+  const attempts: QaAttemptDiagnostic[] = [];
   let modelId: string | null = null;
   let promptTokens = 0;
   let completionTokens = 0;
@@ -103,7 +109,14 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
     const aliasToReal = new Map(window.turns.map((t, i) => [`T${i + 1}`, t.turnId]));
     const aliasedTurns = window.turns.map((t, i) => ({ ...t, turnId: `T${i + 1}` }));
     const windowTurnIds = new Set(aliasToReal.keys());
-    const requestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
+    // Session 16.4.4 — the base id now only seeds per-attempt ids; every
+    // attempt gets its OWN distinct request_id (suffixed with its 1-based
+    // attempt number), fixing a real diagnosability defect found in
+    // docs/AUTOMATED_QA_FAILED_EVALUATION_INVESTIGATION.md §2.2: a
+    // retried window used to log the identical request_id twice, making
+    // it impossible to tell from `request_ids` alone that a retry had
+    // even happened.
+    const baseRequestId = `qa-${Math.random().toString(36).slice(2)}-${window.index}`;
     const baseUserPrompt = buildUserPrompt(aliasedTurns, window.index, windows.length);
     let userPrompt = baseUserPrompt;
 
@@ -112,21 +125,43 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
     let windowMaxOutputTokens = MAX_OUTPUT_TOKENS;
     let contradictionRetried = false;
     let placeholderReasonRetried = false;
+    let previousAttemptId: string | null = null;
+    let retryReason: string | null = null;
+    let correctionInstructionId: string | null = null;
     while (attempt <= MAX_RETRIES_PER_WINDOW) {
+      const attemptNumber = attempt + 1;
+      const attemptId = randomUUID();
+      const requestId = `${baseRequestId}-a${attemptNumber}`;
+      const requestedMaxOutputTokens = windowMaxOutputTokens;
+      const startedAt = new Date().toISOString();
       const res = await callGenericLlm({
         requestId, systemPrompt, userPrompt, jsonSchema: schema,
         temperature: 0, maxOutputTokens: windowMaxOutputTokens,
       });
+      const completedAt = new Date().toISOString();
       requestIds.push(requestId);
       if (res.latencyMs) latencyMs += res.latencyMs;
       if (res.usage.promptTokens) promptTokens += res.usage.promptTokens;
       if (res.usage.completionTokens) completionTokens += res.usage.completionTokens;
       if (res.modelId) modelId = res.modelId;
 
+      const recordAttempt = (outcome: QaAttemptOutcome, errorCode: string | null, errorMessage: string | null, validationDetail: QaAttemptValidationDetail | null) => {
+        attempts.push({
+          attemptId, windowIndex: window.index, attemptNumber, requestId,
+          modelId: res.modelId || null, outcome, errorCode, errorMessage,
+          rawResponseText: boundRawResponse(res.rawResponseText),
+          validationDetail, retryReason, correctionInstructionId, previousAttemptId,
+          requestedMaxOutputTokens, promptTokens: res.usage.promptTokens, completionTokens: res.usage.completionTokens,
+          latencyMs: res.latencyMs, startedAt, completedAt,
+        });
+        previousAttemptId = attemptId;
+      };
+
       if (res.success && res.output && typeof res.output === 'object') {
         const out = res.output as { observations?: unknown; unassessable_parameters?: unknown };
         const validation = validateAutomatedObservations(out.observations, windowTurnIds);
         const windowUnassessable = validateUnassessableParameters(out.unassessable_parameters);
+        const rejectedObservations = validation.rejected.map((r) => ({ reason: r.reason }));
 
         // Session 16.3.5 — a parameter must never appear in BOTH
         // collections (the model classifying something as "not
@@ -140,6 +175,16 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
         if (conflicts.length > 0) {
           lastErrorCode = 'contradictory_applicability';
           lastErrorMessage = `The model classified the same parameter(s) as both assessed and unassessable in one response: ${conflicts.join(', ')}.`;
+          recordAttempt('contradictory_applicability', lastErrorCode, lastErrorMessage, {
+            rejectedObservations,
+            contradiction: {
+              parameterCodes: conflicts,
+              observationOccurrences: countRawParameterOccurrences(out.observations, conflicts),
+              unassessableOccurrences: countRawParameterOccurrences(out.unassessable_parameters, conflicts),
+              detectedAt: 'cross_array_contradiction',
+            },
+            placeholder: null,
+          });
           if (!contradictionRetried && attempt < MAX_RETRIES_PER_WINDOW) {
             // Session 16.3.8 (A2) — names the exact conflicting
             // parameter(s) and instructs the model to leave every other
@@ -149,6 +194,8 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
             // over-correction into an all-unassessable response.
             contradictionRetried = true;
             userPrompt = baseUserPrompt + buildConsistencyRetryInstruction(conflicts);
+            retryReason = lastErrorCode;
+            correctionInstructionId = 'consistency_retry_v1';
             attempt += 1;
             continue;
           }
@@ -168,14 +215,23 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
         if (placeholders.length > 0) {
           lastErrorCode = 'uninformative_unassessability';
           lastErrorMessage = `The model marked parameter(s) unassessable with a placeholder (non-specific) reason instead of a real explanation: ${placeholders.join(', ')}.`;
+          recordAttempt('uninformative_unassessability', lastErrorCode, lastErrorMessage, {
+            rejectedObservations,
+            contradiction: null,
+            placeholder: { parameterCodes: placeholders, detectedAt: 'placeholder_unassessability' },
+          });
           if (!placeholderReasonRetried && attempt < MAX_RETRIES_PER_WINDOW) {
             placeholderReasonRetried = true;
             userPrompt = baseUserPrompt + buildPlaceholderReasonRetryInstruction(placeholders);
+            retryReason = lastErrorCode;
+            correctionInstructionId = 'placeholder_retry_v1';
             attempt += 1;
             continue;
           }
           break;
         }
+
+        recordAttempt('success', null, null, { rejectedObservations, contradiction: null, placeholder: null });
 
         observations.push(...validation.accepted.map((o) => ({
           ...o,
@@ -190,6 +246,12 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
 
       lastErrorCode = res.errorCode;
       lastErrorMessage = res.errorMessage;
+      const outcome: QaAttemptOutcome =
+        res.errorCode === 'network_error' || res.errorCode === 'http_error' ? 'transport_failure'
+        : res.errorCode === 'invalid_model_output' ? 'parse_failure'
+        : 'llm_error';
+      recordAttempt(outcome, res.errorCode, res.errorMessage, null);
+
       if (attempt === MAX_RETRIES_PER_WINDOW) break;
 
       // output_truncated is deterministic, not transient — the API's own
@@ -198,11 +260,15 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
       // isn't rate limiting), capped at MAX_OUTPUT_TOKENS_CAP.
       if (res.errorCode === 'output_truncated' && windowMaxOutputTokens < MAX_OUTPUT_TOKENS_CAP) {
         windowMaxOutputTokens = Math.min(windowMaxOutputTokens * 2, MAX_OUTPUT_TOKENS_CAP);
+        retryReason = res.errorCode;
+        correctionInstructionId = 'output_truncated_budget_escalation';
         attempt += 1;
         continue;
       }
 
       if (!isRetryableLlmError(res.errorCode)) break;
+      retryReason = res.errorCode;
+      correctionInstructionId = 'transient_backoff_retry';
       await sleep(RETRY_BACKOFF_MS[Math.min(attempt, RETRY_BACKOFF_MS.length - 1)]);
       attempt += 1;
     }
@@ -245,6 +311,7 @@ export async function evaluateInteraction(turns: QaTurn[]): Promise<EvaluateInte
     observations,
     errorCode: status === 'failed' ? lastErrorCode : null,
     errorMessage: status === 'failed' ? lastErrorMessage : null,
+    attempts,
   };
 }
 

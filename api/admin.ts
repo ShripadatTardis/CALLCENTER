@@ -55,6 +55,10 @@ const AUTOMATED_QA_SCHEMA_VERSION = 'v1';
  *   POST /api/admin?resource=qa&action=setConclusions   body {reviewId, requestCompletion, fcr, humanAssistanceRequired, businessOutcome, reviewerNote}
  *   POST /api/admin?resource=qa&action=submit           body {reviewId}
  *   GET  /api/admin?resource=qa&action=findings        (Agent-Scope-filtered, submitted reviews only — feeds src/lib/qaRatios.ts)
+ *
+ * Session 16.5 adds Corrective Action Management — see the doc comment
+ * directly above handleCorrectiveActionsGet/Post below for the full
+ * resource=correctiveActions action list.
  */
 
 function queryStr(req: VercelRequest, key: string): string | undefined {
@@ -1188,6 +1192,378 @@ async function handleAutomatedQaPost(req: VercelRequest, res: VercelResponse): P
   res.status(200).json({ data: toCamelAutomatedQa(data) });
 }
 
+/**
+ * Session 16.5 — Corrective Action Management (CAM). Same 12-function-
+ * ceiling reason every other resource lives here instead of its own
+ * route file. The CA domain is deliberately source-independent — this
+ * handler has ZERO QA-specific knowledge (no evaluationId/reviewId
+ * parsing, no parameter-code validation); a QA-originated CA arrives
+ * here as an already-normalized `{title, description, sourceType,
+ * sourceReferenceId, sourceContext, ...}` payload built by the QA
+ * adapter in src/services/correctiveActions, exactly like a manually
+ * created CA. Ownership gate mirrors Session 15's action_items exactly
+ * (`corrective_actions.assign` = manage-any, re-validated inside every
+ * RPC, never trusted blindly from this route).
+ *
+ *   GET  /api/admin?resource=correctiveActions[&status=&priority=&category=&sourceType=&assignedTo=&agentId=&groupId=&search=&limit=&offset=]
+ *   GET  /api/admin?resource=correctiveActions&action=get&id=...
+ *   GET  /api/admin?resource=correctiveActions&action=candidates&excludeId=&agentId=&category=&parameterCode=
+ *   GET  /api/admin?resource=correctiveActions&action=eligiblePeople&id=...
+ *   GET  /api/admin?resource=correctiveActions&action=activity&id=...        (CA activity history)
+ *   GET  /api/admin?resource=correctiveActions&action=groupActivity&groupId=... (group activity history)
+ *   GET  /api/admin?resource=correctiveActions&action=group&id=...
+ *   GET  /api/admin?resource=correctiveActions&action=groups[&status=]
+ *   GET  /api/admin?resource=correctiveActions&action=groupMembers&groupId=...
+ *   POST /api/admin?resource=correctiveActions&action=create          body {title, description, category, priority?, agentId?, sourceType?, sourceReferenceId?, sourceContext?, dueAt?, assignedTo?, idempotencyKey?}
+ *   POST /api/admin?resource=correctiveActions&action=update          body {id, title?, description?, category?, priority?, dueAt?}
+ *   POST /api/admin?resource=correctiveActions&action=assign          body {id, assigneeUserId}
+ *   POST /api/admin?resource=correctiveActions&action=assignVerifier  body {id, verifierUserId}
+ *   POST /api/admin?resource=correctiveActions&action=takeOwnership   body {id}
+ *   POST /api/admin?resource=correctiveActions&action=setStatus       body {id, status, reason?}
+ *   POST /api/admin?resource=correctiveActions&action=recordCorrection body {id, resolutionSummary}
+ *   POST /api/admin?resource=correctiveActions&action=verify          body {id, result, testDescription?, evidenceRef?, notes?}
+ *   POST /api/admin?resource=correctiveActions&action=bulkVerify      body {ids[], result, testDescription?, evidenceRef?, notes?, groupId?}
+ *   POST /api/admin?resource=correctiveActions&action=groupCreate     body {title, description?}
+ *   POST /api/admin?resource=correctiveActions&action=groupUpdate     body {id, title?, description?, rootCause?, proposedCorrection?, implementedCorrection?, assignedInvestigator?, assignedFixer?, assignedVerifier?, status?}
+ *   POST /api/admin?resource=correctiveActions&action=groupLink       body {groupId, caIds[]}
+ *   POST /api/admin?resource=correctiveActions&action=groupUnlink     body {groupId, caId}
+ */
+export function toCorrectiveActionScopeArgs(access: ReturnType<typeof toAgentAccess>): { allAgents: boolean; authorizedAgentIds: string[] } {
+  const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+  return { allAgents, authorizedAgentIds: allAgents ? [] : (access.authorizedAgentIds as string[]) };
+}
+
+/**
+ * Maps the RPCs' `raise exception '<code>'` messages to the right HTTP
+ * status, same convention as mapActionItemError/mapQaError above.
+ */
+export function mapCorrectiveActionError(message: string): number {
+  if (/corrective_action_not_found|corrective_action_group_not_found|not_a_member_of_group/.test(message)) return 404;
+  if (/assignment_not_permitted|ownership_required/.test(message)) return 403;
+  if (
+    /assignee_inactive_or_not_found|assignee_out_of_scope|agent_out_of_scope|invalid_status_transition|invalid_role|invalid_verification_result|title_and_description_required|title_required|cancellation_reason_required|administrative_closure_reason_required|resolution_summary_required|not_eligible_for_verification|cross_tenant_link_rejected|already_in_another_group/.test(message)
+  ) return 422;
+  return 500;
+}
+
+async function handleCorrectiveActionsGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = queryStr(req, 'action');
+  const user = await requirePermission(req, res, 'corrective_actions.view');
+  if (!user) return;
+  const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+  const supabase = getServiceRoleClient();
+
+  if (action === 'get') {
+    const id = queryStr(req, 'id');
+    if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_get', {
+      p_id: id, p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    if (!data) { res.status(404).json({ detail: 'Corrective action not found' }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'candidates') {
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_candidates', {
+      p_exclude_id: queryStr(req, 'excludeId') ?? null,
+      p_agent_id: queryStr(req, 'agentId') ?? null,
+      p_category: queryStr(req, 'category') ?? null,
+      p_parameter_code: queryStr(req, 'parameterCode') ?? null,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+      p_limit: 20,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'eligiblePeople') {
+    const id = queryStr(req, 'id');
+    if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_eligible_people', { p_id: id });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'activity') {
+    const id = queryStr(req, 'id');
+    if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_activity', { p_corrective_action_id: id, p_group_id: null });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groupActivity') {
+    const groupId = queryStr(req, 'groupId');
+    if (!groupId) { res.status(422).json({ detail: 'groupId is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_activity', { p_corrective_action_id: null, p_group_id: groupId });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'group') {
+    const id = queryStr(req, 'id');
+    if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_get', { p_id: id });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    if (!data) { res.status(404).json({ detail: 'Corrective action group not found' }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groups') {
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_list', {
+      p_status: queryStr(req, 'status') ?? null, p_limit: 100, p_offset: 0,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groupMembers') {
+    const groupId = queryStr(req, 'groupId');
+    if (!groupId) { res.status(422).json({ detail: 'groupId is required' }); return; }
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_members', {
+      p_group_id: groupId, p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  // Default: scoped, filtered list.
+  const { data, error } = await supabase.rpc('call_center_corrective_actions_list', {
+    p_status: queryStr(req, 'status') ?? null,
+    p_priority: queryStr(req, 'priority') ?? null,
+    p_category: queryStr(req, 'category') ?? null,
+    p_source_type: queryStr(req, 'sourceType') ?? null,
+    p_assigned_to: queryStr(req, 'assignedTo') ?? null,
+    p_agent_id: queryStr(req, 'agentId') ?? null,
+    p_group_id: queryStr(req, 'groupId') ?? null,
+    p_search: queryStr(req, 'search') ?? null,
+    p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    p_limit: 200, p_offset: 0,
+  });
+  if (error) { res.status(500).json({ detail: error.message }); return; }
+  res.status(200).json({ data });
+}
+
+async function handleCorrectiveActionsPost(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = queryStr(req, 'action');
+
+  if (action === 'create') {
+    const user = await requirePermission(req, res, 'corrective_actions.create');
+    if (!user) return;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_create', {
+      p_input: {
+        title: body.title, description: body.description, category: body.category, priority: body.priority,
+        agentId: body.agentId, sourceType: body.sourceType, sourceReferenceId: body.sourceReferenceId,
+        sourceContext: body.sourceContext, dueAt: body.dueAt, assignedTo: body.assignedTo,
+      },
+      p_actor_user_id: user.id,
+      p_idempotency_key: typeof body.idempotencyKey === 'string' && body.idempotencyKey ? body.idempotencyKey : null,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groupCreate') {
+    const user = await requirePermission(req, res, 'corrective_actions.link');
+    if (!user) return;
+    const { title, description } = (req.body ?? {}) as { title?: string; description?: string };
+    if (typeof title !== 'string') { res.status(422).json({ detail: 'title is required' }); return; }
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_create', {
+      p_title: title, p_description: description ?? null, p_actor_user_id: user.id,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groupUpdate') {
+    const user = await requirePermission(req, res, 'corrective_actions.link');
+    if (!user) return;
+    const body = (req.body ?? {}) as Record<string, unknown> & { id?: string };
+    if (typeof body.id !== 'string') { res.status(422).json({ detail: 'id is required' }); return; }
+    const supabase = getServiceRoleClient();
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { id, ...patch } = body;
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_update', {
+      p_id: id, p_patch: patch, p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groupLink') {
+    const user = await requirePermission(req, res, 'corrective_actions.link');
+    if (!user) return;
+    const { groupId, caIds } = (req.body ?? {}) as { groupId?: string; caIds?: string[] };
+    if (typeof groupId !== 'string' || !Array.isArray(caIds)) { res.status(422).json({ detail: 'groupId and caIds[] are required' }); return; }
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_link', {
+      p_group_id: groupId, p_ca_ids: caIds, p_actor_user_id: user.id,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'groupUnlink') {
+    const user = await requirePermission(req, res, 'corrective_actions.link');
+    if (!user) return;
+    const { groupId, caId } = (req.body ?? {}) as { groupId?: string; caId?: string };
+    if (typeof groupId !== 'string' || typeof caId !== 'string') { res.status(422).json({ detail: 'groupId and caId are required' }); return; }
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_action_groups_unlink', {
+      p_group_id: groupId, p_ca_id: caId, p_actor_user_id: user.id,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  // Everything below requires at minimum `.edit` (update) or the
+  // specific lifecycle permission checked per-action; ownership itself
+  // is re-enforced inside the RPC regardless of what this route decides.
+  if (action === 'update') {
+    const user = await requirePermission(req, res, 'corrective_actions.edit');
+    if (!user) return;
+    const body = (req.body ?? {}) as Record<string, unknown> & { id?: string };
+    if (typeof body.id !== 'string') { res.status(422).json({ detail: 'id is required' }); return; }
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { id, ...patch } = body;
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_update', {
+      p_id: id, p_patch: patch, p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'assign' || action === 'takeOwnership' || action === 'assignVerifier') {
+    const user = await requirePermission(req, res, action === 'assignVerifier' ? 'corrective_actions.verify' : 'corrective_actions.resolve');
+    if (!user) return;
+    const body = (req.body ?? {}) as { id?: string; assigneeUserId?: string; verifierUserId?: string };
+    const id = body.id;
+    const role = action === 'assignVerifier' ? 'verifier' : 'assignee';
+    const personUserId = action === 'takeOwnership' ? user.id : action === 'assignVerifier' ? body.verifierUserId : body.assigneeUserId;
+    if (typeof id !== 'string' || typeof personUserId !== 'string') {
+      res.status(422).json({ detail: 'id (and assigneeUserId/verifierUserId) are required' });
+      return;
+    }
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_assign', {
+      p_id: id, p_role: role, p_person_user_id: personUserId, p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'setStatus') {
+    const { id, status } = (req.body ?? {}) as { id?: string; status?: string; reason?: string };
+    const reason = (req.body ?? {}) as { reason?: string };
+    if (typeof id !== 'string' || typeof status !== 'string') { res.status(422).json({ detail: 'id and status are required' }); return; }
+    const permission = status === 'cancelled' || status === 'reopened' ? 'corrective_actions.reopen_cancel'
+      : status === 'closed' ? 'corrective_actions.verify' : 'corrective_actions.resolve';
+    const user = await requirePermission(req, res, permission);
+    if (!user) return;
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_set_status', {
+      p_id: id, p_status: status, p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny, p_reason: reason.reason ?? null,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'recordCorrection') {
+    const user = await requirePermission(req, res, 'corrective_actions.resolve');
+    if (!user) return;
+    const { id, resolutionSummary } = (req.body ?? {}) as { id?: string; resolutionSummary?: string };
+    if (typeof id !== 'string' || typeof resolutionSummary !== 'string') { res.status(422).json({ detail: 'id and resolutionSummary are required' }); return; }
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_record_correction', {
+      p_id: id, p_resolution_summary: resolutionSummary, p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'verify') {
+    const user = await requirePermission(req, res, 'corrective_actions.verify');
+    if (!user) return;
+    const { id, result, testDescription, evidenceRef, notes } = (req.body ?? {}) as {
+      id?: string; result?: string; testDescription?: string; evidenceRef?: string; notes?: string;
+    };
+    if (typeof id !== 'string' || typeof result !== 'string') { res.status(422).json({ detail: 'id and result are required' }); return; }
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_record_verification', {
+      p_id: id, p_result: result, p_test_description: testDescription ?? null, p_evidence_ref: evidenceRef ?? null, p_notes: notes ?? null,
+      p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  if (action === 'bulkVerify') {
+    const user = await requirePermission(req, res, 'corrective_actions.verify');
+    if (!user) return;
+    const { ids, result, testDescription, evidenceRef, notes, groupId } = (req.body ?? {}) as {
+      ids?: string[]; result?: string; testDescription?: string; evidenceRef?: string; notes?: string; groupId?: string;
+    };
+    if (!Array.isArray(ids) || ids.length === 0 || typeof result !== 'string') {
+      res.status(422).json({ detail: 'ids[] and result are required' });
+      return;
+    }
+    const actorHasManageAny = user.permissions.includes('corrective_actions.assign');
+    const { allAgents, authorizedAgentIds } = toCorrectiveActionScopeArgs(toAgentAccess(user));
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase.rpc('call_center_corrective_actions_bulk_verify', {
+      p_ids: ids, p_result: result, p_test_description: testDescription ?? null, p_evidence_ref: evidenceRef ?? null, p_notes: notes ?? null,
+      p_actor_user_id: user.id, p_actor_has_manage_any: actorHasManageAny, p_group_id: groupId ?? null,
+      p_all_agents: allAgents, p_authorized_agent_ids: authorizedAgentIds,
+    });
+    if (error) { res.status(mapCorrectiveActionError(error.message)).json({ detail: error.message }); return; }
+    res.status(200).json({ data });
+    return;
+  }
+
+  res.status(400).json({ detail: `Unknown action: ${action}` });
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -1251,5 +1627,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, or automatedQa' });
+  if (resource === 'correctiveActions') {
+    if (req.method === 'GET') { await handleCorrectiveActionsGet(req, res); return; }
+    if (req.method === 'POST') { await handleCorrectiveActionsPost(req, res); return; }
+    methodNotAllowed(res, ['GET', 'POST']);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, or correctiveActions' });
 });

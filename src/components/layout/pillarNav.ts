@@ -21,6 +21,7 @@ import {
   ScrollText,
   ListChecks,
   Scale,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -115,6 +116,12 @@ export const PILLARS: Pillar[] = [
       // Session 16.4 — also requires qa.automated.view, enforced inside
       // the page itself (ProtectedRoute only supports one permission).
       { name: 'QA Calibration', href: '/qa-review/calibration', icon: Scale, permission: 'qa.analytics.view' },
+      // Session 16.5 — Corrective Action Management. A reusable,
+      // source-independent operational capability (QA is only the first
+      // source integration) — placed here because its primary current
+      // driver is "improve agents from interaction evidence", not
+      // because it belongs to QA.
+      { name: 'Corrective Actions', href: '/corrective-actions', icon: Wrench, permission: 'corrective_actions.view' },
     ],
   },
   {

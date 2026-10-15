@@ -22,6 +22,10 @@ import {
 import type { QaFindingInput, QaChannel, QaFinding } from '@/services/qa/qaService';
 import { formatTimestamp } from '@/lib/format';
 import { typography } from '@/lib/typography';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { buildCorrectiveActionInputFromHumanQaFinding } from '@/services/correctiveActions/qaAdapter';
+import type { CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
+import { CreateCorrectiveActionDialog } from '@/components/correctiveActions/CreateCorrectiveActionDialog';
 
 interface QaReviewDialogProps {
   isOpen: boolean;
@@ -605,6 +609,9 @@ const QaSummaryPanel: React.FC<{
   const [humanAssistanceRequired, setHumanAssistanceRequired] = useState<HumanAssistanceRequired | null>(review.humanAssistanceRequired);
   const [businessOutcome, setBusinessOutcome] = useState<string | null>(review.businessOutcome);
   const [reviewerNote, setReviewerNote] = useState(review.reviewerNote ?? '');
+  const { user } = useAuth();
+  const canCreateCorrectiveAction = hasPermission(user, 'corrective_actions.create');
+  const [createCaInput, setCreateCaInput] = useState<CreateCorrectiveActionInput | null>(null);
 
   const turnIndexById = useMemo(() => new Map(allTurns.map((t, i) => [t.turnId, i])), [allTurns]);
   // §13/§4 — the summary's "findings by parameter" should reflect what
@@ -648,14 +655,33 @@ const QaSummaryPanel: React.FC<{
         ) : (
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {exceptionFindings.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline block"
-                onClick={() => onJumpToTurn(f.primaryTurnId)}
-              >
-                T{(turnIndexById.get(f.primaryTurnId) ?? 0) + 1} · {QA_PARAMETERS[f.parameterCode].displayName} · {f.value}
-              </button>
+              <div key={f.id} className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline block"
+                  onClick={() => onJumpToTurn(f.primaryTurnId)}
+                >
+                  T{(turnIndexById.get(f.primaryTurnId) ?? 0) + 1} · {QA_PARAMETERS[f.parameterCode].displayName} · {f.value}
+                </button>
+                {canCreateCorrectiveAction && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline flex-shrink-0"
+                    onClick={() =>
+                      setCreateCaInput(
+                        buildCorrectiveActionInputFromHumanQaFinding(f, {
+                          reviewId: review.id,
+                          interactionId: review.interactionId,
+                          channel: review.channel,
+                          agentId: review.agentId,
+                        }),
+                      )
+                    }
+                  >
+                    Create Corrective Action
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -681,6 +707,12 @@ const QaSummaryPanel: React.FC<{
           Submit Review
         </Button>
       )}
+
+      <CreateCorrectiveActionDialog
+        isOpen={Boolean(createCaInput)}
+        onClose={() => setCreateCaInput(null)}
+        initialValues={createCaInput ?? undefined}
+      />
     </div>
   );
 };

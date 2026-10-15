@@ -36,6 +36,7 @@ import UserManagement from "./pages/UserManagement";
 import RoleManagement from "./pages/RoleManagement";
 import AuditTrail from "./pages/AuditTrail";
 import ActionRequired from "./pages/ActionRequired";
+import CorrectiveActions from "./pages/CorrectiveActions";
 import Settings from "./pages/Settings";
 import WhatsAppAuthenticate from "./pages/WhatsAppAuthenticate";
 import Orchestrator from "./pages/Orchestrator";
@@ -72,6 +73,7 @@ const App = () => (
           <Route path="/qa-review/automated/:evaluationId" element={<ProtectedRoute permission="qa.automated.view"><AutomatedQaInspector /></ProtectedRoute>} />
           {/* Session 16.4 — also requires qa.automated.view, enforced inside QaCalibration itself (ProtectedRoute only supports one permission). */}
           <Route path="/qa-review/calibration" element={<ProtectedRoute permission="qa.analytics.view"><QaCalibration /></ProtectedRoute>} />
+          <Route path="/corrective-actions" element={<ProtectedRoute permission="corrective_actions.view"><CorrectiveActions /></ProtectedRoute>} />
           <Route path="/whatsapp-hub" element={<ProtectedRoute><WhatsAppHub /></ProtectedRoute>} />
           <Route path="/formatting-hub" element={<ProtectedRoute><FormattingHub /></ProtectedRoute>} />
           <Route path="/ai-agents" element={<ProtectedRoute permission="agents.view"><AIAgents /></ProtectedRoute>} />

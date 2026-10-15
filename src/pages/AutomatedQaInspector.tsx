@@ -21,6 +21,9 @@ import { QualityMeasurementsGrid } from '@/components/qa/QualityMeasurementsGrid
 import { FindingsList } from '@/components/qa/FindingsList';
 import { AutomatedQaFailedBanner } from '@/components/qa/AutomatedQaFailedBanner';
 import { isAutomatedQaInspectorReturnState } from '@/lib/automatedQaInspectorReturn';
+import { CreateCorrectiveActionDialog } from '@/components/correctiveActions/CreateCorrectiveActionDialog';
+import { buildCorrectiveActionInputFromAutomatedQaObservation } from '@/services/correctiveActions/qaAdapter';
+import type { CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
 
 /**
  * Session 16.3 — read-only Automated QA Inspector. Deliberately a SEPARATE
@@ -148,6 +151,8 @@ const AutomatedQaInspector: React.FC = () => {
 
   const observations: AutomatedQaObservation[] = evaluation?.observations ?? [];
   const selectedFinding = observations.find((o) => o.id === selectedFindingId) ?? null;
+  const [createCaInput, setCreateCaInput] = useState<CreateCorrectiveActionInput | null>(null);
+  const canCreateCorrectiveAction = hasPermission(user, 'corrective_actions.create');
 
   const ratios = useMemo(
     () => computeAutomatedQaRatios(observations.map((o) => ({ evaluationId: o.evaluationId, parameterCode: o.parameterCode, value: o.value }))),
@@ -407,6 +412,27 @@ const AutomatedQaInspector: React.FC = () => {
                       <div><span className="text-muted-foreground">Reason: </span>{selectedFinding.reasonCode ? humanizeReasonCode(selectedFinding.reasonCode) : '—'}</div>
                       <div><span className="text-muted-foreground">Turn: </span>{turnIdx ? `Turn ${turnIdx}` : selectedFinding.primaryTurnId}</div>
                       <div className={`${typography.bodySecondary} pt-0.5`}>{selectedFinding.explanation ?? 'No explanation provided.'}</div>
+                      {canCreateCorrectiveAction && (
+                        <div className="pt-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() =>
+                              setCreateCaInput(
+                                buildCorrectiveActionInputFromAutomatedQaObservation(selectedFinding, {
+                                  evaluationId: evaluation.id,
+                                  interactionId: evaluation.interactionId,
+                                  channel: evaluation.channel,
+                                  agentId: evaluation.agentId,
+                                }),
+                              )
+                            }
+                          >
+                            Create Corrective Action
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })() : (
@@ -441,6 +467,11 @@ const AutomatedQaInspector: React.FC = () => {
         </div>
       </div>
       <QualityMeasurementsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      <CreateCorrectiveActionDialog
+        isOpen={Boolean(createCaInput)}
+        onClose={() => setCreateCaInput(null)}
+        initialValues={createCaInput ?? undefined}
+      />
     </Layout>
   );
 };

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
@@ -12,21 +14,43 @@ import {
   CorrectiveActionStatusBadge,
   CorrectiveActionPriorityBadge,
 } from './correctiveActionStatus';
+import { CreateCorrectiveActionGroupDialog } from './CreateCorrectiveActionGroupDialog';
 import {
   useCorrectiveAction,
   useCorrectiveActionActivity,
   useEligiblePeople,
   useCandidateCorrectiveActions,
+  useUpdateCorrectiveAction,
   useTakeCorrectiveActionOwnership,
   useAssignCorrectiveAction,
   useAssignCorrectiveActionVerifier,
   useSetCorrectiveActionStatus,
   useRecordCorrectiveActionCorrection,
   useRecordCorrectiveActionVerification,
-  useCreateCorrectiveActionGroup,
   useLinkCorrectiveActionsToGroup,
 } from '@/hooks/correctiveActions/useCorrectiveActions';
-import { formatCaNumber } from '@/services/correctiveActions/correctiveActionsService';
+import {
+  formatCaNumber,
+  type CorrectiveActionCategory,
+  type CorrectiveActionGroup,
+  type CorrectiveActionPriority,
+} from '@/services/correctiveActions/correctiveActionsService';
+
+const EDIT_CATEGORIES: Array<{ value: CorrectiveActionCategory; label: string }> = [
+  { value: 'agent_behavior', label: 'Agent Behaviour' },
+  { value: 'knowledge_base', label: 'Knowledge Base' },
+  { value: 'campaign_configuration', label: 'Campaign Configuration' },
+  { value: 'process', label: 'Process' },
+  { value: 'technical', label: 'Technical' },
+  { value: 'other', label: 'Other' },
+];
+
+const EDIT_PRIORITIES: Array<{ value: CorrectiveActionPriority; label: string }> = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'critical', label: 'Critical' },
+];
 
 interface CorrectiveActionDetailDialogProps {
   id: string | null;
@@ -63,6 +87,12 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
   const [assigneeChoice, setAssigneeChoice] = useState('');
   const [verifierChoice, setVerifierChoice] = useState('');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<Set<string>>(new Set());
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState<CorrectiveActionCategory>('other');
+  const [editPriority, setEditPriority] = useState<CorrectiveActionPriority>('medium');
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false);
 
   const canManageAny = hasPermission(user, 'corrective_actions.assign');
   const canEdit = hasPermission(user, 'corrective_actions.edit');
@@ -76,6 +106,12 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
   const canProgressOrResolve = canResolve && (canManageAny || isOwnItem);
   const canTakeOwnership = canResolve && !canManageAny && !ca?.assignedTo;
   const canRecordVerification = canVerify && (canManageAny || isOwnVerification) && (ca?.status === 'pending_verification' || ca?.status === 'in_progress');
+  // Mirrors the server's ownership gate (manage-any OR creator OR
+  // assignee) so the Edit control isn't shown to a permission-holder who
+  // isn't the owner and would just get a server-side rejection — the RPC
+  // itself is still the real enforcement, this is UX only.
+  const isOwner = Boolean(ca && user && (ca.createdBy === user.id || ca.assignedTo === user.id));
+  const canEditThis = canEdit && (canManageAny || isOwner);
 
   const { data: eligiblePeople } = useEligiblePeople(id, isOpen && (canManageAny || canVerify));
   const { data: candidates } = useCandidateCorrectiveActions(
@@ -90,20 +126,50 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
   const setStatusMutation = useSetCorrectiveActionStatus();
   const recordCorrectionMutation = useRecordCorrectiveActionCorrection();
   const recordVerificationMutation = useRecordCorrectiveActionVerification();
-  const createGroupMutation = useCreateCorrectiveActionGroup();
+  const updateMutation = useUpdateCorrectiveAction();
   const linkMutation = useLinkCorrectiveActionsToGroup();
+
+  // Reset transient per-CA UI state (edit mode, candidate selection) when
+  // switching to a different CA or closing the dialog — never carry a
+  // stale draft from one corrective action into another.
+  React.useEffect(() => {
+    setIsEditing(false);
+    setSelectedCandidateIds(new Set());
+  }, [id, isOpen]);
+
+  const openEdit = () => {
+    if (!ca) return;
+    setEditTitle(ca.title);
+    setEditDescription(ca.description);
+    setEditCategory(ca.category);
+    setEditPriority(ca.priority);
+    setIsEditing(true);
+  };
+
+  const canSaveEdit = editTitle.trim().length > 0 && editDescription.trim().length > 0 && !updateMutation.isPending;
+
+  const handleSaveEdit = () => {
+    if (!ca || !canSaveEdit) return;
+    updateMutation.mutate(
+      { id: ca.id, patch: { title: editTitle.trim(), description: editDescription.trim(), category: editCategory, priority: editPriority } },
+      { onSuccess: () => setIsEditing(false) },
+    );
+  };
 
   const handleLinkSelected = async () => {
     if (!ca || selectedCandidateIds.size === 0) return;
-    const ids = Array.from(selectedCandidateIds);
     if (ca.groupId) {
+      const ids = Array.from(selectedCandidateIds);
       await linkMutation.mutateAsync({ groupId: ca.groupId, caIds: ids });
       setSelectedCandidateIds(new Set());
       return;
     }
-    const title = window.prompt('Title for the new corrective action group:', ca.title);
-    if (!title || !title.trim()) return;
-    const group = await createGroupMutation.mutateAsync({ title: title.trim() });
+    setGroupCreateOpen(true);
+  };
+
+  const handleGroupCreated = async (group: CorrectiveActionGroup) => {
+    if (!ca) return;
+    const ids = Array.from(selectedCandidateIds);
     await linkMutation.mutateAsync({ groupId: group.id, caIds: [ca.id, ...ids] });
     setSelectedCandidateIds(new Set());
     onOpenGroup?.(group.id);
@@ -112,6 +178,7 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
   if (!isOpen) return null;
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -128,20 +195,65 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
           </div>
         ) : (
           <div className="space-y-3">
-            <SectionCard title={ca.title}>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{ca.description}</p>
-              <div className="flex flex-wrap gap-3 pt-1.5 text-xs text-muted-foreground">
-                <span>Source: {SOURCE_LABEL[ca.sourceType] ?? ca.sourceType}</span>
-                {ca.sourceReferenceId && <span>Ref: {ca.sourceReferenceId}</span>}
-                <span>Opened {formatTimestamp(ca.createdAt)}</span>
-                {ca.dueAt && <span>Due {formatTimestamp(ca.dueAt)}</span>}
-              </div>
-              {ca.sourceContext && Object.keys(ca.sourceContext).length > 0 && (
-                <div className="pt-1 text-xs text-muted-foreground">
-                  {Object.entries(ca.sourceContext).map(([k, v]) => (
-                    <div key={k} className="truncate"><span className="text-muted-foreground/70">{k}: </span>{Array.isArray(v) ? v.join(', ') : String(v)}</div>
-                  ))}
+            <SectionCard
+              title={isEditing ? 'Edit Corrective Action' : ca.title}
+              action={canEditThis && !isEditing ? (
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openEdit}>Edit</Button>
+              ) : undefined}
+            >
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="ca-edit-title" className="text-xs">Title</Label>
+                    <Input id="ca-edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="ca-edit-description" className="text-xs">Description</Label>
+                    <Textarea id="ca-edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="min-h-[90px] text-sm" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="ca-edit-category" className="text-xs">Category</Label>
+                      <Select value={editCategory} onValueChange={(v) => setEditCategory(v as CorrectiveActionCategory)}>
+                        <SelectTrigger id="ca-edit-category" className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {EDIT_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="ca-edit-priority" className="text-xs">Priority</Label>
+                      <Select value={editPriority} onValueChange={(v) => setEditPriority(v as CorrectiveActionPriority)}>
+                        <SelectTrigger id="ca-edit-priority" className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {EDIT_PRIORITIES.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {updateMutation.isError && <p role="alert" className="text-xs text-destructive">Could not save changes. Please try again.</p>}
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button size="sm" variant="ghost" disabled={updateMutation.isPending} onClick={() => setIsEditing(false)}>Cancel</Button>
+                    <Button size="sm" disabled={!canSaveEdit} onClick={handleSaveEdit}>{updateMutation.isPending ? 'Saving…' : 'Save'}</Button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{ca.description}</p>
+                  <div className="flex flex-wrap gap-3 pt-1.5 text-xs text-muted-foreground">
+                    <span>Source: {SOURCE_LABEL[ca.sourceType] ?? ca.sourceType}</span>
+                    {ca.sourceReferenceId && <span className="break-all">Ref: {ca.sourceReferenceId}</span>}
+                    <span>Opened {formatTimestamp(ca.createdAt)}</span>
+                    {ca.dueAt && <span>Due {formatTimestamp(ca.dueAt)}</span>}
+                  </div>
+                  {ca.sourceContext && Object.keys(ca.sourceContext).length > 0 && (
+                    <div className="pt-1 text-xs text-muted-foreground min-w-0">
+                      {Object.entries(ca.sourceContext).map(([k, v]) => (
+                        <div key={k} className="break-all"><span className="text-muted-foreground/70">{k}: </span>{Array.isArray(v) ? v.join(', ') : String(v)}</div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </SectionCard>
 
@@ -171,6 +283,7 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
                           type="checkbox"
                           className="h-3.5 w-3.5"
                           checked={selectedCandidateIds.has(c.id)}
+                          aria-label={`Select ${formatCaNumber(c.caNumber)} — ${c.title}`}
                           onChange={(e) => {
                             setSelectedCandidateIds((prev) => {
                               const next = new Set(prev);
@@ -190,7 +303,7 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={selectedCandidateIds.size === 0 || createGroupMutation.isPending || linkMutation.isPending}
+                    disabled={selectedCandidateIds.size === 0 || linkMutation.isPending}
                     onClick={() => void handleLinkSelected()}
                   >
                     {ca.groupId ? `Add Selected to Group (${selectedCandidateIds.size})` : `Link Selected into New Group (${selectedCandidateIds.size})`}
@@ -373,5 +486,12 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
         )}
       </DialogContent>
     </Dialog>
+    <CreateCorrectiveActionGroupDialog
+      isOpen={groupCreateOpen}
+      onClose={() => setGroupCreateOpen(false)}
+      onCreated={(group) => void handleGroupCreated(group)}
+      defaultTitle={ca?.title}
+    />
+    </>
   );
 };

@@ -15,8 +15,9 @@ import {
 import { CreateCorrectiveActionDialog } from '@/components/correctiveActions/CreateCorrectiveActionDialog';
 import { CorrectiveActionDetailDialog } from '@/components/correctiveActions/CorrectiveActionDetailDialog';
 import { CorrectiveActionGroupDialog } from '@/components/correctiveActions/CorrectiveActionGroupDialog';
-import { useCorrectiveActions, useCreateCorrectiveActionGroup, useLinkCorrectiveActionsToGroup } from '@/hooks/correctiveActions/useCorrectiveActions';
-import { formatCaNumber, type CorrectiveActionListFilters, type CorrectiveActionStatus } from '@/services/correctiveActions/correctiveActionsService';
+import { CreateCorrectiveActionGroupDialog } from '@/components/correctiveActions/CreateCorrectiveActionGroupDialog';
+import { useCorrectiveActions, useLinkCorrectiveActionsToGroup } from '@/hooks/correctiveActions/useCorrectiveActions';
+import { formatCaNumber, type CorrectiveActionGroup, type CorrectiveActionListFilters, type CorrectiveActionStatus } from '@/services/correctiveActions/correctiveActionsService';
 
 const STATUS_TABS: Array<{ value: CorrectiveActionStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
@@ -49,6 +50,7 @@ const CorrectiveActions: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [groupDialogId, setGroupDialogId] = useState<string | null>(null);
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false);
 
   const filters: CorrectiveActionListFilters = useMemo(() => ({
     status: tab === 'all' ? undefined : tab,
@@ -60,7 +62,6 @@ const CorrectiveActions: React.FC = () => {
   const { data, isLoading, isError, refetch } = useCorrectiveActions(filters);
   const items = data ?? [];
 
-  const createGroupMutation = useCreateCorrectiveActionGroup();
   const linkMutation = useLinkCorrectiveActionsToGroup();
 
   const toggleSelected = (id: string) => {
@@ -73,25 +74,20 @@ const CorrectiveActions: React.FC = () => {
 
   const handleCreateGroupFromSelection = () => {
     if (selectedIds.size < 2) return;
-    const title = window.prompt('Group title (e.g. shared root cause summary):');
-    if (!title || !title.trim()) return;
-    createGroupMutation.mutate(
-      { title: title.trim() },
+    setGroupCreateOpen(true);
+  };
+
+  const handleGroupCreated = (group: CorrectiveActionGroup) => {
+    const count = selectedIds.size;
+    linkMutation.mutate(
+      { groupId: group.id, caIds: Array.from(selectedIds) },
       {
-        onSuccess: (group) => {
-          linkMutation.mutate(
-            { groupId: group.id, caIds: Array.from(selectedIds) },
-            {
-              onSuccess: () => {
-                toast.success(`Linked ${selectedIds.size} corrective actions to a new group.`);
-                setSelectedIds(new Set());
-                setGroupDialogId(group.id);
-              },
-              onError: () => toast.error('Group created, but linking the selected corrective actions failed.'),
-            },
-          );
+        onSuccess: () => {
+          toast.success(`Linked ${count} corrective actions to a new group.`);
+          setSelectedIds(new Set());
+          setGroupDialogId(group.id);
         },
-        onError: () => toast.error('Could not create group.'),
+        onError: () => toast.error('Group created, but linking the selected corrective actions failed.'),
       },
     );
   };
@@ -199,6 +195,7 @@ const CorrectiveActions: React.FC = () => {
       <CreateCorrectiveActionDialog isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreated={(id) => setDetailId(id)} />
       <CorrectiveActionDetailDialog id={detailId} isOpen={Boolean(detailId)} onClose={() => setDetailId(null)} onOpenGroup={(groupId) => { setDetailId(null); setGroupDialogId(groupId); }} />
       <CorrectiveActionGroupDialog groupId={groupDialogId} isOpen={Boolean(groupDialogId)} onClose={() => setGroupDialogId(null)} onOpenCa={(id) => { setGroupDialogId(null); setDetailId(id); }} />
+      <CreateCorrectiveActionGroupDialog isOpen={groupCreateOpen} onClose={() => setGroupCreateOpen(false)} onCreated={handleGroupCreated} />
     </Layout>
   );
 };

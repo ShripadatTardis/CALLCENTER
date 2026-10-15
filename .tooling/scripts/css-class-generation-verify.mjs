@@ -74,6 +74,21 @@ for (const role of STATUS_ROLES) {
   check(`--status-${role}-border is declared in :root`, css.includes(`--status-${role}-border:`));
 }
 
+// --- Session 16.4.3.1 — dialog-size role: real w/h/max-w/max-h rules,
+// not just the :root variable declaration, consumed by
+// InteractionDetailDialog.tsx's DialogContent className.
+const DIALOG_SIZE_RULES = [
+  ['w', 'width', '--dialog-large-width'],
+  ['h', 'height', '--dialog-large-height'],
+  ['max-w', 'max-width', '--dialog-large-max-width'],
+  ['max-h', 'max-height', '--dialog-large-max-height'],
+];
+for (const [utilityPrefix, cssProp, varName] of DIALOG_SIZE_RULES) {
+  const rulePattern = new RegExp(`\\.${utilityPrefix}-\\\\\\[var\\\\\\(${varName}\\\\\\)\\\\\\]\\{${cssProp}:var\\(${varName}\\)\\}`);
+  check(`dialogs.large: a real ${cssProp} rule exists in the built CSS for ${varName}`, rulePattern.test(css));
+  check(`${varName} is declared in :root`, css.includes(`${varName}:`));
+}
+
 rmSync(distDir, { recursive: true, force: true });
 check('dist/ cleaned up after verification', true);
 

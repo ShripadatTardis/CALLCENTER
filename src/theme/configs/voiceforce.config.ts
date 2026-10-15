@@ -490,4 +490,14 @@ export const voiceforceBaselineConfig: VoiceForceThemeConfig = {
       },
     },
   },
+
+  // Session 16.4.3.1 — the restructured, tabbed InteractionDetailDialog's
+  // real target size (brief: "approximately 80vw/80vh... sensible
+  // maximum dimensions for large displays"). 1400x960 as the cap keeps
+  // the dialog from growing unreasonably wide/tall on very large
+  // monitors while 80vw/80vh governs normal desktop sizes; small-screen
+  // behavior is inherently responsive since vw/vh are viewport-relative.
+  dialogs: {
+    large: { widthVw: 80, heightVh: 80, maxWidthPx: 1400, maxHeightPx: 960 },
+  },
 };

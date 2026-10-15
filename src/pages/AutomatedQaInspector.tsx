@@ -1,23 +1,26 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, ChevronDown, ChevronRight, Info, CheckCircle2, HelpCircle, RefreshCw, History, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, CheckCircle2, RefreshCw, History, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAutomatedQaEvaluation, useAutomatedQaEvaluationsForInteraction, useStartAutomatedQaEvaluation } from '@/hooks/qa/useAutomatedQa';
 import { computeAutomatedQaRatios } from '@/lib/automatedQaRatios';
-import { QA_PARAMETERS, type QaParameterCode } from '@/lib/qaParameters';
+import { QA_PARAMETERS } from '@/lib/qaParameters';
 import { humanizeReasonCode } from '@/lib/qaExceptionEditor';
-import { formatTimestamp, formatFractionAsPercent } from '@/lib/format';
+import { formatTimestamp } from '@/lib/format';
 import { typography } from '@/lib/typography';
 import type { QaTurn } from '@/lib/qaConversation';
 import type { AutomatedQaObservation } from '@/services/qa/automatedQaService';
 import { AUTOMATED_QA_STATUS_BADGE } from '@/lib/automatedQaStatusBadge';
 import { QualityMeasurementsHelpDialog } from '@/components/qa/QualityMeasurementsHelpDialog';
+import { QualityMeasurementsGrid } from '@/components/qa/QualityMeasurementsGrid';
+import { FindingsList } from '@/components/qa/FindingsList';
+import { AutomatedQaFailedBanner } from '@/components/qa/AutomatedQaFailedBanner';
+import { isAutomatedQaInspectorReturnState } from '@/lib/automatedQaInspectorReturn';
 
 /**
  * Session 16.3 — read-only Automated QA Inspector. Deliberately a SEPARATE
@@ -66,22 +69,45 @@ function formatTimeOnly(iso: string): string {
  * leaving them empty, which is exactly what the brief rules out. This is
  * purely a rendering order — the canonical QA_PARAMETER_CODES array
  * (used for ratio calculation elsewhere) is untouched.
+ *
+ * Session 16.4.3.1 — the grid itself, the Findings table, and the
+ * failed-evaluation banner below are now `QualityMeasurementsGrid`/
+ * `FindingsList`/`AutomatedQaFailedBanner` (src/components/qa/),
+ * extracted so Call Logs' new inline Automated QA tab renders the
+ * EXACT same measurements/findings/failure presentation as this page,
+ * never a second divergence-prone copy.
  */
-const MEASUREMENT_ROW_GROUPS: QaParameterCode[][] = [
-  ['context_continuity_rate', 'followup_understanding_rate', 'reference_resolution_accuracy', 'task_progression_rate'],
-  ['conversation_recovery_rate', 'response_grounding_rate'],
-  ['unnecessary_clarification_rate', 'repetition_loop_rate', 'customer_correction_rate'],
-];
 
 const AutomatedQaInspector: React.FC = () => {
   const { evaluationId } = useParams<{ evaluationId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [techOpen, setTechOpen] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const conversationContainerRef = useRef<HTMLDivElement | null>(null);
   const turnElementRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Session 16.4.3.1 — return-navigation (brief §6/§7). ONLY when this
+  // Inspector was reached via Call Logs' new inline Automated QA tab's
+  // "Open Full Inspector" action (a narrow, explicit discriminated
+  // state — see src/lib/automatedQaInspectorReturn.ts) does Back go
+  // back to Call Logs with the same interaction's dialog reopened on
+  // the same tab. Every OTHER existing entry point (QA Review's own
+  // navigation, a direct URL, History dropdown selection) is
+  // completely unaffected — `location.state` is absent/different for
+  // all of them, so `returnState` is null and the pre-existing
+  // `navigate('/qa-review')` behavior applies unchanged.
+  const returnState = isAutomatedQaInspectorReturnState(location.state) ? location.state : null;
+  const backLabel = returnState ? 'Back to Call Logs' : 'Back to Interaction Quality';
+  const handleBack = () => {
+    if (returnState) {
+      navigate('/call-logs', { state: { reopenInteraction: returnState.reopenInteraction } });
+    } else {
+      navigate('/qa-review');
+    }
+  };
 
   const { data: evaluation, isLoading } = useAutomatedQaEvaluation(evaluationId ?? null);
 
@@ -153,8 +179,8 @@ const AutomatedQaInspector: React.FC = () => {
     return (
       <Layout>
         <div className="bg-background h-full min-h-0 p-4 space-y-3">
-          <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={() => navigate('/qa-review')}>
-            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Back to Interaction Quality
+          <Button variant="ghost" size="sm" className="h-6 -ml-2 text-muted-foreground hover:text-foreground hover:bg-card" onClick={handleBack}>
+            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> {backLabel}
           </Button>
           <p className={typography.bodyMuted}>You don't have permission to view Automated QA results (requires qa.automated.view).</p>
         </div>
@@ -194,9 +220,9 @@ const AutomatedQaInspector: React.FC = () => {
         >
           <button
             type="button"
-            onClick={() => navigate('/qa-review')}
+            onClick={handleBack}
             className="inline-flex items-center justify-center h-6 w-6 -ml-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 flex-shrink-0"
-            aria-label="Back to Interaction Quality"
+            aria-label={backLabel}
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
@@ -287,9 +313,7 @@ const AutomatedQaInspector: React.FC = () => {
         </div>
 
         {evaluation.status === 'failed' && (
-          <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-400">
-            Evaluation failed ({evaluation.errorCode ?? 'unknown_error'}): {evaluation.errorMessage ?? 'No further detail available.'}
-          </div>
+          <AutomatedQaFailedBanner errorCode={evaluation.errorCode} errorMessage={evaluation.errorMessage} />
         )}
 
         {rerunError && (
@@ -301,127 +325,23 @@ const AutomatedQaInspector: React.FC = () => {
 
         {/* Two-column desktop layout (≥1280px); stacks below that. */}
         <div className="grid grid-cols-1 xl:grid-cols-[58%_42%] gap-3 items-start">
-          {/* LEFT — Quality Measurements + Findings */}
+          {/* LEFT — Quality Measurements + Findings. Session 16.4.3.1 —
+              now the shared `QualityMeasurementsGrid`/`FindingsList`
+              components (see their own header comments). */}
           <div className="min-w-0 space-y-3">
             {evaluation.status !== 'failed' && (
-              <div>
-                <div className="flex items-center gap-1 mb-1.5">
-                  <h2 className={typography.cardTitle}>Quality Measurements</h2>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => setHelpOpen(true)}
-                        className="inline-flex items-center justify-center h-7 w-7 -my-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 rounded-sm"
-                        aria-label="Understanding Quality Measurements"
-                      >
-                        <HelpCircle className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Understanding Quality Measurements</TooltipContent>
-                  </Tooltip>
-                </div>
-                {/* Session 16.3.4 — ~50% smaller cards. Session 16.3.6 —
-                    three separate 4-column grid rows (see
-                    MEASUREMENT_ROW_GROUPS) so each group's unused
-                    trailing cells stay genuinely empty instead of being
-                    filled by the next group's items via grid auto-flow.
-                    Direction (higher/lower-is-better) stays on the
-                    card's own title tooltip. */}
-                <div className="space-y-1.5">
-                  {MEASUREMENT_ROW_GROUPS.map((group, groupIndex) => (
-                    <div key={groupIndex} className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
-                      {group.map((code) => {
-                        const def = QA_PARAMETERS[code];
-                        const r = ratios[code];
-                        const unassessable = evaluation.unassessableParameters.find((u) => u.parameterCode === code);
-                        const directionLabel = def.directionality === 'higher_better' ? 'Higher is better' : 'Lower is better';
-                        return (
-                          <div
-                            key={code}
-                            className="rounded-md border border-border bg-card px-1.5 py-1 min-h-[38px] flex flex-col justify-center"
-                            title={directionLabel}
-                          >
-                            <div className="flex items-start justify-between gap-1">
-                              <div className="text-[10px] font-semibold leading-[1.15] line-clamp-2" title={def.displayName}>{def.displayName}</div>
-                              {r.denominator === 0 && unassessable && (
-                                <Info className="h-2.5 w-2.5 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
-                              )}
-                            </div>
-                            {r.denominator === 0 ? (
-                              <div className="flex items-baseline gap-1" title={unassessable?.reason}>
-                                <span className="text-[14px] font-semibold leading-tight text-muted-foreground">—</span>
-                                <span className={`${typography.microCaption} truncate`}>No eligible population</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-[14px] font-semibold leading-tight">{formatFractionAsPercent(r.rate ?? undefined)}</span>
-                                <span className={`${typography.microCaption} truncate`}>{r.numerator}/{r.denominator} eligible</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <QualityMeasurementsGrid
+                ratios={ratios}
+                unassessableParameters={evaluation.unassessableParameters}
+                onHelpClick={() => setHelpOpen(true)}
+              />
             )}
-
-            {observations.length > 0 && (
-              <div>
-                <h2 className={`${typography.cardTitle} mb-1.5`}>Findings</h2>
-                <div className="rounded-md border border-border overflow-hidden">
-                  <div className="max-h-[420px] overflow-y-auto">
-                    <table className={`w-full ${typography.tableBody}`}>
-                      <thead className="sticky top-0 z-10">
-                        <tr className="h-[30px] bg-card text-muted-foreground uppercase tracking-wide text-[11px] font-semibold">
-                          <th className="text-left px-2">Parameter</th>
-                          <th className="text-left px-2">Value</th>
-                          <th className="text-left px-2">Reason</th>
-                          <th className="text-left px-2">Turn</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {observations.map((o) => {
-                          const def = QA_PARAMETERS[o.parameterCode];
-                          const isClean = o.value === def.cleanValue;
-                          const turnIdx = turnIndexById.get(o.primaryTurnId);
-                          const turnLabel = turnIdx ? `Turn ${turnIdx}` : o.primaryTurnId;
-                          const isSelected = o.id === selectedFindingId;
-                          return (
-                            <tr
-                              key={o.id}
-                              role="button"
-                              tabIndex={0}
-                              aria-pressed={isSelected}
-                              aria-label={`${isSelected ? 'Deselect' : 'Select'} finding for ${def.displayName}, turn ${turnLabel}`}
-                              className={`h-8 border-t border-border cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 ${isSelected ? 'bg-cyan-500/10' : 'hover:bg-muted/40'}`}
-                              onClick={() => selectFinding(o)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  selectFinding(o);
-                                }
-                              }}
-                            >
-                              <td className="px-2 py-1">{def.displayName}</td>
-                              <td className="px-2 py-1">
-                                <Badge variant="outline" className={`h-5 ${isClean ? 'border-emerald-600 text-emerald-700 dark:border-emerald-400 dark:text-emerald-400' : 'border-amber-600 text-amber-700 dark:border-amber-400 dark:text-amber-400'}`}>
-                                  {o.value}
-                                </Badge>
-                              </td>
-                              <td className="px-2 py-1">{o.reasonCode ? humanizeReasonCode(o.reasonCode) : '—'}</td>
-                              <td className="px-2 py-1 whitespace-nowrap" title={o.primaryTurnId}>{turnLabel}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
+            <FindingsList
+              observations={observations}
+              turnIndexById={turnIndexById}
+              selectedFindingId={selectedFindingId}
+              onSelectFinding={selectFinding}
+            />
           </div>
 
           {/* RIGHT — Conversation, Selected Finding, Technical Details */}

@@ -88,6 +88,7 @@
     --table-row-expanded-padding-x: 12px; /* tables.rows.expanded.paddingXPx */
     --table-row-expanded-padding-y: 8px; /* tables.rows.expanded.paddingYPx */
     --height-filter-field: 32px; /* heights.variants.compact.filterField */
+    --height-control: 36px; /* heights.default.control */
     --icon-size-default: 16px; /* icons.default.sizePx */
     --icon-size-tight: 12px; /* icons.variants.tight.sizePx */
     --icon-size-compact: 14px; /* icons.variants.compact.sizePx */
@@ -154,6 +155,10 @@
     --type-fieldLabelMicro-weight: 400; /* typography.roles.fieldLabelMicro.weight */
     --type-panelLabel-size: 12px; /* typography.roles.panelLabel.sizePx */
     --type-panelLabel-weight: 600; /* typography.roles.panelLabel.weight */
+    --dialog-large-width: 80vw; /* dialogs.large.widthVw */
+    --dialog-large-height: 80vh; /* dialogs.large.heightVh */
+    --dialog-large-max-width: 1400px; /* dialogs.large.maxWidthPx */
+    --dialog-large-max-height: 960px; /* dialogs.large.maxHeightPx */
 
     /* Preserved verbatim — not sourced from the config. Session 7.6.3
        confirmed (grep) these are consumed only by the unused

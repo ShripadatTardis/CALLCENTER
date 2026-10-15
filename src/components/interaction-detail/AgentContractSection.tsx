@@ -17,8 +17,8 @@ import type { CallAgentContract } from '@/types/campaign';
  * (e.g. a historical interaction whose agent no longer exists) rather
  * than showing an empty/misleading section.
  */
-export const AgentContractSection: React.FC<{ contract: CallAgentContract | null }> = ({ contract }) => {
-  const [open, setOpen] = useState(false);
+export const AgentContractSection: React.FC<{ contract: CallAgentContract | null; defaultOpen?: boolean }> = ({ contract, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
   if (!contract) return null;
   if (contract.expectedInputFields.length === 0 && contract.expectedOutcomes.length === 0 && contract.outputFields.length === 0) {

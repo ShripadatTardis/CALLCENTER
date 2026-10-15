@@ -4,6 +4,7 @@ import { resolveAccessForAuthenticatedUser } from '../_auth.js';
 import type { CallDataEntryDto, CallDataResponseDto } from '../../src/types/api/calls.js';
 import type { CallMetricsResponseDto } from '../../src/types/api/callMetrics.js';
 import { filterCallMetricsRowsByAuthorizedAgents } from '../../src/lib/callMetricsCorrelation.js';
+import { INTERACTION_ID_PATTERN } from '../../src/lib/interactionTraceValidation.js';
 
 /**
  * GET /api/calls/data -> GET {VOICEBOT_BASE_URL}/api/v1/call-data
@@ -43,6 +44,11 @@ export default withErrorBoundary(async (req, res) => {
 
   if (readReqQuery(req).resource === 'metrics') {
     await handleCallMetrics(req, res);
+    return;
+  }
+
+  if (readReqQuery(req).resource === 'trace') {
+    await handleInteractionTrace(req, res);
     return;
   }
 
@@ -213,4 +219,43 @@ async function handleCallMetrics(req: VercelRequest, res: VercelResponse): Promi
       total_pages: 1,
     },
   });
+}
+
+/**
+ * GET /api/calls/data?resource=trace&id=<interaction_id> ->
+ * GET {VOICEBOT_BASE_URL}/api/v1/interaction-trace/call/{interaction_id}
+ *
+ * Session 16.4.3. Authorization: the upstream Interaction Trace response
+ * carries no agent_id at all, and (as api/calls/session/[id].ts's own
+ * header already documents for the structurally identical problem) a
+ * single call cannot be cheaply/reliably attributed to an agent for a
+ * scope-restricted caller without an expensive correlation fetch. Rather
+ * than build a second fragile heuristic, this follows that SAME
+ * fail-closed precedent: only a caller with unrestricted Agent Scope
+ * (allCategories/'all') may fetch a trace by id. A scope-restricted
+ * caller gets 404, not a silent partial response.
+ *
+ * interaction_id is validated against the documented 1-128
+ * letters/digits/-/_ pattern BEFORE calling upstream, so an obviously
+ * malformed id returns 422 immediately rather than being forwarded.
+ */
+async function handleInteractionTrace(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const id = readReqQuery(req).id;
+  if (!id) {
+    res.status(422).json({ success: false, error: 'invalid_interaction_id', message: 'interaction id is required' });
+    return;
+  }
+  if (!INTERACTION_ID_PATTERN.test(id)) {
+    res.status(422).json({ success: false, error: 'invalid_interaction_id', message: 'interaction id must be 1-128 letters, digits, - or _' });
+    return;
+  }
+
+  const access = await resolveAccessForAuthenticatedUser(req, 'agent');
+  if (!(access.allCategories || access.authorizedAgentIds === 'all')) {
+    res.status(404).json({ success: false, error: 'trace_not_found', message: 'Interaction trace not found' });
+    return;
+  }
+
+  const { baseUrl } = getBackendConfig();
+  await proxyRequest(res, `${baseUrl}/api/v1/interaction-trace/call/${encodeURIComponent(id)}`, { method: 'GET' });
 }

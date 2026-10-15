@@ -1,9 +1,9 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { AdvancedFilters, CallLogFilters, CallLogsSearch } from '@/components/call-logs/AdvancedFilters';
-import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
+import { InteractionDetailDialog, type InteractionDetailDialogTab } from '@/components/call-logs/InteractionDetailDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { DetailNavigationState } from '@/lib/detailOrigin';
@@ -58,6 +58,7 @@ const CallLogs: React.FC = () => {
   const [page, setPage] = useState(1);
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [detailInitialTab, setDetailInitialTab] = useState<InteractionDetailDialogTab>('overview');
   // Session 11.3A — Call Agent is a normal page-local F1 filter, not a
   // GR1 grouping-tree navigation step. The underlying Session 6.2
   // Domain->Category->Agent classification model is untouched; this is
@@ -93,6 +94,31 @@ const CallLogs: React.FC = () => {
   const agentRoster = agentsData?.agents ?? [];
 
   const allInteractions = useMemo(() => data?.interactions ?? [], [data]);
+
+  // Session 16.4.3.1 — return-navigation from the Automated QA
+  // Inspector's "Open Full Inspector" round trip (brief §6/§7; shape
+  // defined once in src/lib/automatedQaInspectorReturn.ts). Looks up
+  // the interaction in the CURRENTLY LOADED page of results only — a
+  // disclosed, honest limitation (not a silent gap): if the interaction
+  // isn't on the page/filter the user happens to be viewing when they
+  // return, nothing reopens, rather than this page fetching a second,
+  // unrelated single-interaction lookup just to cover that edge case.
+  // Clears the location state after attempting the reopen (success or
+  // not) so a later refresh/back-navigation doesn't re-trigger it.
+  useEffect(() => {
+    const reopen = (location.state as { reopenInteraction?: { interactionId: string; tab: InteractionDetailDialogTab } } | null)
+      ?.reopenInteraction;
+    if (!reopen || allInteractions.length === 0) return;
+    const match = allInteractions.find((i) => i.interactionId === reopen.interactionId);
+    if (match) {
+      setSelectedInteraction(match);
+      setDetailInitialTab(reopen.tab);
+      setShowDetail(true);
+    }
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allInteractions]);
+
   const summary = data?.summary;
   const pagination = data?.pagination;
   const clientFacetsActive = fcrFacet !== 'any' || authFacet !== 'any' || Boolean(campaignFacet) || agentFilter !== 'all';
@@ -137,6 +163,7 @@ const CallLogs: React.FC = () => {
 
   const handleViewDetail = (interaction: Interaction) => {
     setSelectedInteraction(interaction);
+    setDetailInitialTab('overview');
     setShowDetail(true);
   };
 
@@ -462,6 +489,7 @@ const CallLogs: React.FC = () => {
           isOpen={showDetail}
           onClose={() => setShowDetail(false)}
           interaction={selectedInteraction}
+          initialTab={detailInitialTab}
         />
       </div>
     </Layout>

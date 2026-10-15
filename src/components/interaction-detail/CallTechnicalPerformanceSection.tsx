@@ -15,7 +15,8 @@ import { formatCallMetricMs, formatTurns, type CallTechnicalPerformance } from '
 export const CallTechnicalPerformanceSection: React.FC<{
   metrics: CallTechnicalPerformance | null;
   isLoading: boolean;
-}> = ({ metrics, isLoading }) => {
+  defaultOpen?: boolean;
+}> = ({ metrics, isLoading, defaultOpen = false }) => {
   if (isLoading || !metrics) return null;
 
   const row = (label: string, value: string) => (
@@ -26,7 +27,7 @@ export const CallTechnicalPerformanceSection: React.FC<{
   );
 
   return (
-    <CollapsibleSectionCard title="Technical Performance">
+    <CollapsibleSectionCard title="Technical Performance" defaultOpen={defaultOpen}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
         <div>
           {row('Turn latency (caller-perceived)', formatCallMetricMs(metrics.turnMs, { recordedAt: metrics.recordedAt }))}

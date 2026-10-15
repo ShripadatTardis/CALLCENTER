@@ -558,4 +558,12 @@ export const katonConfig: VoiceForceThemeConfig = {
       },
     },
   },
+
+  // Session 16.4.3.1 — DERIVED: none of KATON's documented design
+  // standards specify a dialog-size concept at all (only control/input/
+  // button heights). Reuses VoiceForce's exact 80vw/80vh/1400x960
+  // values rather than inventing a KATON-specific size with no source.
+  dialogs: {
+    large: { widthVw: 80, heightVh: 80, maxWidthPx: 1400, maxHeightPx: 960 },
+  },
 };

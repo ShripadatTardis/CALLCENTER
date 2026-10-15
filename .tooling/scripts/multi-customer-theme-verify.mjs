@@ -71,6 +71,19 @@ const vfPrimary = vfRoot.find((d) => d.name === '--primary')?.value;
 const katonPrimary = katonRoot.find((d) => d.name === '--primary')?.value;
 check('VoiceForce and KATON generate genuinely different --primary values', vfPrimary !== katonPrimary, `voiceforce=${vfPrimary} katon=${katonPrimary}`);
 
+// --- 3b. Session 16.4.3.1 — dialog-size role generates for both configs
+for (const [name, root] of [['voiceforce', vfRoot], ['katon', katonRoot]]) {
+  const width = root.find((d) => d.name === '--dialog-large-width')?.value;
+  const height = root.find((d) => d.name === '--dialog-large-height')?.value;
+  const maxWidth = root.find((d) => d.name === '--dialog-large-max-width')?.value;
+  const maxHeight = root.find((d) => d.name === '--dialog-large-max-height')?.value;
+  check(
+    `${name}: --dialog-large-width/-height/-max-width/-max-height are all real, non-empty values`,
+    width === '80vw' && height === '80vh' && Boolean(maxWidth) && Boolean(maxHeight),
+    `width=${width} height=${height} maxWidth=${maxWidth} maxHeight=${maxHeight}`,
+  );
+}
+
 // --- 4. Decision-3 compliance: no curriculum-specific component exists
 // Scoped to components/pages only — src/theme/configs/*.config.ts
 // LEGITIMATELY documents these excluded elements in prose (explaining

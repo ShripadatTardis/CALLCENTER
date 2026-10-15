@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { MetricStrip, type MetricStripItem } from '@/components/common/MetricStrip';
 import { SectionCard } from '@/components/interaction-detail/SectionCard';
@@ -7,7 +8,8 @@ import { CollapsibleSectionCard } from '@/components/interaction-detail/Collapsi
 import { AgentContractSection } from '@/components/interaction-detail/AgentContractSection';
 import { CallTechnicalPerformanceSection } from '@/components/interaction-detail/CallTechnicalPerformanceSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
-import { AutomatedQaPanel } from '@/components/qa/AutomatedQaPanel';
+import { AutomatedQaInlinePanel } from '@/components/qa/AutomatedQaInlinePanel';
+import { InteractionTracePanel } from '@/components/interaction-detail/InteractionTracePanel';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -24,10 +26,14 @@ import {
 } from '@/lib/format';
 import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
 
+export type InteractionDetailDialogTab = 'overview' | 'trace' | 'qa' | 'agent';
+
 interface InteractionDetailDialogProps {
   isOpen: boolean;
   onClose: () => void;
   interaction: Interaction | null;
+  /** Session 16.4.3.1 — which tab opens first. Defaults to 'overview' (the pre-existing single-pane behavior's natural equivalent). Used by `CallLogs.tsx` to reopen on a specific tab (e.g. 'qa') when returning from the Automated QA Inspector's "Open Full Inspector" round trip. */
+  initialTab?: InteractionDetailDialogTab;
 }
 
 /**
@@ -52,6 +58,23 @@ interface InteractionDetailDialogProps {
  * it once upgrades all three, per the session's explicit reuse
  * requirement. Data mapping, transcript source reconciliation, and
  * recording URL are all byte-for-byte unchanged from before this pass.
+ *
+ * Session 16.4.3.1 — four-tab restructure (brief: too many vertically
+ * stacked sections). The identity/metric header above the tabs is
+ * unchanged; everything that used to stack below it now groups into
+ * Overview (Call Summary, Recording, Conversation — the three things a
+ * reviewer reads first), Interaction Trace (unchanged `InteractionTracePanel`),
+ * Automated QA (unchanged `AutomatedQaPanel`), and Agent Performance
+ * (Agent Outcome, Agent Contract, Input Values Sent, Technical
+ * Performance — everything about how the agent itself performed,
+ * grouped together per the brief's own Tab 4 definition). No section's
+ * content, data source, or behavior changed — only which container it
+ * renders inside. The dialog's own size (`--dialog-large-*`) and the
+ * shared `Tabs` primitive's presentation (`bg-muted`/`text-foreground`/
+ * etc., already customer-configurable since Session 7.6+) are the only
+ * two things this restructure centrally controls — see
+ * docs/SESSION_16_4_3_1_INTERACTION_DETAIL_TABS.md for the full mapping
+ * and the two real configuration-control acceptance tests.
  */
 
 function outcomeBadge(outcome: string | undefined): { label: string; variant: 'positive' | 'escalated' | 'secondary' } {
@@ -79,6 +102,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
   isOpen,
   onClose,
   interaction,
+  initialTab = 'overview',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -190,7 +214,11 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[92vh] max-h-[92vh] overflow-hidden flex flex-col gap-2.5 p-5">
+      {/* Session 16.4.3.1 — size resolves entirely from the
+          customer-configurable `dialogs.large` role (schema.ts ->
+          voiceforce.config.ts/katon.config.ts -> generateCssVariables.ts
+          -> these 4 CSS vars). No literal vw/vh/px value here. */}
+      <DialogContent className="w-[var(--dialog-large-width)] h-[var(--dialog-large-height)] max-w-[var(--dialog-large-max-width)] max-h-[var(--dialog-large-max-height)] overflow-hidden flex flex-col gap-2.5 p-5">
         <DialogHeader className="space-y-1 flex-shrink-0">
           <div className="flex items-start justify-between gap-3 pr-6">
             <div className="min-w-0">
@@ -222,136 +250,249 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
           ))}
         </div>
 
-        {(interaction.summary || (interaction.tags && interaction.tags.length > 0)) && (
-          <CollapsibleSectionCard title="Call Summary">
-            {interaction.summary && <p className="text-sm text-foreground leading-relaxed">{interaction.summary}</p>}
-            {interaction.tags && interaction.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {interaction.tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
+        {/* Session 16.4.3.1 — the four-tab restructure. `Tabs`/
+            `TabsList`/`TabsTrigger`/`TabsContent` are the existing
+            shared shadcn primitives (src/components/ui/tabs.tsx),
+            already customer-configurable via the same `bg-muted`/
+            `text-foreground`/`data-[state=active]:bg-background`
+            classes every other themed surface in this app uses — no
+            tab-specific styling is introduced here. */}
+        <Tabs defaultValue={initialTab} className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="flex-shrink-0 w-fit">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="trace">Interaction Trace</TabsTrigger>
+            <TabsTrigger value="qa">Automated QA</TabsTrigger>
+            <TabsTrigger value="agent">Agent Performance</TabsTrigger>
+          </TabsList>
+
+          {/* TAB 1 — Overview: Call Summary, Recording, Conversation.
+              ConversationTranscript manages its own internal flex-1/
+              overflow-y-auto region (it's designed to be the one
+              variable-height child of a bounded flex-col parent), so
+              this tab's own wrapper is a flex column, NOT a second
+              overflow-y-auto — avoiding a nested double scrollbar.
+
+              `data-[state=active]:flex` instead of a bare `flex` —
+              Session 16.4.3.1 bug fix. Radix's `TabsContent` ALWAYS
+              keeps every tab's content mounted (it passes a function
+              as `children` to its internal `Presence`, which forces
+              `forceMount=true` unconditionally — `present`/`isSelected`
+              only controls the DOM `hidden` attribute, confirmed by
+              reading node_modules/@radix-ui/react-tabs's source). The
+              inactive panels rely entirely on the browser's native
+              `[hidden]{display:none}` user-agent rule to disappear —
+              but a bare `flex` class is an AUTHOR-origin style, and
+              author styles always beat user-agent styles in the CSS
+              cascade regardless of specificity or source order. So an
+              unconditional `flex` here kept this panel laid out (still
+              consuming its `flex-1` share of the Tabs container's
+              height) even while every OTHER tab was active, silently
+              stealing space and pushing that tab's real content down —
+              reproducing exactly the reported symptom (same ~500px gap
+              regardless of the other tab's own content size, since the
+              gap was never caused by that tab's content at all).
+              Gating the `flex` behind `data-[state=active]:` means it
+              only applies when Radix's own `data-state="active"`
+              attribute is present, so an inactive panel has no authored
+              `display` override and correctly falls back to the native
+              `hidden`-driven `display:none`. */}
+          <TabsContent value="overview" className="flex-1 min-h-0 hidden data-[state=active]:flex flex-col gap-2.5 mt-2.5">
+            {/* Session 16.4.3.1 (brief §4) — Call Summary displays
+                directly, no accordion: it's the first thing a reviewer
+                reads on the default tab, so it shouldn't need an extra
+                click the way the Agent Performance tab's sections
+                (genuinely secondary, so defaulted open rather than
+                hidden entirely) do. `SectionCard` (not
+                `CollapsibleSectionCard`) is the existing always-visible
+                variant of the exact same visual recipe. */}
+            {/* Session 16.4.3.1 (Overview Recording layout correction) —
+                the recording player moved into Call Summary's own header
+                row (via SectionCard's existing `action` slot) rather than
+                sitting in its own standalone panel below, per the user's
+                explicit follow-up. No "Recording"/"Call Recording"
+                heading is introduced — the player is identified by its
+                native controls alone. `h-[var(--height-control)]`
+                replaces the prior hardcoded `h-9`, consuming the same
+                36px "everything else" control-height token Button's `sm`
+                size already uses (newly exposed as a standalone CSS var
+                for this site — see generateCssVariables.ts's
+                heightDeclarations). `w-56` keeps it compact within the
+                header row; SectionCard's header row now wraps
+                (`flex-wrap`) so this never clips on narrow widths — it
+                drops to its own line below the title instead. Renders
+                only when a summary/tags/recording actually exists, same
+                visibility rule the two source panels had individually. */}
+            {(interaction.summary || (interaction.tags && interaction.tags.length > 0) || interaction.recording?.url) && (
+              <div className="flex-shrink-0">
+                <SectionCard
+                  title="Call Summary"
+                  action={
+                    interaction.recording?.url ? (
+                      <audio controls className="w-56 h-[var(--height-control)]" src={interaction.recording.url}>
+                        Your browser does not support the audio element.
+                      </audio>
+                    ) : undefined
+                  }
+                >
+                  {interaction.summary && <p className="text-sm text-foreground leading-relaxed">{interaction.summary}</p>}
+                  {interaction.tags && interaction.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {interaction.tags.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
               </div>
             )}
-          </CollapsibleSectionCard>
-        )}
 
-        {/* Session 13.2 (DEC-CALL-01, §20) — "candidate for user-facing
-            exposure" when genuinely populated; historical/Chat-sourced
-            interactions correctly render nothing here (no empty section,
-            per §21). Reuses the exact Session 12.5/12.6 classification
-            helpers Campaign's own Agent Result dialog uses. Session 15.2
-            follow-up — now passes the interaction's own live agent
-            contract (resolved above by agentId) instead of null, so
-            field display names/required-ness resolve to the agent's
-            real declared contract rather than a generic fallback; this
-            still does not duplicate Campaign Detail's Agent Result
-            dialog, which additionally shows Campaign Classification
-            against the campaign's captured (possibly historical) outcome
-            policy snapshot — out of scope here, this is always the
-            agent's CURRENT live contract. */}
-        {(() => {
-          const actualOutcome = classifyActualOutcome(agentContract, interaction.actualOutcomeCode ?? null, interaction.actualOutcomeName ?? null);
-          const outputFields = classifyStructuredOutputs(agentContract, interaction.structuredOutputs ?? null);
-          if (actualOutcome.availability === 'unavailable' && outputFields.length === 0) return null;
-          return (
-            <CollapsibleSectionCard title="Agent Outcome">
-              {actualOutcome.availability !== 'unavailable' && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-foreground">{actualOutcome.displayName ?? actualOutcome.code}</span>
-                </div>
-              )}
-              {outputFields.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {outputFields.map((f) => (
-                    <div key={f.fieldCode} className="text-xs">
-                      <span className="text-muted-foreground">{f.displayName}:</span>{' '}
-                      <span className="text-foreground break-words">{formatOutputValue(f.value)}</span>
+            {isActive && liveTranscript.isPollingCapped && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 flex-shrink-0">
+                This call is still active. Live updates have paused after 60s to avoid excessive polling — use
+                Refresh below to check for the latest transcript.
+              </p>
+            )}
+
+            <ConversationTranscript
+              entries={conversationEntries}
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              isLoading={liveTranscript.isLoading && needsLiveFetch}
+              isError={liveTranscript.isError}
+              onRetry={() => liveTranscript.refetch()}
+              onRefresh={() => liveTranscript.refetch()}
+              isRefreshing={liveTranscript.isFetching}
+              showRefresh={needsLiveFetch}
+            />
+          </TabsContent>
+
+          {/* TAB 2 — Interaction Trace. Session 16.4.3.1 (brief §5) —
+              the outer collapsed accordion is removed: the tab itself
+              IS the trigger (`autoExpand`), so selecting this tab
+              fetches and shows turns/status/version directly. Fine
+              per-turn "Technical detail" disclosure is untouched.
+              `hidden data-[state=active]:block` — see the Overview
+              tab's comment above for why every TabsContent needs this
+              explicit pattern (Radix keeps all four panels mounted at
+              all times; without an authored display rule gated on the
+              real `data-state`, an inactive panel's visibility depends
+              entirely on the native `hidden` attribute, which a later
+              unconditional `flex`/`block`/`grid` class elsewhere could
+              silently re-break the same way the Overview tab's bare
+              `flex` already did). */}
+          <TabsContent value="trace" className="flex-1 min-h-0 hidden data-[state=active]:block overflow-y-auto mt-2.5">
+            <InteractionTracePanel interactionId={interaction.interactionId} channel="call" autoExpand />
+          </TabsContent>
+
+          {/* TAB 3 — Automated QA. Session 16.4.3.1 (brief §6/§7) —
+              real measurements/findings/evidence inline, via the new
+              `AutomatedQaInlinePanel` (a SEPARATE component from
+              `AutomatedQaPanel`, which stays untouched for Chat's own
+              dialog — see that component's own header comment for the
+              full rationale). "Open Full Inspector" carries real
+              return-navigation state so the Inspector's Back button
+              can bring the user back here, on this tab, for this
+              interaction — only when reached this way. */}
+          <TabsContent value="qa" className="flex-1 min-h-0 hidden data-[state=active]:block overflow-y-auto mt-2.5">
+            <AutomatedQaInlinePanel interactionId={interaction.interactionId} channel="voice" agentId={interaction.agentId} />
+          </TabsContent>
+
+          {/* TAB 4 — Agent Performance: Agent Outcome, Agent Contract,
+              Input Values Sent, Technical Performance — everything
+              about how the agent itself performed on this interaction,
+              grouped together per the brief's own Tab 4 definition.
+              Same data, same loading/empty-state logic as before.
+              Session 16.4.3.1 (brief §8) — all three (Agent Outcome,
+              Agent Contract, Technical Performance) are now expanded
+              by default (`defaultOpen`), not collapsed — unlike
+              Overview's Call Summary (always fully visible, no
+              accordion at all), these stay genuine accordions so a
+              reviewer who doesn't need them can still collapse any
+              one, but the default state shows everything without an
+              extra click. */}
+          <TabsContent value="agent" className="flex-1 min-h-0 hidden data-[state=active]:block overflow-y-auto mt-2.5 space-y-2.5">
+            {/* Session 13.2 (DEC-CALL-01, §20) — "candidate for user-facing
+                exposure" when genuinely populated; historical/Chat-sourced
+                interactions correctly render nothing here (no empty section,
+                per §21). Reuses the exact Session 12.5/12.6 classification
+                helpers Campaign's own Agent Result dialog uses. Session 15.2
+                follow-up — now passes the interaction's own live agent
+                contract (resolved above by agentId) instead of null, so
+                field display names/required-ness resolve to the agent's
+                real declared contract rather than a generic fallback; this
+                still does not duplicate Campaign Detail's Agent Result
+                dialog, which additionally shows Campaign Classification
+                against the campaign's captured (possibly historical) outcome
+                policy snapshot — out of scope here, this is always the
+                agent's CURRENT live contract. */}
+            {(() => {
+              const actualOutcome = classifyActualOutcome(agentContract, interaction.actualOutcomeCode ?? null, interaction.actualOutcomeName ?? null);
+              const outputFields = classifyStructuredOutputs(agentContract, interaction.structuredOutputs ?? null);
+              if (actualOutcome.availability === 'unavailable' && outputFields.length === 0) return null;
+              return (
+                <CollapsibleSectionCard title="Agent Outcome" defaultOpen>
+                  {actualOutcome.availability !== 'unavailable' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-foreground">{actualOutcome.displayName ?? actualOutcome.code}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CollapsibleSectionCard>
-          );
-        })()}
+                  )}
+                  {outputFields.length > 0 && (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      {outputFields.map((f) => (
+                        <div key={f.fieldCode} className="text-xs">
+                          <span className="text-muted-foreground">{f.displayName}:</span>{' '}
+                          <span className="text-foreground break-words">{formatOutputValue(f.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CollapsibleSectionCard>
+              );
+            })()}
 
-        <AgentContractSection contract={agentContract} />
+            <AgentContractSection contract={agentContract} defaultOpen />
 
-        {/* Session 15.3 — only rendered once a matching execution is
-            actually confirmed to exist, same as Agent Outcome above
-            renders nothing when there's genuinely no data; most
-            calls/chats are not campaign-triggered at all (no stable
-            campaignId is even available upstream to gate on — see the
-            hook's own comment), so showing a permanent empty "not
-            applicable" row on every interaction would be worse noise
-            than the brief loading gap while this single-row lookup
-            resolves. */}
-        {!isExecutionLoading && execution && (() => {
-          const agentInputs = (execution.requestPayloadSnapshot?.agent_inputs ?? null) as Record<string, unknown> | null;
-          const declaredFields = agentContract?.expectedInputFields ?? [];
-          return (
-            <CollapsibleSectionCard title="Input Values Sent">
-              {!agentInputs || Object.keys(agentInputs).length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No declared input-field values were captured for this execution (legacy/partial contract at the
-                  time it ran, or the agent declares no input fields).
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {Object.entries(agentInputs).map(([fieldCode, value]) => {
-                    const field = declaredFields.find((f) => f.fieldCode === fieldCode);
-                    return (
-                      <div key={fieldCode} className="text-xs">
-                        <span className="text-muted-foreground">{field?.displayName ?? fieldCode}:</span>{' '}
-                        <span className="text-foreground break-words">{formatOutputValue(value)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CollapsibleSectionCard>
-          );
-        })()}
+            {/* Session 15.3 — only rendered once a matching execution is
+                actually confirmed to exist, same as Agent Outcome above
+                renders nothing when there's genuinely no data; most
+                calls/chats are not campaign-triggered at all (no stable
+                campaignId is even available upstream to gate on — see the
+                hook's own comment), so showing a permanent empty "not
+                applicable" row on every interaction would be worse noise
+                than the brief loading gap while this single-row lookup
+                resolves. */}
+            {!isExecutionLoading && execution && (() => {
+              const agentInputs = (execution.requestPayloadSnapshot?.agent_inputs ?? null) as Record<string, unknown> | null;
+              const declaredFields = agentContract?.expectedInputFields ?? [];
+              return (
+                <CollapsibleSectionCard title="Input Values Sent">
+                  {!agentInputs || Object.keys(agentInputs).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No declared input-field values were captured for this execution (legacy/partial contract at the
+                      time it ran, or the agent declares no input fields).
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      {Object.entries(agentInputs).map(([fieldCode, value]) => {
+                        const field = declaredFields.find((f) => f.fieldCode === fieldCode);
+                        return (
+                          <div key={fieldCode} className="text-xs">
+                            <span className="text-muted-foreground">{field?.displayName ?? fieldCode}:</span>{' '}
+                            <span className="text-foreground break-words">{formatOutputValue(value)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CollapsibleSectionCard>
+              );
+            })()}
 
-        <CallTechnicalPerformanceSection metrics={technicalPerformance} isLoading={isTechnicalPerformanceLoading} />
-
-        <AutomatedQaPanel interactionId={interaction.interactionId} channel="voice" agentId={interaction.agentId} />
-
-        <SectionCard title="Recording">
-          {interaction.recording?.url ? (
-            <audio controls className="w-full h-9" src={interaction.recording.url}>
-              Your browser does not support the audio element.
-            </audio>
-          ) : (
-            <p className="text-sm text-muted-foreground">Recording not available for this interaction.</p>
-          )}
-        </SectionCard>
-
-        {isActive && liveTranscript.isPollingCapped && (
-          <p className="text-xs text-amber-700 dark:text-amber-400 flex-shrink-0">
-            This call is still active. Live updates have paused after 60s to avoid excessive polling — use Refresh
-            below to check for the latest transcript.
-          </p>
-        )}
-
-        {/* Session §7/§8 — the one scroll region: everything above is
-            fixed-height, so Conversation gets whatever vertical space
-            remains, with one predictable scrollbar rather than several
-            competing boxes. Now the shared ConversationTranscript
-            primitive (src/components/interaction-detail) — also used by
-            Chat Detail — rather than a page-local implementation. */}
-        <ConversationTranscript
-          entries={conversationEntries}
-          searchTerm={searchTerm}
-          onSearchTermChange={setSearchTerm}
-          isLoading={liveTranscript.isLoading && needsLiveFetch}
-          isError={liveTranscript.isError}
-          onRetry={() => liveTranscript.refetch()}
-          onRefresh={() => liveTranscript.refetch()}
-          isRefreshing={liveTranscript.isFetching}
-          showRefresh={needsLiveFetch}
-        />
+            <CallTechnicalPerformanceSection metrics={technicalPerformance} isLoading={isTechnicalPerformanceLoading} defaultOpen />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

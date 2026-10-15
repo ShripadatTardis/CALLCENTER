@@ -140,6 +140,9 @@ export function generateRootDeclarations(config: VoiceForceThemeConfig): Declara
     ...radiiDeclarations(config.radii),
     // Session 7.10.1 — the 15 named typography roles. Mode-independent.
     ...typographyRoleDeclarations(config.typography.roles),
+    // Session 16.4.3.1 — dialog-size roles (currently one: `large`).
+    // Mode-independent (dialog dimensions aren't appearance-dependent).
+    ...dialogDeclarations(config.dialogs),
   ];
 }
 
@@ -292,6 +295,13 @@ function heightDeclarations(heights: VoiceForceThemeConfig['heights']): Declarat
   const filterFieldPx = heights.variants?.compact?.filterField ?? heights.default.filterField;
   return [
     { name: '--height-filter-field', value: `${filterFieldPx}px`, comment: 'heights.variants.compact.filterField' },
+    // Session 16.4.3.1 — the generic "everything else" control height
+    // (heights.default.control, already the existing basis for Button's
+    // `sm` size) was a populated schema field with no standalone CSS
+    // var. Needed to centrally size the compact audio player moved into
+    // Call Summary's header row (InteractionDetailDialog.tsx) without a
+    // new hardcoded h-9/h-[36px].
+    { name: '--height-control', value: `${heights.default.control}px`, comment: 'heights.default.control' },
   ];
 }
 
@@ -369,6 +379,23 @@ function typographyRoleDeclarations(roles: VoiceForceThemeConfig['typography']['
     if (role.lineHeightPx !== undefined) {
       declarations.push({ name: `--type-${name}-line-height`, value: `${role.lineHeightPx}px`, comment: `typography.roles.${name}.lineHeightPx` });
     }
+  }
+  return declarations;
+}
+
+/**
+ * Session 16.4.3.1 — dialog-size roles. Emits viewport-relative width/
+ * height plus a pixel max-width/max-height cap per named role, so a
+ * consuming component writes `w-[var(--dialog-large-width)] max-w-[var(
+ * --dialog-large-max-width)]` etc. instead of a literal `80vw`/`1400px`.
+ */
+function dialogDeclarations(dialogs: VoiceForceThemeConfig['dialogs']): Declaration[] {
+  const declarations: Declaration[] = [];
+  for (const [name, role] of Object.entries(dialogs)) {
+    declarations.push({ name: `--dialog-${name}-width`, value: `${role.widthVw}vw`, comment: `dialogs.${name}.widthVw` });
+    declarations.push({ name: `--dialog-${name}-height`, value: `${role.heightVh}vh`, comment: `dialogs.${name}.heightVh` });
+    declarations.push({ name: `--dialog-${name}-max-width`, value: `${role.maxWidthPx}px`, comment: `dialogs.${name}.maxWidthPx` });
+    declarations.push({ name: `--dialog-${name}-max-height`, value: `${role.maxHeightPx}px`, comment: `dialogs.${name}.maxHeightPx` });
   }
   return declarations;
 }

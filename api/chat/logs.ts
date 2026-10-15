@@ -12,6 +12,7 @@ import type {
 } from '../../src/types/api/chat.js';
 import type { ChatMessage, ChatSessionSummary } from '../../src/types/chat.js';
 import { getCustomerDisplayLabel } from '../../src/lib/customerDisplayLabel.js';
+import { INTERACTION_ID_PATTERN } from '../../src/lib/interactionTraceValidation.js';
 
 type CustomerLink = { customerId: string; displayName: string | null; sourceCustomerRef: string | null; primaryPhoneMasked: string | null };
 type CampaignContext = { campaignId: string | null; campaignTargetId: string | null; campaignName: string | null };
@@ -181,6 +182,11 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
 
   noStore(res);
 
+  if (req.query.resource === 'trace') {
+    await handleChatInteractionTrace(req, res);
+    return;
+  }
+
   // Session 6.2: same category/role authorization Customer 360 and
   // api/calls/data.ts now apply — closes the audited gap where Chat
   // Logs sent an x-user-role header that the server never read. See
@@ -307,3 +313,56 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     });
   }
 });
+
+/**
+ * GET /api/chat/logs?resource=trace&id=<interaction_id> ->
+ * GET {VOICEBOT_BASE_URL}/api/v1/interaction-trace/chat/{interaction_id}
+ *
+ * Session 16.4.3. Authorization: same fail-closed-to-unrestricted-only
+ * precedent api/calls/data.ts's handleInteractionTrace and
+ * api/calls/session/[id].ts already apply for the identical problem
+ * shape (the Interaction Trace response itself carries no agent_id to
+ * authorize against). A scope-restricted caller could in principle be
+ * authorized via a prior chat-session-detail fetch (which does resolve
+ * agent_id), but that fetch returns full message history — deliberately
+ * not performed here just to gate a trace request; this fails closed
+ * instead, consistent with the voice endpoint, rather than introducing
+ * a second, inconsistent authorization shape for the same resource type.
+ */
+async function handleChatInteractionTrace(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const idRaw = req.query.id;
+  const id = Array.isArray(idRaw) ? idRaw[0] : idRaw;
+  if (!id) {
+    res.status(422).json({ success: false, error: 'invalid_interaction_id', message: 'interaction id is required' });
+    return;
+  }
+  if (!INTERACTION_ID_PATTERN.test(id)) {
+    res.status(422).json({ success: false, error: 'invalid_interaction_id', message: 'interaction id must be 1-128 letters, digits, - or _' });
+    return;
+  }
+
+  const access = await resolveAccessForAuthenticatedUser(req, 'agent');
+  if (!(access.allCategories || access.authorizedAgentIds === 'all')) {
+    res.status(404).json({ success: false, error: 'trace_not_found', message: 'Interaction trace not found' });
+    return;
+  }
+
+  const { baseUrl, apiKey } = getBackendConfig();
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${baseUrl}/api/v1/interaction-trace/chat/${encodeURIComponent(id)}`, {
+      headers: { 'X-API-Key': apiKey },
+    });
+  } catch (err) {
+    res.status(502).json({ success: false, error: 'trace_store_unavailable', message: `Upstream request failed: ${err instanceof Error ? err.message : String(err)}` });
+    return;
+  }
+  const text = await upstream.text();
+  let body: unknown = text;
+  try {
+    body = text ? JSON.parse(text) : undefined;
+  } catch {
+    // leave as raw text if not JSON
+  }
+  res.status(upstream.status).json(body);
+}

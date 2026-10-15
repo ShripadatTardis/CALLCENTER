@@ -15,7 +15,13 @@ export const SectionCard: React.FC<{ title: string; children: React.ReactNode; a
   action,
 }) => (
   <div className="rounded-md border border-border bg-card p-3 space-y-2 flex-shrink-0">
-    <div className="flex items-center justify-between gap-2">
+    {/* Session 16.4.3.1 — `flex-wrap` added so a wider `action` (e.g.
+        Call Summary's header-row audio player) wraps below the title on
+        narrow widths instead of clipping/overflowing. No existing
+        `action` consumer passes anything wide enough to be affected by
+        this on a normal-width row, so this is a pure capability
+        addition, not a behavior change for them. */}
+    <div className="flex items-center justify-between gap-2 flex-wrap">
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</div>
       {action}
     </div>

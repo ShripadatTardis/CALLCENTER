@@ -706,6 +706,36 @@ const components = z.object({
 });
 
 // ---------------------------------------------------------------------
+// Overlays — dialog sizing. Session 16.4.3.1.
+// ---------------------------------------------------------------------
+
+/**
+ * Session 16.4.3.1 — a named dialog-size role, mirroring the existing
+ * `heightRoleSet`/`panelVariant` pattern: a closed, named shape rather
+ * than a free-form size map. `large` is the one real size this session
+ * needs (a ~80vw/80vh tabbed record-inspection dialog, e.g. the
+ * restructured InteractionDetailDialog) — not a screen-specific name,
+ * so any future large tabbed dialog can reuse it. The existing
+ * `max-w-lg`/`max-w-xl`..`max-w-3xl` dialog tiers documented in
+ * `dialog.tsx`'s own header comment are UNCHANGED by this addition —
+ * this adds a new, larger tier alongside them, it does not replace or
+ * re-theme the smaller ones (out of scope for this session).
+ */
+const dialogSizeRole = z.object({
+  /** Viewport-relative width, e.g. 80 for 80vw. */
+  widthVw: z.number().positive().max(100),
+  /** Viewport-relative height, e.g. 80 for 80vh. */
+  heightVh: z.number().positive().max(100),
+  /** Sensible upper bound so the dialog doesn't become excessively wide/tall on very large displays. */
+  maxWidthPx: pxValue,
+  maxHeightPx: pxValue,
+});
+
+const dialogs = z.object({
+  large: dialogSizeRole,
+});
+
+// ---------------------------------------------------------------------
 // Top-level schema
 // ---------------------------------------------------------------------
 
@@ -725,6 +755,7 @@ export const voiceForceThemeConfigSchema = z.object({
   charts,
   breakpoints,
   components,
+  dialogs,
 });
 
 export type VoiceForceThemeConfig = z.infer<typeof voiceForceThemeConfigSchema>;

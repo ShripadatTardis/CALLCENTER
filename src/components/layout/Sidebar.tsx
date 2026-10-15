@@ -41,6 +41,10 @@ export const Sidebar: React.FC = () => {
   const activePillar = findPillarForPath(location.pathname);
 
   const [navOpen, setNavOpen] = useState(false);
+  // Which pillar section is expanded inside the overlay. Starts matching
+  // the current route's pillar; a rail-icon click explicitly re-targets
+  // it, independent of whatever the user last expanded by hand.
+  const [expandedPillar, setExpandedPillar] = useState<string | undefined>(activePillar?.key);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +67,17 @@ export const Sidebar: React.FC = () => {
     overlayRef.current?.querySelector<HTMLElement>('a, button')?.focus();
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [navOpen]);
+
+  // Keep the overlay's default section in sync with whichever pillar the
+  // current route belongs to, as long as the overlay is closed — once a
+  // user explicitly opens it (via the hamburger or a rail icon) their
+  // choice of section is never overridden by a route change underneath.
+  useEffect(() => {
+    if (!navOpen) {
+      setExpandedPillar(activePillar?.key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const closeNav = () => {
     setNavOpen(false);
@@ -95,7 +110,10 @@ export const Sidebar: React.FC = () => {
                 type="button"
                 title={pillar.label}
                 aria-label={pillar.label}
-                onClick={() => setNavOpen(true)}
+                onClick={() => {
+                  setExpandedPillar(pillar.key);
+                  setNavOpen(true);
+                }}
                 className={cn(
                   'w-9 h-9 rounded flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--nav-focus-ring)]',
                   isActive
@@ -115,9 +133,17 @@ export const Sidebar: React.FC = () => {
       {/* Temporary overlay — absolutely positioned, never pushes the workspace. */}
       {navOpen && (
         <>
+          {/* Leaves the permanent rail's own width (left-[52px]) uncovered —
+              a fixed inset-0 backdrop previously sat above the rail (static
+              positioning always loses to any positioned+z-indexed sibling,
+              regardless of DOM order), so once the overlay was already
+              open, clicking a DIFFERENT rail icon actually hit this
+              backdrop and just closed the overlay instead of switching
+              pillars — the exact bug reported ("stays what I chose last
+              time"). The rail must always remain directly clickable. */}
           <button
             aria-label="Close navigation overlay"
-            className="fixed inset-0 bg-black/40 z-40"
+            className="fixed inset-y-0 left-[52px] right-0 bg-black/40 z-40"
             onClick={closeNav}
           />
           <div
@@ -149,7 +175,7 @@ export const Sidebar: React.FC = () => {
                 until clicked — "see all sections, then drill in" per the
                 explicit request. */}
             <nav className="flex-1 overflow-y-auto py-1" aria-label="Product navigation, expanded">
-              <Accordion type="single" collapsible defaultValue={activePillar?.key} className="w-full">
+              <Accordion type="single" collapsible value={expandedPillar} onValueChange={setExpandedPillar} className="w-full">
                 {visiblePillars.map((pillar) => {
                   const isPillarActive = activePillar?.key === pillar.key;
                   return (

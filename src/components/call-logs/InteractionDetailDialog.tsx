@@ -252,17 +252,25 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
 
         {/* Session 16.4.3.1 — the four-tab restructure. `Tabs`/
             `TabsList`/`TabsTrigger`/`TabsContent` are the existing
-            shared shadcn primitives (src/components/ui/tabs.tsx),
-            already customer-configurable via the same `bg-muted`/
-            `text-foreground`/`data-[state=active]:bg-background`
-            classes every other themed surface in this app uses — no
-            tab-specific styling is introduced here. */}
+            shared shadcn primitives (src/components/ui/tabs.tsx).
+            Follow-up correction — per explicit visual feedback, the
+            default `bg-muted` TabsList sitting directly on the
+            dialog's own `bg-background` (nearly the same lightness in
+            this theme) left the active tab barely distinguishable.
+            Reused, not invented: `Analytics.tsx` and `Settings.tsx`
+            are this app's two other multi-tab screens, and both
+            already establish the same higher-contrast pattern —
+            `bg-card border border-border` on `TabsList` (a crisp
+            card surface against the page) plus
+            `data-[state=active]:bg-muted` on `TabsTrigger` (a clearly
+            separate shade for the active tab) — reused here
+            byte-for-byte rather than introducing a third variant. */}
         <Tabs defaultValue={initialTab} className="flex-1 min-h-0 flex flex-col">
-          <TabsList className="flex-shrink-0 w-fit">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="trace">Interaction Trace</TabsTrigger>
-            <TabsTrigger value="qa">Automated QA</TabsTrigger>
-            <TabsTrigger value="agent">Agent Performance</TabsTrigger>
+          <TabsList className="flex-shrink-0 w-fit bg-card border border-border">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="trace" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Interaction Trace</TabsTrigger>
+            <TabsTrigger value="qa" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Automated QA</TabsTrigger>
+            <TabsTrigger value="agent" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Agent Performance</TabsTrigger>
           </TabsList>
 
           {/* TAB 1 — Overview: Call Summary, Recording, Conversation.
@@ -316,19 +324,26 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
                 36px "everything else" control-height token Button's `sm`
                 size already uses (newly exposed as a standalone CSS var
                 for this site — see generateCssVariables.ts's
-                heightDeclarations). `w-56` keeps it compact within the
-                header row; SectionCard's header row now wraps
-                (`flex-wrap`) so this never clips on narrow widths — it
-                drops to its own line below the title instead. Renders
-                only when a summary/tags/recording actually exists, same
-                visibility rule the two source panels had individually. */}
+                heightDeclarations).
+                Follow-up correction — per explicit visual feedback, the
+                player previously sat right-aligned at a fixed `w-56`,
+                reading as misplaced and too short. `actionFillsRow`
+                places it immediately after the "CALL SUMMARY" title and
+                lets it grow (`w-full` in place of `w-56`) to fill the
+                remaining header-row width instead. SectionCard's header
+                row still wraps (`flex-wrap`) so this drops to its own
+                full-width line below the title on narrow widths rather
+                than clipping. Renders only when a summary/tags/recording
+                actually exists, same visibility rule the two source
+                panels had individually. */}
             {(interaction.summary || (interaction.tags && interaction.tags.length > 0) || interaction.recording?.url) && (
               <div className="flex-shrink-0">
                 <SectionCard
                   title="Call Summary"
+                  actionFillsRow
                   action={
                     interaction.recording?.url ? (
-                      <audio controls className="w-56 h-[var(--height-control)]" src={interaction.recording.url}>
+                      <audio controls className="w-full h-[var(--height-control)]" src={interaction.recording.url}>
                         Your browser does not support the audio element.
                       </audio>
                     ) : undefined

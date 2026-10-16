@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { FilterPopover } from '@/components/common/FilterPopover';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { typography } from '@/lib/typography';
+import type { InteractionDetailTab } from '@/lib/interactionDetailTabs';
 
 /**
  * Session 11.4 — rebuilt on the Session 11.3/11.3A Call Logs pattern
@@ -30,10 +31,12 @@ type YesNoFacet = 'any' | 'yes' | 'no';
 
 const ChatLogs: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [page, setPage] = useState(1);
   const [statusFacet, setStatusFacet] = useState<StatusFacet>('any');
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<InteractionDetailTab>('overview');
 
   // Page-local only — GET /api/v1/chat/sessions has no free-text search
   // or authenticated-status query parameter (src/types/api/chat.ts /
@@ -64,6 +67,27 @@ const ChatLogs: React.FC = () => {
   const allSessionsRaw = data?.data ?? [];
   const pagination = data?.pagination;
   const isFallback = data?.source === 'local-fallback';
+
+  // Session 16.5.1 — the Chat equivalent of Call Logs' own "Open Full
+  // Inspector" return-navigation handling: reopens the SAME session's
+  // dialog on the SAME tab, but only when the session is found in the
+  // CURRENTLY LOADED page of results — a disclosed, honest limitation
+  // matching Call Logs' own, not a full extra fetch just for this edge
+  // case. Clears the location state after attempting the reopen
+  // (success or not) so a later refresh/back-navigation doesn't
+  // re-trigger it.
+  useEffect(() => {
+    const reopen = (location.state as { reopenInteraction?: { interactionId: string; tab: InteractionDetailTab } } | null)
+      ?.reopenInteraction;
+    if (!reopen || allSessionsRaw.length === 0) return;
+    const match = allSessionsRaw.find((s) => s.sessionId === reopen.interactionId);
+    if (match) {
+      setSelectedSessionId(match.sessionId);
+      setDetailInitialTab(reopen.tab);
+    }
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSessionsRaw, location.state]);
 
   const sessions = allSessionsRaw.filter((s) => {
     if (authFacet === 'yes' && !s.authenticated) return false;
@@ -364,6 +388,7 @@ const ChatLogs: React.FC = () => {
           isOpen={Boolean(selectedSessionId)}
           onClose={() => setSelectedSessionId(null)}
           sessionId={selectedSessionId}
+          initialTab={detailInitialTab}
         />
       </div>
     </Layout>

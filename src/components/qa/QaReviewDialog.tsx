@@ -24,8 +24,10 @@ import { formatTimestamp } from '@/lib/format';
 import { typography } from '@/lib/typography';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { buildCorrectiveActionInputFromHumanQaFinding } from '@/services/correctiveActions/qaAdapter';
-import type { CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
+import { formatCaNumber, type CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
 import { CreateCorrectiveActionDialog } from '@/components/correctiveActions/CreateCorrectiveActionDialog';
+import { CorrectiveActionDetailDialog } from '@/components/correctiveActions/CorrectiveActionDetailDialog';
+import { useCorrectiveActions } from '@/hooks/correctiveActions/useCorrectiveActions';
 
 interface QaReviewDialogProps {
   isOpen: boolean;
@@ -611,7 +613,29 @@ const QaSummaryPanel: React.FC<{
   const [reviewerNote, setReviewerNote] = useState(review.reviewerNote ?? '');
   const { user } = useAuth();
   const canCreateCorrectiveAction = hasPermission(user, 'corrective_actions.create');
+  const canViewCorrectiveAction = hasPermission(user, 'corrective_actions.view');
   const [createCaInput, setCreateCaInput] = useState<CreateCorrectiveActionInput | null>(null);
+  const [viewCaId, setViewCaId] = useState<string | null>(null);
+
+  // Session 16.5.1 follow-up — "Create Corrective Action" is idempotent
+  // per finding server-side (qaAdapter.ts's `human_qa_finding:${finding.id}`
+  // key), so a repeated click never creates a second CA — it silently
+  // returns the one already created. The button used to stay labeled
+  // "Create" forever, which read as broken/no-op rather than "already
+  // done". Looking up existing CAs by sourceReferenceId lets the row
+  // switch to "View <CA number>" once one exists, matching what the
+  // server actually does.
+  const { data: existingCAs } = useCorrectiveActions(
+    { agentId: review.agentId, sourceType: 'human_qa_finding' },
+    canViewCorrectiveAction,
+  );
+  const caByFindingId = useMemo(() => {
+    const map = new Map<string, { id: string; caNumber: number }>();
+    for (const ca of existingCAs ?? []) {
+      if (ca.sourceReferenceId) map.set(ca.sourceReferenceId, { id: ca.id, caNumber: ca.caNumber });
+    }
+    return map;
+  }, [existingCAs]);
 
   const turnIndexById = useMemo(() => new Map(allTurns.map((t, i) => [t.turnId, i])), [allTurns]);
   // §13/§4 — the summary's "findings by parameter" should reflect what
@@ -663,7 +687,15 @@ const QaSummaryPanel: React.FC<{
                 >
                   T{(turnIndexById.get(f.primaryTurnId) ?? 0) + 1} · {QA_PARAMETERS[f.parameterCode].displayName} · {f.value}
                 </button>
-                {canCreateCorrectiveAction && (
+                {canViewCorrectiveAction && caByFindingId.has(f.id) ? (
+                  <button
+                    type="button"
+                    className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline flex-shrink-0"
+                    onClick={() => setViewCaId(caByFindingId.get(f.id)!.id)}
+                  >
+                    View {formatCaNumber(caByFindingId.get(f.id)!.caNumber)}
+                  </button>
+                ) : canCreateCorrectiveAction && (
                   <button
                     type="button"
                     className="text-xs text-muted-foreground hover:text-foreground hover:underline flex-shrink-0"
@@ -712,6 +744,11 @@ const QaSummaryPanel: React.FC<{
         isOpen={Boolean(createCaInput)}
         onClose={() => setCreateCaInput(null)}
         initialValues={createCaInput ?? undefined}
+      />
+      <CorrectiveActionDetailDialog
+        id={viewCaId}
+        isOpen={Boolean(viewCaId)}
+        onClose={() => setViewCaId(null)}
       />
     </div>
   );

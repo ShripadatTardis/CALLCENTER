@@ -14,6 +14,17 @@ const buttonVariants = cva(
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
           "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        // Session 16.5.1 (HIG gate fix) — the semantic "positive/submitted"
+        // outline treatment, previously only expressed via Badge's own
+        // `positive` variant. Several call sites (e.g. a review's "already
+        // submitted" action button) need the same semantic distinction on
+        // a Button, but had no token-driven option and fell back to literal
+        // `emerald-*` Tailwind classes — exactly what ui-centralization.md
+        // Rule 2 asks to avoid. Reuses the SAME `--status-positive-*` CSS
+        // vars Badge's `positive` variant already reads (generateCssVariables.ts),
+        // so it stays customer/theme-configurable with zero new tokens.
+        outlinePositive:
+          "border border-[var(--status-positive-border)] bg-transparent text-[var(--status-positive-text)] hover:bg-[var(--status-positive-fill)]",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",

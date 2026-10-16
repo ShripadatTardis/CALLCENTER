@@ -22,8 +22,10 @@ import { FindingsList } from '@/components/qa/FindingsList';
 import { AutomatedQaFailedBanner } from '@/components/qa/AutomatedQaFailedBanner';
 import { isAutomatedQaInspectorReturnState } from '@/lib/automatedQaInspectorReturn';
 import { CreateCorrectiveActionDialog } from '@/components/correctiveActions/CreateCorrectiveActionDialog';
+import { CorrectiveActionDetailDialog } from '@/components/correctiveActions/CorrectiveActionDetailDialog';
+import { useCorrectiveActions } from '@/hooks/correctiveActions/useCorrectiveActions';
 import { buildCorrectiveActionInputFromAutomatedQaObservation } from '@/services/correctiveActions/qaAdapter';
-import type { CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
+import { formatCaNumber, type CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
 
 /**
  * Session 16.3 — read-only Automated QA Inspector. Deliberately a SEPARATE
@@ -103,10 +105,13 @@ const AutomatedQaInspector: React.FC = () => {
   // all of them, so `returnState` is null and the pre-existing
   // `navigate('/qa-review')` behavior applies unchanged.
   const returnState = isAutomatedQaInspectorReturnState(location.state) ? location.state : null;
-  const backLabel = returnState ? 'Back to Call Logs' : 'Back to Interaction Quality';
+  const backLabel = returnState
+    ? returnState.qaInspectorReturnOrigin === 'chat-logs' ? 'Back to Chat Logs' : 'Back to Call Logs'
+    : 'Back to Interaction Quality';
   const handleBack = () => {
     if (returnState) {
-      navigate('/call-logs', { state: { reopenInteraction: returnState.reopenInteraction } });
+      const path = returnState.qaInspectorReturnOrigin === 'chat-logs' ? '/chat-logs' : '/call-logs';
+      navigate(path, { state: { reopenInteraction: returnState.reopenInteraction } });
     } else {
       navigate('/qa-review');
     }
@@ -152,7 +157,28 @@ const AutomatedQaInspector: React.FC = () => {
   const observations: AutomatedQaObservation[] = evaluation?.observations ?? [];
   const selectedFinding = observations.find((o) => o.id === selectedFindingId) ?? null;
   const [createCaInput, setCreateCaInput] = useState<CreateCorrectiveActionInput | null>(null);
+  const [viewCaId, setViewCaId] = useState<string | null>(null);
   const canCreateCorrectiveAction = hasPermission(user, 'corrective_actions.create');
+  const canViewCorrectiveAction = hasPermission(user, 'corrective_actions.view');
+
+  // Session 16.5.1 follow-up — same idempotent-creation UX fix as
+  // QaReviewDialog.tsx's Summary panel: "Create Corrective Action" is
+  // idempotent per observation (qaAdapter.ts's
+  // `automated_qa_observation:${observation.id}` key), so a repeated
+  // click never creates a second CA — it silently returns the one
+  // already created. Looking up existing CAs by sourceReferenceId lets
+  // the action switch to "View <CA number>" once one exists.
+  const { data: existingCAs } = useCorrectiveActions(
+    { agentId: evaluation?.agentId, sourceType: 'automated_qa_observation' },
+    canViewCorrectiveAction && Boolean(evaluation?.agentId),
+  );
+  const caByObservationId = useMemo(() => {
+    const map = new Map<string, { id: string; caNumber: number }>();
+    for (const ca of existingCAs ?? []) {
+      if (ca.sourceReferenceId) map.set(ca.sourceReferenceId, { id: ca.id, caNumber: ca.caNumber });
+    }
+    return map;
+  }, [existingCAs]);
 
   const ratios = useMemo(
     () => computeAutomatedQaRatios(observations.map((o) => ({ evaluationId: o.evaluationId, parameterCode: o.parameterCode, value: o.value }))),
@@ -412,7 +438,18 @@ const AutomatedQaInspector: React.FC = () => {
                       <div><span className="text-muted-foreground">Reason: </span>{selectedFinding.reasonCode ? humanizeReasonCode(selectedFinding.reasonCode) : '—'}</div>
                       <div><span className="text-muted-foreground">Turn: </span>{turnIdx ? `Turn ${turnIdx}` : selectedFinding.primaryTurnId}</div>
                       <div className={`${typography.bodySecondary} pt-0.5`}>{selectedFinding.explanation ?? 'No explanation provided.'}</div>
-                      {canCreateCorrectiveAction && (
+                      {canViewCorrectiveAction && caByObservationId.has(selectedFinding.id) ? (
+                        <div className="pt-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-cyan-600 text-cyan-700 dark:border-cyan-400 dark:text-cyan-400"
+                            onClick={() => setViewCaId(caByObservationId.get(selectedFinding.id)!.id)}
+                          >
+                            View {formatCaNumber(caByObservationId.get(selectedFinding.id)!.caNumber)}
+                          </Button>
+                        </div>
+                      ) : canCreateCorrectiveAction && (
                         <div className="pt-1.5">
                           <Button
                             size="sm"
@@ -471,6 +508,11 @@ const AutomatedQaInspector: React.FC = () => {
         isOpen={Boolean(createCaInput)}
         onClose={() => setCreateCaInput(null)}
         initialValues={createCaInput ?? undefined}
+      />
+      <CorrectiveActionDetailDialog
+        id={viewCaId}
+        isOpen={Boolean(viewCaId)}
+        onClose={() => setViewCaId(null)}
       />
     </Layout>
   );

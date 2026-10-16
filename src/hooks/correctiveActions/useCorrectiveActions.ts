@@ -53,8 +53,8 @@ function invalidateCa(queryClient: ReturnType<typeof useQueryClient>, ca: Correc
   }
 }
 
-export function useCorrectiveActions(filters: CorrectiveActionListFilters = {}) {
-  return useQuery({ queryKey: correctiveActionsKeys.list(filters), queryFn: () => fetchCorrectiveActions(filters) });
+export function useCorrectiveActions(filters: CorrectiveActionListFilters = {}, enabled = true) {
+  return useQuery({ queryKey: correctiveActionsKeys.list(filters), queryFn: () => fetchCorrectiveActions(filters), enabled });
 }
 
 export function useCorrectiveAction(id: string | null) {

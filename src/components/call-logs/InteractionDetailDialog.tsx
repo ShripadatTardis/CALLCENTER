@@ -9,6 +9,7 @@ import { AgentContractSection } from '@/components/interaction-detail/AgentContr
 import { CallTechnicalPerformanceSection } from '@/components/interaction-detail/CallTechnicalPerformanceSection';
 import { ConversationTranscript, type ConversationEntry } from '@/components/interaction-detail/ConversationTranscript';
 import { AutomatedQaInlinePanel } from '@/components/qa/AutomatedQaInlinePanel';
+import { ManualQaInlinePanel } from '@/components/qa/ManualQaInlinePanel';
 import { InteractionTracePanel } from '@/components/interaction-detail/InteractionTracePanel';
 import { Interaction, TranscriptEntry } from '@/types/interaction';
 import { useInteractionTranscript } from '@/hooks/calls/useInteractionTranscript';
@@ -25,8 +26,14 @@ import {
   formatTimestamp,
 } from '@/lib/format';
 import { classifyActualOutcome, classifyStructuredOutputs, formatOutputValue } from '@/lib/campaignActualOutcome';
+import type { InteractionDetailTab } from '@/lib/interactionDetailTabs';
 
-export type InteractionDetailDialogTab = 'overview' | 'trace' | 'qa' | 'agent';
+// Session 16.5.1 — the canonical definition moved to
+// `src/lib/interactionDetailTabs.ts` so Chat's detail dialog (and the
+// Automated QA Inspector return-navigation state) can share it without
+// importing from this Call-specific file. Re-exported under its
+// original name so every existing importer is unaffected.
+export type InteractionDetailDialogTab = InteractionDetailTab;
 
 interface InteractionDetailDialogProps {
   isOpen: boolean;
@@ -270,6 +277,7 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             <TabsTrigger value="overview" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Overview</TabsTrigger>
             <TabsTrigger value="trace" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Interaction Trace</TabsTrigger>
             <TabsTrigger value="qa" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Automated QA</TabsTrigger>
+            <TabsTrigger value="manualQa" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Manual QA</TabsTrigger>
             <TabsTrigger value="agent" className="data-[state=active]:bg-muted data-[state=active]:text-foreground">Agent Performance</TabsTrigger>
           </TabsList>
 
@@ -414,7 +422,18 @@ export const InteractionDetailDialog: React.FC<InteractionDetailDialogProps> = (
             <AutomatedQaInlinePanel interactionId={interaction.interactionId} channel="voice" agentId={interaction.agentId} />
           </TabsContent>
 
-          {/* TAB 4 — Agent Performance: Agent Outcome, Agent Contract,
+          {/* TAB 4 (Session 16.5.1) — Manual QA: a real, dedicated tab
+              for both channels, reusing the existing Human QA review
+              implementation unchanged (`ManualQaInlinePanel` ->
+              `QaReviewDialog`) rather than a second QA engine. Shows
+              review status/conclusions/findings directly; blind-review
+              independence is preserved since this only ever summarizes
+              a review, never edits one inline. */}
+          <TabsContent value="manualQa" className="flex-1 min-h-0 hidden data-[state=active]:block overflow-y-auto mt-2.5">
+            <ManualQaInlinePanel interactionId={interaction.interactionId} channel="voice" agentId={interaction.agentId} />
+          </TabsContent>
+
+          {/* TAB 5 — Agent Performance: Agent Outcome, Agent Contract,
               Input Values Sent, Technical Performance — everything
               about how the agent itself performed on this interaction,
               grouped together per the brief's own Tab 4 definition.

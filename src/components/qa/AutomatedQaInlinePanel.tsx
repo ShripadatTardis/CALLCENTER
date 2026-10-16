@@ -93,8 +93,13 @@ export const AutomatedQaInlinePanel: React.FC<AutomatedQaInlinePanelProps> = ({ 
 
   const openFullInspector = () => {
     if (!evaluation) return;
+    // Session 16.5.1 — origin is derived from this panel's own
+    // `channel` prop rather than a new prop: the two are already a
+    // strict 1:1 mapping (voice -> Call Logs, chat -> Chat Logs), so a
+    // separate "where did I come from" input would just be able to
+    // disagree with the one that's already known to be true.
     const returnState: AutomatedQaInspectorReturnState = {
-      qaInspectorReturnOrigin: 'call-logs',
+      qaInspectorReturnOrigin: channel === 'voice' ? 'call-logs' : 'chat-logs',
       reopenInteraction: { interactionId, tab: 'qa' },
     };
     navigate(`/qa-review/automated/${evaluation.id}`, { state: returnState });

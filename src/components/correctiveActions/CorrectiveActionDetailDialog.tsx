@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +77,7 @@ const SOURCE_LABEL: Record<string, string> = {
  * ActionItemDetailDialog.
  */
 export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialogProps> = ({ id, isOpen, onClose, onOpenGroup }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: ca, isLoading } = useCorrectiveAction(id);
   const { data: activity } = useCorrectiveActionActivity(id);
@@ -198,7 +200,7 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
             <SectionCard
               title={isEditing ? 'Edit Corrective Action' : ca.title}
               action={canEditThis && !isEditing ? (
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openEdit}>Edit</Button>
+                <Button size="xs" variant="outline" onClick={openEdit}>Edit</Button>
               ) : undefined}
             >
               {isEditing ? (
@@ -246,6 +248,35 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
                     <span>Opened {formatTimestamp(ca.createdAt)}</span>
                     {ca.dueAt && <span>Due {formatTimestamp(ca.dueAt)}</span>}
                   </div>
+                  {/* Session 16.5.1 follow-up — a QA-sourced CA's
+                      sourceContext already carries the originating
+                      interactionId + channel (see qaAdapter.ts); this
+                      reuses the SAME reopenInteraction return-navigation
+                      state Call Logs/Chat Logs already consume (see
+                      automatedQaInspectorReturn.ts's return trip), not a
+                      new mechanism. Honest, disclosed limitation: the
+                      target page only reopens the interaction if it's in
+                      its CURRENTLY LOADED page of results, same as every
+                      other consumer of that state shape. */}
+                  {(() => {
+                    const srcInteractionId = typeof ca.sourceContext?.interactionId === 'string' ? ca.sourceContext.interactionId : null;
+                    const srcChannel = ca.sourceContext?.channel === 'voice' || ca.sourceContext?.channel === 'chat' ? ca.sourceContext.channel : null;
+                    if (!srcInteractionId || !srcChannel) return null;
+                    return (
+                      <button
+                        type="button"
+                        className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline text-left inline-block min-h-6 p-1 -m-1"
+                        onClick={() => {
+                          onClose();
+                          navigate(srcChannel === 'voice' ? '/call-logs' : '/chat-logs', {
+                            state: { reopenInteraction: { interactionId: srcInteractionId, tab: 'overview' } },
+                          });
+                        }}
+                      >
+                        Open {srcChannel === 'voice' ? 'call' : 'chat'} log for this interaction
+                      </button>
+                    );
+                  })()}
                   {ca.sourceContext && Object.keys(ca.sourceContext).length > 0 && (
                     <div className="pt-1 text-xs text-muted-foreground min-w-0">
                       {Object.entries(ca.sourceContext).map(([k, v]) => (
@@ -278,23 +309,25 @@ export const CorrectiveActionDetailDialog: React.FC<CorrectiveActionDetailDialog
                 ) : (
                   <ul className="space-y-1 pt-1.5">
                     {(candidates ?? []).map((c) => (
-                      <li key={c.id} className="flex items-center gap-2 text-xs">
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5"
-                          checked={selectedCandidateIds.has(c.id)}
-                          aria-label={`Select ${formatCaNumber(c.caNumber)} — ${c.title}`}
-                          onChange={(e) => {
-                            setSelectedCandidateIds((prev) => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(c.id); else next.delete(c.id);
-                              return next;
-                            });
-                          }}
-                        />
-                        <span className="font-medium text-foreground">{formatCaNumber(c.caNumber)}</span>
-                        <span className="truncate text-muted-foreground">{c.title}</span>
-                        <CorrectiveActionStatusBadge status={c.status} />
+                      <li key={c.id} className="text-xs">
+                        <label className="flex items-center gap-2 min-h-6 py-0.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5"
+                            checked={selectedCandidateIds.has(c.id)}
+                            aria-label={`Select ${formatCaNumber(c.caNumber)} — ${c.title}`}
+                            onChange={(e) => {
+                              setSelectedCandidateIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                                return next;
+                              });
+                            }}
+                          />
+                          <span className="font-medium text-foreground">{formatCaNumber(c.caNumber)}</span>
+                          <span className="truncate text-muted-foreground">{c.title}</span>
+                          <CorrectiveActionStatusBadge status={c.status} />
+                        </label>
                       </li>
                     ))}
                   </ul>

@@ -4,7 +4,7 @@ import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAu
 import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulationFetcher.js';
 import { fetchQaTurnsForInteraction } from '../src/server/qa/transcriptFetcher.js';
 import { evaluateInteraction, PROMPT_VERSION } from '../src/server/qa/automatedQaEvaluator.js';
-import { persistAttemptDiagnosticsSafely } from '../src/lib/automatedQaAttemptDiagnostics.js';
+import { persistAttemptDiagnosticsSafely, toCamelAttemptDiagnosticRow } from '../src/lib/automatedQaAttemptDiagnostics.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1015,6 +1015,61 @@ async function handleAutomatedQaGet(req: VercelRequest, res: VercelResponse): Pr
     });
     if (error) { res.status(500).json({ detail: error.message }); return; }
     res.status(200).json({ data: toCamelAutomatedQa(data) });
+    return;
+  }
+
+  // Session 16.4.4.1 — read-only LLM attempt diagnostics (brief §3). A
+  // narrower permission than `qa.automated.view` on purpose (brief §2):
+  // holding `automated_qa.diagnostics.view` is necessary but not
+  // sufficient — the caller must ALSO be in-scope for the underlying
+  // evaluation's agent (the same `call_center_automated_qa_get` +
+  // isAgentIdInScope check the `get` action above already uses), so a
+  // diagnostics-only grant can never be used to read an evaluation
+  // outside the caller's own Business Data Scope. The attempts
+  // themselves are still read via the EXISTING Session 16.4.4
+  // service_role-only RPC (`call_center_automated_qa_attempts_list`) —
+  // no new RPC, no broadened grant on it, no new Vercel function (this
+  // is one more branch on the existing `resource=automatedQa`
+  // dispatcher). Every access is audited (brief §2's "record diagnostic-
+  // access events"), with only ids/counts in the audit metadata — never
+  // the raw response text itself (brief §3's "do not expose raw
+  // responses in application logs" extends, by the same reasoning, to
+  // never writing it into the audit trail either).
+  if (action === 'diagnostics') {
+    const user = await requirePermission(req, res, 'automated_qa.diagnostics.view');
+    if (!user) return;
+    const evaluationId = queryStr(req, 'evaluationId');
+    if (!evaluationId) { res.status(422).json({ detail: 'evaluationId is required' }); return; }
+
+    const { data: evalData, error: evalError } = await supabase.rpc('call_center_automated_qa_get', { p_evaluation_id: evaluationId });
+    if (evalError) { res.status(500).json({ detail: evalError.message }); return; }
+    const evaluation = evalData ? (toCamelAutomatedQa(evalData) as { agentId?: string }) : null;
+    if (!evaluation || !isAgentIdInScope(toAgentAccess(user), evaluation.agentId)) {
+      res.status(404).json({ detail: 'Automated QA evaluation not found' });
+      return;
+    }
+
+    const { data, error } = await supabase.rpc('call_center_automated_qa_attempts_list', { p_evaluation_id: evaluationId });
+    if (error) { res.status(500).json({ detail: error.message }); return; }
+    // toCamelAttemptDiagnosticRow (not the generic recursive
+    // toCamelCaseDeep) — validation_detail's nested object keys are
+    // sometimes real stored data (a QA parameter code), not schema field
+    // names; see that function's own comment for the exact bug this
+    // avoids.
+    const attempts = (data ?? []).map((row: Record<string, unknown>) => toCamelAttemptDiagnosticRow(row)) as Array<{ id: string }>;
+
+    await recordAuditEvent({
+      actorType: 'user', actorUserId: user.id, action: 'automated_qa.diagnostics.viewed',
+      resourceType: 'automated_qa_evaluation', resourceId: evaluationId, result: 'success',
+      metadata: { attemptCount: attempts.length }, source: 'api/admin',
+    });
+
+    // Brief §3 — "prevent caching of sensitive diagnostic responses in
+    // shared or persistent caches". This response can carry raw
+    // customer-conversation-derived LLM output; it must never be cached
+    // by a shared proxy/CDN layer or reused across requests.
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({ data: attempts });
     return;
   }
 

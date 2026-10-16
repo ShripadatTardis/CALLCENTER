@@ -88,3 +88,50 @@ export async function listAutomatedQaEvaluations(status?: AutomatedQaStatus): Pr
   });
   return res.data;
 }
+
+/** Session 16.4.4.1 — per-attempt LLM diagnostics for one evaluation
+ * (request/response, structured validation detail, retry relationships).
+ * Distinct from `AutomatedQaEvaluation` itself and from "evaluation
+ * history" (multiple separate evaluation RUNS of the same interaction) —
+ * these are the one-or-more LLM call ATTEMPTS inside a single evaluation
+ * run. Gated server-side on `automated_qa.diagnostics.view`, a narrower
+ * permission than `qa.automated.view`. */
+export type AutomatedQaAttemptOutcome =
+  | 'success' | 'transport_failure' | 'parse_failure' | 'llm_error'
+  | 'contradictory_applicability' | 'uninformative_unassessability';
+
+export interface AutomatedQaAttemptDiagnostic {
+  id: string;
+  evaluationId: string;
+  windowIndex: number;
+  /** 1-based within (evaluationId, windowIndex). */
+  attemptNumber: number;
+  requestId: string;
+  modelId: string | null;
+  outcome: AutomatedQaAttemptOutcome;
+  errorCode: string | null;
+  errorMessage: string | null;
+  /** Exact response body text, never normalized/corrected. Null only for
+   * a transport-level failure that never received a body. */
+  rawResponse: string | null;
+  validationDetail: Record<string, unknown> | null;
+  /** The previous attempt's error/defect code, or null for the first
+   * attempt in a window. */
+  retryReason: string | null;
+  correctionInstructionId: string | null;
+  previousAttemptId: string | null;
+  requestedMaxOutputTokens: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  latencyMs: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export async function fetchAutomatedQaDiagnostics(evaluationId: string): Promise<AutomatedQaAttemptDiagnostic[]> {
+  const res = await request<{ data: AutomatedQaAttemptDiagnostic[] }>('/admin', {
+    query: { resource: 'automatedQa', action: 'diagnostics', evaluationId },
+  });
+  return res.data;
+}

@@ -4,6 +4,7 @@ import {
   fetchAutomatedQaEvaluation,
   listAutomatedQaEvaluationsForInteraction,
   listAutomatedQaEvaluations,
+  fetchAutomatedQaDiagnostics,
   type AutomatedQaEvaluation,
   type AutomatedQaStatus,
 } from '@/services/qa/automatedQaService';
@@ -13,6 +14,7 @@ export const automatedQaKeys = {
   evaluation: (evaluationId: string) => ['automatedQa', 'evaluation', evaluationId] as const,
   forInteraction: (interactionId: string, channel: QaChannel) => ['automatedQa', 'forInteraction', channel, interactionId] as const,
   list: (status?: AutomatedQaStatus) => ['automatedQa', 'list', status ?? 'all'] as const,
+  diagnostics: (evaluationId: string) => ['automatedQa', 'diagnostics', evaluationId] as const,
 };
 
 export function useAutomatedQaEvaluation(evaluationId: string | null) {
@@ -35,6 +37,18 @@ export function useAutomatedQaEvaluations(status?: AutomatedQaStatus) {
   return useQuery({
     queryKey: automatedQaKeys.list(status),
     queryFn: () => listAutomatedQaEvaluations(status),
+  });
+}
+
+/** Session 16.4.4.1 — gated on `enabled` by the caller (both "a real
+ * evaluationId exists" and "the viewer holds automated_qa.diagnostics.view"),
+ * so an unauthorized viewer never even issues the request. Server-side
+ * `requirePermission` is still the real enforcement either way. */
+export function useAutomatedQaDiagnostics(evaluationId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: automatedQaKeys.diagnostics(evaluationId ?? ''),
+    queryFn: () => fetchAutomatedQaDiagnostics(evaluationId as string),
+    enabled: Boolean(evaluationId) && enabled,
   });
 }
 

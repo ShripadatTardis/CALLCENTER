@@ -22,6 +22,31 @@ async function persistAttemptDiagnosticsSafely(write, evaluationId, attempts, no
     return { ok: false, error: message };
   }
 }
+function toCamelAttemptDiagnosticRow(row) {
+  return {
+    id: row.id,
+    evaluationId: row.evaluation_id,
+    windowIndex: row.window_index,
+    attemptNumber: row.attempt_number,
+    requestId: row.request_id,
+    modelId: row.model_id ?? null,
+    outcome: row.outcome,
+    errorCode: row.error_code ?? null,
+    errorMessage: row.error_message ?? null,
+    rawResponse: row.raw_response ?? null,
+    validationDetail: row.validation_detail ?? null,
+    retryReason: row.retry_reason ?? null,
+    correctionInstructionId: row.correction_instruction_id ?? null,
+    previousAttemptId: row.previous_attempt_id ?? null,
+    requestedMaxOutputTokens: row.requested_max_output_tokens ?? null,
+    promptTokens: row.prompt_tokens ?? null,
+    completionTokens: row.completion_tokens ?? null,
+    latencyMs: row.latency_ms ?? null,
+    startedAt: row.started_at ?? null,
+    completedAt: row.completed_at ?? null,
+    createdAt: row.created_at
+  };
+}
 function countRawParameterOccurrences(rawEntries, targetCodes) {
   const counts = {};
   for (const code of targetCodes) counts[code] = 0;
@@ -36,5 +61,6 @@ export {
   RAW_RESPONSE_MAX_CHARS,
   boundRawResponse,
   countRawParameterOccurrences,
-  persistAttemptDiagnosticsSafely
+  persistAttemptDiagnosticsSafely,
+  toCamelAttemptDiagnosticRow
 };

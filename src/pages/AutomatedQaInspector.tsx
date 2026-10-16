@@ -23,6 +23,7 @@ import { AutomatedQaFailedBanner } from '@/components/qa/AutomatedQaFailedBanner
 import { isAutomatedQaInspectorReturnState } from '@/lib/automatedQaInspectorReturn';
 import { CreateCorrectiveActionDialog } from '@/components/correctiveActions/CreateCorrectiveActionDialog';
 import { CorrectiveActionDetailDialog } from '@/components/correctiveActions/CorrectiveActionDetailDialog';
+import { EvaluationDiagnosticsPanel } from '@/components/qa/EvaluationDiagnosticsPanel';
 import { useCorrectiveActions } from '@/hooks/correctiveActions/useCorrectiveActions';
 import { buildCorrectiveActionInputFromAutomatedQaObservation } from '@/services/correctiveActions/qaAdapter';
 import { formatCaNumber, type CreateCorrectiveActionInput } from '@/services/correctiveActions/correctiveActionsService';
@@ -353,6 +354,14 @@ const AutomatedQaInspector: React.FC = () => {
             <span>Re-run failed to start: {rerunError}. The evaluation shown below is unchanged.</span>
           </div>
         )}
+
+        {/* Session 16.4.4.1 — read-only LLM attempt diagnostics, below
+            the error banner, above the main two-column layout so it
+            never disturbs that layout's existing grid. Renders nothing
+            at all for a viewer without automated_qa.diagnostics.view
+            (the component's own gate); available for both successful
+            and failed evaluations to those who do hold it. */}
+        <EvaluationDiagnosticsPanel evaluation={evaluation} />
 
         {/* Two-column desktop layout (≥1280px); stacks below that. */}
         <div className="grid grid-cols-1 xl:grid-cols-[58%_42%] gap-3 items-start">

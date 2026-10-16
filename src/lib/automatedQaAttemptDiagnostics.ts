@@ -129,6 +129,49 @@ export async function persistAttemptDiagnosticsSafely(
   }
 }
 
+/**
+ * Session 16.4.4.1 — converts one raw `automated_qa_evaluation_attempts`
+ * row (snake_case, as returned by `call_center_automated_qa_attempts_list`)
+ * into the camelCase shape the diagnostics API/UI expect, WITHOUT
+ * recursing into `validation_detail`. That field is semi-structured
+ * diagnostic JSON whose object keys are sometimes real stored DATA (a QA
+ * parameter code like `context_continuity_rate`, used as a key in
+ * `observationOccurrences`/`unassessableOccurrences`), not schema field
+ * names — a generic deep-camelCase pass over it silently rewrites those
+ * keys (e.g. to `contextContinuityRate`) and breaks every lookup against
+ * the actual stored parameter code. Found and fixed during this
+ * session's own live browser verification: the comparison UI showed
+ * "observations: 0" for an attempt whose raw row genuinely had 1,
+ * because api/admin.ts's generic recursive camelCaser had mangled this
+ * exact nested key. Every other column gets an ordinary one-level
+ * rename; `validation_detail` is passed through completely verbatim.
+ */
+export function toCamelAttemptDiagnosticRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: row.id,
+    evaluationId: row.evaluation_id,
+    windowIndex: row.window_index,
+    attemptNumber: row.attempt_number,
+    requestId: row.request_id,
+    modelId: row.model_id ?? null,
+    outcome: row.outcome,
+    errorCode: row.error_code ?? null,
+    errorMessage: row.error_message ?? null,
+    rawResponse: row.raw_response ?? null,
+    validationDetail: row.validation_detail ?? null,
+    retryReason: row.retry_reason ?? null,
+    correctionInstructionId: row.correction_instruction_id ?? null,
+    previousAttemptId: row.previous_attempt_id ?? null,
+    requestedMaxOutputTokens: row.requested_max_output_tokens ?? null,
+    promptTokens: row.prompt_tokens ?? null,
+    completionTokens: row.completion_tokens ?? null,
+    latencyMs: row.latency_ms ?? null,
+    startedAt: row.started_at ?? null,
+    completedAt: row.completed_at ?? null,
+    createdAt: row.created_at,
+  };
+}
+
 /** Counts occurrences of each target parameter code in a raw (unvalidated) model array entry list, keyed by `parameter_code`. */
 export function countRawParameterOccurrences(
   rawEntries: unknown,

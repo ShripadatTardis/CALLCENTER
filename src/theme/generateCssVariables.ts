@@ -191,19 +191,37 @@ export function generateDarkDeclarations(config: VoiceForceThemeConfig): Declara
  * 7.7 code did) produced an empty CSS value for any config that
  * honestly omits them (confirmed by KATON's config, which has no
  * distinct secondary active-text treatment) — tripping the generator's
- * own "never silently emit an empty value" guard. Now conditionally
- * emitted, matching the pattern every other optional field in this file
- * already uses (e.g. `panelDeclarations`'s `headerPaddingPx` check).
+ * own "never silently emit an empty value" guard.
+ *
+ * Session 7.12 fix — "omitted" must still resolve to a real, correct
+ * color, not simply absent. A config that declares no distinct
+ * secondary active-text treatment is explicitly saying "use the
+ * ordinary active text color for this too" (confirmed KATON's own
+ * comment: "no distinct secondary active-text treatment is documented
+ * beyond the one active state above"), not "leave this undefined." The
+ * gap was invisible for a STATIC per-customer build (an omitted
+ * property for KATON's generated file just never existed, so the
+ * consuming `text-[var(--x)]` class fell back to its CSS-inherited
+ * color — usually close enough to go unnoticed) but became a real,
+ * visible bug once Session 7.12's runtime switcher made it possible to
+ * view KATON's sidebar directly: the property fell back to whatever a
+ * PREVIOUSLY active skin's stylesheet/inline value happened to be
+ * (VoiceForce's own cyan, baked into the committed `src/index.css`),
+ * producing a low-contrast, easy-to-miss "selected" state against
+ * KATON's pale active background. Falls back to the always-required
+ * `navigation.item.active.foreground` — the one color every config MUST
+ * define for exactly this semantic purpose — rather than inventing a
+ * new value or leaving the property silently absent.
  */
 function navActiveTextDeclarations(item: VoiceForceThemeConfig['navigation']['item'], mode: 'light' | 'dark'): Declaration[] {
-  const declarations: Declaration[] = [];
-  if (item.headingActiveText) {
-    declarations.push({ name: '--nav-heading-active-text', value: item.headingActiveText[mode], comment: `navigation.item.headingActiveText.${mode}` });
-  }
-  if (item.expandedActiveText) {
-    declarations.push({ name: '--nav-item-active-text', value: item.expandedActiveText[mode], comment: `navigation.item.expandedActiveText.${mode}` });
-  }
-  return declarations;
+  return [
+    item.headingActiveText
+      ? { name: '--nav-heading-active-text', value: item.headingActiveText[mode], comment: `navigation.item.headingActiveText.${mode}` }
+      : { name: '--nav-heading-active-text', value: item.active.foreground, comment: 'navigation.item.active.foreground (fallback — no distinct headingActiveText documented)' },
+    item.expandedActiveText
+      ? { name: '--nav-item-active-text', value: item.expandedActiveText[mode], comment: `navigation.item.expandedActiveText.${mode}` }
+      : { name: '--nav-item-active-text', value: item.active.foreground, comment: 'navigation.item.active.foreground (fallback — no distinct expandedActiveText documented)' },
+  ];
 }
 
 type StatusRoleName = 'positive' | 'caution' | 'negative' | 'pending' | 'neutral';

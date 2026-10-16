@@ -7,9 +7,12 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Save, Bell, Shield, Database, SlidersHorizontal, Sun, Moon, Monitor } from 'lucide-react';
+import { Save, Bell, Shield, Database, SlidersHorizontal, Sun, Moon, Monitor, Palette } from 'lucide-react';
 import { type AppearancePreference } from '@/contexts/ThemeContext';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCustomerSkin } from '@/hooks/useCustomerSkin';
+import { CUSTOMER_SKIN_LABELS, type CustomerSkin } from '@/theme/customerConfigs';
 import { typography } from '@/lib/typography';
 
 const Settings: React.FC = () => {
@@ -17,6 +20,17 @@ const Settings: React.FC = () => {
   const [autoEscalation, setAutoEscalation] = useState(false);
   const [dataRetention, setDataRetention] = useState('90');
   const { preference, setPreference } = useTheme();
+  const { user } = useAuth();
+  const { skin, setSkin } = useCustomerSkin();
+  // Session 7.12 — presentation-only visibility gate. Checks the real
+  // assigned roles array (`roles`, never the legacy-compat `role`
+  // string — see src/types/auth.ts's own comment on why `role` must
+  // never be used for a new authorization decision), consistent with
+  // how this app distinguishes "legacy header-forwarding" from "real
+  // authorization" everywhere else. This is UI visibility only: nothing
+  // about the selector reads or writes any permission, tenant, or data-
+  // scope value.
+  const isAdministrator = Boolean(user?.roles?.includes('administrator'));
 
   const handleSave = () => {
     console.log('Settings saved');
@@ -98,6 +112,50 @@ const Settings: React.FC = () => {
                   : `VoiceForce always displays in ${preference} mode on this device.`}
               </p>
             </div>
+
+            {/* Session 7.12 — Demo Skin Selector. Administrator-only,
+                presentation-only: switches which centrally-configured
+                customer theme (VoiceForce/KATON) is applied, immediately
+                and without a reload, by writing CSS custom properties
+                directly onto the DOM (see src/theme/applyCustomerSkin.ts).
+                Deliberately labeled "Demo Skin Selector" throughout, never
+                "tenant"/"customer account" language, so it can't be
+                mistaken for a real multi-tenant switch — it has no effect
+                on auth, permissions, business data, or API routing. */}
+            {isAdministrator && (
+              <div className="rounded-md border border-border bg-card p-4 space-y-3 max-w-md mt-3">
+                <div className="flex items-center gap-1.5">
+                  <Palette className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                  <Label className="text-xs text-foreground">Demo Skin Selector</Label>
+                </div>
+                <p className={typography.bodySecondary}>
+                  Administrator-only. Previews a customer theme skin across the whole app, instantly — this does not
+                  change your account, tenant, permissions, or any data.
+                </p>
+                <ToggleGroup
+                  type="single"
+                  value={skin}
+                  onValueChange={(value) => value && setSkin(value as CustomerSkin)}
+                  className="justify-start gap-2"
+                  aria-label="Demo skin"
+                >
+                  {(Object.keys(CUSTOMER_SKIN_LABELS) as CustomerSkin[]).map((s) => (
+                    <ToggleGroupItem
+                      key={s}
+                      value={s}
+                      aria-label={CUSTOMER_SKIN_LABELS[s]}
+                      className="h-8 px-3 text-xs gap-1.5 border border-border bg-card text-foreground data-[state=on]:bg-cyan-600 data-[state=on]:text-white data-[state=on]:border-cyan-600"
+                    >
+                      {CUSTOMER_SKIN_LABELS[s]}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                <p className={typography.metadata}>
+                  Currently previewing the <strong>{CUSTOMER_SKIN_LABELS[skin]}</strong> skin. Your Light/Dark/System
+                  choice is remembered separately for each skin.
+                </p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="general" className="mt-3">

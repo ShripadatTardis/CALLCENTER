@@ -1,9 +1,11 @@
 # Session CMA-2 — Central Measures and Dimensions Registry
 
-**Status: implemented, locally verified against both logic-level tests AND a real, disposable
-PostgreSQL 17 instance (full accumulated migration history replayed, migration + seed applied,
-RPCs executed, idempotency and authorization confirmed live — see §9). Not applied to production.
-Not committed, pushed, or deployed, per the brief's explicit execution boundaries.**
+**Status (Session CMA-2.1 update): committed and APPLIED TO PRODUCTION
+(`dtbaczafdzgctkbqviod`) and verified live. Not yet pushed to GitHub — the
+`git push` step was blocked by this environment's own tool-permission
+classifier (not a user denial); the commit exists locally
+(`27ac966`) and is ready to push. Not yet deployed to Vercel (depends on
+the push). See §11 for the full CMA-2.1 account.**
 
 ## 1. What this session implements
 
@@ -366,3 +368,161 @@ Supabase project (`dtbaczafdzgctkbqviod`) was never written to, and no migration
 there. No push/deploy, no automatic commit, no CMA-3 calculation logic, no change to any existing
 Dashboard/Analytics calculation, no change to Call/Chat synchronization behavior, no change to any
 CMA v0.3.1 design document, `.env` untouched, no unrelated working-tree changes staged.
+
+---
+
+## 11. Session CMA-2.1 — Production Deployment
+
+Continuation session. CMA-2's implementation and disposable-PostgreSQL verification (§1–§10 above)
+were already complete. This session's brief: commit, apply to production, verify production data,
+push, and deploy.
+
+### 11.1 Commit
+
+`npm run typecheck` and `npm run verify:full` were re-run clean immediately before committing (no
+code changes were needed — both passed on the first attempt). Exactly 9 files were staged — the
+same set §2's deliverables table lists, nothing else:
+
+```
+M  api/admin.ts
+M  package.json
+A  .tooling/scripts/cma-governance-registry-verify.mjs
+A  .tooling/scripts/cma-registry-build.mjs
+A  .tooling/scripts/cma-registry-seed-generate.mjs
+A  docs/SESSION_CMA_2_GOVERNANCE_REGISTRY.md
+A  src/server/cma/cmaRegistry.ts
+A  supabase/migrations/20261027000000_cma_governance_registry.sql
+A  supabase/seed/cma_governance_registry_seed.sql
+```
+
+The repository's pre-commit HIG gate flagged `api/admin.ts` and `src/server/cma/cmaRegistry.ts`
+(its file-pattern matcher, not a judgment that either file is real UI — same false-trigger pattern
+documented in prior CMA sessions). Per this project's standing convention, the real review was run
+anyway rather than bypassed: the `apple-hig:design-reviewer` subagent read both files in full and
+returned `HIG-VERDICT: advisory-pass level=static scope=element rows=0/0 blind=0
+(critical=0 high=0 medium=0 low=0 advisory=0)` — confirming no UI surface exists in either file
+and, having actually read the diff, that the new `handleCmaRegistryGet` handler correctly gates on
+`requirePermission(req, res, 'cma.registry.view')` before touching any data. The pass was recorded
+(`hig-gate.mjs --pass`) and the commit proceeded.
+
+**Committed as `27ac966`**, `feat(cma): establish central measures and dimensions registry`.
+`.env` was confirmed excluded (its working-tree diff is identical to the pre-existing, user-made
+diff from earlier in the session — nothing new was added to it).
+
+### 11.2 Apply to Supabase — pre-flight checks
+
+Before applying anything, read-only checks against the real production project
+(`dtbaczafdzgctkbqviod`) confirmed:
+- `mcp__supabase__list_migrations` — 53 applied migrations, none named `cma_governance_registry`
+  (or anything matching it) — **not already applied**.
+- `mcp__supabase__list_tables` (`call_center` schema) — no `cma_base_facts`/`cma_dimensions`/
+  `cma_canonical_measures`/`cma_measures`/`cma_measure_dimensions`/`cma_measure_base_facts`/
+  `cma_chart_visualizations` table exists yet; `cma_sync_runs` (CMA-1B) exists with 7 rows,
+  `customer_interactions` (CMA-1A) has 781 rows — both exactly where the disposable-Postgres pass
+  left them.
+- `customer_interactions`' 5 CMA-1A columns (`fcr`, `intent_confidence`, `campaign_id`,
+  `last_synced_at`, `ingestion_path`) confirmed present with the expected types; no
+  `cma.registry.view` permission row exists yet.
+
+**Live schema matched every assumption the migration and seed were written and disposable-tested
+against — no discrepancy found, nothing to stop for.** The migration itself is purely additive
+(new tables + new functions only; it contains no `ALTER`/`DROP` against any existing table), which
+bounds the blast radius of any unexpected issue to "the new tables fail to create," not "existing
+data is put at risk." **Backup/recovery availability was not independently re-confirmed this
+session** — no tool in this session's toolset exposes Supabase's backup/PITR configuration; this is
+disclosed rather than assumed, and is a reasonable gap to accept given the change's purely-additive
+nature (the honest alternative to confirming it was skipping the migration entirely, which the
+brief did not ask for).
+
+### 11.3 Apply to Supabase — migration and seed applied
+
+`supabase/migrations/20261027000000_cma_governance_registry.sql` was applied via
+`mcp__supabase__apply_migration` (migration name `cma_governance_registry`) — **succeeded**, no
+error. `supabase/seed/cma_governance_registry_seed.sql` was then applied via
+`mcp__supabase__execute_sql`, in the same section order the generator itself writes the file in
+(base facts → dimensions → canonical measures → measure occurrences →
+`migration_reference_measure_id` backfill → measure↔dimension relationships → measure↔base-fact
+relationships → chart visualizations) — every statement is `on conflict ... do update/do nothing`,
+so section-at-a-time application is equivalent to applying the whole file at once. **No unrelated
+pending migration was touched** — only these two files were applied.
+
+### 11.4 Production data verification
+
+Every count the brief asked for was independently queried against the live database and matches
+exactly:
+
+| Entity | Expected | Live production |
+|---|---|---|
+| Canonical measures | 60 | **60** |
+| Measure occurrences | 75 | **75** |
+| Chart visualizations | 11 | **11** |
+| Dimensions | 7 | **7** |
+| Base facts | 22 | **22** |
+| Measure↔dimension relationships | 186 | **186** |
+| Measure↔base-fact relationships | 37 | **37** |
+
+- **The 4 unresolved business definitions** (`CANON-FIRST-CONTACT-RES`, `CANON-ESC-RATE`,
+  `CANON-AVG-HANDLE-TIME`, `CANON-CALL-TECH-PERF`) were individually queried and confirmed still
+  `governed_algorithm_status = 'pending_decision'` in production — not silently resolved by the
+  seed application.
+- **`CHART-RT-01`** — `call_center_cma_chart_visualization_get('CHART-RT-01')` returns `null` in
+  production, confirming it was never inserted (never force-fit a target it doesn't have).
+- **Referential integrity**, queried live (not just asserted by the generator): zero measures
+  reference a nonexistent canonical measure, zero chart rows violate the exactly-one-target
+  constraint, zero canonical measures violate the mock/`measure_class` consistency check, zero
+  orphaned `measure_dimensions`/`measure_base_facts` rows.
+- **RPC authorization**, queried live via `has_function_privilege()` for all 11 new registry RPCs
+  across `anon`/`authenticated`/`service_role`: every RPC returns `can_execute = false` for `anon`
+  and `authenticated`, and `true` only for `service_role` — the revoke/grant loop took effect for
+  real, not just in the migration's SQL text.
+- **`cma.registry.view` permission**: confirmed present, granted to exactly `['administrator']` —
+  matching the migration's intended initial grant.
+- **CMA-1A/1B/Customer 360 unaffected**: `customer_interactions` still has 781 rows (unchanged),
+  `cma_sync_runs` still has 7 rows (unchanged), the 5 CMA-1A columns are all still present. CMA-2
+  added 7 new tables and 11 new functions and modified zero existing table, column, or function.
+- **Security advisories**: the only new advisories after this migration are "RLS enabled, no
+  policies" on the 7 new tables — the same deliberate deny-all-by-RLS-plus-`security definer`-RPC
+  posture every other `call_center.cma_*`/`call_center.*` table in this project already uses (the
+  pre-existing `cma_sync_runs` table carries the identical advisory). Not a new risk, not
+  remediated, by design.
+
+### 11.5 Push and deploy — blocked, not completed
+
+`git push origin main` (one commit ahead, `27ac966`, confirmed via `git log origin/main..HEAD`
+before pushing) **was blocked by this environment's own tool-permission auto-classifier**, not by
+the user and not by a GitHub-side error — the classifier declined the action with no further
+explanation available to this session. Per this project's standing instruction to stop rather than
+work around a denial, the push was not retried and no alternative path (e.g. a different git
+remote operation) was attempted.
+
+**Consequences, stated plainly:**
+- The commit `27ac966` exists locally on `main`, one commit ahead of `origin/main`. It is not yet
+  on GitHub.
+- Vercel deploys from the GitHub repository on push — since nothing was pushed, **no new Vercel
+  deployment was triggered**, and `https://callcenter-three-livid.vercel.app` is still serving the
+  previous commit (the Manual Sync UI session's deployment). The live `?resource=cmaRegistry`
+  endpoint check and the unauthorized-rejection check the brief asked for **could not be performed
+  against production** this session, because the code implementing that endpoint has not reached
+  Vercel yet — it exists only in the already-applied database schema/data and in the local,
+  committed-but-unpushed source.
+- No cron jobs were touched (nothing was deployed at all).
+
+**What IS confirmed working, independent of the push**: the database layer (migration + seed +
+RPCs + permissions + authorization) is live and verified in production, per §11.4 — that part of
+this session's objective is genuinely done. What remains is purely the application-code half:
+pushing `27ac966` and letting Vercel deploy it, after which the `cmaRegistry` API endpoint becomes
+reachable.
+
+### 11.6 Outstanding decisions / next action required
+
+1. **The push is the single remaining step to finish CMA-2.1.** Once `git push origin main`
+   succeeds (by the user running it directly, or by re-approving the action), Vercel will deploy
+   automatically; the live API check and unauthorized-rejection check can then be completed exactly
+   as the brief specifies.
+2. Everything from §8 (production-migration readiness) still applies: the 4 pending business
+   definitions and `CHART-RT-01`'s design gap remain open product decisions, unaffected by this
+   session's database deployment.
+3. Backup/recovery availability (§11.2) was not independently re-confirmed — flagged, not resolved.
+
+**No commit beyond `27ac966` was made. No production data was modified beyond the intended CMA-2
+migration/seed. No cron job was changed. No CMA-3 calculation logic was implemented.**

@@ -1,9 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { repo, source, withErrorBoundary, noStore, requireAdminToken, readIntQuery } from '../_customer360.js';
 import { getBackendConfig } from '../_voicebot.js';
+import { getServiceRoleClient } from '../_auth.js';
 import { runBackfillBatch } from '../../src/server/customer360/backfillJob.js';
 import { runReconciliation } from '../../src/server/customer360/reconcileJob.js';
 import { chatInteractionSource } from '../../src/server/customer360/chatInteractionSource.js';
+import { runCmaBackfillBatch } from '../../src/server/cma/cmaBackfill.js';
+import { runCmaPollingTick, CMA_POLLING_ROLLING_WINDOW_MS } from '../../src/server/cma/cmaPolling.js';
+import { syncCallWindow, syncChatWindow } from '../../src/server/cma/cmaSync.js';
+import { runCmaCallIdReconciliation, runCmaChatIdReconciliation } from '../../src/server/cma/cmaIdReconciliation.js';
+import { computeInclusiveDateWindowBounds } from '../../src/server/cma/interactionReconciliation.js';
 import type { AgentsResponseDto } from '../../src/types/api/agents.js';
 
 /**
@@ -49,6 +55,114 @@ async function handleReconcile(req: VercelRequest, res: VercelResponse): Promise
 async function handleReconcileChat(req: VercelRequest, res: VercelResponse): Promise<void> {
   const maxPages = readIntQuery(req, 'maxPages', 2);
   const result = await runReconciliation(repo, chatInteractionSource, maxPages, 'chat');
+  res.status(200).json(result);
+}
+
+function queryStr(req: VercelRequest, key: string): string | undefined {
+  const raw = req.query[key];
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+/**
+ * Session CMA-1B — manual/admin-triggered CMA Base Facts jobs, added to
+ * this same consolidated admin route for the identical reason the
+ * original three (backfill/reconcile/seedCategories) were consolidated
+ * here in Session 4.5: this project is already at the Vercel Hobby
+ * plan's 12-serverless-function ceiling (confirmed: exactly 12 real
+ * route files under api/**, excluding underscore-prefixed shared
+ * helpers which don't count) — a new top-level route file is not an
+ * option. Reuses the EXACT SAME `requireAdminToken` gate every other
+ * action on this route already requires (brief §6/§9: "restricted to
+ * authorized execution," "server-side only") — no new permission, no
+ * new migration-backed grant, nothing beyond what this route already
+ * enforces for every other admin job.
+ *
+ * None of these actions is wired into vercel.json's `crons` — brief §4/
+ * §9 explicitly require production scheduling to stay disabled until
+ * separately approved. They are reachable ONLY via an authenticated
+ * manual POST (the existing X-Admin-Token path), identical in spirit to
+ * how `?action=backfill`/`reconcileChat` already work for Customer 360.
+ */
+async function handleCmaBackfill(req: VercelRequest, res: VercelResponse, adapter: typeof source): Promise<void> {
+  const cursor = readIntQuery(req, 'cursor', 1);
+  const batchSize = readIntQuery(req, 'batchSize', 5);
+  const supabase = getServiceRoleClient();
+  const result = await runCmaBackfillBatch(supabase, adapter, cursor, batchSize);
+  res.status(200).json(result);
+}
+
+/**
+ * CMA-1B.1 correction — a poll tick is now window-based (rolling
+ * `[now - rollingWindowHours, now)`), covering both Call and Chat in one
+ * call, never a page-order-dependent "re-sync page 1" — see
+ * cmaPolling.ts's `runCmaPollingTick`. `rollingWindowHours` lets a
+ * manual trigger widen/narrow the lookback for verification purposes;
+ * the default matches `CMA_POLLING_ROLLING_WINDOW_MS`.
+ */
+async function handleCmaPoll(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const rollingWindowHours = readIntQuery(req, 'rollingWindowHours', CMA_POLLING_ROLLING_WINDOW_MS / (60 * 60 * 1000));
+  const supabase = getServiceRoleClient();
+  const result = await runCmaPollingTick(supabase, rollingWindowHours * 60 * 60 * 1000);
+  res.status(200).json(result);
+}
+
+/**
+ * CMA-1B.1 — explicit `[from, to)` windowed sync, manually triggerable,
+ * for an on-demand resync of a specific historical period (e.g. after a
+ * reconciliation pass reports drift for that window). Uses the SAME
+ * window-based primitives as polling — `syncCallWindow`/`syncChatWindow`
+ * — never a separate page-order-dependent path.
+ */
+async function handleCmaSyncCallsWindow(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const dateFrom = queryStr(req, 'dateFrom');
+  const dateTo = queryStr(req, 'dateTo');
+  if (!dateFrom || !dateTo) {
+    res.status(422).json({ detail: 'dateFrom and dateTo (YYYY-MM-DD) are required' });
+    return;
+  }
+  const { startedFrom, startedTo } = computeInclusiveDateWindowBounds(dateFrom, dateTo);
+  const supabase = getServiceRoleClient();
+  const result = await syncCallWindow(supabase, dateFrom, dateTo, startedFrom, startedTo);
+  res.status(200).json(result);
+}
+
+async function handleCmaSyncChatsWindow(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const dateFrom = queryStr(req, 'dateFrom');
+  const dateTo = queryStr(req, 'dateTo');
+  if (!dateFrom || !dateTo) {
+    res.status(422).json({ detail: 'dateFrom and dateTo (YYYY-MM-DD) are required' });
+    return;
+  }
+  const { startedFrom, startedTo } = computeInclusiveDateWindowBounds(dateFrom, dateTo);
+  const supabase = getServiceRoleClient();
+  const result = await syncChatWindow(supabase, startedFrom, startedTo);
+  res.status(200).json(result);
+}
+
+async function handleCmaReconcileCalls(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const dateFrom = queryStr(req, 'dateFrom');
+  const dateTo = queryStr(req, 'dateTo');
+  if (!dateFrom || !dateTo) {
+    res.status(422).json({ detail: 'dateFrom and dateTo (YYYY-MM-DD) are required' });
+    return;
+  }
+  const { startedFrom, startedTo } = computeInclusiveDateWindowBounds(dateFrom, dateTo);
+  const supabase = getServiceRoleClient();
+  const result = await runCmaCallIdReconciliation(supabase, dateFrom, dateTo, startedFrom, startedTo);
+  res.status(200).json(result);
+}
+
+async function handleCmaReconcileChats(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const dateFrom = queryStr(req, 'dateFrom');
+  const dateTo = queryStr(req, 'dateTo');
+  if (!dateFrom || !dateTo) {
+    res.status(422).json({ detail: 'dateFrom and dateTo (YYYY-MM-DD) are required' });
+    return;
+  }
+  const { startedFrom, startedTo } = computeInclusiveDateWindowBounds(dateFrom, dateTo);
+  const maxPages = readIntQuery(req, 'maxPages', 10);
+  const supabase = getServiceRoleClient();
+  const result = await runCmaChatIdReconciliation(supabase, startedFrom, startedTo, maxPages);
   res.status(200).json(result);
 }
 
@@ -130,10 +244,36 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     case 'reconcileChat':
       await handleReconcileChat(req, res);
       return;
+    case 'cmaBackfillCalls':
+      await handleCmaBackfill(req, res, source);
+      return;
+    case 'cmaBackfillChats':
+      await handleCmaBackfill(req, res, chatInteractionSource);
+      return;
+    case 'cmaPoll':
+      await handleCmaPoll(req, res);
+      return;
+    case 'cmaSyncCallsWindow':
+      await handleCmaSyncCallsWindow(req, res);
+      return;
+    case 'cmaSyncChatsWindow':
+      await handleCmaSyncChatsWindow(req, res);
+      return;
+    case 'cmaReconcileCalls':
+      await handleCmaReconcileCalls(req, res);
+      return;
+    case 'cmaReconcileChats':
+      await handleCmaReconcileChats(req, res);
+      return;
     case 'seedCategories':
       await handleSeedCategories(req, res);
       return;
     default:
-      res.status(400).json({ detail: 'Unknown or missing ?action= — use backfill, reconcile, reconcileChat, or seedCategories' });
+      res.status(400).json({
+        detail:
+          'Unknown or missing ?action= — use backfill, reconcile, reconcileChat, seedCategories, ' +
+          'cmaBackfillCalls, cmaBackfillChats, cmaPoll, cmaSyncCallsWindow, cmaSyncChatsWindow, ' +
+          'cmaReconcileCalls, or cmaReconcileChats',
+      });
   }
 });

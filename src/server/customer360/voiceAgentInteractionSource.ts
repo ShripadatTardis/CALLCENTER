@@ -57,7 +57,8 @@ async function fetchCallData(query: Record<string, string>): Promise<CallDataRes
   throw lastError instanceof Error ? lastError : new Error('call-data request failed after retries');
 }
 
-function mapEntry(dto: CallDataEntryDto): SourceInteraction {
+/** Exported for reuse by CMA-1B.1's window-based call sync (cmaSync.ts) — the one real mapping from the raw upstream DTO to SourceInteraction, never duplicated. */
+export function mapEntry(dto: CallDataEntryDto): SourceInteraction {
   return {
     interactionId: dto.call_id,
     channel: dto.channel,

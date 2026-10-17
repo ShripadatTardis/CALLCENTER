@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerSkin } from '@/hooks/useCustomerSkin';
 import { CUSTOMER_SKIN_LABELS, type CustomerSkin } from '@/theme/customerConfigs';
 import { typography } from '@/lib/typography';
+import { CmaSyncPanel } from '@/components/cma/CmaSyncPanel';
 
 const Settings: React.FC = () => {
   const [notifications, setNotifications] = useState(true);
@@ -31,6 +32,10 @@ const Settings: React.FC = () => {
   // about the selector reads or writes any permission, tenant, or data-
   // scope value.
   const isAdministrator = Boolean(user?.roles?.includes('administrator'));
+  // Permission-based gate (not role-name based) — see the server-side
+  // `requirePermission('cma.sync.manage')` check this control's backend
+  // endpoints enforce regardless of what the UI shows or hides.
+  const canManageCmaSync = Boolean(user?.permissions?.includes('cma.sync.manage'));
 
   const handleSave = () => {
     console.log('Settings saved');
@@ -211,6 +216,11 @@ const Settings: React.FC = () => {
                 />
               </div>
             </div>
+            {canManageCmaSync && (
+              <div className="mt-3">
+                <CmaSyncPanel />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="ai" className="mt-3">

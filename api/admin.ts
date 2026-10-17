@@ -5,6 +5,7 @@ import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulat
 import { fetchQaTurnsForInteraction } from '../src/server/qa/transcriptFetcher.js';
 import { evaluateInteraction, PROMPT_VERSION } from '../src/server/qa/automatedQaEvaluator.js';
 import { persistAttemptDiagnosticsSafely, toCamelAttemptDiagnosticRow } from '../src/lib/automatedQaAttemptDiagnostics.js';
+import { runManualCmaSync } from '../src/server/cma/cmaSyncRun.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1619,6 +1620,42 @@ async function handleCorrectiveActionsPost(req: VercelRequest, res: VercelRespon
   res.status(400).json({ detail: `Unknown action: ${action}` });
 }
 
+/**
+ * CMA Synchronization — Manual UI Control. Replaces the originally-
+ * planned Vercel Cron polling (CMA-1B.3 Step 5), abandoned because this
+ * team's confirmed Hobby plan only supports daily cron — too coarse for
+ * CMA freshness. Gated by the real session-based RBAC (`cma.sync.manage`),
+ * NOT the separate `requireAdminToken` shared-secret mechanism the other
+ * CMA actions (`api/customers/admin.ts`) use — that secret must never be
+ * embedded in client code, so a browser-facing control cannot use it.
+ *
+ *   GET  /api/admin?resource=cmaSync                 — { latest, history } (last 10 runs)
+ *   POST /api/admin?resource=cmaSync&action=start     body { lookbackHours?: number }
+ */
+async function handleCmaSyncGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'cma.sync.manage');
+  if (!user) return;
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase.rpc('call_center_cma_sync_runs_list', { p_limit: 10 });
+  if (error) { res.status(500).json({ detail: error.message }); return; }
+  const history = (data as unknown[]) ?? [];
+  res.status(200).json({ data: { latest: history[0] ?? null, history } });
+}
+
+async function handleCmaSyncPost(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const action = queryStr(req, 'action');
+  if (action !== 'start') {
+    res.status(400).json({ detail: 'Unknown or missing ?action= — use start' });
+    return;
+  }
+  const user = await requirePermission(req, res, 'cma.sync.manage');
+  if (!user) return;
+  const { lookbackHours } = (req.body ?? {}) as { lookbackHours?: number };
+  const supabase = getServiceRoleClient();
+  const outcome = await runManualCmaSync(supabase, user.id, lookbackHours ?? null);
+  res.status(200).json({ data: outcome });
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -1689,5 +1726,12 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, or correctiveActions' });
+  if (resource === 'cmaSync') {
+    if (req.method === 'GET') { await handleCmaSyncGet(req, res); return; }
+    if (req.method === 'POST') { await handleCmaSyncPost(req, res); return; }
+    methodNotAllowed(res, ['GET', 'POST']);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, correctiveActions, or cmaSync' });
 });

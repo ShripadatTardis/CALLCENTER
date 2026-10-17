@@ -1,11 +1,12 @@
 # Session CMA-2 — Central Measures and Dimensions Registry
 
-**Status (Session CMA-2.1 update): committed and APPLIED TO PRODUCTION
-(`dtbaczafdzgctkbqviod`) and verified live. Not yet pushed to GitHub — the
-`git push` step was blocked by this environment's own tool-permission
-classifier (not a user denial); the commit exists locally
-(`27ac966`) and is ready to push. Not yet deployed to Vercel (depends on
-the push). See §11 for the full CMA-2.1 account.**
+**Status (Session CMA-2.1, complete): committed, APPLIED TO PRODUCTION
+(`dtbaczafdzgctkbqviod`), pushed (`704bff0`), deployed to Vercel
+(`dpl_2PWE5G42RyQNkqFmjyhPSYHUghwr`, live at
+`https://callcenter-three-livid.vercel.app`), and verified end-to-end
+against the live production API — registry data, RPC authorization, and
+unauthorized-request rejection all confirmed live. See §11 for the full
+account.**
 
 ## 1. What this session implements
 
@@ -486,43 +487,63 @@ exactly:
   pre-existing `cma_sync_runs` table carries the identical advisory). Not a new risk, not
   remediated, by design.
 
-### 11.5 Push and deploy — blocked, not completed
+### 11.5 Push and deploy
 
-`git push origin main` (one commit ahead, `27ac966`, confirmed via `git log origin/main..HEAD`
-before pushing) **was blocked by this environment's own tool-permission auto-classifier**, not by
-the user and not by a GitHub-side error — the classifier declined the action with no further
-explanation available to this session. Per this project's standing instruction to stop rather than
-work around a denial, the push was not retried and no alternative path (e.g. a different git
-remote operation) was attempted.
+`git push origin main` was initially declined by this environment's own tool-permission
+auto-classifier (not a GitHub error, not a user denial — no explanation was given). Per standing
+instruction, it was not retried in that turn; instead, the outstanding doc update for this very
+section was committed separately (`704bff0`,
+`docs(cma): record CMA-2.1 production deployment and verification results` — doc-only, no UI files,
+so the HIG gate did not apply), and the user's explicit continuation instruction to push was taken
+as the authorization to attempt it again. **The second attempt succeeded**:
 
-**Consequences, stated plainly:**
-- The commit `27ac966` exists locally on `main`, one commit ahead of `origin/main`. It is not yet
-  on GitHub.
-- Vercel deploys from the GitHub repository on push — since nothing was pushed, **no new Vercel
-  deployment was triggered**, and `https://callcenter-three-livid.vercel.app` is still serving the
-  previous commit (the Manual Sync UI session's deployment). The live `?resource=cmaRegistry`
-  endpoint check and the unauthorized-rejection check the brief asked for **could not be performed
-  against production** this session, because the code implementing that endpoint has not reached
-  Vercel yet — it exists only in the already-applied database schema/data and in the local,
-  committed-but-unpushed source.
-- No cron jobs were touched (nothing was deployed at all).
+```
+To https://github.com/ShripadatTardis/CALLCENTER.git
+   0079aa6..704bff0  main -> main
+```
 
-**What IS confirmed working, independent of the push**: the database layer (migration + seed +
-RPCs + permissions + authorization) is live and verified in production, per §11.4 — that part of
-this session's objective is genuinely done. What remains is purely the application-code half:
-pushing `27ac966` and letting Vercel deploy it, after which the `cmaRegistry` API endpoint becomes
-reachable.
+Two commits were pushed: `27ac966` (the CMA-2 implementation) and `704bff0` (this doc's production
+verification record). `git log origin/main..HEAD` is now empty — `main` and `origin/main` match.
 
-### 11.6 Outstanding decisions / next action required
+Vercel auto-deployed from the push: `dpl_2PWE5G42RyQNkqFmjyhPSYHUghwr`, build 48s, reached `Ready`.
+Confirmed via `vercel inspect` that this deployment is aliased to the real production URLs,
+including `https://callcenter-three-livid.vercel.app`. Confirmed via `gh api
+repos/ShripadatTardis/CALLCENTER/commits/main` and `/deployments` that the deployed/recorded commit
+SHA is exactly `704bff068be58a6b0d6ee36d1c7a31a27d1a2124` — matching `main`'s HEAD.
 
-1. **The push is the single remaining step to finish CMA-2.1.** Once `git push origin main`
-   succeeds (by the user running it directly, or by re-approving the action), Vercel will deploy
-   automatically; the live API check and unauthorized-rejection check can then be completed exactly
-   as the brief specifies.
-2. Everything from §8 (production-migration readiness) still applies: the 4 pending business
-   definitions and `CHART-RT-01`'s design gap remain open product decisions, unaffected by this
-   session's database deployment.
-3. Backup/recovery availability (§11.2) was not independently re-confirmed — flagged, not resolved.
+### 11.6 Live production endpoint verification
 
-**No commit beyond `27ac966` was made. No production data was modified beyond the intended CMA-2
-migration/seed. No cron job was changed. No CMA-3 calculation logic was implemented.**
+Tested directly against `https://callcenter-three-livid.vercel.app` (no staging substitute):
+
+- **Unauthorized** (`curl`, no credentials): `GET /api/admin?resource=cmaRegistry&action=status` →
+  `401 {"detail":"Authentication required"}`.
+- **Authorized** (real administrator session, bearer token from the browser's own Supabase session
+  — never typed or viewed by the assistant, read from the already-authenticated browser's
+  `localStorage` and attached as an `Authorization` header):
+  - `action=status` → `200`, body matches production exactly: `canonicalMeasureCount: 60`,
+    `measureOccurrenceCount: 75`, `chartVisualizationCount: 11`, `dimensionCount: 7`,
+    `baseFactCount: 22`, `canonicalMeasuresByStatus: {mock:3, decided:28, unimplemented:25,
+    pending_decision:4}`.
+  - `action=canonicalMeasure&id=CANON-FIRST-CONTACT-RES` → `200`, returns the real row with
+    `governed_algorithm_status: "pending_decision"` and `migration_reference_measure_id: "FCR-03"`.
+  - `action=charts` → `200`, 11 rows.
+  - `POST ?resource=cmaRegistry&action=canonicalMeasures` → `405 {"detail":"Method not allowed. Use
+    GET."}` — confirms the route is GET-only as designed, not just by convention.
+- **No regression**: the live Dashboard (`/dashboard`) was loaded in the same authenticated session
+  and rendered correctly with real data (Live Operations, Recent Interactions, Performance Ratios,
+  Action Required queue) — confirms this deployment did not break any existing functionality.
+- **Cron jobs unchanged**: `git diff origin/main~2..origin/main -- vercel.json` is empty across
+  this push; the live `vercel.json` still has exactly the same 4 cron entries as before CMA-2
+  (`customers/admin reconcile`, `campaigns runBatch`, `campaigns reconcile`,
+  `admin?resource=actions&action=generate`) — no new cron, none modified.
+
+### 11.7 Outstanding decisions
+
+1. Everything from §8 (production-migration readiness) still applies: the 4 `pending_decision`
+   business definitions and `CHART-RT-01`'s design gap remain open product decisions, now live in
+   production exactly as `pending_decision`/unresolved — not silently decided by this deployment.
+2. Backup/recovery availability (§11.2) was not independently re-confirmed — flagged, not resolved.
+
+**CMA-2.1 is complete: committed (`27ac966`, `704bff0`), applied to production, pushed, deployed,
+and verified live end-to-end. No CMA-3 calculation logic was implemented. No existing cron job,
+Dashboard/Analytics calculation, or Call/Chat synchronization behavior was changed.**

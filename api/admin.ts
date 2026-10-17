@@ -6,6 +6,10 @@ import { fetchQaTurnsForInteraction } from '../src/server/qa/transcriptFetcher.j
 import { evaluateInteraction, PROMPT_VERSION } from '../src/server/qa/automatedQaEvaluator.js';
 import { persistAttemptDiagnosticsSafely, toCamelAttemptDiagnosticRow } from '../src/lib/automatedQaAttemptDiagnostics.js';
 import { runManualCmaSync } from '../src/server/cma/cmaSyncRun.js';
+import {
+  listCanonicalMeasures, getCanonicalMeasure, listCanonicalMeasureOccurrences, getMeasureOccurrence,
+  listDimensions, listBaseFactsForMeasure, listChartVisualizations, getGovernanceStatus,
+} from '../src/server/cma/cmaRegistry.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1656,6 +1660,58 @@ async function handleCmaSyncPost(req: VercelRequest, res: VercelResponse): Promi
   res.status(200).json({ data: outcome });
 }
 
+/**
+ * CMA-2 — Central Measures and Dimensions Registry read API. Exposes
+ * governance DEFINITIONS only — never executes a calculation (CMA-3's
+ * scope, untouched here). Gated by `cma.registry.view`, the same
+ * session-based RBAC pattern as `cmaSync` above.
+ *
+ *   GET /api/admin?resource=cmaRegistry&action=canonicalMeasures
+ *   GET /api/admin?resource=cmaRegistry&action=canonicalMeasure&id=CANON-...
+ *   GET /api/admin?resource=cmaRegistry&action=occurrences&id=CANON-...
+ *   GET /api/admin?resource=cmaRegistry&action=measure&id=FCR-03
+ *   GET /api/admin?resource=cmaRegistry&action=dimensions
+ *   GET /api/admin?resource=cmaRegistry&action=measureBaseFacts&id=FCR-03
+ *   GET /api/admin?resource=cmaRegistry&action=charts
+ *   GET /api/admin?resource=cmaRegistry&action=status (default)
+ */
+async function handleCmaRegistryGet(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'cma.registry.view');
+  if (!user) return;
+  const action = queryStr(req, 'action') ?? 'status';
+  const id = queryStr(req, 'id');
+  const supabase = getServiceRoleClient();
+  try {
+    if (action === 'canonicalMeasures') { res.status(200).json({ data: await listCanonicalMeasures(supabase) }); return; }
+    if (action === 'canonicalMeasure') {
+      if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+      res.status(200).json({ data: await getCanonicalMeasure(supabase, id) });
+      return;
+    }
+    if (action === 'occurrences') {
+      if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+      res.status(200).json({ data: await listCanonicalMeasureOccurrences(supabase, id) });
+      return;
+    }
+    if (action === 'measure') {
+      if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+      res.status(200).json({ data: await getMeasureOccurrence(supabase, id) });
+      return;
+    }
+    if (action === 'dimensions') { res.status(200).json({ data: await listDimensions(supabase) }); return; }
+    if (action === 'measureBaseFacts') {
+      if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+      res.status(200).json({ data: await listBaseFactsForMeasure(supabase, id) });
+      return;
+    }
+    if (action === 'charts') { res.status(200).json({ data: await listChartVisualizations(supabase) }); return; }
+    if (action === 'status') { res.status(200).json({ data: await getGovernanceStatus(supabase) }); return; }
+    res.status(400).json({ detail: `Unknown ?action= — use canonicalMeasures, canonicalMeasure, occurrences, measure, dimensions, measureBaseFacts, charts, or status` });
+  } catch (err) {
+    res.status(500).json({ detail: err instanceof Error ? err.message : 'cmaRegistry lookup failed' });
+  }
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -1733,5 +1789,11 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, correctiveActions, or cmaSync' });
+  if (resource === 'cmaRegistry') {
+    if (req.method !== 'GET') { methodNotAllowed(res, ['GET']); return; }
+    await handleCmaRegistryGet(req, res);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, correctiveActions, cmaSync, or cmaRegistry' });
 });

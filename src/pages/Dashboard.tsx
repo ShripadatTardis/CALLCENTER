@@ -9,6 +9,10 @@ import { useChatLogs } from '@/hooks/chat/useChatLogs';
 import { useRatioSummary } from '@/hooks/analytics/useRatio';
 import { getFrontendRatioDefinition } from '@/lib/ratios/ratioFrontendRegistry';
 import { formatRatioValue } from '@/components/ratios/RatioHero';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { cmaMeasureUnavailableReason } from '@/types/cma';
+import { defaultDashboardCmaWindow } from '@/lib/cma/cmaWindow';
 import {
   DASHBOARD_AHT_RATIO_ID,
   DASHBOARD_ORIGIN_STATE,
@@ -91,21 +95,74 @@ const LiveOperationsTile: React.FC<{ label: string; value: React.ReactNode; hint
 };
 
 /**
- * One compact Performance Ratio card — a thin presentational consumer
- * of `useRatioSummary`, the EXACT hook/service Ratio Explorer itself
- * uses (src/hooks/analytics/useRatio.ts -> src/server/analytics/
- * ratioService.ts). No Dashboard-local formula exists for any of these
- * 5 ratios — one semantic source, per the session's explicit §5
- * requirement. Runtime states are shown honestly: a null value never
- * becomes a fabricated 0%, it shows the real `unavailableReason` the
- * service itself returned (the same text Ratio Explorer would show).
+ * Session CMA-4A — the 3 Performance Ratio cards whose canonical measure
+ * is `decided` AND wired into the CMA evaluation engine (RES-01/SRT-01/
+ * AUTH-01, of the 19 operational algorithm-registry entries). FCR,
+ * Escalation Rate and AHT are deliberately excluded — their canonical
+ * measures (CANON-FIRST-CONTACT-RES / CANON-ESC-RATE /
+ * CANON-AVG-HANDLE-TIME) remain `pending_decision`; per brief §4 they
+ * stay on the legacy ratio engine unchanged and are never relabeled as
+ * CMA-authoritative. Verified against production before wiring this up
+ * (not assumed): a direct 30-day-window comparison of the legacy ratio
+ * endpoint vs. the CMA evaluation RPC for all 3 measures returned
+ * byte-identical numerator/denominator/population — see
+ * docs/SESSION_CMA_4A_DASHBOARD_INTEGRATION.md.
+ *
+ * `cma.evaluate` is currently granted to the `administrator` role only
+ * (confirmed in `supabase/migrations/20261028000000_cma_evaluation_engine.sql`
+ * — no broader grant exists, and this session is not authorized to add
+ * one via a new migration). So this mapping is used only when the viewer
+ * actually holds the permission; everyone else continues to see the
+ * exact same legacy-sourced card as before CMA-4A — never a 403, never a
+ * fabricated value, never a silent fallback mid-request (brief §6/§7).
+ */
+const CMA_BACKED_RATIO_MEASURES: Record<string, string> = {
+  resolution_rate: 'CANON-RES-RATE',
+  successful_resolution_time: 'CANON-SUCCESSFUL-RES-TIME',
+  authentication_success_rate: 'CANON-AUTH-SUCCESS-RATE',
+};
+
+/**
+ * One compact Performance Ratio card. For the 3 CMA-eligible ratio ids,
+ * when the viewer holds `cma.evaluate`, this calls the CMA evaluation API
+ * directly (`useCmaMeasure`) instead of the legacy ratio engine — no
+ * Dashboard-local formula either way, one semantic source per request,
+ * never both at once (the legacy `useRatioSummary` call is disabled
+ * whenever the CMA path is used, so this never fires two requests for one
+ * card). Every other ratio id (including the 3 still-pending ones) is
+ * unaffected and keeps using `useRatioSummary`, the EXACT hook/service
+ * Ratio Explorer itself uses (src/hooks/analytics/useRatio.ts ->
+ * src/server/analytics/ratioService.ts). Runtime states are shown
+ * honestly either way: a null/non-value result never becomes a
+ * fabricated 0%, it shows the real reason the source returned.
  */
 const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
   const guardedNavigate = useGuardedNavigate();
+  const { user } = useAuth();
   const definition = getFrontendRatioDefinition(ratioId);
-  const { data, isLoading, isError, refetch } = useRatioSummary(ratioId, {});
   const link = buildDashboardRatioLink(ratioId);
-  const value = data && data.value !== null ? formatRatioValue(data.value, data.unit) : null;
+
+  const canonicalMeasureId = CMA_BACKED_RATIO_MEASURES[ratioId];
+  const useCma = Boolean(canonicalMeasureId) && hasPermission(user, 'cma.evaluate');
+  const cmaWindow = useMemo(() => defaultDashboardCmaWindow(), []);
+
+  const legacy = useRatioSummary(useCma ? undefined : ratioId, {});
+  const cma = useCmaMeasure(useCma, { canonicalMeasureId: canonicalMeasureId ?? '', window: cmaWindow });
+
+  const isLoading = useCma ? cma.isLoading : legacy.isLoading;
+  const isError = useCma ? cma.isError : legacy.isError;
+  const refetch = useCma ? cma.refetch : legacy.refetch;
+
+  let value: string | null = null;
+  let unavailableReason: string | null = null;
+  if (useCma) {
+    const result = cma.data?.groups[0]?.result;
+    if (result?.kind === 'value') value = formatRatioValue(result.value, result.unit);
+    else if (result) unavailableReason = cmaMeasureUnavailableReason(result);
+  } else {
+    value = legacy.data && legacy.data.value !== null ? formatRatioValue(legacy.data.value, legacy.data.unit) : null;
+    unavailableReason = legacy.data?.unavailableReason ?? null;
+  }
 
   if (isError) {
     return (
@@ -131,7 +188,7 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
       onClick={() => guardedNavigate(link.path, { state: link.state }, 'ratios.view', 'Ratio Explorer')}
       className="flex-1 min-w-[8.5rem] text-left px-3 py-2 hover:bg-muted/40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:-outline-offset-2"
     >
-      <div className="text-[11px] text-muted-foreground truncate" title={definition?.name}>
+      <div className="text-[11px] text-muted-foreground truncate" title={useCma ? `${definition?.name ?? ratioId} — Source: Central Measures Authority` : definition?.name}>
         {definition?.shortLabel ?? ratioId}
       </div>
       {isLoading ? (
@@ -139,8 +196,8 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
       ) : value !== null ? (
         <div className={typography.metricValue}>{value}</div>
       ) : (
-        <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title={data?.unavailableReason ?? undefined}>
-          {data?.unavailableReason ?? 'No eligible population'}
+        <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title={unavailableReason ?? undefined}>
+          {unavailableReason ?? 'No eligible population'}
         </div>
       )}
     </button>

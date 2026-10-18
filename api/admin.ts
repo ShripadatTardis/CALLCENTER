@@ -10,6 +10,8 @@ import {
   listCanonicalMeasures, getCanonicalMeasure, listCanonicalMeasureOccurrences, getMeasureOccurrence,
   listDimensions, listBaseFactsForMeasure, listChartVisualizations, getGovernanceStatus,
 } from '../src/server/cma/cmaRegistry.js';
+import { evaluateCmaMeasure } from '../src/server/cma/cmaEvaluation.js';
+import type { CmaDimensionId } from '../src/server/cma/cmaEvaluationTypes.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1712,6 +1714,60 @@ async function handleCmaRegistryGet(req: VercelRequest, res: VercelResponse): Pr
   }
 }
 
+/**
+ * CMA-3A — Central Calculation & Evaluation Engine. The ONLY API route
+ * that ever calls evaluateCmaMeasure() — any future Dashboard/Analytics/
+ * Reports consumer is expected to call this same route rather than
+ * re-implementing calculation logic (brief §2). Gated by `cma.evaluate`,
+ * the same minimal-first-grant pattern `cma.sync.manage`/`cma.registry.view`
+ * used.
+ *
+ *   POST /api/admin?resource=cmaEvaluate
+ *   body: {
+ *     canonicalMeasureId: string,
+ *     window: { from: string, to: string },      // ISO timestamps, half-open [from, to)
+ *     filters?: { agent?: string, channel?: string, campaign?: string },
+ *     groupBy?: 'agent' | 'channel',
+ *   }
+ */
+async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await requirePermission(req, res, 'cma.evaluate');
+  if (!user) return;
+
+  const body = (req.body ?? {}) as {
+    canonicalMeasureId?: string;
+    window?: { from?: string; to?: string };
+    filters?: Partial<Record<CmaDimensionId, string>>;
+    groupBy?: CmaDimensionId;
+  };
+  if (!body.canonicalMeasureId || typeof body.canonicalMeasureId !== 'string') {
+    res.status(422).json({ detail: 'canonicalMeasureId is required' });
+    return;
+  }
+  if (!body.window?.from || !body.window?.to) {
+    res.status(422).json({ detail: 'window.from and window.to are required (ISO timestamps)' });
+    return;
+  }
+
+  const access = toAgentAccess(user);
+  const supabase = getServiceRoleClient();
+  try {
+    const result = await evaluateCmaMeasure(
+      supabase,
+      {
+        canonicalMeasureId: body.canonicalMeasureId,
+        window: { from: body.window.from, to: body.window.to },
+        filters: body.filters,
+        groupBy: body.groupBy,
+      },
+      { allCategories: access.allCategories, authorizedAgentIds: access.authorizedAgentIds },
+    );
+    res.status(200).json({ data: result });
+  } catch (err) {
+    res.status(500).json({ detail: err instanceof Error ? err.message : 'cmaEvaluate failed' });
+  }
+}
+
 export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse) => {
   noStore(res);
   const resource = queryStr(req, 'resource');
@@ -1795,5 +1851,11 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
     return;
   }
 
-  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, correctiveActions, cmaSync, or cmaRegistry' });
+  if (resource === 'cmaEvaluate') {
+    if (req.method !== 'POST') { methodNotAllowed(res, ['POST']); return; }
+    await handleCmaEvaluatePost(req, res);
+    return;
+  }
+
+  res.status(400).json({ detail: 'Unknown or missing ?resource= — use me, users, roles, permissions, audit, actions, qa, automatedQa, correctiveActions, cmaSync, cmaRegistry, or cmaEvaluate' });
 });

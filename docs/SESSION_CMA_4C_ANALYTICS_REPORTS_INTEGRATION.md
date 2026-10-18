@@ -146,5 +146,45 @@ new discrepancy was introduced or discovered.
   (time-series/histogram) CMA's evaluation contract doesn't support —
   each with a specific, stated reason, not a blanket "not done."
 
-Committed, not pushed or deployed, per this session's execution
-boundary. CMA-4D/CMA-5 not started.
+## Addendum — Session CMA-4C.1: production deployment and verification
+
+**Deployment.** Commit `810e888` (`810e88806477de1d643bcf6c55087603b6bb7499`)
+pushed to `main`; Vercel auto-deployed
+(`callcenter-1b2qkl8mn-sk-tardis-projects.vercel.app`) and is aliased to
+`callcenter-three-livid.vercel.app` (confirmed via `vercel inspect`). No
+Supabase migration was needed or applied — confirmed, none expected for
+a pure frontend data-source change.
+
+**Pre-deployment re-verification.** Confirmed commit `810e888` contains
+exactly `src/components/campaigns/CampaignOverviewStats.tsx` and this
+session doc, nothing else; working tree otherwise clean (only
+pre-existing, unrelated untracked files and `.env`, untouched).
+`npm run typecheck` / `npm run verify:full` (46 tests, 0 failed) /
+`npm run build` all re-run clean immediately before pushing.
+
+**Production smoke test** (on `callcenter-three-livid.vercel.app`, real
+authenticated administrator session):
+
+| Check | Result |
+|---|---|
+| Analytics → Campaigns renders correctly | **Confirmed** — Total Campaigns 5, Active 1, Total Targets 8, Calls Triggered 2, Success Rate 100.0%, 6 unclassified |
+| Total Targets / Success Rate use `cmaEvaluate` | **Confirmed** — exactly 2 `POST /api/admin?resource=cmaEvaluate` calls (CAMP-01 + CAMP-02), both 200, observed via network inspection |
+| Results match independently queried production facts | **Confirmed** — identical to the CAMP-01=8, CAMP-02=2/2=100% values already proven against production in CMA-4B |
+| Campaign filtering remains functional | **Confirmed** — the status filter `<select>` (all/draft/scheduled/running/paused/completed/stopped/failed) is present and unmodified by this change |
+| Other Analytics tabs unchanged | **Confirmed** — Overview tab tiles unchanged (0 values for the current narrow window, same FCR/AHT/Escalation/Intent Accuracy fields as before) |
+| Reports mock catalog unchanged | **Confirmed** — still shows the same fabricated "12 Scheduled Reports" / "156 Downloads This Month" placeholder content, "No reports found" for the default filter — exactly as documented as pre-existing mock content, not touched |
+| Dashboard CMA cards remain operational | **Confirmed** — Resolution/Resolution Time/Auth Success still show (correctly) "No eligible population" for the current window; FCR/Escalation unchanged on the legacy path |
+| Campaign list/detail CMA integrations remain operational | **Confirmed** — Outbound Campaigns list renders with the same CMA-sourced totals (8 targets, 100.0%) as before this deployment |
+| Unauthorized CMA requests remain rejected | **Confirmed** — an anonymous `POST /api/admin?resource=cmaEvaluate` still returns `401` |
+
+**Remaining deferred integrations** — unchanged from the original CMA-4C
+report above: all pending-definition measures (FCR/AHT/Escalation/Call
+Technical Performance) untouched; Avg Intent Accuracy, turn
+latency/concurrency, and every time-series/histogram chart remain
+on their existing implementations for the documented reasons (no
+canonical measure, or a chart shape `cmaEvaluate`'s single-value/
+single-groupBy contract cannot produce); `Reports.tsx` remains
+unbuilt/mock, out of this session's scope to construct.
+
+No unresolved issues found. CMA-4D/CMA-5 not started, per this
+session's boundary.

@@ -26,7 +26,7 @@ import {
   getCanonicalMeasure, listBaseFactsForMeasure, listDimensionsForMeasure,
   type CmaCanonicalMeasure,
 } from './cmaRegistry.js';
-import { CMA_ALGORITHM_REGISTRY } from './cmaEvaluationAlgorithms.js';
+import { CMA_ALGORITHM_REGISTRY, type CmaAlgorithmDefinition } from './cmaEvaluationAlgorithms.js';
 import type {
   CmaMeasureRequest, CmaMeasureResponse, CmaMeasureResponseGroup, CmaMeasureValue, CmaDimensionId, CmaMeasureUnit,
 } from './cmaEvaluationTypes.js';
@@ -43,15 +43,26 @@ export function isAgentIdInEvaluationScope(access: EvaluationScopeAccess, agentI
   return !!agentId && access.authorizedAgentIds.includes(agentId);
 }
 
-/** This evaluation engine's currently-supported dimensions — a deliberate
- *  SUBSET of the real registry's 7 (time, channel, agent, campaign,
- *  interaction_source, outcome, customer). 'time' is covered by the
- *  mandatory `window` request field, not requested as a dimension here.
- *  'outcome', 'customer', 'interaction_source' are not wired into this
- *  engine at all this session — requesting them returns
- *  unsupported_dimension, never a silently-ignored filter. */
+/** This evaluation engine's currently-supported dimensions overall — a
+ *  deliberate SUBSET of the real registry's 7 (time, channel, agent,
+ *  campaign, interaction_source, outcome, customer). 'time' is covered
+ *  by the mandatory `window` request field, not requested as a
+ *  dimension here. 'outcome', 'customer', 'interaction_source' are not
+ *  wired into this engine at all this session — requesting them returns
+ *  unsupported_dimension, never a silently-ignored filter. This is the
+ *  outer ceiling (dimension ids this engine implements AT ALL); WHICH of
+ *  these apply to a given measure is governed entirely by the CMA
+ *  Dimensions Registry (`cma_measure_dimensions`, queried below for
+ *  EVERY source family, not just 'interaction') — not by any per-
+ *  algorithm array in this file. [CMA-3B.1] Prior to this correction,
+ *  a duplicate `CMA_ALGORITHM_REGISTRY[id].supportedDimensions` array
+ *  also gated this decision for the 4 non-interaction families, on the
+ *  (incorrect) assumption that CMA-2 had never seeded registry
+ *  relationships for them — it had, for all 75 occurrences, including
+ *  these. That duplication is removed; the registry is now the single
+ *  authority, consistent with how it already governed the 'interaction'
+ *  family. */
 const SUPPORTED_FILTER_DIMENSIONS: readonly CmaDimensionId[] = ['agent', 'channel', 'campaign'];
-const SUPPORTED_GROUP_BY: readonly CmaDimensionId[] = ['agent', 'channel'];
 
 interface RpcGroupRow { key: string; population: number; numerator: number | null; denominator: number }
 interface RpcResult {
@@ -105,10 +116,54 @@ function terminal(
 }
 
 function toValueKind(numerator: number | null, denominator: number, unit: CmaMeasureUnit): CmaMeasureValue {
+  // 'count' measures (e.g. Campaign Target Count, Action Required Queue Items) are a raw
+  // population size, not a ratio — a count of 0 is a real, meaningful answer ("no eligible rows
+  // in this window"), never an "unavailable" state, so this unit never reports zero_denominator.
+  if (unit === 'count') return { kind: 'value', value: Math.round(numerator ?? 0), unit };
   if (!denominator || denominator <= 0) return { kind: 'zero_denominator', displayAs: 'null' };
   const raw = (numerator ?? 0) / denominator;
   const value = unit === 'percent' ? Math.round(raw * 1000) / 10 : Math.round(raw * 100) / 100;
   return { kind: 'value', value, unit };
+}
+
+/** Builds the exact RPC argument object for this algorithm's source family — each family's RPC
+ *  has a different parameter signature (a chat-session-backed RPC has no p_filter_campaign_id,
+ *  a campaign-backed RPC has no p_filter_channel, etc.), reflecting the real grain of its source
+ *  table rather than forcing one bloated generic signature on every family. */
+function buildRpcArgs(
+  algorithm: CmaAlgorithmDefinition,
+  canonicalId: string,
+  req: CmaMeasureRequest,
+  access: EvaluationScopeAccess,
+  filterAgentId: string | null,
+): Record<string, unknown> {
+  const common = {
+    p_canonical_measure_id: canonicalId,
+    p_started_from: req.window.from,
+    p_started_to: req.window.to,
+    p_all_agents: access.allCategories || access.authorizedAgentIds === 'all',
+    p_authorized_agent_ids: access.authorizedAgentIds === 'all' ? [] : access.authorizedAgentIds,
+    p_filter_agent_id: filterAgentId,
+    p_group_by: req.groupBy ?? null,
+  };
+  switch (algorithm.sourceFamily) {
+    case 'interaction':
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null };
+    case 'qa':
+      return { ...common, p_filter_channel: req.filters?.channel ?? null };
+    case 'campaign':
+      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
+    case 'chat':
+    case 'action':
+      // [CMA-3B.1] both chat_sessions and action_items have a real campaign_id column (confirmed
+      // by direct schema inspection), and the CMA-2 registry already (correctly) lists 'campaign'
+      // as a valid dimension for CHAT-SPAN-01/ACTION-01 — this RPC argument is the physical-field
+      // mapping that makes runtime capability match that registered claim. Neither table has a
+      // 'channel' column, so no p_filter_channel is ever constructed for these two families.
+      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
+    default:
+      return common;
+  }
 }
 
 export async function evaluateCmaMeasure(
@@ -159,8 +214,11 @@ export async function evaluateCmaMeasure(
       resolvedMeasureId ?? undefined);
   }
 
-  // ---- 1d. VALIDATE: registry/algorithm Base Fact drift check (brief §9). ----
-  if (resolvedMeasureId) {
+  // ---- 1d. VALIDATE: registry/algorithm Base Fact drift check (brief §9). Skipped for source
+  // families CMA-2 never seeded interaction-centric Base Fact relationships for (qa/campaign/
+  // chat/action — algorithm.expectedBaseFactIds is deliberately empty for those; see
+  // cmaEvaluationAlgorithms.ts's own comment on this scope boundary). ----
+  if (resolvedMeasureId && algorithm.expectedBaseFactIds.length > 0) {
     const registeredFacts = await listBaseFactsForMeasure(supabase, resolvedMeasureId);
     const registeredIds = new Set(registeredFacts.map((f) => f.baseFact.id));
     const missing = algorithm.expectedBaseFactIds.filter((id) => !registeredIds.has(id));
@@ -171,8 +229,14 @@ export async function evaluateCmaMeasure(
     }
   }
 
-  // ---- 1e. VALIDATE: requested filter/groupBy dimensions — supported by this engine AND
-  // registered as applicable to the resolved occurrence (cma_measure_dimensions). ----
+  // ---- 1e. VALIDATE: requested filter/groupBy dimensions. [CMA-3B.1] The CMA Dimensions
+  // Registry (`cma_measure_dimensions`) is now the SINGLE authority for which dimensions a
+  // measure supports, for every source family — not just 'interaction'. CMA-2 seeded real,
+  // CSV-derived relationships for all 75 register occurrences, this engine's 4 non-interaction
+  // families included; there is no per-algorithm duplicate of this decision left in this
+  // codebase. SUPPORTED_FILTER_DIMENSIONS remains this engine's own outer ceiling (which
+  // dimension ids it implements at all) — a measure can only be as permissive as the
+  // intersection of what the registry allows and what this engine has wired up. ----
   const requestedDimensionIds = Array.from(new Set<CmaDimensionId>([
     ...(Object.keys(req.filters ?? {}) as CmaDimensionId[]),
     ...(req.groupBy ? [req.groupBy] : []),
@@ -182,10 +246,6 @@ export async function evaluateCmaMeasure(
       return terminal(req, canonical.governed_algorithm_status, access, requestedFilters,
         { kind: 'unsupported_dimension', reason: `Dimension '${dim}' is not supported by this evaluation engine.` }, resolvedMeasureId ?? undefined);
     }
-  }
-  if (req.groupBy && !SUPPORTED_GROUP_BY.includes(req.groupBy)) {
-    return terminal(req, canonical.governed_algorithm_status, access, requestedFilters,
-      { kind: 'unsupported_dimension', reason: `Grouping by '${req.groupBy}' is not supported by this evaluation engine.` }, resolvedMeasureId ?? undefined);
   }
   if (resolvedMeasureId) {
     const approved = await listDimensionsForMeasure(supabase, resolvedMeasureId);
@@ -206,19 +266,14 @@ export async function evaluateCmaMeasure(
       { kind: 'unauthorized_filter', reason: `agent '${filterAgentId}' is outside your authorized Business Data Scope.` }, resolvedMeasureId);
   }
 
-  // ---- 3. CALCULATE: one RPC call, all aggregation server-side, scope enforced inside its own WHERE clause. ----
-  const { data, error } = await supabase.rpc('call_center_cma_evaluate_measure', {
-    p_canonical_measure_id: canonical.id,
-    p_started_from: req.window.from,
-    p_started_to: req.window.to,
-    p_all_agents: access.allCategories || access.authorizedAgentIds === 'all',
-    p_authorized_agent_ids: access.authorizedAgentIds === 'all' ? [] : access.authorizedAgentIds,
-    p_filter_agent_id: filterAgentId,
-    p_filter_channel: req.filters?.channel ?? null,
-    p_filter_campaign_id: req.filters?.campaign ?? null,
-    p_group_by: req.groupBy ?? null,
-  });
-  if (error) throw new Error(`call_center_cma_evaluate_measure: ${error.message}`);
+  // ---- 3. CALCULATE: one RPC call (the one named by this algorithm's source family), all
+  // aggregation server-side, Business Data Scope enforced inside that RPC's own WHERE clause —
+  // including for the 4 non-interaction source families CMA-3B adds (brief §3: "Apply authorized
+  // Business Data Scope before aggregation, including calculations backed by non-interaction
+  // sources"). ----
+  const rpcArgs = buildRpcArgs(algorithm, canonical.id, req, access, filterAgentId);
+  const { data, error } = await supabase.rpc(algorithm.rpc, rpcArgs);
+  if (error) throw new Error(`${algorithm.rpc}: ${error.message}`);
 
   const rpcResult = data as RpcResult;
   if (rpcResult.status !== 'ok') {

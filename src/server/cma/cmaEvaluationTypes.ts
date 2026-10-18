@@ -26,7 +26,7 @@ export type AlgorithmRef = string & { readonly __brand: 'AlgorithmRef' };
 /** The real, deployed CMA-2 registry dimension ids this engine supports requesting against. */
 export type CmaDimensionId = 'agent' | 'channel' | 'campaign';
 
-export type CmaMeasureUnit = 'percent' | 'seconds' | 'score';
+export type CmaMeasureUnit = 'percent' | 'seconds' | 'score' | 'count';
 
 export type CmaMeasureValue =
   | { kind: 'value'; value: number; unit: CmaMeasureUnit }

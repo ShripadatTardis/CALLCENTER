@@ -23,3 +23,27 @@ export function defaultDashboardCmaWindow(): { from: string; to: string } {
   toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
   return { from: `${fromDateOnly}T00:00:00.000Z`, to: toExclusive.toISOString() };
 }
+
+/**
+ * Session CMA-4B. `call_center_campaign_list` (the legacy source of
+ * Outbound Campaigns' stat strip) has no time-window filter at all — its
+ * `target_count`/`classified_count`/`success_count` are genuinely
+ * all-time across every campaign. `cmaEvaluate` has no "all time" mode,
+ * so this constructs the narrowest window guaranteed to cover every
+ * currently-listed campaign's targets: from the earliest campaign's
+ * `createdAt` (campaign creation necessarily precedes any of its
+ * targets' own `created_at`) through now. Returns null when there are no
+ * campaigns to evaluate (nothing to construct a window from, and the
+ * legacy path already renders the correct all-zero/empty state).
+ *
+ * Verified against production before this was written (not assumed):
+ * CAMP-01/CAMP-02 evaluated with this exact window construction returned
+ * byte-identical totals to `call_center_campaign_list`'s own summed
+ * target_count/classified_count/success_count — see
+ * docs/SESSION_CMA_4B_OPERATIONAL_INTEGRATION.md.
+ */
+export function campaignAllTimeCmaWindow(campaigns: { createdAt: string }[]): { from: string; to: string } | null {
+  if (campaigns.length === 0) return null;
+  const earliest = campaigns.reduce((min, c) => Math.min(min, new Date(c.createdAt).getTime()), Infinity);
+  return { from: new Date(earliest).toISOString(), to: new Date().toISOString() };
+}

@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { HelpCircle } from 'lucide-react';
 import type { CampaignWithStats } from '@/types/campaign';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { campaignAllTimeCmaWindow } from '@/lib/cma/cmaWindow';
 
 interface CampaignStatStripProps {
   campaigns: CampaignWithStats[];
@@ -15,14 +18,56 @@ interface CampaignStatStripProps {
  * Same real formulas: target-level success via effective_result_id
  * (never raw campaign_results row counts), unclassified surfaced
  * separately, never folded into success/failure.
+ *
+ * Session CMA-4B — Targets / success rate are now CMA-authoritative
+ * (CANON-CAMPAIGN-TARGET-COUNT / CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI)
+ * when the viewer holds `cma.evaluate` (verified byte-identical against
+ * the legacy `call_center_campaign_list` totals on production before
+ * wiring this up — see docs/SESSION_CMA_4B_OPERATIONAL_INTEGRATION.md).
+ * `cma.evaluate` is not yet granted to every role that holds
+ * `campaigns.view` (`operator` does not have it) — for viewers without
+ * it, this falls back to the exact same client-side sum as before, never
+ * a 403, never a fabricated value. "Campaigns" / "Running" / "Calls
+ * triggered" / "unclassified" are operational counts with no CMA
+ * canonical-measure equivalent and are always computed from the fetched
+ * campaign list, CMA or not.
  */
 export const CampaignStatStrip: React.FC<CampaignStatStripProps> = ({ campaigns }) => {
+  const { user } = useAuth();
+  const useCma = hasPermission(user, 'cma.evaluate');
+  const cmaWindow = useMemo(() => campaignAllTimeCmaWindow(campaigns), [campaigns]);
+
+  const targetCountResult = useCmaMeasure(useCma && Boolean(cmaWindow), {
+    canonicalMeasureId: 'CANON-CAMPAIGN-TARGET-COUNT',
+    window: cmaWindow ?? { from: '', to: '' },
+  });
+  const successRateResult = useCmaMeasure(useCma && Boolean(cmaWindow), {
+    canonicalMeasureId: 'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI',
+    window: cmaWindow ?? { from: '', to: '' },
+  });
+
   const totalCampaigns = campaigns.length;
   const activeCampaigns = campaigns.filter((c) => c.status === 'running').length;
-  const totalTargets = campaigns.reduce((sum, c) => sum + c.stats.targetCount, 0);
   const totalTriggered = campaigns.reduce((sum, c) => sum + c.stats.triggeredCount, 0);
-  const totalClassified = campaigns.reduce((sum, c) => sum + c.stats.classifiedCount, 0);
-  const totalSuccess = campaigns.reduce((sum, c) => sum + c.stats.successCount, 0);
+
+  // CMA is "ready" only once BOTH evaluations have returned an actual
+  // computed result (evidence present) — never a partial mix of one CMA
+  // number and one legacy number, and never while still loading (the
+  // loading state below falls back to the legacy sum so the strip never
+  // shows a stale "…" where a real total used to be instantly).
+  const cmaTargetEvidence = targetCountResult.data?.groups[0]?.evidence;
+  const cmaSuccessEvidence = successRateResult.data?.groups[0]?.evidence;
+  const cmaReady = useCma && Boolean(cmaWindow) && Boolean(cmaTargetEvidence) && Boolean(cmaSuccessEvidence);
+
+  const totalTargets = cmaReady
+    ? (cmaTargetEvidence?.numerator ?? 0)
+    : campaigns.reduce((sum, c) => sum + c.stats.targetCount, 0);
+  const totalClassified = cmaReady
+    ? (cmaSuccessEvidence?.denominator ?? 0)
+    : campaigns.reduce((sum, c) => sum + c.stats.classifiedCount, 0);
+  const totalSuccess = cmaReady
+    ? (cmaSuccessEvidence?.numerator ?? 0)
+    : campaigns.reduce((sum, c) => sum + c.stats.successCount, 0);
   const totalUnclassified = totalTargets - totalClassified;
   const successRate = totalClassified > 0 ? (totalSuccess / totalClassified) * 100 : null;
 

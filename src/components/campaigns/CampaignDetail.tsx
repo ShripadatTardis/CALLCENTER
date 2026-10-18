@@ -15,7 +15,9 @@ import { CampaignConfigurationSummary } from './CampaignConfigurationSummary';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useCampaignActions } from '@/hooks/campaigns/useCampaignActions';
 import { useCampaignClassifications, useCampaignConfigurationVersions } from '@/hooks/campaigns/useCampaigns';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { campaignAllTimeCmaWindow } from '@/lib/cma/cmaWindow';
 import { fetchCallData } from '@/services/calls/callsService';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
 import { formatTimestamp } from '@/lib/format';
@@ -290,6 +292,7 @@ interface CampaignDetailProps {
 
 export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, targets, onBack, onRefetch }) => {
   const navigate = useNavigate();
+  const { user: viewer } = useAuth();
   const actions = useCampaignActions(campaign.id);
   const { data: classifications = [] } = useCampaignClassifications();
   const [openInteractionId, setOpenInteractionId] = useState<string | null>(null);
@@ -302,15 +305,43 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
   const { data: configurationVersions = [] } = useCampaignConfigurationVersions(campaign.id);
   const activeConfigurationVersion = configurationVersions.find((v) => v.status === 'active') ?? null;
 
-  const rate = campaign.stats.classifiedCount > 0 ? (campaign.stats.successCount / campaign.stats.classifiedCount) * 100 : null;
-  const unclassified = campaign.stats.targetCount - campaign.stats.classifiedCount;
+  // Session CMA-4B — target count, raw success rate and policy success
+  // rate become CMA-authoritative (CANON-CAMPAIGN-TARGET-COUNT /
+  // -SUCCESS-COUNT-RATE-RAW-CLASSIFI / -SUCCESS-COUNT-RATE-POLICY-CLASS,
+  // filtered to this one campaign) when the viewer holds `cma.evaluate`
+  // — verified byte-identical against this exact `campaign.stats` source
+  // on production before wiring this up (including the policy variant's
+  // honest empty state when no campaign has policy classification data
+  // yet) — see docs/SESSION_CMA_4B_OPERATIONAL_INTEGRATION.md. Falls
+  // back to the unmodified `campaign.stats.*` values (never a 403, never
+  // fabricated) for viewers without the permission — `operator`, who
+  // manages campaigns day to day, does not currently hold `cma.evaluate`.
+  const useCma = hasPermission(viewer, 'cma.evaluate');
+  const cmaWindow = campaignAllTimeCmaWindow([{ createdAt: campaign.createdAt }]);
+  const camp01 = useCmaMeasure(useCma, { canonicalMeasureId: 'CANON-CAMPAIGN-TARGET-COUNT', window: cmaWindow!, filters: { campaign: campaign.id } });
+  const camp02 = useCmaMeasure(useCma, { canonicalMeasureId: 'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI', window: cmaWindow!, filters: { campaign: campaign.id } });
+  const camp03 = useCmaMeasure(useCma, { canonicalMeasureId: 'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-POLICY-CLASS', window: cmaWindow!, filters: { campaign: campaign.id } });
+
+  const camp01Evidence = camp01.data?.groups[0]?.evidence;
+  const camp02Evidence = camp02.data?.groups[0]?.evidence;
+  const camp03Evidence = camp03.data?.groups[0]?.evidence;
+  const cmaReady = useCma && Boolean(camp01Evidence) && Boolean(camp02Evidence) && Boolean(camp03Evidence);
+
+  const targetCount = cmaReady ? (camp01Evidence?.numerator ?? 0) : campaign.stats.targetCount;
+  const classifiedCount = cmaReady ? (camp02Evidence?.denominator ?? 0) : campaign.stats.classifiedCount;
+  const successCount = cmaReady ? (camp02Evidence?.numerator ?? 0) : campaign.stats.successCount;
+  const policyClassifiedCount = cmaReady ? (camp03Evidence?.denominator ?? 0) : campaign.stats.policyClassifiedCount;
+  const policySuccessfulCount = cmaReady ? (camp03Evidence?.numerator ?? 0) : campaign.stats.policySuccessfulCount;
+
+  const rate = classifiedCount > 0 ? (successCount / classifiedCount) * 100 : null;
+  const unclassified = targetCount - classifiedCount;
   // Session 12.6 §9/§12 — a SEPARATE, additional statistic, computed
   // only from the new policy-driven classification layer; the existing
   // `rate`/`unclassified` above (driven by the generic is_success
   // column) are completely untouched and remain this campaign's real
   // statistics regardless of whether it has an outcome policy.
   const isPolicyEnabled = Boolean(campaign.outcomePolicySnapshot);
-  const policyRate = campaign.stats.policyClassifiedCount > 0 ? (campaign.stats.policySuccessfulCount / campaign.stats.policyClassifiedCount) * 100 : null;
+  const policyRate = policyClassifiedCount > 0 ? (policySuccessfulCount / policyClassifiedCount) * 100 : null;
 
   const runAction = (mutation: { mutateAsync: (id: string) => Promise<unknown> }) => {
     mutation.mutateAsync(campaign.id).then(onRefetch);
@@ -375,7 +406,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
 
       <div className={`flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-2.5 border border-border rounded-md bg-card/40 ${typography.denseBody}`}>
         <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold tabular-nums text-foreground">{campaign.stats.targetCount}</span>
+          <span className="font-semibold tabular-nums text-foreground">{targetCount}</span>
           <span className={typography.metadata}>targets</span>
         </div>
         <div className="flex items-baseline gap-1.5">
@@ -398,7 +429,7 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           <>
             <div className="h-4 w-px bg-muted" aria-hidden="true" />
             <div className="flex items-baseline gap-1.5">
-              <span className="font-semibold tabular-nums text-foreground">{campaign.stats.policyClassifiedCount}</span>
+              <span className="font-semibold tabular-nums text-foreground">{policyClassifiedCount}</span>
               <span className={typography.metadata}>classified (policy)</span>
             </div>
             <div className="flex items-baseline gap-1.5">
@@ -447,16 +478,23 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
       <div>
         <div className="flex items-center justify-between mb-1.5 px-0.5">
           <h2 className={typography.sectionTitle}>
-            Targets ({campaign.stats.targetCount})
+            {/* Shows the same `targetCount` as the stat strip above
+                (CMA-authoritative when available) so the two never
+                visibly disagree — the join-gap diagnostic below
+                intentionally keeps comparing against the raw,
+                un-windowed campaign.stats.targetCount instead, since
+                that's the specific number its own detection logic
+                needs (see the comment on that check). */}
+            Targets ({targetCount})
           </h2>
           <Button size="sm" variant="outline" className="h-7 text-[11px] border-border bg-transparent text-foreground hover:bg-muted hover:text-foreground" onClick={() => setAddTargetsOpen(true)}>
             Add Targets
           </Button>
         </div>
         {/*
-          Session 12.1 — the heading now uses campaign.stats.targetCount
-          (a plain COUNT over campaign_targets, always correct) rather
-          than targets.length (the rows actually returned by
+          Session 12.1 — this check uses campaign.stats.targetCount (a
+          plain, un-windowed COUNT over campaign_targets, always correct)
+          rather than targets.length (the rows actually returned by
           listTargets, which INNER JOINs customer/contact-point and can
           therefore silently omit a target whose customer or contact
           point row doesn't resolve — the root cause of the previously
@@ -465,6 +503,14 @@ export const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaign, target
           honestly here rather than hidden — flagged for a future
           session, not fixed in 12.1 (fixing it requires a migration
           change to call_center_campaign_list_targets, out of scope).
+
+          Session CMA-4B — deliberately kept on the raw
+          campaign.stats.targetCount here, NOT the (possibly
+          CMA-windowed) `targetCount` the heading above now uses: this
+          check exists to catch a join-level data gap, and comparing
+          against a time-windowed figure instead could produce a false
+          "targets missing" alarm at a window boundary that has nothing
+          to do with the real bug this watches for.
         */}
         {campaign.stats.targetCount !== targets.length && (
           <div className="mb-1.5 px-0.5 flex items-center gap-1.5 text-[11px] text-[var(--status-caution-text)]">

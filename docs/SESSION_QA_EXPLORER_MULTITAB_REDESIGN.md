@@ -90,5 +90,39 @@ couldn't complete it.
 ## Constraints honored
 
 No CMA calculations/registry touched. No Supabase schema/API changes. No other
-screens redesigned. No new UI dependencies. `.env` untouched. Nothing
-committed, pushed, or deployed as part of this session.
+screens redesigned. No new UI dependencies. `.env` untouched.
+
+## Addendum — commit, deploy, and live production verification
+
+Committed as `c919a6a` (`feat(qa): organize quality explorer into analytical
+tabs`), HIG-gate pass recorded (0 high-severity findings — one subagent review
+flagged only two pre-existing, inherited-from-`Analytics.tsx` advisory notes:
+no scroll-affordance indicator on the tab strip at narrow widths, and the
+shared `Tabs` primitive's native `h-9` vs. the filter row's
+`--height-filter-field` token — neither is a new defect introduced by this
+change). Pushed to `main`; Vercel auto-deployed and aliased to
+`callcenter-three-livid.vercel.app` (confirmed via `vercel inspect`).
+
+The local `vercel dev` proxy issue reported above was not a blocker for
+production verification — tested directly on the deployed URL instead:
+
+- All five tabs (Overview, Failure Analysis, Trends, Agent Performance,
+  Interaction Outcomes) load and render correctly at 1920×1080.
+- Values in every tab match exactly what the unmigrated page showed
+  (Review Coverage 136/16/13/10%/191/10; Quality Measures 97%/95%/99%/100%/100%;
+  Agent-Level Quality rows for Inbound Banking Assistant/EMI Reminder/Forex
+  Transaction) — confirms no calculation changed, only layout.
+- Setting Channel = Voice in the filter row and switching through all five
+  tabs confirmed the filter persists across every tab switch (Trends' and
+  Agent Performance's numbers changed to the Voice-scoped subset, correctly,
+  without needing to re-select the filter).
+- The Failure Reasons drill-down dialog opens correctly from inside the
+  Failure Analysis tab and shows real evidence turns.
+- Re-tested at a narrower viewport (~1432×768, the automation tool's
+  practical minimum, representative of the 1366×768 target): no page-level
+  horizontal overflow (`document.documentElement.scrollWidth <=
+  clientWidth`, confirmed via direct DOM check), Agent Performance's wide
+  table scrolls within its own bounded region rather than the page.
+
+Nothing else was deployed as a side effect — only this file and the session
+doc were in the commit.

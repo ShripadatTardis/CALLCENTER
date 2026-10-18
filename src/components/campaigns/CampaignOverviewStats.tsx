@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { HelpCircle, PhoneCall, Play, TrendingUp, Users } from 'lucide-react';
 import type { CampaignWithStats } from '@/types/campaign';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { campaignAllTimeCmaWindow } from '@/lib/cma/cmaWindow';
 
 interface CampaignOverviewStatsProps {
   campaigns: CampaignWithStats[];
@@ -15,14 +18,53 @@ interface CampaignOverviewStatsProps {
  * could double-count one target). Unclassified/pending targets are
  * surfaced as a separate count, never silently folded into either side
  * of the ratio (plan §20).
+ *
+ * Session CMA-4C — Total Targets / Success Rate become CMA-authoritative
+ * (CANON-CAMPAIGN-TARGET-COUNT / CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI)
+ * when the viewer holds `cma.evaluate`, reusing the exact same formula,
+ * window-construction helper, and permission-gated fallback pattern
+ * already verified byte-identical against production for
+ * `CampaignStatStrip.tsx` (Session CMA-4B) — this component reads the
+ * identical `CampaignWithStats[]` shape from the same `useCampaigns()`
+ * source, so the same equivalence proof applies without re-deriving it.
+ * "Total Campaigns" / "Active Campaigns" / "Calls Triggered" / unclassified
+ * have no CMA canonical-measure equivalent and stay computed from the
+ * fetched campaign list, as before. The Analytics Campaigns tab's CSV
+ * export is unaffected — it exports a separate per-campaign row table
+ * (`CampaignAnalyticsTab.tsx`), not this component's cross-campaign
+ * aggregate, so there is nothing for it to contradict.
  */
 export const CampaignOverviewStats: React.FC<CampaignOverviewStatsProps> = ({ campaigns }) => {
+  const { user } = useAuth();
+  const useCma = hasPermission(user, 'cma.evaluate');
+  const cmaWindow = useMemo(() => campaignAllTimeCmaWindow(campaigns), [campaigns]);
+
+  const targetCountResult = useCmaMeasure(useCma && Boolean(cmaWindow), {
+    canonicalMeasureId: 'CANON-CAMPAIGN-TARGET-COUNT',
+    window: cmaWindow ?? { from: '', to: '' },
+  });
+  const successRateResult = useCmaMeasure(useCma && Boolean(cmaWindow), {
+    canonicalMeasureId: 'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI',
+    window: cmaWindow ?? { from: '', to: '' },
+  });
+
   const totalCampaigns = campaigns.length;
   const activeCampaigns = campaigns.filter((c) => c.status === 'running').length;
-  const totalTargets = campaigns.reduce((sum, c) => sum + c.stats.targetCount, 0);
   const totalTriggered = campaigns.reduce((sum, c) => sum + c.stats.triggeredCount, 0);
-  const totalClassified = campaigns.reduce((sum, c) => sum + c.stats.classifiedCount, 0);
-  const totalSuccess = campaigns.reduce((sum, c) => sum + c.stats.successCount, 0);
+
+  const cmaTargetEvidence = targetCountResult.data?.groups[0]?.evidence;
+  const cmaSuccessEvidence = successRateResult.data?.groups[0]?.evidence;
+  const cmaReady = useCma && Boolean(cmaWindow) && Boolean(cmaTargetEvidence) && Boolean(cmaSuccessEvidence);
+
+  const totalTargets = cmaReady
+    ? (cmaTargetEvidence?.numerator ?? 0)
+    : campaigns.reduce((sum, c) => sum + c.stats.targetCount, 0);
+  const totalClassified = cmaReady
+    ? (cmaSuccessEvidence?.denominator ?? 0)
+    : campaigns.reduce((sum, c) => sum + c.stats.classifiedCount, 0);
+  const totalSuccess = cmaReady
+    ? (cmaSuccessEvidence?.numerator ?? 0)
+    : campaigns.reduce((sum, c) => sum + c.stats.successCount, 0);
   const totalUnclassified = totalTargets - totalClassified;
 
   const successRate = totalClassified > 0 ? (totalSuccess / totalClassified) * 100 : null;

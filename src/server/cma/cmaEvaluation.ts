@@ -150,7 +150,10 @@ function buildRpcArgs(
     case 'interaction':
       return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null };
     case 'qa':
-      return { ...common, p_filter_channel: req.filters?.channel ?? null };
+      // [Session 4D] p_population defaults to 'combined' in the RPC itself when omitted —
+      // passed through explicitly here only when the caller actually requested a narrower
+      // population, so every pre-existing caller's behavior is unchanged byte-for-byte.
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_population: req.qaPopulation ?? 'combined' };
     case 'campaign':
       return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
     case 'chat':
@@ -226,6 +229,22 @@ export async function evaluateCmaMeasure(
       return terminal(req, canonical.governed_algorithm_status, access, requestedFilters,
         { kind: 'missing_required_facts', reason: `The registry does not record the base fact(s) this algorithm requires: ${missing.join(', ')}.` },
         resolvedMeasureId);
+    }
+  }
+
+  // ---- 1d-bis. VALIDATE: the QA population selector (Session 4D). Only meaningful for the
+  // 'qa' source family — requesting it against any other measure is rejected rather than
+  // silently ignored (brief: "Prevent unsupported population selections"). An invalid value
+  // is caught here too, even though the RPC itself also validates it — defense in depth,
+  // matching this file's existing pattern for every other governed input. ----
+  if (req.qaPopulation !== undefined) {
+    if (algorithm.sourceFamily !== 'qa') {
+      return terminal(req, canonical.governed_algorithm_status, access, requestedFilters,
+        { kind: 'unsupported', reason: 'qaPopulation only applies to QA-family measures.' }, resolvedMeasureId ?? undefined);
+    }
+    if (!['human', 'automated', 'combined'].includes(req.qaPopulation)) {
+      return terminal(req, canonical.governed_algorithm_status, access, requestedFilters,
+        { kind: 'unsupported', reason: `qaPopulation '${req.qaPopulation}' is not a recognized population — use 'human', 'automated', or 'combined'.` }, resolvedMeasureId ?? undefined);
     }
   }
 

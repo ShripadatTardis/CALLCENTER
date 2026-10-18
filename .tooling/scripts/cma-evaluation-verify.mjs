@@ -255,6 +255,46 @@ const SCOPED_ACCESS = { allCategories: false, authorizedAgentIds: ['agent-a', 'a
   assert('CMA-3B.3 qa family rejects an unsupported campaign filter: result kind', result.groups[0].result.kind, 'unsupported_dimension');
 }
 
+// --- Session 4D. QA population selector: defaults to 'combined' when omitted (byte-for-byte
+// unchanged behavior for every pre-existing caller). ---
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_qa_measure: { status: 'ok', population: 4, numerator: 3, denominator: 4 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CONTEXT-CONTINUITY-RATE', window: WINDOW }, ALL_ACCESS);
+  assert("Session 4D qa population selector: defaults to 'combined' when omitted", capturedArgs.p_population, 'combined');
+}
+
+// --- Session 4D. QA population selector: 'human' is passed through to the RPC untouched. ---
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_qa_measure: { status: 'ok', population: 2, numerator: 2, denominator: 2 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CONTEXT-CONTINUITY-RATE', window: WINDOW, qaPopulation: 'human' }, ALL_ACCESS);
+  assert("Session 4D qa population selector: 'human' passed through", capturedArgs.p_population, 'human');
+  assert('Session 4D qa population selector: value computed from the (mocked) human-only RPC result', result.groups[0].result, { kind: 'value', value: 100, unit: 'percent' });
+}
+
+// --- Session 4D. QA population selector: rejected for a non-QA measure, never reaches the database. ---
+{
+  const supabase = makeFakeSupabase({ rpcScenarios: {} });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-RES-RATE', window: WINDOW, qaPopulation: 'human' }, ALL_ACCESS);
+  assertTrue('Session 4D qa population selector: rejected for a non-QA measure before touching the database', !supabase.calls.some((c) => c.fn === 'call_center_cma_evaluate_measure'));
+  assert('Session 4D qa population selector: rejected for a non-QA measure: result kind', result.groups[0].result.kind, 'unsupported');
+}
+
+// --- Session 4D. QA population selector: an invalid value is rejected before touching the database. ---
+{
+  const supabase = makeFakeSupabase({ rpcScenarios: {} });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CONTEXT-CONTINUITY-RATE', window: WINDOW, qaPopulation: 'both' }, ALL_ACCESS);
+  assertTrue('Session 4D qa population selector: invalid value rejected before touching the database', !supabase.calls.some((c) => c.fn === 'call_center_cma_evaluate_qa_measure'));
+  assert('Session 4D qa population selector: invalid value: result kind', result.groups[0].result.kind, 'unsupported');
+}
+
 // --- CMA-3B 4. 'campaign' family: count unit never reports zero_denominator for a real zero count. ---
 {
   const supabase = makeFakeSupabase({

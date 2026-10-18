@@ -44,11 +44,15 @@ export interface CmaMeasureResponse {
   evaluatedAt: string;
 }
 
+/** Session 4D — only meaningful for QA-family measures; 'combined' (the default) preserves every pre-existing caller's behavior unchanged. */
+export type CmaQaPopulation = 'human' | 'automated' | 'combined';
+
 export interface CmaMeasureRequest {
   canonicalMeasureId: string;
   window: { from: string; to: string };
   filters?: Partial<Record<CmaDimensionId, string>>;
   groupBy?: CmaDimensionId;
+  qaPopulation?: CmaQaPopulation;
 }
 
 /** A human-readable reason for every non-value CmaMeasureValue kind, matching the existing Performance Ratio card's `unavailableReason` display convention (never a raw internal kind string shown to a user). */

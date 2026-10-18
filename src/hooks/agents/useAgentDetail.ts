@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAgents } from './useAgents';
 import { useCallData } from '@/hooks/calls/useCallData';
 import { useCallMetricsBulk } from '@/hooks/calls/useCallMetrics';
@@ -12,6 +13,9 @@ import {
   computeAgentCampaignOutcomeSummary,
 } from '@/services/agents/agentPerformanceAggregator';
 import { buildCallMetricsByInteractionId } from '@/lib/callMetricsCorrelation';
+import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { agentPerformanceCmaWindow } from '@/lib/cma/cmaWindow';
+import type { CmaMeasureValue } from '@/types/cma';
 
 /**
  * Composes the real /agents roster with already-existing calls/chat/
@@ -23,9 +27,21 @@ import { buildCallMetricsByInteractionId } from '@/lib/callMetricsCorrelation';
  * historical scan" convention (e.g. Customer 360 progressive
  * materialization's bounded first-fetch, §7 of this session's plan).
  */
+/**
+ * Session 4D — a real, authorization-aware result for the two measures
+ * now sourced from CMA (never "loading forever", never a raw CMA kind
+ * string leaking to the UI unexplained).
+ */
+export type AgentCmaMeasureState =
+  | { kind: 'unauthorized' }
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | CmaMeasureValue;
+
 export function useAgentDetail(agentId: string | undefined) {
   const { user } = useAuth();
   const role = user?.role ?? 'unauthenticated';
+  const canUseCma = hasPermission(user, 'cma.evaluate');
 
   const agentsQuery = useAgents();
   const callsQuery = useCallData({ page_size: 100 });
@@ -63,6 +79,47 @@ export function useAgentDetail(agentId: string | undefined) {
   const metricsByInteractionId = buildCallMetricsByInteractionId(technicalPerformanceQuery.data?.rows ?? []);
   const technicalPerformance = computeAgentCallTechnicalPerformance(callInteractions, metricsByInteractionId);
 
+  // Session 4D — CANON-AVG-SENT-SCORE / CANON-INTENT-CONFIDENCE are now
+  // CMA-authoritative, per-agent and properly windowed (see
+  // agentPerformanceCmaWindow's doc comment for why 90 days), replacing
+  // the previous bounded-100-calls-GLOBAL-then-client-filtered sample
+  // that could badly under-represent a lower-volume agent. Per this
+  // session's explicit instruction, there is NO fallback to that old
+  // sampling method for viewers without `cma.evaluate` — it was flagged
+  // as a real population mismatch, not merely "less authoritative," so
+  // reverting to it would mean knowingly showing a wrong number again.
+  // Viewers without the permission see an honest "unauthorized" state
+  // instead (never the old figure, never a fabricated one).
+  // Memoized deliberately: agentPerformanceCmaWindow() reads `Date.now()`, so calling it
+  // unmemoized on every render produces a new `from`/`to` ISO string (and therefore a new
+  // useCmaMeasure query key) on every single render — which starts a brand-new request before
+  // the previous one can ever resolve, so the UI never leaves its loading state. Stable for the
+  // life of this hook instance (eslint-disable: deliberately empty deps — a fresh window should
+  // only be computed on remount/agent change, never merely because something else re-rendered).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cmaWindow = useMemo(() => agentPerformanceCmaWindow(), [agentId]);
+  const sentimentCmaQuery = useCmaMeasure(canUseCma && Boolean(agentId), {
+    canonicalMeasureId: 'CANON-AVG-SENT-SCORE',
+    window: { from: cmaWindow.from, to: cmaWindow.to },
+    filters: { agent: agentId },
+  });
+  const intentConfidenceCmaQuery = useCmaMeasure(canUseCma && Boolean(agentId), {
+    canonicalMeasureId: 'CANON-INTENT-CONFIDENCE',
+    window: { from: cmaWindow.from, to: cmaWindow.to },
+    filters: { agent: agentId },
+  });
+
+  const toCmaMeasureState = (q: typeof sentimentCmaQuery): AgentCmaMeasureState => {
+    if (!canUseCma) return { kind: 'unauthorized' };
+    if (q.isLoading) return { kind: 'loading' };
+    if (q.isError) return { kind: 'error' };
+    const result = q.data?.groups[0]?.result;
+    return result ?? { kind: 'error' };
+  };
+
+  const sentimentCma = toCmaMeasureState(sentimentCmaQuery);
+  const intentConfidenceCma = toCmaMeasureState(intentConfidenceCmaQuery);
+
   return {
     agent,
     callInteractions,
@@ -72,6 +129,9 @@ export function useAgentDetail(agentId: string | undefined) {
     chatMetrics,
     campaignOutcomes,
     technicalPerformance,
+    sentimentCma,
+    intentConfidenceCma,
+    cmaWindowDays: cmaWindow.days,
     isLoading: agentsQuery.isLoading || callsQuery.isLoading || chatQuery.isLoading || campaignsQuery.isLoading,
     isError: agentsQuery.isError || callsQuery.isError || chatQuery.isError || campaignsQuery.isError,
   };

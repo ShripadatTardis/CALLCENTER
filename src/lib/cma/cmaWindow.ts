@@ -47,3 +47,46 @@ export function campaignAllTimeCmaWindow(campaigns: { createdAt: string }[]): { 
   const earliest = campaigns.reduce((min, c) => Math.min(min, new Date(c.createdAt).getTime()), Infinity);
   return { from: new Date(earliest).toISOString(), to: new Date().toISOString() };
 }
+
+/**
+ * Session 4D — Agent Detail's per-agent CMA-backed measures
+ * (CANON-AVG-SENT-SCORE / CANON-INTENT-CONFIDENCE). Unlike the bounded
+ * global-100-call sample this replaces, `cmaEvaluate` has no implicit
+ * population at all, so a real, clearly-stated window must be chosen
+ * explicitly. A trailing 90-day window was chosen (not assumed — checked
+ * against production first): every `customer_interactions` row observed
+ * in this project so far falls within the last ~30 days, so 90 days
+ * comfortably covers "this agent's real recent history" without
+ * silently truncating it, while staying an honest, disclosed window
+ * rather than an unbounded "all time" claim the UI can label precisely.
+ */
+export function agentPerformanceCmaWindow(): { from: string; to: string; days: number } {
+  const days = 90;
+  const now = new Date();
+  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  return { from: from.toISOString(), to: now.toISOString(), days };
+}
+
+/**
+ * Session 4D — Human QA Quality Explorer's "Submitted from"/"Submitted
+ * to" date filters are plain `YYYY-MM-DD` inputs (review SUBMISSION
+ * date, per that page's own documented semantics — not interaction
+ * date). When the viewer has set one or both, this builds the exact
+ * half-open `[from, to)` window they asked for (both dates inclusive,
+ * matching this app's established date-range convention). When neither
+ * is set, defaults to a trailing 365-day window — wide enough to cover
+ * this project's entire real review history to date, while still being
+ * an honest, disclosed window rather than an unbounded "all time" claim.
+ */
+export function qaExplorerCmaWindow(dateFrom: string, dateTo: string): { from: string; to: string; isDefaultWindow: boolean } {
+  if (!dateFrom && !dateTo) {
+    const days = 365;
+    const now = new Date();
+    const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    return { from: from.toISOString(), to: now.toISOString(), isDefaultWindow: true };
+  }
+  const from = dateFrom ? `${dateFrom}T00:00:00.000Z` : new Date(0).toISOString();
+  const toExclusive = dateTo ? new Date(`${dateTo}T00:00:00.000Z`) : new Date();
+  if (dateTo) toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+  return { from, to: toExclusive.toISOString(), isDefaultWindow: false };
+}

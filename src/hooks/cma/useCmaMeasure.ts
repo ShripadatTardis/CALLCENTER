@@ -11,7 +11,7 @@ export function useCmaMeasure(enabled: boolean, req: CmaMeasureRequest) {
   return useQuery({
     queryKey: [
       'cma', 'evaluate', req.canonicalMeasureId, req.window.from, req.window.to,
-      req.filters?.agent, req.filters?.channel, req.filters?.campaign, req.groupBy,
+      req.filters?.agent, req.filters?.channel, req.filters?.campaign, req.groupBy, req.qaPopulation,
     ],
     queryFn: () => evaluateCmaMeasure(req),
     enabled,

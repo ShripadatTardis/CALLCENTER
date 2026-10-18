@@ -19,12 +19,36 @@ import {
   reasonCodeDistribution, reasonCodeAffectedInteractions, agentAggregation, trendBuckets, interactionOutcomeAggregation,
   type QaAnalysisFinding, type QaTrendGranularity,
 } from '@/lib/qaAnalysis';
-import { computeQaRatios } from '@/lib/qaRatios';
+import { computeQaRatios, type QaRatioResult } from '@/lib/qaRatios';
 import { QA_PARAMETER_CODES, QA_PARAMETERS, type QaParameterCode } from '@/lib/qaParameters';
 import { humanizeReasonCode } from '@/lib/qaExceptionEditor';
 import { QaReviewDialog } from '@/components/qa/QaReviewDialog';
 import { formatFractionAsPercent, formatTimestamp } from '@/lib/format';
 import { typography } from '@/lib/typography';
+import { useCmaMeasures } from '@/hooks/cma/useCmaMeasures';
+import { qaExplorerCmaWindow } from '@/lib/cma/cmaWindow';
+import type { CmaMeasureRequest } from '@/types/cma';
+
+/**
+ * Session 4D — the central, governed QA population selector
+ * (`qaPopulation: 'human'`) lets this page's 9 "Quality Measures" tiles
+ * become CMA-authoritative WITHOUT silently combining in Automated QA,
+ * which is exactly the population mismatch CMA-4B/4C identified and
+ * deliberately left unmigrated. One canonical measure id per parameter
+ * code — no new vocabulary invented, these are the same 9 ids already
+ * registered and operational in the CMA algorithm registry.
+ */
+const QA_PARAMETER_TO_CANONICAL_MEASURE: Record<QaParameterCode, string> = {
+  context_continuity_rate: 'CANON-CONTEXT-CONTINUITY-RATE',
+  followup_understanding_rate: 'CANON-FOLLOWUP-UNDERSTANDING-RATE',
+  task_progression_rate: 'CANON-TASK-PROGRESSION-RATE',
+  reference_resolution_accuracy: 'CANON-REFERENCE-RES-ACC',
+  unnecessary_clarification_rate: 'CANON-UNNECESSARY-CLARIFICATION-RATE',
+  repetition_loop_rate: 'CANON-REPETITION-LOOP-RATE',
+  customer_correction_rate: 'CANON-CUSTOMER-CORRECTION-RATE',
+  conversation_recovery_rate: 'CANON-CONVERSATION-RECOVERY-RATE',
+  response_grounding_rate: 'CANON-RESPONSE-GROUNDING-RATE',
+};
 
 const ALL = '__all__';
 
@@ -125,7 +149,42 @@ const QaQualityExplorer: React.FC = () => {
 
   const coverage = computeCoveragePopulation(scopedReviews, scopedFindings);
   const coverageRate = computeCoverageRate(coverage.reviewedInteractionsCount, eligibleInteractionsCount);
-  const ratios = computeQaRatios(scopedFindings);
+  const legacyRatios = computeQaRatios(scopedFindings);
+
+  // Session 4D — CMA has no "reviewer" dimension (not a registered
+  // business filter anywhere in the registry), so a reviewer filter
+  // falls back to the existing client-side computation rather than
+  // silently ignoring that filter. Agent and channel are both CMA
+  // dimensions, so those stay CMA-eligible either way.
+  const canUseCma = hasPermission(user, 'cma.evaluate') && reviewerUserId === ALL;
+  // Memoized deliberately: qaExplorerCmaWindow() reads Date.now() when no explicit date filter
+  // is set, so calling it unmemoized on every render would produce a new query key (and a new,
+  // never-settling request) on every render — see the identical fix/comment in useAgentDetail.ts.
+  const cmaWindow = useMemo(() => qaExplorerCmaWindow(dateFrom, dateTo), [dateFrom, dateTo]);
+  const cmaRequests: CmaMeasureRequest[] = QA_PARAMETER_CODES.map((code) => ({
+    canonicalMeasureId: QA_PARAMETER_TO_CANONICAL_MEASURE[code],
+    window: { from: cmaWindow.from, to: cmaWindow.to },
+    filters: {
+      ...(agentId !== ALL ? { agent: agentId } : {}),
+      ...(channel !== 'all' ? { channel } : {}),
+    },
+    qaPopulation: 'human',
+  }));
+  const cmaResults = useCmaMeasures(canUseCma, cmaRequests);
+
+  const ratios: Record<QaParameterCode, QaRatioResult & { cmaUnavailableReason?: string }> = {} as Record<QaParameterCode, QaRatioResult & { cmaUnavailableReason?: string }>;
+  QA_PARAMETER_CODES.forEach((code, i) => {
+    const q = cmaResults[i];
+    const evidence = canUseCma ? q.data?.groups[0]?.evidence : undefined;
+    const resultKind = canUseCma ? q.data?.groups[0]?.result?.kind : undefined;
+    if (canUseCma && evidence && resultKind !== 'unsupported_dimension' && resultKind !== 'unauthorized_filter') {
+      const denominator = evidence.denominator ?? 0;
+      const numerator = evidence.numerator ?? 0;
+      ratios[code] = { parameterCode: code, numerator, denominator, rate: denominator > 0 ? numerator / denominator : null };
+    } else {
+      ratios[code] = legacyRatios[code];
+    }
+  });
   const reasons = reasonCodeDistribution(scopedFindings);
   const agentRows = useMemo(() => agentAggregation(scopedFindings, scopedReviews), [scopedFindings, scopedReviews]);
   const trend = useMemo(() => trendBuckets(scopedFindings, scopedReviews, trendParameter, trendGranularity), [scopedFindings, scopedReviews, trendParameter, trendGranularity]);
@@ -247,7 +306,17 @@ const QaQualityExplorer: React.FC = () => {
 
         {/* Quality measures */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
-          <div className={typography.sectionTitle}>Quality Measures</div>
+          <div className="flex items-center justify-between">
+            <div className={typography.sectionTitle}>Quality Measures</div>
+            <Notes notes={[
+              canUseCma
+                ? `Sourced from the Central Measures Authority, Human-QA population only (never combined with Automated QA) — window ${cmaWindow.isDefaultWindow ? 'defaults to the trailing 365 days' : 'matches your Submitted from/to filters'}.`
+                : reviewerUserId !== ALL
+                  ? 'Showing the existing client-computed figures — the Reviewer filter has no Central Measures Authority equivalent, so this stays on the prior calculation while that filter is active.'
+                  : 'Showing the existing client-computed figures — your role does not hold CMA evaluation access.',
+              'Either source uses the identical eligibility rule and numerator/denominator definition per parameter — only where the calculation runs differs, never the business meaning.',
+            ]} />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
             {QA_PARAMETER_CODES.map((code) => {
               const def = QA_PARAMETERS[code];

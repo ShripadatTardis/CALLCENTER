@@ -9,7 +9,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Bot, ChevronDown, ChevronLeft, ChevronRight, Info, Loader2 } from 'lucide-react';
-import { useAgentDetail } from '@/hooks/agents/useAgentDetail';
+import { useAgentDetail, type AgentCmaMeasureState } from '@/hooks/agents/useAgentDetail';
+import { cmaMeasureUnavailableReason } from '@/types/cma';
 import { useClassification } from '@/hooks/classification/useClassification';
 import { buildAgentContractFromRoster } from '@/lib/campaignAgentContract';
 import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetailDialog';
@@ -19,13 +20,26 @@ import { resolveDetailOrigin, type DetailNavigationState } from '@/lib/detailOri
 import {
   formatDurationLong,
   formatFractionAsPercent,
-  formatPercent,
   formatStatusLabel,
   formatTimestamp,
 } from '@/lib/format';
 import { typography } from '@/lib/typography';
 
 const FALLBACK = '—';
+/**
+ * Session 4D — formats the CMA-backed sentiment/intent-confidence
+ * state. Deliberately never falls through to a sample-derived number:
+ * `unauthorized` gets its own explicit, distinct message (never
+ * confused with FALLBACK's "no eligible population" meaning), and every
+ * other non-value kind uses the real reason the evaluation returned.
+ */
+function formatAgentCmaScore(state: AgentCmaMeasureState): string {
+  if (state.kind === 'unauthorized') return 'Requires CMA access';
+  if (state.kind === 'loading') return '…';
+  if (state.kind === 'error') return 'Could not load';
+  if (state.kind === 'value') return state.value.toFixed(2);
+  return cmaMeasureUnavailableReason(state);
+}
 /** Session 15.4 — null here means "no eligible calls in this agent's sample", a real aggregate state distinct from a single call's "not available yet"/"not used" — see src/lib/callMetricsFormat.ts for the single-call formatter. */
 const fmtMs = (ms: number | null): string => (ms === null ? FALLBACK : `${Math.round(ms)} ms`);
 const RECENT_INTERACTIONS_PAGE_SIZES = [5, 10, 25, 50] as const;
@@ -156,6 +170,9 @@ const AgentDetail: React.FC = () => {
     chatMetrics,
     campaignOutcomes,
     technicalPerformance,
+    sentimentCma,
+    intentConfidenceCma,
+    cmaWindowDays,
     isLoading,
   } = useAgentDetail(agentId);
 
@@ -242,6 +259,7 @@ const AgentDetail: React.FC = () => {
   const performanceNotes = [
     'Voice business outcomes: call-data outcome/fcr, aggregated. Chat has no documented business-outcome field today — intentionally not shown.',
     'Intent confidence (voice/chat): the model\'s own classifier confidence, not a measured accuracy against a human-verified ground-truth label — never presented as "accuracy".',
+    `Sentiment (voice) and Intent confidence (voice) are sourced from the Central Measures Authority (CANON-AVG-SENT-SCORE / CANON-INTENT-CONFIDENCE), scoped to this agent and a trailing ${cmaWindowDays}-day window — not the bounded company-wide sample the other Voice metrics below still use. Requires the viewer to hold cma.evaluate; shown as "Requires CMA access" otherwise, never a stale or substituted figure.`,
     callMetrics.staleAhtExcludedCount > 0
       ? `${callMetrics.staleAhtExcludedCount} call${callMetrics.staleAhtExcludedCount === 1 ? '' : 's'} excluded from Avg handle time (implausible/stale duration, same 4h guard used elsewhere).`
       : null,
@@ -379,9 +397,9 @@ const AgentDetail: React.FC = () => {
                   <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
                 </CollapsibleSubsection>
                 <CollapsibleSubsection title="Conversational Quality">
-                  <MetricRow label="Intent confidence (voice)" value={callMetrics.avgIntentAccuracy === null ? FALLBACK : formatPercent(callMetrics.avgIntentAccuracy)} />
+                  <MetricRow label={`Intent confidence (voice, CMA, last ${cmaWindowDays}d)`} value={formatAgentCmaScore(intentConfidenceCma)} />
                   <MetricRow label="Intent confidence (chat)" value={chatMetrics.avgConfidence === null ? FALLBACK : formatFractionAsPercent(chatMetrics.avgConfidence)} />
-                  <MetricRow label="Sentiment (voice)" value={callMetrics.avgSentimentScore === null ? FALLBACK : callMetrics.avgSentimentScore.toFixed(2)} />
+                  <MetricRow label={`Sentiment (voice, CMA, last ${cmaWindowDays}d)`} value={formatAgentCmaScore(sentimentCma)} />
                   <MetricRow label="Authenticated (voice/chat)" value={`${callMetrics.authenticatedCount} / ${chatMetrics.authenticatedCount}`} />
                 </CollapsibleSubsection>
                 {/* Session 15.4 — real per-agent Voice turn latency, from

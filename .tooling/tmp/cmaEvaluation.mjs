@@ -242,7 +242,7 @@ function buildRpcArgs(algorithm, canonicalId, req, access, filterAgentId) {
     case "interaction":
       return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null };
     case "qa":
-      return { ...common, p_filter_channel: req.filters?.channel ?? null };
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_population: req.qaPopulation ?? "combined" };
     case "campaign":
       return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
     case "chat":
@@ -319,6 +319,28 @@ async function evaluateCmaMeasure(supabase, req, access) {
         requestedFilters,
         { kind: "missing_required_facts", reason: `The registry does not record the base fact(s) this algorithm requires: ${missing.join(", ")}.` },
         resolvedMeasureId
+      );
+    }
+  }
+  if (req.qaPopulation !== void 0) {
+    if (algorithm.sourceFamily !== "qa") {
+      return terminal(
+        req,
+        canonical.governed_algorithm_status,
+        access,
+        requestedFilters,
+        { kind: "unsupported", reason: "qaPopulation only applies to QA-family measures." },
+        resolvedMeasureId ?? void 0
+      );
+    }
+    if (!["human", "automated", "combined"].includes(req.qaPopulation)) {
+      return terminal(
+        req,
+        canonical.governed_algorithm_status,
+        access,
+        requestedFilters,
+        { kind: "unsupported", reason: `qaPopulation '${req.qaPopulation}' is not a recognized population \u2014 use 'human', 'automated', or 'combined'.` },
+        resolvedMeasureId ?? void 0
       );
     }
   }

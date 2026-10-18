@@ -72,9 +72,19 @@ export interface CmaMeasureResponse {
   evaluatedAt: string;
 }
 
+/**
+ * Session 4D — the central, governed QA population selector. Only
+ * meaningful for 'qa' source-family measures; requesting it against any
+ * other measure is rejected (see cmaEvaluation.ts), never silently
+ * ignored. 'combined' is the default when omitted — the same behavior
+ * every existing caller already got before this field existed.
+ */
+export type CmaQaPopulation = 'human' | 'automated' | 'combined';
+
 export interface CmaMeasureRequest {
   canonicalMeasureId: string;
   window: { from: string; to: string };
   filters?: Partial<Record<CmaDimensionId, string>>;
   groupBy?: CmaDimensionId;
+  qaPopulation?: CmaQaPopulation;
 }

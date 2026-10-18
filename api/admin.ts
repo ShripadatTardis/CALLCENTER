@@ -11,7 +11,7 @@ import {
   listDimensions, listBaseFactsForMeasure, listChartVisualizations, getGovernanceStatus,
 } from '../src/server/cma/cmaRegistry.js';
 import { evaluateCmaMeasure } from '../src/server/cma/cmaEvaluation.js';
-import type { CmaDimensionId } from '../src/server/cma/cmaEvaluationTypes.js';
+import type { CmaDimensionId, CmaQaPopulation } from '../src/server/cma/cmaEvaluationTypes.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1739,6 +1739,7 @@ async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): P
     window?: { from?: string; to?: string };
     filters?: Partial<Record<CmaDimensionId, string>>;
     groupBy?: CmaDimensionId;
+    qaPopulation?: CmaQaPopulation;
   };
   if (!body.canonicalMeasureId || typeof body.canonicalMeasureId !== 'string') {
     res.status(422).json({ detail: 'canonicalMeasureId is required' });
@@ -1759,6 +1760,7 @@ async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): P
         window: { from: body.window.from, to: body.window.to },
         filters: body.filters,
         groupBy: body.groupBy,
+        qaPopulation: body.qaPopulation,
       },
       { allCategories: access.allCategories, authorizedAgentIds: access.authorizedAgentIds },
     );

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Info, ChevronRight } from 'lucide-react';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useAgents } from '@/hooks/agents/useAgents';
@@ -207,6 +208,24 @@ const QaQualityExplorer: React.FC = () => {
           </div>
         </div>
 
+        {/* Session: Human QA Quality Explorer multi-tab redesign — the six
+            analytical sections below were previously stacked vertically on
+            one page (requiring ~50% browser zoom to see an overview).
+            Grouped into five tabs per the brief; filters above stay shared
+            across all tabs via the existing component state (no new fetch
+            paths, no duplicated data-fetching — every section still reads
+            from the same scopedFindings/scopedReviews/ratios/etc. computed
+            once above). */}
+        <Tabs defaultValue="overview" className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="bg-card border border-border h-9 flex-nowrap overflow-x-auto max-w-full justify-start flex-shrink-0">
+            <TabsTrigger value="overview" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="failures" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Failure Analysis</TabsTrigger>
+            <TabsTrigger value="trends" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Trends</TabsTrigger>
+            <TabsTrigger value="agents" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Agent Performance</TabsTrigger>
+            <TabsTrigger value="outcomes" className="text-xs shrink-0 data-[state=active]:bg-muted data-[state=active]:text-foreground">Interaction Outcomes</TabsTrigger>
+          </TabsList>
+
+        <TabsContent value="overview" className="mt-3 space-y-3">
         {/* Review coverage */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className="flex items-center justify-between">
@@ -261,7 +280,9 @@ const QaQualityExplorer: React.FC = () => {
             })}
           </div>
         </div>
+        </TabsContent>
 
+        <TabsContent value="failures" className="mt-3 space-y-3">
         {/* Failure reasons */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className="flex items-center justify-between">
@@ -308,7 +329,9 @@ const QaQualityExplorer: React.FC = () => {
             </div>
           )}
         </div>
+        </TabsContent>
 
+        <TabsContent value="trends" className="mt-3 space-y-3">
         {/* Quality trend */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -356,7 +379,9 @@ const QaQualityExplorer: React.FC = () => {
             </div>
           )}
         </div>
+        </TabsContent>
 
+        <TabsContent value="agents" className="mt-3 space-y-3">
         {/* Agent comparison */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className={typography.sectionTitle}>Agent-Level Quality</div>
@@ -392,7 +417,9 @@ const QaQualityExplorer: React.FC = () => {
           )}
           <p className={typography.metadata}>Every percentage keeps its own eligible-population denominator — an agent with few reviewed interactions is not equally representative as one with many; compare the "Reviewed interactions" column alongside any rate.</p>
         </div>
+        </TabsContent>
 
+        <TabsContent value="outcomes" className="mt-3 space-y-3">
         {/* Interaction-level Human QA outcomes */}
         <div className="rounded-md border border-border bg-card p-2 space-y-1.5">
           <div className={typography.sectionTitle}>Human-Reviewed Interaction Outcomes</div>
@@ -403,6 +430,8 @@ const QaQualityExplorer: React.FC = () => {
             <OutcomeBreakdown title="Human Assistance Required" breakdown={outcomes.humanAssistanceRequired} />
           </div>
         </div>
+        </TabsContent>
+        </Tabs>
       </div>
 
       {drillDown && (

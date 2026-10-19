@@ -6,10 +6,11 @@ building a small, typed evaluation foundation that uses the
 VoiceForce Conversational Agent's own existing analysis as input
 rather than independently re-analysing every conversation. No existing
 CMA calculation, registry, synchronization pipeline, evaluation API,
-dimension, or authorization mechanism was touched. Nothing was
-committed, pushed, or deployed; the one new migration this session
-wrote was validated only against disposable PostgreSQL, never applied
-to production, per this session's explicit boundary.
+dimension, or authorization mechanism was touched. This foundation was
+committed, pushed, and deployed to production in Session 6.1 — see
+the "Session 6.1 — Deployment and production verification" section at
+the end of this document for the commit, migration, and verification
+record.
 
 ## Part A — Evidence inventory (verified against real code and real production data, not assumed)
 
@@ -230,11 +231,73 @@ enforcement) was modified.
   in the documented structured-output contract is unverified.
 - No Trace-API ingestion exists yet — the 9 `C`-strategy measures
   remain `unimplemented` until a future session builds that sync path.
-- The new migration is validated only in disposable PostgreSQL, never
-  applied to production, per this session's explicit boundary — a
-  future session must still apply and re-verify it live before any
-  measure can actually use it.
 - This foundation covers exactly one fact (`escalation_reason`); no
   other interaction-level fact has been ported onto the new contract
   yet (deliberately — brief §13: "avoid unnecessary architecture
   expansion").
+- No screen or production route calls `evaluateEscalationReasonEvidence`
+  or the new `cma_interaction_evidence` table yet — this session's
+  reference implementation and its persistence are deployed but not
+  yet wired to any caller, so normal measurement queries, dashboards,
+  and the existing 19 operational algorithms are entirely unaffected.
+
+## Session 6.1 — Deployment and production verification
+
+Session 6.1 committed, deployed, and verified in production the
+already-complete Session 6 foundation (no new design or
+implementation — deployment only, per that session's own brief).
+
+- **Pre-deployment re-verification**: `npm run typecheck`,
+  `npm run verify:full` (includes the 30 `cma-escalation-evidence-verify.mjs`
+  assertions plus every other existing deterministic suite — zero
+  regressions), and `npm run build` all passed clean. The evidence
+  migration was independently re-validated end-to-end in a fresh
+  disposable PostgreSQL 17 cluster (full real migration history replay
+  + the new migration + 8 targeted checks: clean apply, table/check
+  constraints, the one-active-per-fact partial unique index actually
+  rejecting a duplicate, the upsert RPC's previously-fixed
+  ambiguous-column bug confirmed still fixed with no regression, correct
+  supersession chaining, `get_active` returning only the active row,
+  `service_role`-only grants, and confirmation the migration is purely
+  additive with no `ALTER` on any existing table).
+- **Commit**: `5ef3fa2` — `feat(cma): add conversation-aware evidence
+  foundation`. Staged exactly the Session 6 implementation/test/doc
+  files (`src/server/cma/cmaEvidenceTypes.ts`,
+  `cmaEvidencePathSelector.ts`, `cmaEscalationEvidence.ts`, the
+  migration, the esbuild bundle, the verify script, the two Part G
+  docs, and the `verify:full` wiring in `package.json`). `.env` and the
+  pre-existing Session 5 doc edit were deliberately left unstaged and
+  untouched.
+- **Migration deployed**: applied directly (via the Supabase
+  management API) to the production project `dtbaczafdzgctkbqviod`,
+  recorded in its migration history as version `20261019041938`, name
+  `cma_interaction_evidence_foundation` — unchanged from the
+  disposable-Postgres-validated file. No synthetic data was written to
+  production (deliberately — the brief's own prohibition); production
+  verification was limited to read-only schema/grant/RLS inspection.
+- **Production verification (read-only)**:
+  - `call_center.cma_interaction_evidence` exists with all 18 expected
+    columns and correct nullability, matching the migration exactly.
+  - Both new RPCs (`call_center_cma_evidence_upsert`,
+    `call_center_cma_evidence_get_active`) show `EXECUTE` granted only
+    to `postgres` (owner) and `service_role` — no `anon`, `authenticated`,
+    or `public` grant.
+  - `relrowsecurity` is `true` on the new table with zero rows in
+    `pg_policies` — deny-all RLS confirmed, exactly as designed.
+  - The migration is additive only — no existing table, RPC, or
+    production CMA calculation was altered; the existing 19-entry
+    `CMA_ALGORITHM_REGISTRY`, the sync pipeline, and every other
+    production screen are unaffected, since nothing yet calls the new
+    table or RPCs (see the outstanding-limitations note above).
+- **GitHub push**: `5ef3fa2` pushed to `origin/main`
+  (`ShripadatTardis/CALLCENTER`), fast-forward from `275dd7c`.
+- **Vercel deploy**: the GitHub push auto-triggered a new Production
+  deployment (`callcenter-mct4f36kw-sk-tardis-projects.vercel.app`),
+  which reached `Ready` in 38s and is aliased to the live production
+  domains (`callcenter-three-livid.vercel.app` and the project's other
+  aliases). Serverless function count stayed at 12 (Hobby-plan
+  ceiling unaffected — no new `api/*` route file was added).
+- **Post-deploy smoke check**: the production Dashboard route returns
+  HTTP 200; `GET /api/admin?resource=me` with no auth returns 401 (the
+  correct unauthenticated response), not a 500 — confirming the
+  existing auth-gated API surface is intact after the deploy.

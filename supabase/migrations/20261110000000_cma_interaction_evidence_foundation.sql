@@ -13,14 +13,12 @@
 -- security definer RPCs under public.call_center_*, grant execute to
 -- service_role only.
 --
--- NOT APPLIED TO PRODUCTION THIS SESSION. Per Session 6's explicit
--- boundary ("Do not apply new migrations to production without
--- explicit authorization" / "Stop after Session 6" / "Do not commit,
--- push or deploy automatically"), this file is written and validated
--- only against a disposable local PostgreSQL cluster — see
--- docs/SESSION_6_CMA_CONVERSATION_AWARE_FOUNDATION.md for that run's
--- results. It is a reusable foundation for a future session's rollout,
--- not a live change.
+-- Written and validated in Session 6 against a disposable local
+-- PostgreSQL cluster (see docs/SESSION_6_CMA_CONVERSATION_AWARE_FOUNDATION.md),
+-- then explicitly authorized and applied to production in Session 6.1
+-- (recorded in Supabase project dtbaczafdzgctkbqviod's migration
+-- history as version 20261019041938, name
+-- cma_interaction_evidence_foundation).
 
 create table if not exists call_center.cma_interaction_evidence (
   id uuid primary key default gen_random_uuid(),

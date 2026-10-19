@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { findPillarAndItemForPath } from './pillarNav';
+import { DatasetModeSelector } from './DatasetModeSelector';
 
 interface ContextBarProps {
   /** Optional operational content (e.g. live counts) — only ever pass real, authoritative values. Never fabricated. */
@@ -49,7 +50,10 @@ export const ContextBar: React.FC<ContextBarProps> = ({ children }) => {
           )}
         </div>
       </div>
-      {children && <div className="flex items-center gap-3 text-xs shrink-0">{children}</div>}
+      <div className="flex items-center gap-3 text-xs shrink-0">
+        <DatasetModeSelector />
+        {children}
+      </div>
     </div>
   );
 };

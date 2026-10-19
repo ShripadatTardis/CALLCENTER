@@ -28,6 +28,7 @@ import { typography } from '@/lib/typography';
 import { useCmaMeasures } from '@/hooks/cma/useCmaMeasures';
 import { qaExplorerCmaWindow } from '@/lib/cma/cmaWindow';
 import type { CmaMeasureRequest } from '@/types/cma';
+import { useDatasetMode } from '@/contexts/DatasetModeContext';
 
 /**
  * Session 4D — the central, governed QA population selector
@@ -105,6 +106,7 @@ const QaQualityExplorer: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canView = hasPermission(user, 'qa.analytics.view');
+  const { datasetId } = useDatasetMode();
 
   const [channel, setChannel] = useState<'all' | 'voice' | 'chat'>('all');
   const [agentId, setAgentId] = useState(ALL);
@@ -121,7 +123,8 @@ const QaQualityExplorer: React.FC = () => {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     reviewerUserId: reviewerUserId === ALL ? undefined : reviewerUserId,
-  }), [channel, dateFrom, dateTo, reviewerUserId]);
+    datasetId: datasetId ?? undefined,
+  }), [channel, dateFrom, dateTo, reviewerUserId, datasetId]);
 
   const findingsQuery = useQaAnalysisFindings(serverFilters);
   const populationQuery = useQaAnalysisPopulation(serverFilters);
@@ -169,6 +172,7 @@ const QaQualityExplorer: React.FC = () => {
       ...(channel !== 'all' ? { channel } : {}),
     },
     qaPopulation: 'human',
+    datasetId,
   }));
   const cmaResults = useCmaMeasures(canUseCma, cmaRequests);
 

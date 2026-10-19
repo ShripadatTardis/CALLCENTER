@@ -6,6 +6,7 @@ import type { CampaignWithStats } from '@/types/campaign';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
 import { campaignAllTimeCmaWindow } from '@/lib/cma/cmaWindow';
+import { useDatasetMode } from '@/contexts/DatasetModeContext';
 
 interface CampaignOverviewStatsProps {
   campaigns: CampaignWithStats[];
@@ -37,15 +38,18 @@ interface CampaignOverviewStatsProps {
 export const CampaignOverviewStats: React.FC<CampaignOverviewStatsProps> = ({ campaigns }) => {
   const { user } = useAuth();
   const useCma = hasPermission(user, 'cma.evaluate');
+  const { datasetId } = useDatasetMode();
   const cmaWindow = useMemo(() => campaignAllTimeCmaWindow(campaigns), [campaigns]);
 
   const targetCountResult = useCmaMeasure(useCma && Boolean(cmaWindow), {
     canonicalMeasureId: 'CANON-CAMPAIGN-TARGET-COUNT',
     window: cmaWindow ?? { from: '', to: '' },
+    datasetId,
   });
   const successRateResult = useCmaMeasure(useCma && Boolean(cmaWindow), {
     canonicalMeasureId: 'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI',
     window: cmaWindow ?? { from: '', to: '' },
+    datasetId,
   });
 
   const totalCampaigns = campaigns.length;

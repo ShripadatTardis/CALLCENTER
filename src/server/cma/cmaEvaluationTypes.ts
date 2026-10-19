@@ -87,4 +87,13 @@ export interface CmaMeasureRequest {
   filters?: Partial<Record<CmaDimensionId, string>>;
   groupBy?: CmaDimensionId;
   qaPopulation?: CmaQaPopulation;
+  /**
+   * Session 7.1 — dataset mode. Omitted/null (the default) is NORMAL
+   * mode: only rows with no dataset_id (every real operational row).
+   * A real label (e.g. 'CMA_POC_500_V1') is TEST mode: only rows
+   * tagged with that exact dataset_id. The two populations are never
+   * mixed — every CMA RPC this engine calls enforces the same
+   * either/or predicate server-side.
+   */
+  datasetId?: string | null;
 }

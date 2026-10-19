@@ -28,6 +28,7 @@ import { InteractionDetailDialog } from '@/components/call-logs/InteractionDetai
 import { ChatSessionDetailDialog } from '@/components/chat/ChatSessionDetailDialog';
 import { ActionRequiredCard } from '@/components/actions/ActionRequiredCard';
 import { useGuardedNavigate } from '@/hooks/useGuardedNavigate';
+import { useDatasetMode } from '@/contexts/DatasetModeContext';
 import type { Interaction } from '@/types/interaction';
 import {
   formatDurationExact,
@@ -139,6 +140,7 @@ const CMA_BACKED_RATIO_MEASURES: Record<string, string> = {
 const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
   const guardedNavigate = useGuardedNavigate();
   const { user } = useAuth();
+  const { datasetId } = useDatasetMode();
   const definition = getFrontendRatioDefinition(ratioId);
   const link = buildDashboardRatioLink(ratioId);
 
@@ -147,7 +149,7 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
   const cmaWindow = useMemo(() => defaultDashboardCmaWindow(), []);
 
   const legacy = useRatioSummary(useCma ? undefined : ratioId, {});
-  const cma = useCmaMeasure(useCma, { canonicalMeasureId: canonicalMeasureId ?? '', window: cmaWindow });
+  const cma = useCmaMeasure(useCma, { canonicalMeasureId: canonicalMeasureId ?? '', window: cmaWindow, datasetId });
 
   const isLoading = useCma ? cma.isLoading : legacy.isLoading;
   const isError = useCma ? cma.isError : legacy.isError;

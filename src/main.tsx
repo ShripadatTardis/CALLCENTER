@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { IndustryProvider } from '@/contexts/IndustryContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { CustomerSkinProvider } from '@/contexts/CustomerSkinContext';
+import { DatasetModeProvider } from '@/contexts/DatasetModeContext';
 
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
@@ -15,7 +16,11 @@ createRoot(document.getElementById("root")!).render(
     <CustomerSkinProvider>
       <IndustryProvider>
         <AuthProvider>
-          <App />
+          {/* Session 7.1 — inside AuthProvider: needs the resolved user's
+              permissions to gate TEST mode. */}
+          <DatasetModeProvider>
+            <App />
+          </DatasetModeProvider>
         </AuthProvider>
       </IndustryProvider>
     </CustomerSkinProvider>

@@ -53,6 +53,8 @@ export interface CmaMeasureRequest {
   filters?: Partial<Record<CmaDimensionId, string>>;
   groupBy?: CmaDimensionId;
   qaPopulation?: CmaQaPopulation;
+  /** Session 7.1 — dataset mode. Omitted/null = NORMAL (real operational data only). A real label (e.g. 'CMA_POC_500_V1') = TEST mode, only that dataset's rows — never mixed with NORMAL. */
+  datasetId?: string | null;
 }
 
 /** A human-readable reason for every non-value CmaMeasureValue kind, matching the existing Performance Ratio card's `unavailableReason` display convention (never a raw internal kind string shown to a user). */

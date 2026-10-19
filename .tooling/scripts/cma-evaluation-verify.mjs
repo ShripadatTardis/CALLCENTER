@@ -397,6 +397,65 @@ const SCOPED_ACCESS = { allCategories: false, authorizedAgentIds: ['agent-a', 'a
   assert('CMA-3B.1.4 campaign family still rejects channel (the unsupported registry relationship was removed, not left in place)', result.groups[0].result.kind, 'unsupported_dimension');
 }
 
+// --- Session 7.1 — p_dataset_id threading. NORMAL mode (datasetId
+// omitted/null) must send p_dataset_id: null; TEST mode must send the
+// real label; the 'action' family must NEVER receive this argument at
+// all (no dataset_id column exists on action_items this session). ---
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_measure: { status: 'ok', population: 10, numerator: 7, denominator: 10 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-RES-RATE', window: WINDOW }, ALL_ACCESS);
+  assert('Session 7.1: datasetId omitted -> p_dataset_id is null (NORMAL mode default)', capturedArgs.p_dataset_id, null);
+}
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_measure: { status: 'ok', population: 10, numerator: 7, denominator: 10 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-RES-RATE', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS);
+  assert('Session 7.1: explicit datasetId -> p_dataset_id carries the real label (TEST mode)', capturedArgs.p_dataset_id, 'CMA_POC_500_V1');
+}
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_qa_measure: { status: 'ok', population: 4, numerator: 3, denominator: 4 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CONTEXT-CONTINUITY-RATE', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS);
+  assert('Session 7.1: qa family receives p_dataset_id in TEST mode', capturedArgs.p_dataset_id, 'CMA_POC_500_V1');
+}
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_campaign_measure: { status: 'ok', population: 2, numerator: 1, denominator: 2 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CAMPAIGN-TARGET-COUNT', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS);
+  assert('Session 7.1: campaign family receives p_dataset_id in TEST mode', capturedArgs.p_dataset_id, 'CMA_POC_500_V1');
+}
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_chat_measure: { status: 'ok', population: 2, numerator: 240, denominator: 2 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CHAT-SESSION-SPAN', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS);
+  assert('Session 7.1: chat family receives p_dataset_id in TEST mode', capturedArgs.p_dataset_id, 'CMA_POC_500_V1');
+}
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_action_measure: { status: 'ok', population: 5, numerator: 5, denominator: 5 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-ACTION-REQUIRED-QUEUE-ITEMS', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS);
+  assertTrue('Session 7.1: action family NEVER receives p_dataset_id (no such column/parameter exists)', !('p_dataset_id' in capturedArgs));
+}
+
 console.log('');
 console.log(`${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

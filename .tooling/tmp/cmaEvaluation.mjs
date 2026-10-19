@@ -238,14 +238,16 @@ function buildRpcArgs(algorithm, canonicalId, req, access, filterAgentId) {
     p_filter_agent_id: filterAgentId,
     p_group_by: req.groupBy ?? null
   };
+  const datasetArg = { p_dataset_id: req.datasetId ?? null };
   switch (algorithm.sourceFamily) {
     case "interaction":
-      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null };
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null, ...datasetArg };
     case "qa":
-      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_population: req.qaPopulation ?? "combined" };
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_population: req.qaPopulation ?? "combined", ...datasetArg };
     case "campaign":
-      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
+      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null, ...datasetArg };
     case "chat":
+      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null, ...datasetArg };
     case "action":
       return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
     default:

@@ -15,6 +15,8 @@ export interface QaAnalysisFilterParams {
   dateFrom?: string;
   dateTo?: string;
   reviewerUserId?: string;
+  /** Session 7.1 — dataset mode. Omitted = NORMAL (real operational data only). A real label (e.g. 'CMA_POC_500_V1') = TEST mode, only that dataset's rows. */
+  datasetId?: string;
 }
 
 export async function fetchQaAnalysisFindings(filters: QaAnalysisFilterParams = {}): Promise<QaAnalysisFinding[]> {

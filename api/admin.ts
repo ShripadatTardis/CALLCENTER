@@ -836,12 +836,18 @@ async function handleQaGet(req: VercelRequest, res: VercelResponse): Promise<voi
     const dateFrom = queryStr(req, 'dateFrom');
     const dateTo = queryStr(req, 'dateTo');
     const reviewerUserId = queryStr(req, 'reviewerUserId');
+    // Session 7.1 — dataset mode. Omitted/absent -> NORMAL (RPC default
+    // null -> dataset_id is null). A real label (e.g. 'CMA_POC_500_V1')
+    // -> TEST mode, only rows tagged with that exact dataset_id. Never
+    // both at once — see 20261113000000_cma_dataset_isolation.sql.
+    const datasetId = queryStr(req, 'datasetId');
     if (channel && channel !== 'voice' && channel !== 'chat') { res.status(422).json({ detail: 'channel must be "voice" or "chat"' }); return; }
 
     if (action === 'findings') {
       const { data, error } = await supabase.rpc('call_center_qa_findings_list', {
         p_authorized_agent_ids: authorizedAgentIds, p_all_agents: allAgents,
         p_channel: channel ?? null, p_date_from: dateFrom ?? null, p_date_to: dateTo ?? null, p_reviewer_user_id: reviewerUserId ?? null,
+        p_dataset_id: datasetId ?? null,
       });
       if (error) { res.status(500).json({ detail: error.message }); return; }
       res.status(200).json({ data: toCamelCaseDeep(data) });
@@ -851,6 +857,7 @@ async function handleQaGet(req: VercelRequest, res: VercelResponse): Promise<voi
     const { data, error } = await supabase.rpc('call_center_qa_reviews_population', {
       p_authorized_agent_ids: authorizedAgentIds, p_all_agents: allAgents,
       p_channel: channel ?? null, p_date_from: dateFrom ?? null, p_date_to: dateTo ?? null, p_reviewer_user_id: reviewerUserId ?? null,
+      p_dataset_id: datasetId ?? null,
     });
     if (error) { res.status(500).json({ detail: error.message }); return; }
     res.status(200).json({ data: toCamelCaseDeep(data) });
@@ -1740,6 +1747,8 @@ async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): P
     filters?: Partial<Record<CmaDimensionId, string>>;
     groupBy?: CmaDimensionId;
     qaPopulation?: CmaQaPopulation;
+    /** Session 7.1 — dataset mode; omitted/null = NORMAL. */
+    datasetId?: string | null;
   };
   if (!body.canonicalMeasureId || typeof body.canonicalMeasureId !== 'string') {
     res.status(422).json({ detail: 'canonicalMeasureId is required' });
@@ -1761,6 +1770,7 @@ async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): P
         filters: body.filters,
         groupBy: body.groupBy,
         qaPopulation: body.qaPopulation,
+        datasetId: body.datasetId ?? null,
       },
       { allCategories: access.allCategories, authorizedAgentIds: access.authorizedAgentIds },
     );

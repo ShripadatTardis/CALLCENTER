@@ -146,23 +146,35 @@ function buildRpcArgs(
     p_filter_agent_id: filterAgentId,
     p_group_by: req.groupBy ?? null,
   };
+  // [Session 7.1] p_dataset_id is added to exactly the RPCs that were
+  // actually amended with that parameter (interaction/qa/campaign/chat —
+  // see 20261113000000_cma_dataset_isolation.sql); 'action' deliberately
+  // did NOT get this parameter (no dataset_id column on action_items
+  // yet, documented as out of scope this session) — including it in
+  // that RPC's call would make PostgREST reject the call outright
+  // ("could not find function with these parameters"), so it is never
+  // added to the 'action' branch below.
+  const datasetArg = { p_dataset_id: req.datasetId ?? null };
   switch (algorithm.sourceFamily) {
     case 'interaction':
-      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null };
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_filter_campaign_id: req.filters?.campaign ?? null, ...datasetArg };
     case 'qa':
       // [Session 4D] p_population defaults to 'combined' in the RPC itself when omitted —
       // passed through explicitly here only when the caller actually requested a narrower
       // population, so every pre-existing caller's behavior is unchanged byte-for-byte.
-      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_population: req.qaPopulation ?? 'combined' };
+      return { ...common, p_filter_channel: req.filters?.channel ?? null, p_population: req.qaPopulation ?? 'combined', ...datasetArg };
     case 'campaign':
-      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
+      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null, ...datasetArg };
     case 'chat':
+      // [CMA-3B.1] chat_sessions has a real campaign_id column (confirmed by direct schema
+      // inspection), and the CMA-2 registry already (correctly) lists 'campaign' as a valid
+      // dimension for CHAT-SPAN-01 — this RPC argument is the physical-field mapping that makes
+      // runtime capability match that registered claim. No 'channel' column on this table, so no
+      // p_filter_channel is ever constructed for this family.
+      return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null, ...datasetArg };
     case 'action':
-      // [CMA-3B.1] both chat_sessions and action_items have a real campaign_id column (confirmed
-      // by direct schema inspection), and the CMA-2 registry already (correctly) lists 'campaign'
-      // as a valid dimension for CHAT-SPAN-01/ACTION-01 — this RPC argument is the physical-field
-      // mapping that makes runtime capability match that registered claim. Neither table has a
-      // 'channel' column, so no p_filter_channel is ever constructed for these two families.
+      // action_items has no dataset_id column yet (documented out-of-scope, Session 7.1) — no
+      // p_dataset_id argument is constructed for this family; see the comment above datasetArg.
       return { ...common, p_filter_campaign_id: req.filters?.campaign ?? null };
     default:
       return common;

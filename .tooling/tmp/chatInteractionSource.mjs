@@ -226,7 +226,11 @@ function mapRow(dto, preferredCustomerId = null, campaignName = null) {
     // genuinely absent from the Chat API contract
     campaignName,
     recordingAvailable: false,
-    source: "chat-sessions"
+    source: "chat-sessions",
+    fcr: null,
+    // genuinely absent from the Chat API contract
+    intentConfidence: null
+    // genuinely absent from the Chat API contract
   };
 }
 async function getTrialFlagsSafely(upstreamSessionIds) {

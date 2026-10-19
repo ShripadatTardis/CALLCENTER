@@ -27,7 +27,10 @@ function assert(name, actual, expected) {
 
 // --- buildCmaSyncPayload: a full SourceInteraction snapshot maps to ---
 // --- every field the sync RPC accepts EXCEPT customerId/contactPointId/ ---
-// --- campaignId/fcr/intentConfidence, which must never appear at all. ---
+// --- campaignId, which must never appear at all. fcr/intentConfidence ---
+// --- ARE included as of Session 7 (corrects the Session 6 finding that ---
+// --- these fields don't exist upstream — they do; the gap was only in ---
+// --- this payload builder, confirmed against the real documented API). ---
 
 const fullCallRow = {
   interactionId: 'call-001',
@@ -47,11 +50,13 @@ const fullCallRow = {
   campaignName: null,
   recordingAvailable: true,
   source: 'call-data',
+  fcr: true,
+  intentConfidence: 0.92,
 };
 
 const callPayload = buildCmaSyncPayload(fullCallRow);
 
-assert('buildCmaSyncPayload maps every SourceInteraction field the RPC accepts', callPayload, {
+assert('buildCmaSyncPayload maps every SourceInteraction field the RPC accepts, including fcr/intentConfidence', callPayload, {
   source: 'call-data',
   interactionId: 'call-001',
   startedAt: '2026-01-15T10:00:00.000Z',
@@ -67,11 +72,20 @@ assert('buildCmaSyncPayload maps every SourceInteraction field the RPC accepts',
   escalationTrigger: null,
   campaignName: null,
   recordingAvailable: true,
+  fcr: true,
+  intentConfidence: 0.92,
 });
 
 assert(
-  'buildCmaSyncPayload NEVER includes customerId/contactPointId/campaignId/fcr/intentConfidence — CMA sync does no identity resolution and SourceInteraction has none of these fields to fabricate',
-  ['customerId', 'contactPointId', 'campaignId', 'fcr', 'intentConfidence'].every((k) => !(k in callPayload)),
+  'buildCmaSyncPayload NEVER includes customerId/contactPointId/campaignId — CMA sync does no identity resolution and SourceInteraction has none of these fields to fabricate',
+  ['customerId', 'contactPointId', 'campaignId'].every((k) => !(k in callPayload)),
+  true,
+);
+
+const nullFcrCallRow = { ...fullCallRow, interactionId: 'call-002', fcr: null, intentConfidence: null };
+assert(
+  'buildCmaSyncPayload: a genuinely-null fcr/intentConfidence (upstream has no value right now) is sent as an explicit null, never omitted or fabricated',
+  buildCmaSyncPayload(nullFcrCallRow).fcr === null && buildCmaSyncPayload(nullFcrCallRow).intentConfidence === null,
   true,
 );
 
@@ -94,10 +108,12 @@ const nullyChatRow = {
   campaignName: 'spring-promo',
   recordingAvailable: false,
   source: 'chat-sessions',
+  fcr: null,
+  intentConfidence: null,
 };
 
 assert(
-  'buildCmaSyncPayload for a Chat row: a genuinely-null outcome/sentimentScore/escalationTrigger is sent as an explicit null (overwrite), never fabricated into a fake value',
+  'buildCmaSyncPayload for a Chat row: a genuinely-null outcome/sentimentScore/escalationTrigger/fcr/intentConfidence is sent as an explicit null (overwrite), never fabricated into a fake value',
   buildCmaSyncPayload(nullyChatRow),
   {
     source: 'chat-sessions',
@@ -115,6 +131,8 @@ assert(
     escalationTrigger: null,
     campaignName: 'spring-promo',
     recordingAvailable: false,
+    fcr: null,
+    intentConfidence: null,
   },
 );
 

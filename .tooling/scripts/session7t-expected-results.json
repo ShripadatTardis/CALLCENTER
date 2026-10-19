@@ -1,0 +1,212 @@
+{
+  "datasetId": "CMA_POC_500_V1",
+  "seed": 12821760,
+  "window": {
+    "from": "2026-08-01T00:00:00.000Z",
+    "to": "2026-08-08T00:00:00.000Z"
+  },
+  "counts": {
+    "total": 500,
+    "voice": 350,
+    "chat": 150,
+    "distribution": {
+      "resolved": 205,
+      "escalated": 115,
+      "unresolved": 90,
+      "incomplete": 50,
+      "ambiguous": 40
+    },
+    "qaHumanSubmitted": 72,
+    "qaHumanDraft": 8,
+    "qaAutoCompleted": 54,
+    "qaAutoRunning": 6
+  },
+  "excludedBoundaryRowInteractionId": "cma500_voice_0001",
+  "measures": {
+    "resolutionRate": {
+      "canonicalId": "CANON-RES-RATE",
+      "governance": "decided_operational",
+      "population": 349,
+      "numerator": 164,
+      "denominator": 248,
+      "expectedValue": 66.13
+    },
+    "fcr": {
+      "canonicalId": "CANON-FIRST-CONTACT-RES",
+      "governance": "pending_decision_candidate_only",
+      "population": 215,
+      "numerator": 100,
+      "denominator": 215,
+      "expectedValue": 46.51
+    },
+    "escalationRate": {
+      "canonicalId": "CANON-ESC-RATE",
+      "governance": "pending_decision_candidate_only",
+      "population": 349,
+      "numerator": 84,
+      "denominator": 248,
+      "expectedValue": 33.87
+    },
+    "successfulResTime": {
+      "canonicalId": "CANON-SUCCESSFUL-RES-TIME",
+      "governance": "decided_operational",
+      "population": 349,
+      "numerator": 79758,
+      "denominator": 164,
+      "expectedValue": 486.33
+    },
+    "aht": {
+      "canonicalId": "CANON-AVG-HANDLE-TIME",
+      "governance": "pending_decision_candidate_only",
+      "population": 349,
+      "numerator": 199314,
+      "denominator": 349,
+      "expectedValue": 571.1
+    },
+    "authSuccessRate": {
+      "canonicalId": "CANON-AUTH-SUCCESS-RATE",
+      "governance": "decided_operational",
+      "population": 349,
+      "numerator": 238,
+      "denominator": 293,
+      "expectedValue": 81.23
+    },
+    "avgSentScore": {
+      "canonicalId": "CANON-AVG-SENT-SCORE",
+      "governance": "decided_operational",
+      "population": 349,
+      "numerator": 129.85,
+      "denominator": 296,
+      "expectedValue": 0.44
+    },
+    "intentConfidence": {
+      "canonicalId": "CANON-INTENT-CONFIDENCE",
+      "governance": "decided_operational_blocked_in_prod_only",
+      "population": 349,
+      "numerator": 206.82,
+      "denominator": 297,
+      "expectedValue": 0.7
+    },
+    "chatSpan": {
+      "canonicalId": "CANON-CHAT-SESSION-SPAN",
+      "governance": "decided_operational",
+      "population": 150,
+      "numerator": 77080,
+      "denominator": 150,
+      "expectedValue": 513.87
+    },
+    "contextContinuity": {
+      "canonicalId": "CANON-CONTEXT-CONTINUITY-RATE",
+      "governance": "decided_operational",
+      "human": {
+        "population": 71,
+        "numerator": 51,
+        "denominator": 71,
+        "expectedValue": 71.83
+      },
+      "automated": {
+        "population": 54,
+        "numerator": 39,
+        "denominator": 54,
+        "expectedValue": 72.22
+      },
+      "combined": {
+        "population": 125,
+        "numerator": 90,
+        "denominator": 125,
+        "expectedValue": 72
+      }
+    },
+    "taskProgression": {
+      "canonicalId": "CANON-TASK-PROGRESSION-RATE",
+      "governance": "decided_operational",
+      "human": {
+        "population": 71,
+        "numerator": 46,
+        "denominator": 71,
+        "expectedValue": 64.79
+      },
+      "automated": {
+        "population": 54,
+        "numerator": 35,
+        "denominator": 54,
+        "expectedValue": 64.81
+      },
+      "combined": {
+        "population": 125,
+        "numerator": 81,
+        "denominator": 125,
+        "expectedValue": 64.8
+      }
+    }
+  },
+  "slices": {
+    "perAgentResRate": [
+      {
+        "agentId": "cma500_agent_1",
+        "population": 79,
+        "numerator": 45,
+        "denominator": 62,
+        "expectedValue": 72.58
+      },
+      {
+        "agentId": "cma500_agent_2",
+        "population": 68,
+        "numerator": 34,
+        "denominator": 47,
+        "expectedValue": 72.34
+      },
+      {
+        "agentId": "cma500_agent_3",
+        "population": 65,
+        "numerator": 26,
+        "denominator": 48,
+        "expectedValue": 54.17
+      },
+      {
+        "agentId": "cma500_agent_4",
+        "population": 55,
+        "numerator": 19,
+        "denominator": 34,
+        "expectedValue": 55.88
+      },
+      {
+        "agentId": "cma500_agent_5",
+        "population": 75,
+        "numerator": 37,
+        "denominator": 52,
+        "expectedValue": 71.15
+      }
+    ],
+    "perCampaignResRate": [
+      {
+        "campaignId": "c5000000-0000-4000-8000-0000000000c1",
+        "population": 63,
+        "numerator": 29,
+        "denominator": 45,
+        "expectedValue": 64.44
+      },
+      {
+        "campaignId": "c5000000-0000-4000-8000-0000000000c2",
+        "population": 56,
+        "numerator": 21,
+        "denominator": 35,
+        "expectedValue": 60
+      }
+    ],
+    "restrictedScopeResRate": {
+      "agentId": "cma500_agent_4",
+      "population": 55,
+      "numerator": 19,
+      "denominator": 34,
+      "expectedValue": 55.88
+    },
+    "emptyWindowResRate": {
+      "population": 0,
+      "numerator": null,
+      "denominator": 0,
+      "expectedValue": null,
+      "note": "zero_denominator -- window has no eligible rows by construction"
+    }
+  }
+}

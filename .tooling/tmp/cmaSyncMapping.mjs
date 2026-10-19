@@ -15,7 +15,9 @@ function buildCmaSyncPayload(row) {
     wasAuthenticated: row.wasAuthenticated,
     escalationTrigger: row.escalationTrigger,
     campaignName: row.campaignName,
-    recordingAvailable: row.recordingAvailable
+    recordingAvailable: row.recordingAvailable,
+    fcr: row.fcr,
+    intentConfidence: row.intentConfidence
   };
 }
 export {

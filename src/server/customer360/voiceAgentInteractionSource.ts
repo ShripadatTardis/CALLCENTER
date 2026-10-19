@@ -80,6 +80,10 @@ export function mapEntry(dto: CallDataEntryDto): SourceInteraction {
     campaignName: dto.campaign_name || null,
     recordingAvailable: Boolean(dto.voice_record_url),
     source: 'call-data',
+    fcr: typeof dto.fcr === 'boolean' ? dto.fcr : null,
+    // intent_accuracy is documented 0-100; rescaled to 0-1 to match
+    // this schema's existing 0-1 "score" convention (sentimentScore).
+    intentConfidence: typeof dto.intent_accuracy === 'number' ? dto.intent_accuracy / 100 : null,
   };
 }
 

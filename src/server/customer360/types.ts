@@ -122,4 +122,20 @@ export interface SourceInteraction {
   campaignName: string | null;
   recordingAvailable: boolean;
   source: string;
+  /**
+   * First-call-resolution flag (Session 7). Real field on the Voice
+   * API's `/call-data` response (`CallDataEntryDto.fcr`) — chat has no
+   * equivalent concept and always supplies null here.
+   */
+  fcr: boolean | null;
+  /**
+   * Intent-classifier confidence, normalized to the 0-1 scale this
+   * schema's other "score" fields already use (Session 7). The Voice
+   * API documents `intent_accuracy` on a 0-100 scale
+   * (`CallDataEntryDto.intent_accuracy`) — divided by 100 at the
+   * mapping boundary, never stored raw, so it stays directly
+   * comparable to `sentimentScore`. Chat has no equivalent concept and
+   * always supplies null here.
+   */
+  intentConfidence: number | null;
 }

@@ -50,6 +50,14 @@ export interface EscalationReasonVerificationResult {
   confidence: number;
   /** Turn indices (0-based) the model cites as evidence — validated against the real transcript before being trusted. */
   evidenceTurnIndices: number[];
+  /**
+   * Session 7 Part E — optional model/prompt provenance, passed through
+   * verbatim into the persisted finding's `sourceObservation.raw`
+   * (never interpreted by this evaluator). Optional and additive: a
+   * verifier/mock that omits these behaves exactly as before.
+   */
+  modelId?: string;
+  promptVersion?: string;
 }
 
 export type EscalationReasonVerifier = (

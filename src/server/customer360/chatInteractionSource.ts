@@ -149,6 +149,8 @@ export function mapRow(
     campaignName,
     recordingAvailable: false,
     source: 'chat-sessions',
+    fcr: null, // genuinely absent from the Chat API contract
+    intentConfidence: null, // genuinely absent from the Chat API contract
   };
 }
 

@@ -19,19 +19,27 @@ import type { SourceInteraction } from '../customer360/types.js';
  * literal.
  *
  * Deliberately OMITTED from this payload, always: `customerId`,
- * `contactPointId`, `campaignId`, `fcr`, `intentConfidence`. CMA sync
- * does no identity resolution at all (the entire point of this path
- * vs. Customer 360's own identity-gated `call_center_upsert_interaction`
- * — see cmaBackfill.ts/cmaSync.ts); `SourceInteraction` itself has no
- * `fcr`/`intentConfidence`/`campaignId` field today (neither adapter's
- * DTO mapping sets one — confirmed by reading both `mapEntry` and
- * `mapRow`), so these are never fabricated, only genuinely absent.
- * Because the payload never carries these keys, `call_center_sync_
- * interaction`'s own presence-checked merge (`p_payload ? 'key'`)
- * leaves any value Customer 360 or a future source already wrote for
- * them completely untouched — CMA sync can never regress a real
- * `fcr`/`intentConfidence`/`campaignId` value another ingestion path
- * set.
+ * `contactPointId`, `campaignId`. CMA sync does no identity resolution
+ * at all (the entire point of this path vs. Customer 360's own
+ * identity-gated `call_center_upsert_interaction` — see
+ * cmaBackfill.ts/cmaSync.ts), and `SourceInteraction` has no
+ * `campaignId` field today. Because the payload never carries these
+ * keys, `call_center_sync_interaction`'s own presence-checked merge
+ * (`p_payload ? 'key'`) leaves any value Customer 360 or a future
+ * source already wrote for them completely untouched.
+ *
+ * `fcr`/`intentConfidence` ARE included below (Session 7 — corrects a
+ * Session 6 misdiagnosis). Both are real fields on the Voice API's
+ * `/call-data` response (`fcr`, `intent_accuracy`); `SourceInteraction`
+ * now carries them (`voiceAgentInteractionSource.ts` maps them,
+ * `chatInteractionSource.ts` always sets them null — chat has no
+ * equivalent). Like every other always-included field in this payload,
+ * a null here is a real "upstream currently has no value," which must
+ * overwrite a stale local value, not preserve it — the previous
+ * `was_authenticated`-shaped root cause (the real API returning null
+ * for that field on existing historical rows, not a sync omission)
+ * does not apply to `fcr`/`intentConfidence`: unlike `was_authenticated`,
+ * these were never sent at all before this session.
  *
  * Every OTHER field below is always included, as a real value or an
  * explicit `null` — never conditionally omitted — because each call to
@@ -62,6 +70,8 @@ export interface CmaSyncPayload {
   escalationTrigger: string | null;
   campaignName: string | null;
   recordingAvailable: boolean;
+  fcr: boolean | null;
+  intentConfidence: number | null;
 }
 
 export function buildCmaSyncPayload(row: SourceInteraction): CmaSyncPayload {
@@ -81,5 +91,7 @@ export function buildCmaSyncPayload(row: SourceInteraction): CmaSyncPayload {
     escalationTrigger: row.escalationTrigger,
     campaignName: row.campaignName,
     recordingAvailable: row.recordingAvailable,
+    fcr: row.fcr,
+    intentConfidence: row.intentConfidence,
   };
 }

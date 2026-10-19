@@ -3,6 +3,7 @@ import { mapSessionTranscriptToInteraction } from '../../services/calls/callsMap
 import { voiceTurnsFromTranscript, chatTurnsFromMessages, type QaTurn } from '../../lib/qaConversation.js';
 import type { SessionTranscriptResponseDto } from '../../types/api/calls.js';
 import type { ChatSessionDetailResponseDto } from '../../types/api/chat.js';
+import type { TranscriptEntry } from '../../types/interaction.js';
 
 /**
  * Session 16.3 — server-side transcript fetch for Automated QA, reusing
@@ -12,7 +13,29 @@ import type { ChatSessionDetailResponseDto } from '../../types/api/chat.js';
  * uses client-side — guarantees identical turn ids between an automated
  * evaluation and a human review of the same interaction, with no second
  * mapping implementation to drift out of sync.
+ *
+ * Session 7 split the voice fetch out into `fetchRawVoiceTranscript`
+ * (below) so CMA's transcript-evidence cache (`cmaTranscriptEvidenceCache.ts`)
+ * can reuse the exact same fetch+map call without going through the
+ * `role`/`speakerLabel` normalization `voiceTurnsFromTranscript` applies
+ * — `computeVoiceTurnId` (which both this file and CMA's evidence
+ * evaluators call) needs the RAW `TranscriptEntry.speaker` value to stay
+ * turn-id-compatible with Human/Automated QA; `role` collapses 'ai' and
+ * 'agent' together, which would silently change turn ids if used instead.
  */
+export async function fetchRawVoiceTranscript(interactionId: string): Promise<TranscriptEntry[]> {
+  const { baseUrl, apiKey } = getBackendConfig();
+  const res = await fetch(`${baseUrl}/api/v1/sessions/${encodeURIComponent(interactionId)}`, {
+    headers: { 'X-API-Key': apiKey },
+  });
+  if (!res.ok) {
+    throw new Error(`Voice session transcript fetch failed: HTTP ${res.status}`);
+  }
+  const dto = (await res.json()) as SessionTranscriptResponseDto;
+  const { transcript } = mapSessionTranscriptToInteraction(dto);
+  return transcript ?? [];
+}
+
 export async function fetchQaTurnsForInteraction(
   interactionId: string,
   channel: 'voice' | 'chat',
@@ -20,15 +43,8 @@ export async function fetchQaTurnsForInteraction(
   const { baseUrl, apiKey } = getBackendConfig();
 
   if (channel === 'voice') {
-    const res = await fetch(`${baseUrl}/api/v1/sessions/${encodeURIComponent(interactionId)}`, {
-      headers: { 'X-API-Key': apiKey },
-    });
-    if (!res.ok) {
-      throw new Error(`Voice session transcript fetch failed: HTTP ${res.status}`);
-    }
-    const dto = (await res.json()) as SessionTranscriptResponseDto;
-    const { transcript } = mapSessionTranscriptToInteraction(dto);
-    return voiceTurnsFromTranscript(interactionId, transcript ?? []);
+    const transcript = await fetchRawVoiceTranscript(interactionId);
+    return voiceTurnsFromTranscript(interactionId, transcript);
   }
 
   const res = await fetch(`${baseUrl}/api/v1/chat/sessions/${encodeURIComponent(interactionId)}`, {

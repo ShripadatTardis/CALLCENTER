@@ -38,6 +38,10 @@ const CANON = {
   'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI': { id: 'CANON-CAMPAIGN-SUCCESS-COUNT-RATE-RAW-CLASSIFI', canonical_name: 'Campaign Success Count / Rate (raw classification)', measure_class: 'business_measure', governed_algorithm_status: 'decided', migration_reference_measure_id: 'CAMP-02' },
   'CANON-CHAT-SESSION-SPAN': { id: 'CANON-CHAT-SESSION-SPAN', canonical_name: 'Chat Session Span', measure_class: 'business_measure', governed_algorithm_status: 'decided', migration_reference_measure_id: 'CHAT-SPAN-01' },
   'CANON-ACTION-REQUIRED-QUEUE-ITEMS': { id: 'CANON-ACTION-REQUIRED-QUEUE-ITEMS', canonical_name: 'Action Required Queue Items', measure_class: 'business_measure', governed_algorithm_status: 'decided', migration_reference_measure_id: 'ACTION-01' },
+  // Session 8 — 'customer' source family (Customer Category Scope).
+  'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA': { id: 'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA', canonical_name: 'Customer 360 Total/Inbound/Outbound Interactions', measure_class: 'business_measure', governed_algorithm_status: 'decided', migration_reference_measure_id: 'CUST360-01' },
+  'CANON-CUSTOMER-360-ESC-COUNT': { id: 'CANON-CUSTOMER-360-ESC-COUNT', canonical_name: 'Customer 360 Escalation Count', measure_class: 'business_measure', governed_algorithm_status: 'decided', migration_reference_measure_id: 'CUST360-02' },
+  'CANON-CUSTOMER-360-AUTH-SUMMARY': { id: 'CANON-CUSTOMER-360-AUTH-SUMMARY', canonical_name: 'Customer 360 Authentication Summary', measure_class: 'business_measure', governed_algorithm_status: 'decided', migration_reference_measure_id: 'CUST360-03' },
 };
 
 const BASE_FACTS = {
@@ -65,7 +69,7 @@ const DIMENSIONS = {
 const CALCULATION_RPC_NAMES = [
   'call_center_cma_evaluate_measure', 'call_center_cma_evaluate_qa_measure',
   'call_center_cma_evaluate_campaign_measure', 'call_center_cma_evaluate_chat_measure',
-  'call_center_cma_evaluate_action_measure',
+  'call_center_cma_evaluate_action_measure', 'call_center_cma_evaluate_customer_measure',
 ];
 
 function makeFakeSupabase({ rpcScenario = {}, rpcScenarios, onCall } = {}) {
@@ -454,6 +458,127 @@ const SCOPED_ACCESS = { allCategories: false, authorizedAgentIds: ['agent-a', 'a
   });
   await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-ACTION-REQUIRED-QUEUE-ITEMS', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS);
   assertTrue('Session 7.1: action family NEVER receives p_dataset_id (no such column/parameter exists)', !('p_dataset_id' in capturedArgs));
+}
+
+// --- Session 8 — Customer Category Scope, the 'customer' source family.
+// This family is scoped EXCLUSIVELY by categoryAccess (evaluateCmaMeasure's
+// 4th argument), never by `access` (Agent Scope, the 3rd argument) — every
+// scenario below passes a deliberately WIDE `access` and a deliberately
+// NARROW `categoryAccess` (or vice versa) so a bug that read the wrong one
+// would be caught immediately. ---
+const ALL_CATEGORY_ACCESS = { allCategories: true, authorizedAgentIds: 'all' };
+const SCOPED_CATEGORY_ACCESS_A = { allCategories: false, authorizedAgentIds: ['cat-agent-a'] };
+const SCOPED_CATEGORY_ACCESS_AB = { allCategories: false, authorizedAgentIds: ['cat-agent-a', 'cat-agent-b'] };
+const EMPTY_CATEGORY_ACCESS = { allCategories: false, authorizedAgentIds: [] };
+
+// 1. Unrestricted authorized access.
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 34, numerator: 631, denominator: 34 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA', window: WINDOW }, SCOPED_ACCESS, ALL_CATEGORY_ACCESS);
+  assert('Session 8.1: unrestricted category access -> p_all_categories true, empty id array', [capturedArgs.p_all_categories, capturedArgs.p_authorized_category_agent_ids], [true, []]);
+  assert('Session 8.1: value result', result.groups[0].result, { kind: 'value', value: 631, unit: 'count' });
+  assert('Session 8.1: categoryScopeApplied reported, allCategories true', result.categoryScopeApplied, { allCategories: true, categoryAgentIds: 'all' });
+  assertTrue('Session 8.1: scopeApplied (Agent Scope) still reflects the restricted `access` passed in, unaffected by the unrestricted category access', JSON.stringify(result.scopeApplied) === JSON.stringify({ allAgents: false, agentIds: ['agent-a', 'agent-b'] }));
+}
+
+// 2. Restricted categories (a single authorized category-derived agent id).
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 15, numerator: 631, denominator: 15 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA', window: WINDOW }, ALL_ACCESS, SCOPED_CATEGORY_ACCESS_A);
+  assert('Session 8.2: restricted categories -> p_all_categories false, exact id array sent', [capturedArgs.p_all_categories, capturedArgs.p_authorized_category_agent_ids], [false, ['cat-agent-a']]);
+  assert('Session 8.2: categoryScopeApplied reports the real restricted set', result.categoryScopeApplied, { allCategories: false, categoryAgentIds: ['cat-agent-a'] });
+}
+
+// 3. Multiple permitted categories.
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 25, numerator: 631, denominator: 25 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA', window: WINDOW }, ALL_ACCESS, SCOPED_CATEGORY_ACCESS_AB);
+  assert('Session 8.3: multiple permitted categories -> both ids sent, unaltered order', capturedArgs.p_authorized_category_agent_ids, ['cat-agent-a', 'cat-agent-b']);
+}
+
+// 4. Empty permitted categories -> fails closed, never silently defaults to unrestricted.
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 0, numerator: 0, denominator: 0 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-ESC-COUNT', window: WINDOW }, ALL_ACCESS, EMPTY_CATEGORY_ACCESS);
+  assert('Session 8.4: empty permitted categories -> p_all_categories stays false, empty array sent (never defaults to all)', [capturedArgs.p_all_categories, capturedArgs.p_authorized_category_agent_ids], [false, []]);
+  assert('Session 8.4: zero-eligible-population never fabricated as a nonzero count', result.groups[0].result, { kind: 'value', value: 0, unit: 'count' });
+}
+
+// 5. Explicitly requesting a category/agent filter against a customer-family measure is
+// rejected before the RPC is ever called -- no mechanism exists to narrow/override Customer
+// Category Scope for this family (no dimension is registered for these 3 occurrences).
+{
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 99, numerator: 99, denominator: 99 } },
+  });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-ESC-COUNT', window: WINDOW, filters: { agent: 'unauthorized-agent' } }, ALL_ACCESS, SCOPED_CATEGORY_ACCESS_A);
+  assertTrue('Session 8.5: a filter attempting to reach outside Customer Category Scope is rejected as unsupported_dimension, never reaching the RPC', result.groups[0].result.kind === 'unsupported_dimension' && !supabase.calls.some((c) => c.fn === 'call_center_cma_evaluate_customer_measure'));
+}
+
+// 6. Combined Agent Scope + Customer Category Scope: the two dimensions must never broaden
+// each other. A 'customer'-family call with a WIDE agent `access` and a NARROW `categoryAccess`
+// must send ONLY the category predicate (no agent-scope key present at all) -- and, conversely,
+// an 'interaction'-family call (Agent-Scope-only) with a NARROW `categoryAccess` passed alongside
+// a WIDE agent `access` must never see any category-related key leak into its own RPC args.
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 15, numerator: 29, denominator: 15 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-ESC-COUNT', window: WINDOW }, ALL_ACCESS, SCOPED_CATEGORY_ACCESS_A);
+  assertTrue('Session 8.6a: customer family RPC args carry no Agent Scope key at all, even with a wide `access`', !('p_all_agents' in capturedArgs) && !('p_authorized_agent_ids' in capturedArgs));
+  assert('Session 8.6a: customer family RPC args reflect only the narrow categoryAccess', [capturedArgs.p_all_categories, capturedArgs.p_authorized_category_agent_ids], [false, ['cat-agent-a']]);
+}
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_measure: { status: 'ok', population: 10, numerator: 7, denominator: 10 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-RES-RATE', window: WINDOW }, ALL_ACCESS, SCOPED_CATEGORY_ACCESS_A);
+  assertTrue('Session 8.6b: an interaction-family call never leaks any category-related key into its RPC args, regardless of what categoryAccess is passed', !('p_all_categories' in capturedArgs) && !('p_authorized_category_agent_ids' in capturedArgs));
+}
+
+// 7. NORMAL vs TEST dataset isolation: the 'customer' family NEVER receives p_dataset_id --
+// the real customers table has no dataset_id column (Session 7.1 deliberately excluded
+// Customer 360 from the synthetic population to avoid contaminating this screen), so including
+// this argument would make PostgREST reject the call outright, exactly like the 'action' family.
+{
+  let capturedArgs = null;
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 34, numerator: 1, denominator: 34 } },
+    onCall: (fn, args) => { capturedArgs = args; },
+  });
+  await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-AUTH-SUMMARY', window: WINDOW, datasetId: 'CMA_POC_500_V1' }, ALL_ACCESS, ALL_CATEGORY_ACCESS);
+  assertTrue('Session 8.7: customer family NEVER receives p_dataset_id (customers table has no dataset_id column)', !('p_dataset_id' in capturedArgs));
+}
+
+// 8. Fail closed when Customer Category Scope cannot be resolved at all (categoryAccess
+// omitted) -- a customer-family measure must never default to unrestricted just because the
+// caller forgot to resolve/pass it.
+{
+  const supabase = makeFakeSupabase({
+    rpcScenarios: { call_center_cma_evaluate_customer_measure: { status: 'ok', population: 999, numerator: 999, denominator: 999 } },
+  });
+  const result = await evaluateCmaMeasure(supabase, { canonicalMeasureId: 'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA', window: WINDOW }, ALL_ACCESS);
+  assertTrue('Session 8.8: unresolved Customer Category Scope -> rejected, never reaches the database, never defaults to unrestricted', result.groups[0].result.kind === 'unsupported' && !supabase.calls.some((c) => c.fn === 'call_center_cma_evaluate_customer_measure'));
 }
 
 console.log('');

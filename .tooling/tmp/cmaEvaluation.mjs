@@ -191,6 +191,44 @@ var CMA_ALGORITHM_REGISTRY = {
     rpc: "call_center_cma_evaluate_action_measure",
     expectedBaseFactIds: [],
     eligiblePopulationDescription: "action_items created in the window, within the authorized agent scope"
+  },
+  // ===== Session 8 — 'customer' family: call_center.customers' pre-aggregated per-customer
+  // columns (total_interactions, inbound_count, outbound_count, escalation_count, auth_summary —
+  // the same facts CUST360-01/02/03's existing per-customer Customer Detail calculation already
+  // reads via aggregateMath.ts, FORMULA VERIFIED). CMA's job here is NOT to recompute the
+  // per-customer numbers (that calculation is correct and unchanged) — it is to own the
+  // POPULATION-level aggregate across every customer the caller's Customer Category Scope
+  // authorizes, which no existing code computes today. Scoped exclusively by Customer Category
+  // Scope (resolved to an agent_id set via customer360_category_agents, mirroring Customer
+  // 360's own `toCustomerAccess`) — NOT Agent Scope, matching every existing Customer 360 route
+  // (api/customers/*), none of which apply Agent Scope either. This family is also NOT windowed
+  // (CUST360-01/02/03's own approved definition: "n/a (lifetime, not windowed)") — p_started_from/
+  // p_started_to are never sent to this RPC, unlike every other family. No filter/groupBy
+  // dimensions are registered for these 3 occurrences (no cma_measure_dimensions rows), so
+  // requesting one is rejected as unsupported_dimension, not silently ignored. =====
+  "CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA": {
+    canonicalMeasureId: "CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA",
+    unit: "count",
+    sourceFamily: "customer",
+    rpc: "call_center_cma_evaluate_customer_measure",
+    expectedBaseFactIds: [],
+    eligiblePopulationDescription: "sum(customers.total_interactions) across every customer within the authorized Customer Category Scope (lifetime, not windowed)"
+  },
+  "CANON-CUSTOMER-360-ESC-COUNT": {
+    canonicalMeasureId: "CANON-CUSTOMER-360-ESC-COUNT",
+    unit: "count",
+    sourceFamily: "customer",
+    rpc: "call_center_cma_evaluate_customer_measure",
+    expectedBaseFactIds: [],
+    eligiblePopulationDescription: "sum(customers.escalation_count) across every customer within the authorized Customer Category Scope (lifetime, not windowed)"
+  },
+  "CANON-CUSTOMER-360-AUTH-SUMMARY": {
+    canonicalMeasureId: "CANON-CUSTOMER-360-AUTH-SUMMARY",
+    unit: "percent",
+    sourceFamily: "customer",
+    rpc: "call_center_cma_evaluate_customer_measure",
+    expectedBaseFactIds: [],
+    eligiblePopulationDescription: "percent of customers within the authorized Customer Category Scope whose auth_summary.everAuthenticated is true (lifetime, not windowed)"
   }
 };
 
@@ -204,7 +242,11 @@ function scopeAppliedOf(access) {
   if (access.allCategories || access.authorizedAgentIds === "all") return { allAgents: true, agentIds: "all" };
   return { allAgents: false, agentIds: access.authorizedAgentIds };
 }
-function buildResponse(req, algorithmStatus, access, requestedFilters, appliedFilters, groups, populationSize, dataCompletenessNote, resolvedMeasureId, algorithmRef) {
+function categoryScopeAppliedOf(categoryAccess) {
+  if (categoryAccess.allCategories || categoryAccess.authorizedAgentIds === "all") return { allCategories: true, categoryAgentIds: "all" };
+  return { allCategories: false, categoryAgentIds: categoryAccess.authorizedAgentIds };
+}
+function buildResponse(req, algorithmStatus, access, requestedFilters, appliedFilters, groups, populationSize, dataCompletenessNote, resolvedMeasureId, algorithmRef, categoryAccess) {
   return {
     canonicalMeasureId: req.canonicalMeasureId,
     resolvedMeasureId,
@@ -213,6 +255,7 @@ function buildResponse(req, algorithmStatus, access, requestedFilters, appliedFi
     requestedFilters,
     appliedFilters,
     scopeApplied: scopeAppliedOf(access),
+    ...categoryAccess ? { categoryScopeApplied: categoryScopeAppliedOf(categoryAccess) } : {},
     groups,
     dataCompleteness: { populationSize, note: dataCompletenessNote },
     evaluatedAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -228,7 +271,17 @@ function toValueKind(numerator, denominator, unit) {
   const value = unit === "percent" ? Math.round(raw * 1e3) / 10 : Math.round(raw * 100) / 100;
   return { kind: "value", value, unit };
 }
-function buildRpcArgs(algorithm, canonicalId, req, access, filterAgentId) {
+function buildRpcArgs(algorithm, canonicalId, req, access, filterAgentId, categoryAccess) {
+  if (algorithm.sourceFamily === "customer") {
+    if (!categoryAccess) {
+      throw new Error("Customer Category Scope access is required to evaluate a customer-family measure.");
+    }
+    return {
+      p_canonical_measure_id: canonicalId,
+      p_all_categories: categoryAccess.allCategories || categoryAccess.authorizedAgentIds === "all",
+      p_authorized_category_agent_ids: categoryAccess.authorizedAgentIds === "all" ? [] : categoryAccess.authorizedAgentIds
+    };
+  }
   const common = {
     p_canonical_measure_id: canonicalId,
     p_started_from: req.window.from,
@@ -254,7 +307,7 @@ function buildRpcArgs(algorithm, canonicalId, req, access, filterAgentId) {
       return common;
   }
 }
-async function evaluateCmaMeasure(supabase, req, access) {
+async function evaluateCmaMeasure(supabase, req, access, categoryAccess) {
   const requestedFilters = { ...req.filters ?? {} };
   const canonical = await getCanonicalMeasure(supabase, req.canonicalMeasureId);
   if (!canonical) {
@@ -389,7 +442,17 @@ async function evaluateCmaMeasure(supabase, req, access) {
       resolvedMeasureId
     );
   }
-  const rpcArgs = buildRpcArgs(algorithm, canonical.id, req, access, filterAgentId);
+  if (algorithm.sourceFamily === "customer" && !categoryAccess) {
+    return terminal(
+      req,
+      canonical.governed_algorithm_status,
+      access,
+      requestedFilters,
+      { kind: "unsupported", reason: "Customer Category Scope access could not be resolved for this measure." },
+      resolvedMeasureId
+    );
+  }
+  const rpcArgs = buildRpcArgs(algorithm, canonical.id, req, access, filterAgentId, categoryAccess);
   const { data, error } = await supabase.rpc(algorithm.rpc, rpcArgs);
   if (error) throw new Error(`${algorithm.rpc}: ${error.message}`);
   const rpcResult = data;
@@ -436,7 +499,8 @@ async function evaluateCmaMeasure(supabase, req, access) {
     totalPopulation,
     algorithm.eligiblePopulationDescription,
     resolvedMeasureId ?? void 0,
-    resolvedMeasureId ?? void 0
+    resolvedMeasureId ?? void 0,
+    algorithm.sourceFamily === "customer" ? categoryAccess : void 0
   );
 }
 export {

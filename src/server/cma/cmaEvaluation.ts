@@ -78,6 +78,15 @@ function scopeAppliedOf(access: EvaluationScopeAccess): { allAgents: boolean; ag
   return { allAgents: false, agentIds: access.authorizedAgentIds };
 }
 
+/** Session 8 — identical shape to scopeAppliedOf, kept as a separate named
+ *  function (not reused) so Agent Scope and Customer Category Scope
+ *  reporting can never be accidentally conflated at a call site, even
+ *  though their underlying EvaluationScopeAccess shape is the same. */
+function categoryScopeAppliedOf(categoryAccess: EvaluationScopeAccess): { allCategories: boolean; categoryAgentIds: string[] | 'all' } {
+  if (categoryAccess.allCategories || categoryAccess.authorizedAgentIds === 'all') return { allCategories: true, categoryAgentIds: 'all' };
+  return { allCategories: false, categoryAgentIds: categoryAccess.authorizedAgentIds };
+}
+
 function buildResponse(
   req: CmaMeasureRequest,
   algorithmStatus: CmaMeasureResponse['algorithmStatus'],
@@ -89,6 +98,7 @@ function buildResponse(
   dataCompletenessNote: string,
   resolvedMeasureId?: string | null,
   algorithmRef?: string | null,
+  categoryAccess?: EvaluationScopeAccess,
 ): CmaMeasureResponse {
   return {
     canonicalMeasureId: req.canonicalMeasureId as CmaMeasureResponse['canonicalMeasureId'],
@@ -98,6 +108,7 @@ function buildResponse(
     requestedFilters,
     appliedFilters,
     scopeApplied: scopeAppliedOf(access),
+    ...(categoryAccess ? { categoryScopeApplied: categoryScopeAppliedOf(categoryAccess) } : {}),
     groups,
     dataCompleteness: { populationSize, note: dataCompletenessNote },
     evaluatedAt: new Date().toISOString(),
@@ -136,7 +147,34 @@ function buildRpcArgs(
   req: CmaMeasureRequest,
   access: EvaluationScopeAccess,
   filterAgentId: string | null,
+  categoryAccess?: EvaluationScopeAccess,
 ): Record<string, unknown> {
+  // [Session 8] The 'customer' family is scoped EXCLUSIVELY by Customer
+  // Category Scope, never Agent Scope -- matching every existing
+  // Customer 360 route (api/customers/*), none of which apply Agent
+  // Scope either. It is also not windowed (CUST360-01/02/03's own
+  // approved definition is lifetime, not time-filtered). This branch
+  // deliberately does NOT spread `common` below: `common` is built from
+  // `access` (Agent Scope) and `req.window`, and spreading it here would
+  // be the exact "the two restrictions broaden each other" failure mode
+  // this session's brief explicitly forbids -- a caller restricted by
+  // Agent Scope but unrestricted by Customer Category Scope must not
+  // see every customer just because `common.p_all_agents` was true.
+  if (algorithm.sourceFamily === 'customer') {
+    if (!categoryAccess) {
+      // Fail closed: a 'customer'-family measure evaluated without a
+      // resolved Customer Category Scope must never default to
+      // unrestricted. The caller (evaluateCmaMeasure) checks this
+      // upfront and never reaches buildRpcArgs in that case -- this
+      // throw is a defense-in-depth backstop, not the primary guard.
+      throw new Error('Customer Category Scope access is required to evaluate a customer-family measure.');
+    }
+    return {
+      p_canonical_measure_id: canonicalId,
+      p_all_categories: categoryAccess.allCategories || categoryAccess.authorizedAgentIds === 'all',
+      p_authorized_category_agent_ids: categoryAccess.authorizedAgentIds === 'all' ? [] : categoryAccess.authorizedAgentIds,
+    };
+  }
   const common = {
     p_canonical_measure_id: canonicalId,
     p_started_from: req.window.from,
@@ -185,6 +223,7 @@ export async function evaluateCmaMeasure(
   supabase: SupabaseClient,
   req: CmaMeasureRequest,
   access: EvaluationScopeAccess,
+  categoryAccess?: EvaluationScopeAccess,
 ): Promise<CmaMeasureResponse> {
   const requestedFilters: Partial<Record<CmaDimensionId, string>> = { ...(req.filters ?? {}) };
 
@@ -297,12 +336,20 @@ export async function evaluateCmaMeasure(
       { kind: 'unauthorized_filter', reason: `agent '${filterAgentId}' is outside your authorized Business Data Scope.` }, resolvedMeasureId);
   }
 
+  // ---- 2b. SCOPE [Session 8]: a 'customer'-family measure MUST have a resolved Customer
+  // Category Scope to evaluate at all — fail closed rather than ever defaulting to
+  // unrestricted when the caller (api/admin.ts) didn't resolve/pass one. ----
+  if (algorithm.sourceFamily === 'customer' && !categoryAccess) {
+    return terminal(req, canonical.governed_algorithm_status, access, requestedFilters,
+      { kind: 'unsupported', reason: 'Customer Category Scope access could not be resolved for this measure.' }, resolvedMeasureId);
+  }
+
   // ---- 3. CALCULATE: one RPC call (the one named by this algorithm's source family), all
   // aggregation server-side, Business Data Scope enforced inside that RPC's own WHERE clause —
   // including for the 4 non-interaction source families CMA-3B adds (brief §3: "Apply authorized
   // Business Data Scope before aggregation, including calculations backed by non-interaction
-  // sources"). ----
-  const rpcArgs = buildRpcArgs(algorithm, canonical.id, req, access, filterAgentId);
+  // sources") and for Customer Category Scope on the 'customer' family CMA-3C/Session 8 adds. ----
+  const rpcArgs = buildRpcArgs(algorithm, canonical.id, req, access, filterAgentId, categoryAccess);
   const { data, error } = await supabase.rpc(algorithm.rpc, rpcArgs);
   if (error) throw new Error(`${algorithm.rpc}: ${error.message}`);
 
@@ -342,5 +389,6 @@ export async function evaluateCmaMeasure(
     req, canonical.governed_algorithm_status, access, requestedFilters, appliedFilters,
     groups, totalPopulation, algorithm.eligiblePopulationDescription,
     resolvedMeasureId ?? undefined, resolvedMeasureId ?? undefined,
+    algorithm.sourceFamily === 'customer' ? categoryAccess : undefined,
   );
 }

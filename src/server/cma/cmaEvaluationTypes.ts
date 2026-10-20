@@ -67,6 +67,17 @@ export interface CmaMeasureResponse {
   requestedFilters: Partial<Record<CmaDimensionId, string>>;
   appliedFilters: Partial<Record<CmaDimensionId, string>>;
   scopeApplied: { allAgents: boolean; agentIds: string[] | 'all' };
+  /**
+   * Session 8 — Customer Category Scope, as actually applied by a
+   * 'customer'-source-family algorithm. Present ONLY when a real
+   * category-scoped query ran (the success path of evaluateCmaMeasure
+   * for that family) — omitted on every terminal/early-exit response
+   * and on every other source family, since those never enforce this
+   * scope dimension at all. Never conflated with `scopeApplied`
+   * (Agent Scope): the two dimensions are independent and reported
+   * independently.
+   */
+  categoryScopeApplied?: { allCategories: boolean; categoryAgentIds: string[] | 'all' };
   groups: CmaMeasureResponseGroup[];
   dataCompleteness: { populationSize: number; note: string };
   evaluatedAt: string;

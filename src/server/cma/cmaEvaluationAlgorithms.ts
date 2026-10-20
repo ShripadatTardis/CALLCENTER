@@ -38,7 +38,7 @@
 // duplicated per algorithm here.
 
 export type CmaMeasureUnit = 'percent' | 'seconds' | 'score' | 'count';
-export type CmaSourceFamily = 'interaction' | 'qa' | 'campaign' | 'chat' | 'action';
+export type CmaSourceFamily = 'interaction' | 'qa' | 'campaign' | 'chat' | 'action' | 'customer';
 
 export interface CmaAlgorithmDefinition {
   canonicalMeasureId: string;
@@ -180,5 +180,35 @@ export const CMA_ALGORITHM_REGISTRY: Readonly<Record<string, CmaAlgorithmDefinit
     canonicalMeasureId: 'CANON-ACTION-REQUIRED-QUEUE-ITEMS', unit: 'count', sourceFamily: 'action', rpc: 'call_center_cma_evaluate_action_measure',
     expectedBaseFactIds: [],
     eligiblePopulationDescription: 'action_items created in the window, within the authorized agent scope',
+  },
+
+  // ===== Session 8 — 'customer' family: call_center.customers' pre-aggregated per-customer
+  // columns (total_interactions, inbound_count, outbound_count, escalation_count, auth_summary —
+  // the same facts CUST360-01/02/03's existing per-customer Customer Detail calculation already
+  // reads via aggregateMath.ts, FORMULA VERIFIED). CMA's job here is NOT to recompute the
+  // per-customer numbers (that calculation is correct and unchanged) — it is to own the
+  // POPULATION-level aggregate across every customer the caller's Customer Category Scope
+  // authorizes, which no existing code computes today. Scoped exclusively by Customer Category
+  // Scope (resolved to an agent_id set via customer360_category_agents, mirroring Customer
+  // 360's own `toCustomerAccess`) — NOT Agent Scope, matching every existing Customer 360 route
+  // (api/customers/*), none of which apply Agent Scope either. This family is also NOT windowed
+  // (CUST360-01/02/03's own approved definition: "n/a (lifetime, not windowed)") — p_started_from/
+  // p_started_to are never sent to this RPC, unlike every other family. No filter/groupBy
+  // dimensions are registered for these 3 occurrences (no cma_measure_dimensions rows), so
+  // requesting one is rejected as unsupported_dimension, not silently ignored. =====
+  'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA': {
+    canonicalMeasureId: 'CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA', unit: 'count', sourceFamily: 'customer', rpc: 'call_center_cma_evaluate_customer_measure',
+    expectedBaseFactIds: [],
+    eligiblePopulationDescription: 'sum(customers.total_interactions) across every customer within the authorized Customer Category Scope (lifetime, not windowed)',
+  },
+  'CANON-CUSTOMER-360-ESC-COUNT': {
+    canonicalMeasureId: 'CANON-CUSTOMER-360-ESC-COUNT', unit: 'count', sourceFamily: 'customer', rpc: 'call_center_cma_evaluate_customer_measure',
+    expectedBaseFactIds: [],
+    eligiblePopulationDescription: 'sum(customers.escalation_count) across every customer within the authorized Customer Category Scope (lifetime, not windowed)',
+  },
+  'CANON-CUSTOMER-360-AUTH-SUMMARY': {
+    canonicalMeasureId: 'CANON-CUSTOMER-360-AUTH-SUMMARY', unit: 'percent', sourceFamily: 'customer', rpc: 'call_center_cma_evaluate_customer_measure',
+    expectedBaseFactIds: [],
+    eligiblePopulationDescription: "percent of customers within the authorized Customer Category Scope whose auth_summary.everAuthenticated is true (lifetime, not windowed)",
   },
 };

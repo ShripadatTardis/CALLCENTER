@@ -1,8 +1,12 @@
 # CMA Calculation Coverage — Complete 60-Measure Matrix
 
-**As of Session CMA-3B.** Source: the live, applied CMA-2 registry (`dtbaczafdzgctkbqviod`, 60
-canonical measures, queried directly this session — not assumed from any prior document) cross-
-referenced against the actual `CMA_ALGORITHM_REGISTRY` in
+**As of Session 8.1.** Originally compiled Session CMA-3B; Session 8 moved CUST360-01/02/03 from
+"blocked" to "operational" now that Customer Category Scope is integrated into the CMA evaluation
+pipeline (the 'customer' source family). Session 8.1 deployed that work: the new RPC and its
+grant-fix migration are now applied to production (`dtbaczafdzgctkbqviod`), and all 22 operational
+measures — including the 3 new Customer 360 ones — are confirmed reachable through the deployed
+CMA API. Source: the live, applied CMA-2 registry (`dtbaczafdzgctkbqviod`, 60 canonical measures)
+cross-referenced against the actual `CMA_ALGORITHM_REGISTRY` in
 `src/server/cma/cmaEvaluationAlgorithms.ts`. Every one of the 60 rows below is accounted for; none
 is silently omitted.
 
@@ -10,18 +14,18 @@ is silently omitted.
 
 | Bucket | Count |
 |---|---|
-| **Operational** (implemented, live-calculable through the evaluation engine) | **19** |
-| **Blocked — decided but not implemented this session** (real reasons, not fabricated) | 9 |
+| **Operational** (implemented, live-calculable through the evaluation engine) | **22** |
+| **Blocked — decided but not implemented** (real reasons, not fabricated) | 6 |
 | **Pending business definition** (governance decision required before any implementation) | 4 |
 | **Mock** (explicitly fabricated, never evaluated as real) | 3 |
 | **Unavailable — missing data/implementation** (25 `unimplemented` canonical measures, individually classified) | 25 |
 | **Total** | **60** |
 
-19 + 9 + 4 + 3 + 25 = 60.
+22 + 6 + 4 + 3 + 25 = 60.
 
 ---
 
-## 1. Operational (19) — calculable today through `evaluateCmaMeasure()`
+## 1. Operational (22) — calculable today through `evaluateCmaMeasure()`
 
 | Canonical ID | Occurrence | Source family | Unit | Dimensions |
 |---|---|---|---|---|
@@ -44,29 +48,66 @@ is silently omitted.
 | `CANON-CAMPAIGN-SUCCESS-COUNT-RATE-POLICY-CLASS` | CAMP-03 | campaign | percent | agent, campaign |
 | `CANON-CHAT-SESSION-SPAN` | CHAT-SPAN-01 | chat | seconds | agent |
 | `CANON-ACTION-REQUIRED-QUEUE-ITEMS` | ACTION-01 | action | count | agent |
+| `CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA` | CUST360-01 | customer | count | *(none registered — see below)* |
+| `CANON-CUSTOMER-360-ESC-COUNT` | CUST360-02 | customer | count | *(none registered)* |
+| `CANON-CUSTOMER-360-AUTH-SUMMARY` | CUST360-03 | customer | percent | *(none registered)* |
 
 4 of these (`CANON-RES-RATE`, `CANON-AUTH-SUCCESS-RATE`, `CANON-SUCCESSFUL-RES-TIME`,
-`CANON-AVG-SENT-SCORE`) are Session CMA-3A's production-verified set, unchanged. The other 15 are
-new this session.
+`CANON-AVG-SENT-SCORE`) are Session CMA-3A's production-verified set, unchanged. 15 more were
+added in CMA-3B. The 3 `CUST360-*` rows are new this session (Session 8) — the first measures
+backed by the new 'customer' source family, scoped exclusively by Customer Category Scope
+(never Agent Scope — see Part D account below), and deliberately not windowed (their approved
+definition is "lifetime, not windowed," so this family's RPC takes no time-window parameters at
+all, unlike every other family).
 
-## 2. Blocked — decided but not implemented this session (9)
+**Session 8 account — Customer Category Scope integration.** `src/server/cma/cmaEvaluation.ts`'s
+`evaluateCmaMeasure()` now takes an optional 4th argument, `categoryAccess: EvaluationScopeAccess`
+— structurally identical to the existing Agent Scope `access` argument, but resolved from
+`api/_auth.ts`'s existing `toCustomerAccess(user)` (unchanged — the same category→agent_id
+resolution Customer 360's own routes already use, computed once at identity-resolution time by
+`call_center_users_resolve_identity`, nothing new added there). The new RPC,
+`call_center_cma_evaluate_customer_measure` (migrations `20261020031303_cma_customer_category_scope.sql`
+and `20261020031525_cma_customer_category_scope_grant_fix.sql`, validated against known expected
+values in disposable PostgreSQL — see the Session 8/8.1 reports for the exact scenarios and
+numbers — **applied to production in Session 8.1**, including a corrective grant-fix migration
+after the initial apply left `EXECUTE` grants on `anon`/`authenticated` that this project's
+default privileges attach automatically to any new function — the fix revokes from
+`public, anon, authenticated` explicitly, matching the convention already used in every other CMA
+evaluate RPC), aggregates `call_center.customers`' pre-aggregated columns
+(`total_interactions`, `escalation_count`, `auth_summary->>'everAuthenticated'`) across every
+customer whose `latest_agent_id` falls in the caller's authorized category-derived agent-id set,
+or every customer when unrestricted. It takes no `p_all_agents`/`p_authorized_agent_ids`
+parameter at all — Agent Scope and Customer Category Scope are structurally independent for this
+family, so neither can broaden the other; a `customer`-family evaluation with no resolved
+`categoryAccess` fails closed (`{ kind: 'unsupported' }`) rather than defaulting to unrestricted.
+No filter/groupBy dimension is registered for these 3 occurrences — requesting one is rejected as
+`unsupported_dimension`, not silently ignored. The existing, independently-correct per-customer
+Customer Detail calculation (`src/server/customer360/aggregateMath.ts`, FORMULA VERIFIED) is
+**unchanged** — CMA owns a new, different capability (the scoped population-level aggregate
+across every authorized customer), not a recomputation of the per-customer numbers.
+
+**UI integration — not performed this session, documented, not fabricated.** No existing screen
+displays a population-level "total interactions / escalations / ever-authenticated %" across the
+Customer 360 population today (confirmed by inspection of `Customers.tsx`, `Dashboard.tsx`,
+`Analytics.tsx` — no such widget exists to replace), and the brief's own Part F instruction is
+explicit: do not invent a new dashboard widget merely to display a newly-calculated measure. All
+3 measures are operational and independently tested but have no screen consumer yet.
+
+## 2. Blocked — decided but not implemented (6)
 
 Each has a real, documented reason — none is a placeholder.
 
 | Canonical ID | Occurrence | Reason blocked |
 |---|---|---|
 | `CANON-AVG-INTENT-ACC` | INTAVG-01 | Register's own `numerator`/`denominator`/`eligible_population` are `"unknown"` — an upstream-opaque passthrough with no documented formula to reimplement. Not computable from any Supabase-persisted fact. |
-| `CANON-INTENT-CONFIDENCE`'s per-row sibling... *(n/a — implemented, see §1)* | — | — |
 | `CANON-SENT` | SENT-01 | A categorical sentiment *label*, not a scalar — this engine's `value`/ratio contract has no "distribution" result shape. `CANON-AVG-SENT-SCORE` already covers the numeric `sentiment_score` aggregate; a label-distribution measure would need a new response shape, not a missing fact. |
 | `CANON-CORRECTIVE-ACTION-STATUSPRIORITYCATEGORY` | CA-01 | Direct fields on one `corrective_actions` row (status/priority/category), not a population aggregate — there is no ratio or average to compute; it is a record lookup, outside this engine's scope by design. |
-| `CANON-CUSTOMER-360-TOTALINBOUNDOUTBOUND-INTERA` | CUST360-01 | Facts already exist (the `customers` table is pre-aggregated: `total_interactions`, `inbound_count`, `outbound_count`). **Blocked on authorization, not data**: Customer 360 requires Customer Category Scope (`toCustomerAccess`), a structurally different authorization mechanism from the Agent Scope this engine integrates. Per brief §3: "If a source cannot be safely scoped using existing authorization rules, report the measure as blocked rather than returning unrestricted results." |
-| `CANON-CUSTOMER-360-ESC-COUNT` | CUST360-02 | Same blocker as CUST360-01 (Customer Category Scope not integrated). |
-| `CANON-CUSTOMER-360-AUTH-SUMMARY` | CUST360-03 | Same blocker as CUST360-01. |
-| `CANON-QA-CALIBRATION-PERPARAMETER-CLASSIFICATI` | CALIB-01 | Classifies each (interaction, parameter) pair into one of 5 categories by comparing Human QA vs Automated QA side-by-side for the SAME interaction — a genuinely different aggregation shape (a paired comparison, not a sum/count over one population) than every other measure this session implements. Real engineering scope, deliberately not attempted alongside 15 other new measures in one session. |
+| `CANON-QA-CALIBRATION-PERPARAMETER-CLASSIFICATI` | CALIB-01 | Classifies each (interaction, parameter) pair into one of 5 categories by comparing Human QA vs Automated QA side-by-side for the SAME interaction — a genuinely different aggregation shape (a paired comparison, not a sum/count over one population) than every other measure this session implements. Real engineering scope, and has no UI consumer today either way. |
 | `CANON-QA-CALIBRATION-COVERAGE-DIVERGENCE` | CALIB-02 | Same shape problem as CALIB-01 (a cross-side comparison, not a population ratio). |
 | `CANON-QA-CALIBRATION-PROMPT-VERSION-DISAGREEME` | CALIB-03 | Same shape problem as CALIB-01. |
 
-(9 rows: INTAVG-01, SENT-01, CA-01, CUST360-01/02/03, CALIB-01/02/03.)
+(6 rows: INTAVG-01, SENT-01, CA-01, CALIB-01/02/03. CUST360-01/02/03 moved to §1 — Operational —
+this session; see the Session 8 account there.)
 
 ## 3. Pending business definition (4) — untouched, per brief §4/§10
 

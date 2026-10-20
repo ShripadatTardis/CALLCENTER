@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { withErrorBoundary, noStore, methodNotAllowed } from './_voicebot.js';
-import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent, toAgentAccess, isAgentIdInScope, type AuthenticatedCallCenterUser } from './_auth.js';
+import { requirePermission, getAuthenticatedUser, getServiceRoleClient, recordAuditEvent, toAgentAccess, toCustomerAccess, isAgentIdInScope, type AuthenticatedCallCenterUser } from './_auth.js';
 import { fetchCompleteCallPopulation } from '../src/server/analytics/callPopulationFetcher.js';
 import { fetchQaTurnsForInteraction } from '../src/server/qa/transcriptFetcher.js';
 import { evaluateInteraction, PROMPT_VERSION } from '../src/server/qa/automatedQaEvaluator.js';
@@ -1760,6 +1760,10 @@ async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): P
   }
 
   const access = toAgentAccess(user);
+  // [Session 8] Resolved unconditionally for every cmaEvaluate call, same as `access` above —
+  // zero behavior change for the 19 pre-existing measures (their algorithms never read it),
+  // and lets the new 'customer' source family evaluate without a second route/branch.
+  const categoryAccess = toCustomerAccess(user);
   const supabase = getServiceRoleClient();
   try {
     const result = await evaluateCmaMeasure(
@@ -1773,6 +1777,7 @@ async function handleCmaEvaluatePost(req: VercelRequest, res: VercelResponse): P
         datasetId: body.datasetId ?? null,
       },
       { allCategories: access.allCategories, authorizedAgentIds: access.authorizedAgentIds },
+      { allCategories: categoryAccess.allCategories, authorizedAgentIds: categoryAccess.authorizedAgentIds },
     );
     res.status(200).json({ data: result });
   } catch (err) {

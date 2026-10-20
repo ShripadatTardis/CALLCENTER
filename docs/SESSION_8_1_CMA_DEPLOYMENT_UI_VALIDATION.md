@@ -301,18 +301,74 @@ JS-level regression test for this specific guarantee, it would need `api/calls/d
 and `api/chat/logs.ts` refactored so their TEST-mode branches are separately
 importable — judged out of proportion to add as a side effect of this session.
 
-**Browser verification**: not performed — no test login credentials exist in this
-repository (confirmed by grep), and the deployed app is a production host, not a
-local/staging host this environment's rules permit entering credentials into. Stated
-plainly here rather than fabricated. Every verification in this document is either a
+**Browser verification**: not performed at the time this document was first written —
+no test login credentials exist in this repository (confirmed by grep), and the
+deployed app is a production host, not a local/staging host this environment's rules
+permit entering credentials into. Every verification above this point is either a
 direct database/RPC check against the live production project, or static code
-inspection — never a simulated or assumed browser result.
+inspection — never a simulated or assumed browser result. **This limitation was
+subsequently closed** using an already-authenticated desktop session the user made
+available after this document was first written — see "Browser Verification —
+Addendum" below. That addendum is real, authenticated browser evidence; everything
+above it in this document remains exactly what it always was (database/RPC/code-level
+verification), stated honestly as such at the time it was performed.
 
 ## Part I — this document
 
 See also: `docs/CMA_CALCULATION_COVERAGE.md` (operational-but-deployed status for the
 3 new measures), `docs/CMA_MEASURE_OWNERSHIP_TRANSITION.csv` (same), `supabase/migrations/20261020031303_*`,
 `20261020031525_*`, `20261020033724_*` (all three applied to `dtbaczafdzgctkbqviod`).
+
+## Browser Verification — Addendum
+
+Performed after the rest of this document was written, using an already-authenticated
+desktop browser session the user made available for this purpose (not a credential
+entered by this session — the user was already signed in). This is real,
+screenshot-observed UI behavior against the live production deployment
+(`callcenter-three-livid.vercel.app`), not a database/RPC check. It confirms the UI
+*renders* the already-verified Part B/C/E values correctly; it does not re-derive
+those values independently — the independent-calculation verification remains Parts
+B/C/E above, against the database directly.
+
+1. **Call Logs — TEST mode**: switching the dataset selector to "CMA Test Data (500)"
+   showed **350 total calls** (exactly matching the Part C production count), the
+   "TEST DATA" badge rendered in the header, both `VF_TEST_AGENT_A`/`VF_TEST_AGENT_B`
+   present in the rows, and fields with no synthetic equivalent (caller name, phone)
+   rendered blank/em-dash rather than fabricated.
+
+2. **Chat Logs — TEST mode**: showed **150 total sessions** (matching Part C), the
+   amber "Showing the CMA_POC_500_V1 synthetic test population..." banner rendered
+   above the table. Opened one session's detail view: it displayed "No messages in
+   this session" — confirmed in the browser, not just by the database join-count in
+   Part D, that no transcript content is fabricated for sessions that have none.
+
+3. **Agent Detail — `VF_TEST_AGENT_A`**: loaded correctly at
+   `/ai-agents/VF_TEST_AGENT_A` in TEST mode, labeled "Test Agent A (synthetic)" with
+   its id shown alongside (never presented as a real roster agent). Showed **53 calls
+   handled** and **100 chats handled**. The two CMA tiles rendered real values —
+   **Intent confidence (voice, CMA, last 90d) = 0.70**, **Sentiment (voice, CMA, last
+   90d) = 0.45** — on first load, with no visible repeated/retried requests and no
+   stuck loading state (the exact failure mode the memoized `cmaWindow` fix in
+   `useAgentDetail.ts` exists to prevent). A paginated "Recent Interactions" list
+   (153 rows total) showed only this agent's own synthetic interactions.
+
+4. **AI Agents roster — NORMAL mode**: confirmed live in the browser, not just by
+   code reading, that the roster lists exactly the 3 real agents
+   (Inbound Banking Assistant, EMI Reminder, Forex Transaction) and does not list
+   either synthetic test agent — the documented Part D/"Deferred" limitation, now
+   browser-confirmed rather than only inferred from the live-API-only source code.
+
+5. **Dataset selector persistence — a minor UX limitation newly found by this
+   browser pass**: switching to TEST mode and then navigating via in-app links (the
+   sidebar, "View" actions) correctly preserves TEST mode across pages. A **full
+   page reload or a direct URL navigation**, however, resets the selector back to
+   NORMAL — observed repeatedly and consistently. This is not a measurement, scope,
+   or isolation defect: every RPC and route in this document still enforces NORMAL/
+   TEST correctly for whatever mode is actually selected (Part G is unaffected). It
+   means only that a viewer who reloads the page, or opens a direct link, must
+   reselect "CMA Test Data (500)" before synthetic data becomes visible again. Not
+   fixed as part of this addendum (documentation-only update, per instruction); noted
+   here as a genuine, disclosed finding for a future session to pick up if desired.
 
 ## Deferred — stated plainly, not silently skipped
 

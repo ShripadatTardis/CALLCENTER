@@ -124,23 +124,26 @@ export async function closeChatSession(role: string, chatSessionId: string): Pro
 
 export async function fetchChatLogs(
   role: string,
-  opts: { page?: number; pageSize?: number; agentId?: string; status?: string } = {},
+  // Session 8.1 — datasetId: TEST mode (src/contexts/DatasetModeContext.tsx).
+  // When set, api/chat/logs.ts reads the CMA_POC_500_V1 synthetic chat
+  // population from Supabase instead of the live Chat API.
+  opts: { page?: number; pageSize?: number; agentId?: string; status?: string; datasetId?: string | null } = {},
 ): Promise<{
   data: ChatSessionSummary[];
   pagination: { page: number; pageSize: number; totalCount: number; totalPages: number };
-  source: 'live' | 'local-fallback';
+  source: 'live' | 'local-fallback' | 'synthetic';
 }> {
   return request('/chat/logs', {
     method: 'GET',
-    query: { page: opts.page, pageSize: opts.pageSize, agentId: opts.agentId, status: opts.status },
+    query: { page: opts.page, pageSize: opts.pageSize, agentId: opts.agentId, status: opts.status, datasetId: opts.datasetId ?? undefined },
     headers: roleHeaders(role),
   });
 }
 
-export async function fetchChatSessionDetail(role: string, sessionId: string): Promise<ChatSessionDetail> {
+export async function fetchChatSessionDetail(role: string, sessionId: string, datasetId?: string | null): Promise<ChatSessionDetail> {
   return request<ChatSessionDetail>('/chat/logs', {
     method: 'GET',
-    query: { id: sessionId },
+    query: { id: sessionId, datasetId: datasetId ?? undefined },
     headers: roleHeaders(role),
   });
 }

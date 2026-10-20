@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, withErrorBoundary, noStore } from '../_voicebot.js';
 import { readIntQuery } from '../_customer360.js';
-import { resolveAccessForAuthenticatedUser } from '../_auth.js';
+import { resolveAccessForAuthenticatedUser, getServiceRoleClient } from '../_auth.js';
 import { supabaseChatRepository } from '../../src/server/chat/supabaseChatRepository.js';
 import type { ChatMessageRecord, ChatSessionRecord } from '../../src/server/chat/types.js';
 import type {
@@ -94,6 +94,112 @@ function toSummaryFromLive(
     updatedAt: row.updated_at,
     source: 'live',
   };
+}
+
+type SyntheticChatSessionRow = {
+  upstream_session_id: string;
+  started_at: string;
+  last_activity_at: string;
+  status: string | null;
+  agent_id: string | null;
+  agent_name: string | null;
+  message_count: number | null;
+  latest_intent: string | null;
+  latest_confidence: number | null;
+  latest_authenticated: boolean | null;
+  latest_data_source: string | null;
+  latest_detection_method: string | null;
+  latest_latency_ms: number | null;
+  backend_customer_id: string | null;
+  backend_contact_id: string | null;
+  caller_name: string | null;
+  phone_number: string | null;
+  is_bank_customer: boolean | null;
+};
+
+/**
+ * Session 8.1 Part D — the CMA_POC_500_V1 synthetic chat population has
+ * zero rows in call_center.chat_messages (verified: no synthetic
+ * fixture generated a transcript for any of the 150 sessions), so
+ * `messages` is always `[]` here — never invented, per the brief's own
+ * "do not invent missing chat transcript content" instruction. The row
+ * shape otherwise mirrors toSummaryFromLocal, tagged `source: 'synthetic'`
+ * so the UI can distinguish it from both 'live' and 'local-fallback'.
+ */
+function toSummaryFromSynthetic(s: SyntheticChatSessionRow): ChatSessionSummary {
+  return {
+    sessionId: s.upstream_session_id,
+    resolvedCustomerLabel: null,
+    customer360Id: null,
+    campaignId: null,
+    campaignTargetId: null,
+    campaignName: null,
+    isTrial: null,
+    agentId: s.agent_id,
+    agentName: s.agent_name,
+    customerId: s.backend_customer_id,
+    contactId: s.backend_contact_id,
+    callerName: s.caller_name,
+    phoneNumber: s.phone_number,
+    isBankCustomer: s.is_bank_customer,
+    status: s.status === 'active' ? 'active' : 'completed',
+    authenticated: Boolean(s.latest_authenticated),
+    messageCount: s.message_count ?? 0,
+    historyDocId: null,
+    latestIntent: s.latest_intent,
+    latestConfidence: s.latest_confidence,
+    latestDataSource: (s.latest_data_source as ChatSessionSummary['latestDataSource']) ?? null,
+    latestDetectionMethod: s.latest_detection_method,
+    latestLatencyMs: s.latest_latency_ms,
+    startedAt: s.started_at,
+    updatedAt: s.last_activity_at,
+    source: 'synthetic',
+  };
+}
+
+async function fetchSyntheticChatList(
+  datasetId: string,
+  access: { allCategories: boolean; authorizedAgentIds: string[] | 'all' },
+  page: number,
+  pageSize: number,
+): Promise<{ data: ChatSessionSummary[]; pagination: { page: number; pageSize: number; totalCount: number; totalPages: number }; source: 'synthetic' }> {
+  const supabase = getServiceRoleClient();
+  const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+  const { data, error } = await supabase.rpc('call_center_test_mode_chat_sessions_list', {
+    p_dataset_id: datasetId,
+    p_all_agents: allAgents,
+    p_authorized_agent_ids: allAgents ? [] : (access.authorizedAgentIds as string[]),
+  });
+  if (error) throw new Error(`Synthetic chat dataset query failed: ${error.message}`);
+
+  const rows = (data ?? []) as SyntheticChatSessionRow[];
+  const totalCount = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  return {
+    data: pageRows.map(toSummaryFromSynthetic),
+    pagination: { page, pageSize, totalCount, totalPages },
+    source: 'synthetic',
+  };
+}
+
+async function fetchSyntheticChatDetail(
+  datasetId: string,
+  sessionId: string,
+  access: { allCategories: boolean; authorizedAgentIds: string[] | 'all' },
+): Promise<{ session: ChatSessionSummary; messages: never[] } | null> {
+  const supabase = getServiceRoleClient();
+  const allAgents = access.allCategories || access.authorizedAgentIds === 'all';
+  const { data, error } = await supabase.rpc('call_center_test_mode_chat_session_get', {
+    p_dataset_id: datasetId,
+    p_upstream_session_id: sessionId,
+    p_all_agents: allAgents,
+    p_authorized_agent_ids: allAgents ? [] : (access.authorizedAgentIds as string[]),
+  });
+  if (error) throw new Error(`Synthetic chat session lookup failed: ${error.message}`);
+  const row = (Array.isArray(data) ? data[0] : data) as SyntheticChatSessionRow | null;
+  if (!row) return null;
+  return { session: toSummaryFromSynthetic(row), messages: [] };
 }
 
 function toSummaryFromLocal(s: ChatSessionRecord, link?: CustomerLink, campaignName?: string | null): ChatSessionSummary {
@@ -199,6 +305,28 @@ export default withErrorBoundary(async (req: VercelRequest, res: VercelResponse)
 
   const idRaw = req.query.id;
   const sessionId = Array.isArray(idRaw) ? idRaw[0] : idRaw;
+  const datasetIdRaw = req.query.datasetId;
+  const datasetId = Array.isArray(datasetIdRaw) ? datasetIdRaw[0] : datasetIdRaw;
+
+  // Session 8.1 Part D — TEST mode short-circuits the live Chat API
+  // entirely (never sends a synthetic session id upstream) and reads
+  // CMA_POC_500_V1 straight from Supabase. Checked before both the
+  // detail and list branches below.
+  if (datasetId) {
+    if (sessionId) {
+      const detail = await fetchSyntheticChatDetail(datasetId, sessionId, access);
+      if (!detail) {
+        res.status(404).json({ detail: 'Chat session not found' });
+        return;
+      }
+      res.status(200).json(detail);
+      return;
+    }
+    const page = readIntQuery(req, 'page', 1);
+    const pageSize = readIntQuery(req, 'pageSize', 15);
+    res.status(200).json(await fetchSyntheticChatList(datasetId, access, page, pageSize));
+    return;
+  }
 
   if (sessionId) {
     try {

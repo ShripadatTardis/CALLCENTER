@@ -14,6 +14,7 @@ import {
 } from '@/services/agents/agentPerformanceAggregator';
 import { buildCallMetricsByInteractionId } from '@/lib/callMetricsCorrelation';
 import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { useDatasetMode } from '@/contexts/DatasetModeContext';
 import { agentPerformanceCmaWindow } from '@/lib/cma/cmaWindow';
 import type { CmaMeasureValue } from '@/types/cma';
 
@@ -42,18 +43,48 @@ export function useAgentDetail(agentId: string | undefined) {
   const { user } = useAuth();
   const role = user?.role ?? 'unauthenticated';
   const canUseCma = hasPermission(user, 'cma.evaluate');
+  // Session 8.1 Part D/E — threaded through so this agent's call/chat
+  // history tables read the synthetic CMA_POC_500_V1 population in TEST
+  // mode, same as Call Logs/Chat Logs, rather than an always-empty live
+  // lookup for an agent id (VF_TEST_AGENT_A/B) the live API has never
+  // heard of.
+  const { datasetId } = useDatasetMode();
 
   const agentsQuery = useAgents();
-  const callsQuery = useCallData({ page_size: 100 });
+  const callsQuery = useCallData({ page_size: 100, datasetId: datasetId ?? undefined });
   const campaignsQuery = useCampaigns({ pageSize: 100 });
 
   const chatQuery = useQuery({
-    queryKey: ['chat', 'logs', 'byAgent', agentId, role],
-    queryFn: () => fetchChatLogs(role, { agentId, pageSize: 100 }),
+    queryKey: ['chat', 'logs', 'byAgent', agentId, role, datasetId],
+    queryFn: () => fetchChatLogs(role, { agentId, pageSize: 100, datasetId }),
     enabled: Boolean(user) && Boolean(agentId),
   });
 
-  const agent = agentsQuery.data?.agents.find((a) => a.agentId === agentId) ?? null;
+  // Session 8.1 Part D/E — the live roster (GET /api/v1/agents) never
+  // contains the two synthetic test agents (VF_TEST_AGENT_A/B); without
+  // this, the page's own `if (!agent)` guard would show "No agent found"
+  // and never render the two CMA tiles above, for an agent id this
+  // session's dataset explicitly requires to be selectable in TEST mode.
+  // A minimal, honestly-labeled stand-in — never presented as if it came
+  // from the live roster.
+  const liveAgent = agentsQuery.data?.agents.find((a) => a.agentId === agentId) ?? null;
+  const isSyntheticTestAgent = Boolean(datasetId) && (agentId === 'VF_TEST_AGENT_A' || agentId === 'VF_TEST_AGENT_B');
+  const agent = liveAgent ?? (isSyntheticTestAgent && agentId
+    ? {
+        agentId,
+        agentName: agentId,
+        displayName: agentId === 'VF_TEST_AGENT_A' ? 'Test Agent A (synthetic)' : 'Test Agent B (synthetic)',
+        personaName: '',
+        direction: 'inbound',
+        status: 'active',
+        description: 'Synthetic CMA_POC_500_V1 test fixture agent — not a real registered Voice API agent.',
+        language: '',
+        isDefault: false,
+        expectedInputFields: [],
+        expectedOutcomes: [],
+        outputFields: [],
+      }
+    : null);
 
   const callInteractions = (callsQuery.data?.interactions ?? []).filter((i) => i.agentId === agentId);
   const chatSessions = chatQuery.data?.data ?? [];
@@ -98,15 +129,22 @@ export function useAgentDetail(agentId: string | undefined) {
   // only be computed on remount/agent change, never merely because something else re-rendered).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cmaWindow = useMemo(() => agentPerformanceCmaWindow(), [agentId]);
+  // Session 8.1 Part D/E — datasetId (already resolved above for the
+  // synthetic-agent fallback) was never threaded through these two tiles
+  // before (a pre-existing gap found during this session, not a
+  // regression it introduced): the underlying RPC and this hook's own
+  // query-key have supported it since Session 7.1, nothing else to wire.
   const sentimentCmaQuery = useCmaMeasure(canUseCma && Boolean(agentId), {
     canonicalMeasureId: 'CANON-AVG-SENT-SCORE',
     window: { from: cmaWindow.from, to: cmaWindow.to },
     filters: { agent: agentId },
+    datasetId,
   });
   const intentConfidenceCmaQuery = useCmaMeasure(canUseCma && Boolean(agentId), {
     canonicalMeasureId: 'CANON-INTENT-CONFIDENCE',
     window: { from: cmaWindow.from, to: cmaWindow.to },
     filters: { agent: agentId },
+    datasetId,
   });
 
   const toCmaMeasureState = (q: typeof sentimentCmaQuery): AgentCmaMeasureState => {

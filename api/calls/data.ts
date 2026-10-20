@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBackendConfig, methodNotAllowed, noStore, proxyRequest, readReqQuery, withErrorBoundary } from '../_voicebot.js';
-import { resolveAccessForAuthenticatedUser } from '../_auth.js';
+import { resolveAccessForAuthenticatedUser, getServiceRoleClient } from '../_auth.js';
 import type { CallDataEntryDto, CallDataResponseDto } from '../../src/types/api/calls.js';
 import type { CallMetricsResponseDto } from '../../src/types/api/callMetrics.js';
 import { filterCallMetricsRowsByAuthorizedAgents } from '../../src/lib/callMetricsCorrelation.js';
@@ -35,6 +35,17 @@ import { INTERACTION_ID_PATTERN } from '../../src/lib/interactionTraceValidation
  * already at (confirmed via `find api -name "*.ts" -not -name "_*"`) —
  * same established dispatch-via-existing-file convention api/admin.ts
  * and api/campaigns.ts already use. See handleCallMetrics below.
+ *
+ * Session 8.1 — `?datasetId=<id>` (a truthy, non-empty value; the only
+ * one the app ever sends is CMA_TEST_DATASET_ID, from
+ * src/contexts/DatasetModeContext.tsx's TEST mode) short-circuits the
+ * live Voice API proxy entirely and reads the CMA_POC_500_V1 synthetic
+ * voice population straight from call_center.customer_interactions —
+ * see handleTestModeCallData. Never forwarded upstream: a synthetic
+ * interaction_id does not exist in the real Voice API and would just
+ * 404/error there. NORMAL mode (no datasetId, the default for every
+ * existing call site) is completely unaffected — this branch is
+ * additive and only triggers when the query param is actually present.
  */
 export default withErrorBoundary(async (req, res) => {
   if (req.method !== 'GET') {
@@ -49,6 +60,12 @@ export default withErrorBoundary(async (req, res) => {
 
   if (readReqQuery(req).resource === 'trace') {
     await handleInteractionTrace(req, res);
+    return;
+  }
+
+  const datasetId = readReqQuery(req).datasetId;
+  if (datasetId) {
+    await handleTestModeCallData(req, res, datasetId);
     return;
   }
 
@@ -98,6 +115,137 @@ export default withErrorBoundary(async (req, res) => {
     };
   });
 });
+
+/**
+ * TEST mode — reads the synthetic voice population directly from
+ * call_center.customer_interactions (dataset_id = the caller's TEST
+ * dataset id, channel = 'voice'), shaped into the same CallDataEntryDto
+ * the live branch returns so src/services/calls/callsMapper.ts needs no
+ * TEST-aware special casing. Fields the synthetic fixture genuinely has
+ * no value for (caller_name/number, transcript, recording, tags,
+ * analysis, actual_outcome_*, structured_outputs) are left null/empty —
+ * never fabricated — and the mapper already treats every one of those
+ * as optional (`|| undefined`/`?? undefined`), so this renders safely
+ * with those fields simply absent rather than showing invented content.
+ *
+ * Agent Scope is applied the same way as the live branch (filter by the
+ * caller's authorized agent ids), applied server-side before the rows
+ * ever leave this route — never a frontend-only filter.
+ */
+async function handleTestModeCallData(req: VercelRequest, res: VercelResponse, datasetId: string): Promise<void> {
+  const access = await resolveAccessForAuthenticatedUser(req, 'agent');
+  const query = readReqQuery(req);
+  const supabase = getServiceRoleClient();
+
+  // This project only exposes the `public` schema to PostgREST — every
+  // read of a call_center.* table goes through a public.call_center_*
+  // RPC wrapper (same convention as every existing repository in this
+  // codebase), never a direct .from() table call.
+  const { data, error } = await supabase.rpc('call_center_test_mode_voice_interactions_list', {
+    p_dataset_id: datasetId,
+    p_all_agents: access.allCategories || access.authorizedAgentIds === 'all',
+    p_authorized_agent_ids: access.allCategories || access.authorizedAgentIds === 'all' ? [] : (access.authorizedAgentIds as string[]),
+    p_direction: query.direction === 'inbound' || query.direction === 'outbound' ? query.direction : null,
+    p_outcome: query.outcome ?? null,
+    p_started_from: query.date_from ?? null,
+    p_started_to: query.date_to ? `${query.date_to}T23:59:59.999Z` : null,
+  });
+  if (error) {
+    res.status(502).json({ detail: `Synthetic dataset query failed: ${error.message}` });
+    return;
+  }
+
+  type Row = {
+    interaction_id: string; agent_id: string | null; agent_display_name: string | null; direction: string | null;
+    started_at: string; duration_seconds: number | null; intent: string | null; outcome: string | null;
+    sentiment_score: number | null; was_authenticated: boolean | null; escalation_trigger: string | null;
+    campaign_name: string | null; fcr: boolean | null;
+  };
+  let rows = (data ?? []) as Row[];
+
+  const minDuration = query.min_duration ? Number(query.min_duration) : undefined;
+  const maxDuration = query.max_duration ? Number(query.max_duration) : undefined;
+  if (minDuration !== undefined) rows = rows.filter((r) => (r.duration_seconds ?? 0) >= minDuration);
+  if (maxDuration !== undefined) rows = rows.filter((r) => (r.duration_seconds ?? 0) <= maxDuration);
+  if (query.search) {
+    const needle = query.search.toLowerCase();
+    rows = rows.filter((r) => [r.interaction_id, r.agent_display_name, r.intent, r.outcome]
+      .some((v) => typeof v === 'string' && v.toLowerCase().includes(needle)));
+  }
+
+  const page = Math.max(1, Number(query.page) || 1);
+  const pageSize = Math.max(1, Number(query.page_size) || 25);
+  const totalRecords = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+
+  const calls: CallDataEntryDto[] = pageRows.map((r) => ({
+    call_id: r.interaction_id,
+    status: 'inactive',
+    caller_name: '',
+    caller_number: '',
+    from_phone_number: '',
+    agent_id: r.agent_id,
+    direction: r.direction === 'outbound' ? 'outbound' : 'inbound',
+    outcome: r.outcome ?? '',
+    fcr: r.fcr ?? false,
+    aht_seconds: r.duration_seconds ?? 0,
+    intent_accuracy: 0,
+    intent: r.intent ?? '',
+    sentiment: '',
+    sentiment_score: r.sentiment_score ?? 0,
+    campaign_name: r.campaign_name ?? '',
+    tags: [],
+    transcript_summary: '',
+    timestamp: r.started_at,
+    start_time: r.started_at,
+    stage: '',
+    duration_seconds: r.duration_seconds ?? 0,
+    channel: 'voice',
+    ai_agent_id: r.agent_id ?? '',
+    ai_agent_name: r.agent_display_name ?? '',
+    context: '',
+    escalation_trigger: r.escalation_trigger ?? null,
+    transcript_doc_id: null,
+    voice_record_url: null,
+    was_authenticated: r.was_authenticated,
+    is_bank_customer: false,
+    analysis: null as unknown as CallDataEntryDto['analysis'],
+    detailed_transcript: [],
+    actual_outcome_code: null,
+    actual_outcome_name: null,
+    structured_outputs: null,
+  }));
+
+  const resolvedCount = calls.filter((c) => c.outcome === 'resolved').length;
+  const escalatedCount = calls.filter((c) => c.outcome === 'escalated').length;
+  const durations = calls.map((c) => c.duration_seconds).filter((n) => Number.isFinite(n));
+  const avg = (nums: number[]) => (nums.length ? nums.reduce((a, n) => a + n, 0) / nums.length : 0);
+
+  noStore(res);
+  res.status(200).json({
+    success: true,
+    data: {
+      summary: {
+        active_calls: 0,
+        connecting_calls: 0,
+        escalated_calls: escalatedCount,
+        avg_handle_time_seconds: Math.round(avg(durations)),
+        transfers_today: 0,
+        total_calls: totalRecords,
+        fcr_rate: calls.length ? (calls.filter((c) => c.fcr === true).length / calls.length) * 100 : 0,
+        avg_aht_seconds: Math.round(avg(durations)),
+        avg_intent_accuracy: 0,
+        escalation_rate: calls.length ? (escalatedCount / calls.length) * 100 : 0,
+        resolved_count: resolvedCount,
+        escalated_count: escalatedCount,
+        scoped: !(access.allCategories || access.authorizedAgentIds === 'all'),
+      },
+      calls,
+      pagination: { page, page_size: pageSize, total_records: totalRecords, total_pages: totalPages },
+    },
+  });
+}
 
 /**
  * GET /api/calls/data?resource=metrics -> GET {VOICEBOT_BASE_URL}/api/v1/analytics/call-metrics

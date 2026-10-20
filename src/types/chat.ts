@@ -47,8 +47,8 @@ export interface ChatSessionSummary {
   latestLatencyMs: number | null;
   startedAt: string;
   updatedAt: string;
-  /** 'live' when sourced from the real backend just now; 'local-fallback' when the live call failed and this row came from this app's own persisted copy instead (never fabricated — see plan §2). */
-  source: 'live' | 'local-fallback';
+  /** 'live' when sourced from the real backend just now; 'local-fallback' when the live call failed and this row came from this app's own persisted copy instead (never fabricated — see plan §2); 'synthetic' when sourced from the CMA_POC_500_V1 TEST-mode fixture (Session 8.1, never mixed with 'live'/'local-fallback' rows). */
+  source: 'live' | 'local-fallback' | 'synthetic';
   /**
    * The resolved Customer 360 display label (display_name -> CIF ->
    * masked phone), when this session has either an authoritative

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import type { DetailNavigationState } from '@/lib/detailOrigin';
 import { Eye, Loader2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallData } from '@/hooks/calls/useCallData';
+import { useDatasetMode } from '@/contexts/DatasetModeContext';
 import { Interaction } from '@/types/interaction';
 import { QueryErrorBanner } from '@/components/common/QueryErrorBanner';
 import { formatDurationExact, formatDurationLong, formatPercent, formatPhoneNumber, formatTimestamp } from '@/lib/format';
@@ -84,11 +85,20 @@ const CallLogs: React.FC = () => {
     setPage(1);
   };
 
+  // Session 8.1 Part D — TEST mode. When set, api/calls/data.ts reads the
+  // CMA_POC_500_V1 synthetic voice population from Supabase instead of
+  // the live Voice API (never sent to it). `?? undefined` (not the raw
+  // `datasetId`, which is `null` in NORMAL mode) — httpClient serializes
+  // any non-undefined query value, including `null`, as the literal
+  // string "null", which would be truthy server-side and wrongly select
+  // TEST mode.
+  const { datasetId } = useDatasetMode();
   const { data, isLoading, isError, error, refetch, isFetching } = useCallData({
     status: 'inactive',
     page_size: PAGE_SIZE,
     page,
     ...filters,
+    datasetId: datasetId ?? undefined,
   });
   const { data: agentsData } = useAgents();
   const agentRoster = agentsData?.agents ?? [];

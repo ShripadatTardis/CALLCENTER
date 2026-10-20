@@ -83,6 +83,14 @@ export interface CallDataQueryDto {
   max_duration?: number;
   page?: number;
   page_size?: number;
+  /**
+   * Session 8.1 — TEST mode (src/contexts/DatasetModeContext.tsx). When
+   * set, api/calls/data.ts reads the CMA_POC_500_V1 synthetic voice
+   * population from Supabase instead of proxying the live Voice API —
+   * never sent to the live backend. Omitted (undefined) in NORMAL mode,
+   * the default for every existing call site.
+   */
+  datasetId?: string | null;
 }
 
 export interface CallDataSummaryDto {

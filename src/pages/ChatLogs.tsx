@@ -67,6 +67,7 @@ const ChatLogs: React.FC = () => {
   const allSessionsRaw = data?.data ?? [];
   const pagination = data?.pagination;
   const isFallback = data?.source === 'local-fallback';
+  const isSynthetic = data?.source === 'synthetic';
 
   // Session 16.5.1 — the Chat equivalent of Call Logs' own "Open Full
   // Inspector" return-navigation handling: reopens the SAME session's
@@ -199,6 +200,11 @@ const ChatLogs: React.FC = () => {
         {isFallback && (
           <div className="flex-shrink-0 rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
             Showing this app's local operational copy — the live chat history service didn't respond. Data may be incomplete or slightly out of date.
+          </div>
+        )}
+        {isSynthetic && (
+          <div className="flex-shrink-0 rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+            Showing the CMA_POC_500_V1 synthetic test population, not live Voice API conversations. These fixture sessions have no recorded transcript.
           </div>
         )}
 

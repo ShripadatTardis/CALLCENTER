@@ -1,14 +1,25 @@
 # CMA Calculation Coverage — Complete 60-Measure Matrix
 
-**As of Session 8.1.** Originally compiled Session CMA-3B; Session 8 moved CUST360-01/02/03 from
+**As of Session 10.** Originally compiled Session CMA-3B; Session 8 moved CUST360-01/02/03 from
 "blocked" to "operational" now that Customer Category Scope is integrated into the CMA evaluation
-pipeline (the 'customer' source family). Session 8.1 deployed that work: the new RPC and its
-grant-fix migration are now applied to production (`dtbaczafdzgctkbqviod`), and all 22 operational
-measures — including the 3 new Customer 360 ones — are confirmed reachable through the deployed
-CMA API. Source: the live, applied CMA-2 registry (`dtbaczafdzgctkbqviod`, 60 canonical measures)
-cross-referenced against the actual `CMA_ALGORITHM_REGISTRY` in
-`src/server/cma/cmaEvaluationAlgorithms.ts`. Every one of the 60 rows below is accounted for; none
-is silently omitted.
+pipeline (the 'customer' source family). Session 8.1 deployed that work. Session 9 independently
+verified FCR-03/ESC-03/AHT-03 as candidate calculations. **Session 10 gives every one of the 60
+canonical measures below a CMA ownership mode and a real, working delivery path** — this is a
+dimension layered alongside (never replacing) the operational/blocked/pending/mock/unavailable
+buckets this document already tracked: `CMA_NATIVE` (25 — the 22 operational measures below plus
+the 3 mock indicators, both natively handled by `evaluateCmaMeasure()`), `CMA_PROVISIONAL` (3 —
+FCR-03/ESC-03/AHT-03, independently tested, business approval still pending — **not** counted as
+operational), `CMA_LEGACY_ADAPTER` (2 — `CANON-AVG-INTENT-ACC`, `CANON-CALL-TECH-PERF`),
+`CMA_NON_AGGREGATE` (5 — Sentiment distribution, Corrective Action lookup, the 3 QA Calibration
+comparisons), `CMA_UNAVAILABLE` (25 — the unimplemented measures below). See
+`src/server/cma/cmaOwnershipRegistry.ts` for the authoritative, auditable classification and
+`docs/SESSION_10_CMA_COMPLETE_OWNERSHIP.md` for the full account. **The "22 operational" count
+below is unchanged in meaning and still refers only to `CMA_NATIVE`, accuracy-verified,
+business-approved calculations — ownership (60) and operational-native status (22) are two
+different, independently tracked facts, never combined into one number.** Source: the live,
+applied CMA-2 registry (`dtbaczafdzgctkbqviod`, 60 canonical measures) cross-referenced against the
+actual `CMA_ALGORITHM_REGISTRY` in `src/server/cma/cmaEvaluationAlgorithms.ts`. Every one of the 60
+rows below is accounted for; none is silently omitted.
 
 ## Summary
 
@@ -112,8 +123,14 @@ this session; see the Session 8 account there.)
 ## 3. Pending business definition (4) — untouched, per brief §4/§10
 
 `CANON-FIRST-CONTACT-RES`, `CANON-ESC-RATE`, `CANON-AVG-HANDLE-TIME`, `CANON-CALL-TECH-PERF`.
-Confirmed still `pending_decision` in production before and after this session. See
-`docs/CMA_BUSINESS_DEFINITION_DECISIONS.md` for the full analysis and recommendation.
+Confirmed still `pending_decision` in production — unchanged by Session 10, which
+delivers the first 3 of these through CMA as `CMA_PROVISIONAL` (a real, independently
+tested calculation, routed around `evaluateCmaMeasure()`'s own governance gate by the
+new ownership layer — see `docs/SESSION_10_CMA_COMPLETE_OWNERSHIP.md`) without
+rewriting the governance status itself. `CANON-CALL-TECH-PERF` is delivered as
+`CMA_LEGACY_ADAPTER` instead (wraps the existing real per-agent correlation in
+`agentPerformanceAggregator.ts`). See `docs/CMA_BUSINESS_DEFINITION_DECISIONS.md` for
+the full analysis and recommendation.
 
 ## 4. Mock (3) — never evaluated as real
 

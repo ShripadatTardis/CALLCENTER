@@ -221,6 +221,18 @@ for (let i = 0; i < N_VOICE; i++) {
   if (i === 0) startedAtIso = new Date(WINDOW_FROM).toISOString(); // inclusive start boundary
   if (i === 1) startedAtIso = new Date(WINDOW_TO).toISOString(); // exclusive end boundary -- must NOT be counted
 
+  // [Session 9] fcr — a synthetic API-style classification, not an
+  // independently verified longitudinal first-contact outcome. The
+  // fixture's customer_id is deliberately null on every row (see the
+  // comment at the top of this file / Session 8.1's "Deferred" section),
+  // so a genuine repeat-contact-aware rule cannot be computed here. This
+  // mirrors the real/NORMAL population's own observed fcr semantics
+  // instead (verified live against production: fcr=true iff
+  // outcome='resolved', fcr=false for every other non-null outcome, zero
+  // exceptions across 761 real rows) — deliberately the same simple rule
+  // production actually exhibits, not an invented improvement on it.
+  const fcrValue = facts.outcome === 'resolved' ? true : facts.outcome === 'escalated' ? false : null;
+
   voiceRows.push({
     rowIndex: i,
     id: `c7000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
@@ -239,6 +251,7 @@ for (let i = 0; i < N_VOICE; i++) {
     campaign_id: campaign ? campaign.id : null,
     scenario_category: tag,
     evidence_path: facts.evidencePath,
+    fcr: fcrValue,
   });
 }
 
@@ -378,7 +391,25 @@ const customerFirstInteractionIds = new Set();
 }
 const fcrEligible = eligibleVoice.filter((r) => r.customer_id && customerFirstInteractionIds.has(r.interaction_id));
 const fcrNum = fcrEligible.filter((r) => r.outcome === 'resolved').length;
-const fcr = { canonicalId: 'CANON-FIRST-CONTACT-RES', governance: 'pending_decision_candidate_only', population: fcrEligible.length, numerator: fcrNum, denominator: fcrEligible.length, expectedValue: ratio(fcrNum, fcrEligible.length) };
+const fcr = { canonicalId: 'CANON-FIRST-CONTACT-RES', governance: 'pending_decision_candidate_only', population: fcrEligible.length, numerator: fcrNum, denominator: fcrEligible.length, expectedValue: ratio(fcrNum, fcrEligible.length), note: 'unreachable in this fixture: customer_id is null on every row, so this per-customer-history definition always yields a zero-row eligible population; kept only as a record of the candidate definition that was considered and rejected for this fixture, see fcr03FieldBased for the definition actually implemented/tested' };
+
+// [Session 9] FCR-03 as actually implemented/tested — the field-based
+// definition (count(fcr=true) / count(all fetched calls), zero-denom ->
+// null), computed over the raw fcr values set above (outcome='resolved'
+// -> true, 'escalated' -> false, else null). Two denominator variants are
+// reported because CMA_BUSINESS_DEFINITION_DECISIONS.md's own recorded
+// FCR-03 text ("count(fcr=true) / count(all fetched calls)") is
+// ambiguous about whether indeterminate (fcr=null) rows belong in the
+// denominator -- this is flagged, not silently resolved, in the Session
+// 9 deliverable.
+const fcr03AllCallsDenom = eligibleVoice.length;
+const fcr03TrueCount = eligibleVoice.filter((r) => r.fcr === true).length;
+const fcr03DeterminateDenom = eligibleVoice.filter((r) => r.fcr !== null).length;
+const fcr03FieldBased = {
+  canonicalId: 'CANON-FIRST-CONTACT-RES', candidateId: 'FCR-03',
+  allCallsVariant: { population: eligibleVoice.length, numerator: fcr03TrueCount, denominator: fcr03AllCallsDenom, expectedValue: ratio(fcr03TrueCount, fcr03AllCallsDenom) },
+  determinateOnlyVariant: { population: eligibleVoice.length, numerator: fcr03TrueCount, denominator: fcr03DeterminateDenom, expectedValue: ratio(fcr03TrueCount, fcr03DeterminateDenom) },
+};
 
 // 3. Escalation Rate (candidate only -- CANON-ESC-RATE, pending_decision)
 const escDenom = resDenom; // same handled population as resolution rate
@@ -481,7 +512,7 @@ const expected = {
   counts: { total: TOTAL, voice: N_VOICE, chat: N_CHAT, distribution: DIST, qaHumanSubmitted: N_HUMAN_SUBMITTED, qaHumanDraft: N_HUMAN_DRAFT, qaAutoCompleted: N_AUTO_COMPLETED, qaAutoRunning: N_AUTO_RUNNING },
   excludedBoundaryRowInteractionId: excludedBoundaryRow ? excludedBoundaryRow.interaction_id : null,
   measures: {
-    resolutionRate, fcr, escalationRate, successfulResTime, aht, authSuccessRate, avgSentScore,
+    resolutionRate, fcr, fcr03FieldBased, escalationRate, successfulResTime, aht, authSuccessRate, avgSentScore,
     intentConfidence, chatSpan, contextContinuity, taskProgression,
   },
   slices: { perAgentResRate, perCampaignResRate, restrictedScopeResRate, emptyWindowResRate },
@@ -508,7 +539,7 @@ fixtureSql.push('delete from call_center.customer_interactions where interaction
 fixtureSql.push('-- voice interactions');
 for (const r of voiceRows) {
   fixtureSql.push(
-    `insert into call_center.customer_interactions (id, interaction_id, channel, agent_id, started_at, outcome, duration_seconds, sentiment_score, intent_confidence, was_authenticated, escalation_trigger, customer_id, recording_available, campaign_id, source, ingested_at) values (${sqlStr(r.id)}, ${sqlStr(r.interaction_id)}, 'voice', ${sqlStr(r.agent_id)}, ${sqlStr(r.started_at)}, ${sqlStr(r.outcome)}, ${sqlStr(r.duration_seconds)}, ${sqlStr(r.sentiment_score)}, ${sqlStr(r.intent_confidence)}, ${sqlStr(r.was_authenticated)}, ${sqlStr(r.escalation_trigger)}, ${r.customer_id ? sqlStr(r.customer_id) : 'null'}, ${sqlStr(r.recording_available)}, ${r.campaign_id ? sqlStr(r.campaign_id) : 'null'}, 'cma500-synthetic', now());`
+    `insert into call_center.customer_interactions (id, interaction_id, channel, agent_id, started_at, outcome, duration_seconds, sentiment_score, intent_confidence, was_authenticated, escalation_trigger, customer_id, recording_available, campaign_id, source, ingested_at, dataset_id, fcr) values (${sqlStr(r.id)}, ${sqlStr(r.interaction_id)}, 'voice', ${sqlStr(r.agent_id)}, ${sqlStr(r.started_at)}, ${sqlStr(r.outcome)}, ${sqlStr(r.duration_seconds)}, ${sqlStr(r.sentiment_score)}, ${sqlStr(r.intent_confidence)}, ${sqlStr(r.was_authenticated)}, ${sqlStr(r.escalation_trigger)}, ${r.customer_id ? sqlStr(r.customer_id) : 'null'}, ${sqlStr(r.recording_available)}, ${r.campaign_id ? sqlStr(r.campaign_id) : 'null'}, 'cma500-synthetic', now(), 'CMA_POC_500_V1', ${sqlStr(r.fcr)});`
   );
 }
 

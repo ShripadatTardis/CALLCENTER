@@ -92,6 +92,82 @@ export interface CmaMeasureResponse {
  */
 export type CmaQaPopulation = 'human' | 'automated' | 'combined';
 
+// ---------------------------------------------------------------------
+// Session 10 — complete CMA ownership. Additive only: every type above
+// this line, and every existing CmaMeasureResponse/CmaMeasureValue
+// consumer, is unchanged. These types describe a NEW layer —
+// "does CMA own this measure, and through what delivery mode" — that
+// sits alongside the existing per-request evaluation contract, never
+// replacing it. See cmaOwnershipRegistry.ts for the resolver that
+// produces these.
+// ---------------------------------------------------------------------
+
+/**
+ * How CMA currently delivers a given canonical measure. Deliberately
+ * distinct from `governed_algorithm_status` (cmaRegistry.ts) and from
+ * `accuracyStatus` below — a measure can be CMA_PROVISIONAL (owned,
+ * real calculation exists) while its governance status stays
+ * `pending_decision` (not yet business-approved) and its accuracy
+ * status stays `unverified` (approval, not correctness, is what's
+ * missing). Ownership, governance, and accuracy are three independent
+ * axes — never collapsed into one combined number anywhere in this
+ * codebase (brief §8, user correction confirming this for the 22-vs-60
+ * counts specifically).
+ */
+export type CmaOwnershipMode =
+  | 'CMA_NATIVE'          // one of the 22 already-deployed, accuracy-verified algorithms (also used for the 3 'mock' indicators, which are natively handled by this same engine's own governance short-circuit — never fabricated as a real measurement, see accuracyStatus)
+  | 'CMA_PROVISIONAL'     // a real CMA calculation exists and was independently tested, but business approval of the definition itself is still pending
+  | 'CMA_LEGACY_ADAPTER'  // the value is sourced from an existing upstream API or local aggregation, normalized and delivered through CMA rather than reimplemented
+  | 'CMA_UNAVAILABLE'     // no source data or formula exists anywhere in this system
+  | 'CMA_NON_AGGREGATE';  // a record lookup, distribution, or paired comparison — not a scalar ratio/average
+
+export type CmaAccuracyStatus = 'verified' | 'unverified' | 'not_applicable';
+
+export type CmaSourceType = 'cma_rpc' | 'voiceforce_api' | 'local_aggregation' | 'none';
+
+/** Session 10 — the typed result shapes for CMA_NON_AGGREGATE measures.
+ *  Never forced into `{value, unit}` — a record lookup or a
+ *  distribution is not a ratio, and pretending otherwise would be
+ *  exactly the kind of invented calculation this session's brief
+ *  forbids ("do not force every measure into a percentage/average"). */
+export type CmaNonAggregateResult =
+  | { kind: 'record_lookup'; fields: Record<string, string | number | boolean | null> }
+  | { kind: 'distribution'; buckets: Array<{ label: string; count: number }>; totalPopulation: number }
+  | {
+      kind: 'paired_comparison';
+      rows: Array<{ dimension: string; humanValue: string | number | boolean | null; automatedValue: string | number | boolean | null; agreement: boolean | null }>;
+    }
+  | { kind: 'no_eligible_rows'; reason: string };
+
+/**
+ * One canonical measure's complete ownership record — the unified
+ * shape `resolveCmaMeasure()` (cmaOwnershipRegistry.ts) returns for
+ * every one of the 60 registered canonical ids, with or without a live
+ * evaluation request. See that file's own header comment for exactly
+ * which fields are populated in the static-only vs. live-evaluated case.
+ */
+export interface CmaOwnedMeasure {
+  canonicalMeasureId: string;
+  measureName: string;
+  governanceStatus: 'pending_decision' | 'decided' | 'unimplemented' | 'mock' | 'not_applicable';
+  ownershipMode: CmaOwnershipMode;
+  accuracyStatus: CmaAccuracyStatus;
+  sourceType: CmaSourceType;
+  sourceReference: string | null;
+  calculationVersion: string | null;
+  consumingScreens: string[];
+  unavailableReason: string | null;
+  /** Populated only when a live evaluation (CMA_NATIVE/CMA_PROVISIONAL via evaluateCmaMeasure,
+   *  or a CMA_LEGACY_ADAPTER/CMA_NON_AGGREGATE wrapper) actually ran — never for
+   *  CMA_UNAVAILABLE, which never attempts one regardless of whether a request was passed. */
+  value?: CmaMeasureValue | CmaNonAggregateResult;
+  dataWindow?: { from: string; to: string };
+  appliedDimensions?: Partial<Record<CmaDimensionId, string>>;
+  appliedBusinessDataScope?: { allAgents: boolean; agentIds: string[] | 'all' };
+  datasetMode?: string | null;
+  dataQualityWarnings?: string[];
+}
+
 export interface CmaMeasureRequest {
   canonicalMeasureId: string;
   window: { from: string; to: string };

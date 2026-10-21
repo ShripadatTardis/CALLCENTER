@@ -57,6 +57,52 @@ export interface CmaMeasureRequest {
   datasetId?: string | null;
 }
 
+// ---------------------------------------------------------------------
+// Session 10 — complete CMA ownership. Same hand-kept-in-sync convention
+// as the rest of this file; mirrors src/server/cma/cmaEvaluationTypes.ts.
+// ---------------------------------------------------------------------
+
+export type CmaOwnershipMode = 'CMA_NATIVE' | 'CMA_PROVISIONAL' | 'CMA_LEGACY_ADAPTER' | 'CMA_UNAVAILABLE' | 'CMA_NON_AGGREGATE';
+export type CmaAccuracyStatus = 'verified' | 'unverified' | 'not_applicable';
+export type CmaSourceType = 'cma_rpc' | 'voiceforce_api' | 'local_aggregation' | 'none';
+
+export type CmaNonAggregateResult =
+  | { kind: 'record_lookup'; fields: Record<string, string | number | boolean | null> }
+  | { kind: 'distribution'; buckets: Array<{ label: string; count: number }>; totalPopulation: number }
+  | { kind: 'paired_comparison'; rows: Array<{ dimension: string; humanValue: string | number | boolean | null; automatedValue: string | number | boolean | null; agreement: boolean | null }> }
+  | { kind: 'no_eligible_rows'; reason: string };
+
+export interface CmaOwnedMeasure {
+  canonicalMeasureId: string;
+  measureName: string;
+  governanceStatus: 'pending_decision' | 'decided' | 'unimplemented' | 'mock' | 'not_applicable';
+  ownershipMode: CmaOwnershipMode;
+  accuracyStatus: CmaAccuracyStatus;
+  sourceType: CmaSourceType;
+  sourceReference: string | null;
+  calculationVersion: string | null;
+  consumingScreens: string[];
+  unavailableReason: string | null;
+  value?: CmaMeasureValue | CmaNonAggregateResult;
+  dataWindow?: { from: string; to: string };
+  appliedDimensions?: Partial<Record<CmaDimensionId, string>>;
+  appliedBusinessDataScope?: { allAgents: boolean; agentIds: string[] | 'all' };
+  datasetMode?: string | null;
+  dataQualityWarnings?: string[];
+}
+
+const CMA_MEASURE_VALUE_KINDS = new Set([
+  'value', 'zero_denominator', 'not_yet_governed', 'unimplemented', 'mock', 'not_found',
+  'unsupported', 'missing_required_facts', 'unauthorized_filter', 'unsupported_dimension',
+]);
+
+/** Session 10 — narrows the CmaOwnedMeasure.value union (CmaMeasureValue | CmaNonAggregateResult)
+ *  down to the ratio-shaped CmaMeasureValue member, for the CMA_NATIVE/CMA_PROVISIONAL/
+ *  CMA_LEGACY_ADAPTER call sites that only ever receive that shape in practice. */
+export function isCmaMeasureValue(result: CmaMeasureValue | CmaNonAggregateResult | undefined): result is CmaMeasureValue {
+  return Boolean(result) && CMA_MEASURE_VALUE_KINDS.has(result!.kind);
+}
+
 /** A human-readable reason for every non-value CmaMeasureValue kind, matching the existing Performance Ratio card's `unavailableReason` display convention (never a raw internal kind string shown to a user). */
 export function cmaMeasureUnavailableReason(result: CmaMeasureValue): string {
   switch (result.kind) {

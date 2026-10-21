@@ -20,6 +20,7 @@ import { resolveDetailOrigin, type DetailNavigationState } from '@/lib/detailOri
 import {
   formatDurationLong,
   formatFractionAsPercent,
+  formatPercent,
   formatStatusLabel,
   formatTimestamp,
 } from '@/lib/format';
@@ -38,6 +39,16 @@ function formatAgentCmaScore(state: AgentCmaMeasureState): string {
   if (state.kind === 'loading') return '…';
   if (state.kind === 'error') return 'Could not load';
   if (state.kind === 'value') return state.value.toFixed(2);
+  return cmaMeasureUnavailableReason(state);
+}
+/** Session 10 — formats the CMA_PROVISIONAL FCR-03/AHT-03 state (percent/seconds units,
+ *  unlike formatAgentCmaScore's fixed 0-1 score formatting above). Same honesty rules:
+ *  never falls through to the legacy local figure, 'unauthorized' stays visually distinct. */
+function formatAgentCmaRatio(state: AgentCmaMeasureState, kind: 'percent' | 'seconds'): string {
+  if (state.kind === 'unauthorized') return 'Requires CMA access';
+  if (state.kind === 'loading') return '…';
+  if (state.kind === 'error') return 'Could not load';
+  if (state.kind === 'value') return kind === 'percent' ? formatPercent(state.value) : formatDurationLong(state.value);
   return cmaMeasureUnavailableReason(state);
 }
 /** Session 15.4 — null here means "no eligible calls in this agent's sample", a real aggregate state distinct from a single call's "not available yet"/"not used" — see src/lib/callMetricsFormat.ts for the single-call formatter. */
@@ -172,6 +183,8 @@ const AgentDetail: React.FC = () => {
     technicalPerformance,
     sentimentCma,
     intentConfidenceCma,
+    fcrCma,
+    ahtCma,
     cmaWindowDays,
     isLoading,
   } = useAgentDetail(agentId);
@@ -394,7 +407,7 @@ const AgentDetail: React.FC = () => {
                 <CollapsibleSubsection title="Business Outcomes">
                   <MetricRow label="Resolved" value={callMetrics.resolvedCount} />
                   <MetricRow label="Escalated" value={callMetrics.escalatedCount} />
-                  <MetricRow label="FCR" value={callMetrics.fcrRate === null ? FALLBACK : formatFractionAsPercent(callMetrics.fcrRate)} />
+                  <MetricRow label="FCR (CMA, provisional)" value={formatAgentCmaRatio(fcrCma, 'percent')} />
                 </CollapsibleSubsection>
                 <CollapsibleSubsection title="Conversational Quality">
                   <MetricRow label={`Intent confidence (voice, CMA, last ${cmaWindowDays}d)`} value={formatAgentCmaScore(intentConfidenceCma)} />
@@ -410,8 +423,12 @@ const AgentDetail: React.FC = () => {
                     the prior "no per-row latency field" gap). Averages
                     exclude calls with no matching Call Metrics row or a
                     still-null value — never fabricated, never 0ms. */}
-                <CollapsibleSubsection title="Technical Performance">
-                  <MetricRow label="Avg handle time (voice)" value={formatDurationLong(callMetrics.avgAhtSeconds ?? undefined)} />
+                {/* Session 10 — CANON-CALL-TECH-PERF is CMA_LEGACY_ADAPTER: this section IS
+                    CMA's designated delivery for this measure (Mode C — an existing real
+                    calculation, normalized/owned through CMA rather than reimplemented), not an
+                    independent parallel calculation. See cmaOwnershipRegistry.ts. */}
+                <CollapsibleSubsection title="Technical Performance (CMA legacy adapter)">
+                  <MetricRow label="Avg handle time (voice, CMA, provisional)" value={formatAgentCmaRatio(ahtCma, 'seconds')} />
                   <MetricRow label="Avg turn latency (voice)" value={fmtMs(technicalPerformance.avgTurnMs)} />
                   <MetricRow label="Avg STT (voice)" value={fmtMs(technicalPerformance.avgSttMs)} />
                   <MetricRow label="Avg LLM first token (voice)" value={fmtMs(technicalPerformance.avgLlmTtftMs)} />

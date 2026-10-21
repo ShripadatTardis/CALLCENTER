@@ -15,6 +15,33 @@ import { DriverPanel } from '@/components/ratios/DriverPanel';
 import { InteractionTable } from '@/components/ratios/InteractionTable';
 import type { DetailNavigationState } from '@/lib/detailOrigin';
 import { typography } from '@/lib/typography';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useCmaOwnedMeasure } from '@/hooks/cma/useCmaOwnedMeasure';
+import { isCmaMeasureValue, cmaMeasureUnavailableReason } from '@/types/cma';
+import type { RatioSummaryDto } from '@/types/ratio';
+
+/**
+ * Session 10 — the subset of ratio ids CMA currently owns a calculation
+ * path for (3 CMA_NATIVE + 3 CMA_PROVISIONAL). Mirrors Dashboard's own
+ * CMA_BACKED_RATIO_MEASURES/CMA_PROVISIONAL_RATIO_MEASURES maps exactly
+ * — the same canonical ids, never a different mapping per screen.
+ */
+const CMA_OWNED_RATIO_MEASURES: Record<string, string> = {
+  resolution_rate: 'CANON-RES-RATE',
+  successful_resolution_time: 'CANON-SUCCESSFUL-RES-TIME',
+  authentication_success_rate: 'CANON-AUTH-SUCCESS-RATE',
+  fcr: 'CANON-FIRST-CONTACT-RES',
+  escalation_rate: 'CANON-ESC-RATE',
+  aht: 'CANON-AVG-HANDLE-TIME',
+};
+
+function rangeToCmaWindow(range: string | undefined): { from: string; to: string } {
+  const days: Record<string, number> = { '1h': 1, '6h': 1, '12h': 1, '24h': 1, '7d': 7, '30d': 30 };
+  const windowDays = days[range ?? '24h'] ?? 1;
+  const now = new Date();
+  const from = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+  return { from: from.toISOString(), to: now.toISOString() };
+}
 
 const INTERACTIONS_PAGE_SIZE = 25;
 
@@ -46,7 +73,47 @@ const RatioExplorer: React.FC = () => {
 
   const definition = ratioId ? getFrontendRatioDefinition(ratioId) : null;
 
-  const summaryQuery = useRatioSummary(ratioId, filters);
+  // Session 10 — CMA now owns this ratio's headline number for the 6 CMA-eligible
+  // ids, REPLACING the legacy summary fetch entirely (never run alongside it), but
+  // only when every active filter is one CMA's engine actually supports (agent/
+  // channel/campaign) — trend/breakdown/driver/comparison have no CMA equivalent
+  // today (a real, structural gap: CMA returns a single population snapshot, never
+  // a time series or arbitrary-dimension drill-down) and stay legacy-sourced,
+  // disclosed honestly rather than silently forced into a shape that doesn't fit.
+  const { user: ratioExplorerUser } = useAuth();
+  const cmaEligibleMeasureId = ratioId ? CMA_OWNED_RATIO_MEASURES[ratioId] : undefined;
+  const hasCmaIncompatibleFilter = Boolean(filters.breakdown || filters.breakdownValue || filters.driver || filters.domain || filters.intent || filters.direction);
+  const useCmaHero = Boolean(cmaEligibleMeasureId) && !hasCmaIncompatibleFilter && hasPermission(ratioExplorerUser, 'cma.evaluate');
+  const cmaHeroWindow = rangeToCmaWindow(filters.range);
+  const cmaHero = useCmaOwnedMeasure(
+    useCmaHero, cmaEligibleMeasureId ?? '',
+    useCmaHero ? { ...cmaHeroWindow, agent: filters.agent, ...(filters.channel ? {} : {}) } : undefined,
+  );
+  const cmaHeroResult = isCmaMeasureValue(cmaHero.data?.value) ? cmaHero.data?.value : undefined;
+  const cmaHeroSummary: RatioSummaryDto | undefined = ratioId && cmaEligibleMeasureId ? {
+    ratioId,
+    availability: 'direct',
+    runtimeState: cmaHeroResult?.kind === 'value' ? 'live' : cmaHeroResult ? 'no_data' : 'live',
+    httpStatus: null,
+    value: cmaHeroResult?.kind === 'value' ? cmaHeroResult.value : null,
+    unit: cmaHeroResult?.kind === 'value' ? cmaHeroResult.unit : (definition?.unit ?? 'percent'),
+    numerator: null,
+    denominator: null,
+    population: null,
+    comparison: null,
+    dataFreshness: new Date().toISOString(),
+    unavailableReason: cmaHeroResult && cmaHeroResult.kind !== 'value'
+      ? (cmaHero.data?.ownershipMode === 'CMA_PROVISIONAL' ? `(CMA provisional) ${cmaMeasureUnavailableReason(cmaHeroResult)}` : cmaMeasureUnavailableReason(cmaHeroResult))
+      : (cmaHero.data?.ownershipMode === 'CMA_PROVISIONAL' ? 'Source: CMA (provisional — business definition not yet approved)' : null),
+    filtersEcho: filters,
+    populationCapped: false,
+    trueTotalRecords: null,
+  } : undefined;
+
+  const legacySummaryQuery = useRatioSummary(useCmaHero ? undefined : ratioId, filters);
+  const summaryQuery = useCmaHero
+    ? { data: cmaHeroSummary, isLoading: cmaHero.isLoading, isError: cmaHero.isError, refetch: cmaHero.refetch }
+    : legacySummaryQuery;
   const trendQuery = useRatioTrend(ratioId, filters);
   const breakdownQuery = useRatioBreakdown(ratioId, filters.breakdown, filters);
   const driversQuery = useRatioDrivers(ratioId, filters, Boolean(filters.breakdownValue));

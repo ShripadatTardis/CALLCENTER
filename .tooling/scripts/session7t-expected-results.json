@@ -37,7 +37,24 @@
       "population": 215,
       "numerator": 100,
       "denominator": 215,
-      "expectedValue": 46.51
+      "expectedValue": 46.51,
+      "note": "unreachable in this fixture: customer_id is null on every row, so this per-customer-history definition always yields a zero-row eligible population; kept only as a record of the candidate definition that was considered and rejected for this fixture, see fcr03FieldBased for the definition actually implemented/tested"
+    },
+    "fcr03FieldBased": {
+      "canonicalId": "CANON-FIRST-CONTACT-RES",
+      "candidateId": "FCR-03",
+      "allCallsVariant": {
+        "population": 349,
+        "numerator": 164,
+        "denominator": 349,
+        "expectedValue": 46.99
+      },
+      "determinateOnlyVariant": {
+        "population": 349,
+        "numerator": 164,
+        "denominator": 248,
+        "expectedValue": 66.13
+      }
     },
     "escalationRate": {
       "canonicalId": "CANON-ESC-RATE",

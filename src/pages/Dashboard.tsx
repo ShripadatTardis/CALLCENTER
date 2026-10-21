@@ -11,7 +11,8 @@ import { getFrontendRatioDefinition } from '@/lib/ratios/ratioFrontendRegistry';
 import { formatRatioValue } from '@/components/ratios/RatioHero';
 import { useAuth, hasPermission } from '@/contexts/AuthContext';
 import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
-import { cmaMeasureUnavailableReason } from '@/types/cma';
+import { useCmaOwnedMeasure } from '@/hooks/cma/useCmaOwnedMeasure';
+import { cmaMeasureUnavailableReason, isCmaMeasureValue } from '@/types/cma';
 import { defaultDashboardCmaWindow } from '@/lib/cma/cmaWindow';
 import {
   DASHBOARD_AHT_RATIO_ID,
@@ -124,6 +125,23 @@ const CMA_BACKED_RATIO_MEASURES: Record<string, string> = {
 };
 
 /**
+ * Session 10 — the 3 Session 9 candidates, delivered through CMA as
+ * CMA_PROVISIONAL (via useCmaOwnedMeasure, which can reach them despite
+ * governed_algorithm_status staying pending_decision — see
+ * cmaOwnershipResolver.ts). Kept in a separate map from
+ * CMA_BACKED_RATIO_MEASURES above so native-vs-provisional is never
+ * conflated at this call site either. The legacy ratioService call for
+ * these 3 ratio ids is now fully replaced, not run in parallel — per
+ * this session's "no screen may keep an independent calculation for a
+ * measure CMA now owns" instruction.
+ */
+const CMA_PROVISIONAL_RATIO_MEASURES: Record<string, string> = {
+  fcr: 'CANON-FIRST-CONTACT-RES',
+  escalation_rate: 'CANON-ESC-RATE',
+  aht: 'CANON-AVG-HANDLE-TIME',
+};
+
+/**
  * One compact Performance Ratio card. For the 3 CMA-eligible ratio ids,
  * when the viewer holds `cma.evaluate`, this calls the CMA evaluation API
  * directly (`useCmaMeasure`) instead of the legacy ratio engine — no
@@ -145,15 +163,18 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
   const link = buildDashboardRatioLink(ratioId);
 
   const canonicalMeasureId = CMA_BACKED_RATIO_MEASURES[ratioId];
+  const provisionalMeasureId = CMA_PROVISIONAL_RATIO_MEASURES[ratioId];
   const useCma = Boolean(canonicalMeasureId) && hasPermission(user, 'cma.evaluate');
+  const useProvisional = Boolean(provisionalMeasureId) && hasPermission(user, 'cma.evaluate');
   const cmaWindow = useMemo(() => defaultDashboardCmaWindow(), []);
 
-  const legacy = useRatioSummary(useCma ? undefined : ratioId, {});
+  const legacy = useRatioSummary(useCma || useProvisional ? undefined : ratioId, {});
   const cma = useCmaMeasure(useCma, { canonicalMeasureId: canonicalMeasureId ?? '', window: cmaWindow, datasetId });
+  const provisional = useCmaOwnedMeasure(useProvisional, provisionalMeasureId ?? '', useProvisional ? { ...cmaWindow, datasetId } : undefined);
 
-  const isLoading = useCma ? cma.isLoading : legacy.isLoading;
-  const isError = useCma ? cma.isError : legacy.isError;
-  const refetch = useCma ? cma.refetch : legacy.refetch;
+  const isLoading = useCma ? cma.isLoading : useProvisional ? provisional.isLoading : legacy.isLoading;
+  const isError = useCma ? cma.isError : useProvisional ? provisional.isError : legacy.isError;
+  const refetch = useCma ? cma.refetch : useProvisional ? provisional.refetch : legacy.refetch;
 
   let value: string | null = null;
   let unavailableReason: string | null = null;
@@ -161,6 +182,12 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
     const result = cma.data?.groups[0]?.result;
     if (result?.kind === 'value') value = formatRatioValue(result.value, result.unit);
     else if (result) unavailableReason = cmaMeasureUnavailableReason(result);
+  } else if (useProvisional) {
+    const result = provisional.data?.value;
+    if (isCmaMeasureValue(result)) {
+      if (result.kind === 'value') value = formatRatioValue(result.value, result.unit);
+      else unavailableReason = cmaMeasureUnavailableReason(result);
+    }
   } else {
     value = legacy.data && legacy.data.value !== null ? formatRatioValue(legacy.data.value, legacy.data.unit) : null;
     unavailableReason = legacy.data?.unavailableReason ?? null;
@@ -190,8 +217,14 @@ const PerformanceRatioCard: React.FC<{ ratioId: string }> = ({ ratioId }) => {
       onClick={() => guardedNavigate(link.path, { state: link.state }, 'ratios.view', 'Ratio Explorer')}
       className="flex-1 min-w-[8.5rem] text-left px-3 py-2 hover:bg-muted/40 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:-outline-offset-2"
     >
-      <div className="text-[11px] text-muted-foreground truncate" title={useCma ? `${definition?.name ?? ratioId} — Source: Central Measures Authority` : definition?.name}>
-        {definition?.shortLabel ?? ratioId}
+      <div className="flex items-center gap-1 min-w-0">
+        <div
+          className="text-[11px] text-muted-foreground truncate"
+          title={useCma ? `${definition?.name ?? ratioId} — Source: Central Measures Authority` : useProvisional ? `${definition?.name ?? ratioId} — Source: Central Measures Authority (provisional — business definition not yet approved)` : definition?.name}
+        >
+          {definition?.shortLabel ?? ratioId}
+        </div>
+        {useProvisional && <Badge variant="warning" className="shrink-0 text-[9px] px-1 py-0 leading-tight">PROVISIONAL</Badge>}
       </div>
       {isLoading ? (
         <div className={`${typography.metricValue} text-muted-foreground`}>…</div>
@@ -211,7 +244,23 @@ const Dashboard: React.FC = () => {
   const recent = useCallData({ page_size: 5 });
   const agents = useAgents();
   const chat = useChatLogs(1);
-  const ahtSummary = useRatioSummary(DASHBOARD_AHT_RATIO_ID, {});
+  const { user: currentUser } = useAuth();
+  const { datasetId: dashboardDatasetId } = useDatasetMode();
+  const ahtUseCma = hasPermission(currentUser, 'cma.evaluate');
+  const ahtCmaWindow = useMemo(() => defaultDashboardCmaWindow(), []);
+  // Session 10 — AHT-03 (CMA_PROVISIONAL), replacing the legacy ratioService call entirely
+  // for viewers who hold cma.evaluate; everyone else keeps the exact prior legacy-sourced tile.
+  const ahtLegacy = useRatioSummary(ahtUseCma ? undefined : DASHBOARD_AHT_RATIO_ID, {});
+  const ahtProvisional = useCmaOwnedMeasure(ahtUseCma, 'CANON-AVG-HANDLE-TIME', ahtUseCma ? { ...ahtCmaWindow, datasetId: dashboardDatasetId } : undefined);
+  const ahtProvisionalResult = isCmaMeasureValue(ahtProvisional.data?.value) ? ahtProvisional.data?.value : undefined;
+  const ahtSummary = ahtUseCma
+    ? {
+        isLoading: ahtProvisional.isLoading,
+        data: ahtProvisionalResult?.kind === 'value'
+          ? { value: ahtProvisionalResult.value, unit: ahtProvisionalResult.unit, unavailableReason: null }
+          : { value: null, unit: 'seconds' as const, unavailableReason: ahtProvisionalResult ? cmaMeasureUnavailableReason(ahtProvisionalResult) : null },
+      }
+    : ahtLegacy;
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null);
   const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
 

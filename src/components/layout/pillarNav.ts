@@ -22,6 +22,7 @@ import {
   ListChecks,
   Scale,
   Wrench,
+  Gauge,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -141,6 +142,10 @@ export const PILLARS: Pillar[] = [
       { name: 'User Mgmt', href: '/user-management', icon: Users, permission: 'users.view' },
       { name: 'Role Mgmt', href: '/role-management', icon: KeyRound, permission: 'roles.view' },
       { name: 'Audit Trail', href: '/audit-trail', icon: ScrollText, permission: 'audit.view' },
+      // Session 10 — read-only ownership/governance register over all 60 canonical
+      // measures. Reuses the existing cma.evaluate permission (already granted to
+      // administrator/analyst/read_only/supervisor) rather than a new permission key.
+      { name: 'CMA Measures', href: '/cma-measures', icon: Gauge, permission: 'cma.evaluate' },
       // Settings remains a placeholder — left ungated, same reasoning as above.
       { name: 'Settings', href: '/settings', icon: Settings },
     ],

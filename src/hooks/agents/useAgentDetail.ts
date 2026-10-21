@@ -14,6 +14,8 @@ import {
 } from '@/services/agents/agentPerformanceAggregator';
 import { buildCallMetricsByInteractionId } from '@/lib/callMetricsCorrelation';
 import { useCmaMeasure } from '@/hooks/cma/useCmaMeasure';
+import { useCmaOwnedMeasure } from '@/hooks/cma/useCmaOwnedMeasure';
+import { isCmaMeasureValue } from '@/types/cma';
 import { useDatasetMode } from '@/contexts/DatasetModeContext';
 import { agentPerformanceCmaWindow } from '@/lib/cma/cmaWindow';
 import type { CmaMeasureValue } from '@/types/cma';
@@ -158,6 +160,22 @@ export function useAgentDetail(agentId: string | undefined) {
   const sentimentCma = toCmaMeasureState(sentimentCmaQuery);
   const intentConfidenceCma = toCmaMeasureState(intentConfidenceCmaQuery);
 
+  // Session 10 — FCR-03 (CMA_PROVISIONAL), replacing computeAgentCallMetrics' own
+  // fcrRate/avgAhtSeconds local derivation for any viewer who holds cma.evaluate.
+  // Same agent/window/dataset scope as the two CMA tiles above.
+  const fcrCmaQuery = useCmaOwnedMeasure(canUseCma && Boolean(agentId), 'CANON-FIRST-CONTACT-RES', canUseCma && agentId ? { from: cmaWindow.from, to: cmaWindow.to, datasetId, agent: agentId } : undefined);
+  const ahtCmaQuery = useCmaOwnedMeasure(canUseCma && Boolean(agentId), 'CANON-AVG-HANDLE-TIME', canUseCma && agentId ? { from: cmaWindow.from, to: cmaWindow.to, datasetId, agent: agentId } : undefined);
+
+  const toOwnedMeasureState = (q: typeof fcrCmaQuery): AgentCmaMeasureState => {
+    if (!canUseCma) return { kind: 'unauthorized' };
+    if (q.isLoading) return { kind: 'loading' };
+    if (q.isError) return { kind: 'error' };
+    const result = q.data?.value;
+    return isCmaMeasureValue(result) ? result : { kind: 'error' };
+  };
+  const fcrCma = toOwnedMeasureState(fcrCmaQuery);
+  const ahtCma = toOwnedMeasureState(ahtCmaQuery);
+
   return {
     agent,
     callInteractions,
@@ -169,6 +187,8 @@ export function useAgentDetail(agentId: string | undefined) {
     technicalPerformance,
     sentimentCma,
     intentConfidenceCma,
+    fcrCma,
+    ahtCma,
     cmaWindowDays: cmaWindow.days,
     isLoading: agentsQuery.isLoading || callsQuery.isLoading || chatQuery.isLoading || campaignsQuery.isLoading,
     isError: agentsQuery.isError || callsQuery.isError || chatQuery.isError || campaignsQuery.isError,

@@ -62,7 +62,7 @@ export function isAgentIdInEvaluationScope(access: EvaluationScopeAccess, agentI
  *  these. That duplication is removed; the registry is now the single
  *  authority, consistent with how it already governed the 'interaction'
  *  family. */
-const SUPPORTED_FILTER_DIMENSIONS: readonly CmaDimensionId[] = ['agent', 'channel', 'campaign'];
+export const SUPPORTED_FILTER_DIMENSIONS: readonly CmaDimensionId[] = ['agent', 'channel', 'campaign'];
 
 interface RpcGroupRow { key: string; population: number; numerator: number | null; denominator: number }
 interface RpcResult {
@@ -126,7 +126,7 @@ function terminal(
   return buildResponse(req, algorithmStatus, access, requestedFilters, {}, [{ result }], 0, 'Not calculated.', resolvedMeasureId);
 }
 
-function toValueKind(numerator: number | null, denominator: number, unit: CmaMeasureUnit): CmaMeasureValue {
+export function toValueKind(numerator: number | null, denominator: number, unit: CmaMeasureUnit): CmaMeasureValue {
   // 'count' measures (e.g. Campaign Target Count, Action Required Queue Items) are a raw
   // population size, not a ratio — a count of 0 is a real, meaningful answer ("no eligible rows
   // in this window"), never an "unavailable" state, so this unit never reports zero_denominator.
@@ -141,7 +141,7 @@ function toValueKind(numerator: number | null, denominator: number, unit: CmaMea
  *  has a different parameter signature (a chat-session-backed RPC has no p_filter_campaign_id,
  *  a campaign-backed RPC has no p_filter_channel, etc.), reflecting the real grain of its source
  *  table rather than forcing one bloated generic signature on every family. */
-function buildRpcArgs(
+export function buildRpcArgs(
   algorithm: CmaAlgorithmDefinition,
   canonicalId: string,
   req: CmaMeasureRequest,

@@ -1,5 +1,5 @@
 import { request } from '@/services/transport/httpClient';
-import type { CmaMeasureRequest, CmaMeasureResponse } from '@/types/cma';
+import type { CmaMeasureRequest, CmaMeasureResponse, CmaOwnedMeasure } from '@/types/cma';
 
 /**
  * Session CMA-4A — the one place any frontend code calls the CMA
@@ -17,6 +17,39 @@ export async function evaluateCmaMeasure(req: CmaMeasureRequest): Promise<CmaMea
     method: 'POST',
     query: { resource: 'cmaEvaluate' },
     body: req,
+  });
+  return res.data;
+}
+
+/**
+ * Session 10 — the central ownership entry point every screen/UI call
+ * site uses to ask "what does CMA deliver for this measure" (and
+ * optionally its live value). Mirrors evaluateCmaMeasure's convention;
+ * no other service/hook should build this request directly.
+ */
+export async function fetchCmaOwnedMeasure(
+  canonicalMeasureId: string,
+  live?: { from: string; to: string; datasetId?: string | null; recordId?: string; agent?: string },
+): Promise<CmaOwnedMeasure> {
+  const res = await request<{ data: CmaOwnedMeasure }>('/admin', {
+    method: 'GET',
+    query: {
+      resource: 'cmaRegistry', action: 'ownership', id: canonicalMeasureId,
+      ...(live ? {
+        from: live.from, to: live.to,
+        ...(live.datasetId ? { datasetId: live.datasetId } : {}),
+        ...(live.recordId ? { recordId: live.recordId } : {}),
+        ...(live.agent ? { agent: live.agent } : {}),
+      } : {}),
+    },
+  });
+  return res.data;
+}
+
+export async function fetchCmaOwnershipMap(): Promise<CmaOwnedMeasure[]> {
+  const res = await request<{ data: CmaOwnedMeasure[] }>('/admin', {
+    method: 'GET',
+    query: { resource: 'cmaRegistry', action: 'ownershipMap' },
   });
   return res.data;
 }

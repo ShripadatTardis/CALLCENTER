@@ -17,6 +17,10 @@ import { useAgents } from '@/hooks/agents/useAgents';
 import { ActiveFilterChips } from '@/components/common/ActiveFilterChips';
 import { FilterPopover } from '@/components/common/FilterPopover';
 import { MetricStrip } from '@/components/common/MetricStrip';
+import { useAuth, hasPermission } from '@/contexts/AuthContext';
+import { useCmaOwnedMeasure } from '@/hooks/cma/useCmaOwnedMeasure';
+import { isCmaMeasureValue } from '@/types/cma';
+import { qaExplorerCmaWindow } from '@/lib/cma/cmaWindow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { typography } from '@/lib/typography';
@@ -102,6 +106,20 @@ const CallLogs: React.FC = () => {
   });
   const { data: agentsData } = useAgents();
   const agentRoster = agentsData?.agents ?? [];
+
+  // Session 10 — FCR-03/ESC-03/AHT-03 (CMA_PROVISIONAL) and
+  // CANON-AVG-INTENT-ACC (CMA_LEGACY_ADAPTER) now source this strip for
+  // any viewer who holds cma.evaluate, replacing the local re-derivation
+  // / opaque passthrough in api/calls/data.ts entirely (never run in
+  // parallel with it). Window matches the page's own date filters —
+  // reuses the same helper Human QA Quality Explorer already uses.
+  const { user: callLogsUser } = useAuth();
+  const canUseCma = hasPermission(callLogsUser, 'cma.evaluate');
+  const cmaWindow = useMemo(() => qaExplorerCmaWindow(filters.date_from ?? '', filters.date_to ?? ''), [filters.date_from, filters.date_to]);
+  const cmaFcr = useCmaOwnedMeasure(canUseCma, 'CANON-FIRST-CONTACT-RES', canUseCma ? { ...cmaWindow, datasetId } : undefined);
+  const cmaEsc = useCmaOwnedMeasure(canUseCma, 'CANON-ESC-RATE', canUseCma ? { ...cmaWindow, datasetId } : undefined);
+  const cmaAht = useCmaOwnedMeasure(canUseCma, 'CANON-AVG-HANDLE-TIME', canUseCma ? { ...cmaWindow, datasetId } : undefined);
+  const cmaIntentAcc = useCmaOwnedMeasure(canUseCma, 'CANON-AVG-INTENT-ACC', canUseCma ? { ...cmaWindow, datasetId } : undefined);
 
   const allInteractions = useMemo(() => data?.interactions ?? [], [data]);
 
@@ -207,10 +225,31 @@ const CallLogs: React.FC = () => {
           <div className="flex-shrink-0">
             <MetricStrip
               items={[
-                { label: 'FCR', value: formatPercent(summary.fcr_rate), hint: `${summary.resolved_count} of ${summary.total_calls} resolved` },
-                { label: 'Avg handle time', value: formatDurationLong(summary.avg_aht_seconds), hint: formatDurationExact(summary.avg_aht_seconds) },
-                { label: 'Intent accuracy', value: formatPercent(summary.avg_intent_accuracy) },
-                { label: 'Escalation rate', value: formatPercent(summary.escalation_rate), hint: `${summary.escalated_count} escalated`, tone: summary.escalation_rate && summary.escalation_rate > 20 ? 'warning' : 'default' },
+                (() => {
+                  const r = isCmaMeasureValue(cmaFcr.data?.value) ? cmaFcr.data?.value : undefined;
+                  return canUseCma
+                    ? { label: 'FCR', value: r?.kind === 'value' ? formatPercent(r.value) : '—', hint: 'Source: CMA (provisional — business definition not yet approved)' }
+                    : { label: 'FCR', value: formatPercent(summary.fcr_rate), hint: `${summary.resolved_count} of ${summary.total_calls} resolved` };
+                })(),
+                (() => {
+                  const r = isCmaMeasureValue(cmaAht.data?.value) ? cmaAht.data?.value : undefined;
+                  return canUseCma
+                    ? { label: 'Avg handle time', value: r?.kind === 'value' ? formatDurationLong(r.value) : '—', hint: 'Source: CMA (provisional — business definition not yet approved)' }
+                    : { label: 'Avg handle time', value: formatDurationLong(summary.avg_aht_seconds), hint: formatDurationExact(summary.avg_aht_seconds) };
+                })(),
+                (() => {
+                  const r = isCmaMeasureValue(cmaIntentAcc.data?.value) ? cmaIntentAcc.data?.value : undefined;
+                  return canUseCma
+                    ? { label: 'Intent accuracy', value: r?.kind === 'value' ? formatPercent(r.value) : '—', hint: 'Source: CMA legacy adapter — upstream VoiceForce API field' }
+                    : { label: 'Intent accuracy', value: formatPercent(summary.avg_intent_accuracy) };
+                })(),
+                (() => {
+                  const r = isCmaMeasureValue(cmaEsc.data?.value) ? cmaEsc.data?.value : undefined;
+                  const value = r?.kind === 'value' ? r.value : null;
+                  return canUseCma
+                    ? { label: 'Escalation rate', value: value !== null ? formatPercent(value) : '—', hint: 'Source: CMA (provisional — business definition not yet approved)', tone: value !== null && value > 20 ? 'warning' as const : 'default' as const }
+                    : { label: 'Escalation rate', value: formatPercent(summary.escalation_rate), hint: `${summary.escalated_count} escalated`, tone: summary.escalation_rate && summary.escalation_rate > 20 ? 'warning' as const : 'default' as const };
+                })(),
               ]}
             />
           </div>

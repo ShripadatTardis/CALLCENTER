@@ -12,6 +12,8 @@ import {
 } from '../src/server/cma/cmaRegistry.js';
 import { evaluateCmaMeasure } from '../src/server/cma/cmaEvaluation.js';
 import type { CmaDimensionId, CmaQaPopulation } from '../src/server/cma/cmaEvaluationTypes.js';
+import { resolveCmaMeasure, listAllCmaOwnedMeasures } from '../src/server/cma/cmaOwnershipResolver.js';
+import { CMA_CONSUMING_SCREENS } from '../src/server/cma/cmaOwnershipRegistry.js';
 import crypto from 'node:crypto';
 
 const AUTOMATED_QA_CONTRACT_VERSION = 'v1';
@@ -1683,6 +1685,9 @@ async function handleCmaSyncPost(req: VercelRequest, res: VercelResponse): Promi
  *   GET /api/admin?resource=cmaRegistry&action=measureBaseFacts&id=FCR-03
  *   GET /api/admin?resource=cmaRegistry&action=charts
  *   GET /api/admin?resource=cmaRegistry&action=status (default)
+ *   GET /api/admin?resource=cmaRegistry&action=ownershipMap                           -- Session 10, static-only, all 60
+ *   GET /api/admin?resource=cmaRegistry&action=ownership&id=CANON-...                 -- Session 10, static-only
+ *   GET /api/admin?resource=cmaRegistry&action=ownership&id=CANON-...&from=&to=       -- Session 10, live evaluation (requires cma.evaluate)
  */
 async function handleCmaRegistryGet(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await requirePermission(req, res, 'cma.registry.view');
@@ -1715,7 +1720,53 @@ async function handleCmaRegistryGet(req: VercelRequest, res: VercelResponse): Pr
     }
     if (action === 'charts') { res.status(200).json({ data: await listChartVisualizations(supabase) }); return; }
     if (action === 'status') { res.status(200).json({ data: await getGovernanceStatus(supabase) }); return; }
-    res.status(400).json({ detail: `Unknown ?action= — use canonicalMeasures, canonicalMeasure, occurrences, measure, dimensions, measureBaseFacts, charts, or status` });
+    if (action === 'ownership') {
+      // Session 10 — single-measure ownership + optional live evaluation ("evaluate now" in
+      // the CMA Measures detail view). The live branch requires cma.evaluate specifically
+      // (a stricter bar than this route's own cma.registry.view gate) since it runs a real
+      // calculation, not just a definitions lookup — matches cmaEvaluate's own permission.
+      if (!id) { res.status(422).json({ detail: 'id is required' }); return; }
+      const access = toAgentAccess(user);
+      const categoryAccess = toCustomerAccess(user);
+      const windowFrom = queryStr(req, 'from');
+      const windowTo = queryStr(req, 'to');
+      const wantsLive = Boolean(windowFrom && windowTo);
+      if (wantsLive && !user.permissions.includes('cma.evaluate')) {
+        res.status(403).json({ detail: 'cma.evaluate permission is required to run a live evaluation.' });
+        return;
+      }
+      const filterAgent = queryStr(req, 'agent');
+      const data = await resolveCmaMeasure(
+        supabase, id,
+        { allCategories: access.allCategories, authorizedAgentIds: access.authorizedAgentIds },
+        { allCategories: categoryAccess.allCategories, authorizedAgentIds: categoryAccess.authorizedAgentIds },
+        wantsLive ? {
+          window: { from: windowFrom as string, to: windowTo as string },
+          datasetId: queryStr(req, 'datasetId') ?? null,
+          recordId: queryStr(req, 'recordId'),
+          filters: filterAgent ? { agent: filterAgent } : undefined,
+        } : undefined,
+        CMA_CONSUMING_SCREENS[id] ?? [],
+      );
+      res.status(200).json({ data });
+      return;
+    }
+    if (action === 'ownershipMap') {
+      // Session 10 — static-only (no live evaluation) ownership view of all 60 canonical
+      // measures, cheap enough for a single page load. Gated the same as the rest of this
+      // route (cma.registry.view) — no live calculation happens here.
+      const access = toAgentAccess(user);
+      const categoryAccess = toCustomerAccess(user);
+      const data = await listAllCmaOwnedMeasures(
+        supabase,
+        { allCategories: access.allCategories, authorizedAgentIds: access.authorizedAgentIds },
+        { allCategories: categoryAccess.allCategories, authorizedAgentIds: categoryAccess.authorizedAgentIds },
+        CMA_CONSUMING_SCREENS,
+      );
+      res.status(200).json({ data });
+      return;
+    }
+    res.status(400).json({ detail: `Unknown ?action= — use canonicalMeasures, canonicalMeasure, occurrences, measure, dimensions, measureBaseFacts, charts, status, or ownershipMap` });
   } catch (err) {
     res.status(500).json({ detail: err instanceof Error ? err.message : 'cmaRegistry lookup failed' });
   }

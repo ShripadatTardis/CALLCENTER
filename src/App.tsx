@@ -35,6 +35,7 @@ import Reports from "./pages/Reports";
 import UserManagement from "./pages/UserManagement";
 import RoleManagement from "./pages/RoleManagement";
 import AuditTrail from "./pages/AuditTrail";
+import CmaMeasures from "./pages/CmaMeasures";
 import ActionRequired from "./pages/ActionRequired";
 import CorrectiveActions from "./pages/CorrectiveActions";
 import Settings from "./pages/Settings";
@@ -89,6 +90,7 @@ const App = () => (
           <Route path="/user-management" element={<ProtectedRoute permission="users.view"><UserManagement /></ProtectedRoute>} />
           <Route path="/role-management" element={<ProtectedRoute permission="roles.view"><RoleManagement /></ProtectedRoute>} />
           <Route path="/audit-trail" element={<ProtectedRoute permission="audit.view"><AuditTrail /></ProtectedRoute>} />
+          <Route path="/cma-measures" element={<ProtectedRoute permission="cma.evaluate"><CmaMeasures /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
         </Routes>
